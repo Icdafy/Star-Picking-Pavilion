@@ -7,8 +7,10 @@ const {
   ALL_CATEGORY,
   LINKS,
   STORAGE_KEY,
+  LEGACY_STORAGE_KEYS,
   getCategories,
   getDefaultFavoriteIds,
+  isValidFavoriteStorage,
   parseFavoriteIds,
   filterAndSortLinks
 } = require('../renderer/common-links');
@@ -65,7 +67,16 @@ test('空数组有效且未知或重复 ID 被清洗', () => {
     [...parseFavoriteIds(JSON.stringify(['travel-memo', 'missing', 'travel-memo']))],
     ['travel-memo']
   );
-  assert.equal(STORAGE_KEY, 'zxg-common-links-favorites');
+  assert.equal(STORAGE_KEY, 'star-picking-pavilion.common-links.favorites');
+  assert.deepEqual(LEGACY_STORAGE_KEYS, ['zxg-common-links-favorites']);
+});
+
+test('仅 JSON 数组可作为旧星标存储迁移源', () => {
+  assert.equal(isValidFavoriteStorage('[]'), true);
+  assert.equal(isValidFavoriteStorage('["work-plan"]'), true);
+  assert.equal(isValidFavoriteStorage('{"id":"work-plan"}'), false);
+  assert.equal(isValidFavoriteStorage('{bad json'), false);
+  assert.equal(isValidFavoriteStorage(null), false);
 });
 
 test('按分类筛选后星标优先且每组保持原始顺序', () => {

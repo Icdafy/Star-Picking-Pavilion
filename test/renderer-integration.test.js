@@ -46,6 +46,13 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
   assert.match(app, /class="common-links-open"[^>]*target="_blank"[^>]*rel="noopener"/);
 });
 
+test('应用使用规范存储键并只迁移有效的旧星标数组', () => {
+  assert.match(app, /StarPickingPavilionBootstrap/);
+  assert.match(app, /starPickingPavilion\s*\|\|\s*window\.windcatcher/);
+  assert.match(app, /migrateStorage\(localStorage,\s*CommonLinks\.STORAGE_KEY,\s*CommonLinks\.LEGACY_STORAGE_KEYS,\s*CommonLinks\.isValidFavoriteStorage\)/);
+  assert.doesNotMatch(app, /localStorage\.setItem\(['"]wc-(?:theme|realtime)/);
+});
+
 test('常用网址重渲染后将键盘焦点恢复到同一控制项', () => {
   assert.match(app, /const DomUtils = window\.DomUtils;/);
   assert.match(app, /data-focus-key="category:\$\{esc\(category\)\}"/);

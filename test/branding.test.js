@@ -8,36 +8,59 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const pkg = JSON.parse(read('package.json'));
-const brandedFiles = [
-  'package.json',
-  'renderer/index.html',
-  'renderer/app.js',
-  'renderer/styles.css',
-  'electron/main.js',
-  'server/index.js',
-  'server/ai/pipeline.js',
-  'build/make-icon.py',
-  'README.md'
-];
 
-test('所有用户可见和内容身份统一为摘星阁', () => {
-  for (const file of brandedFiles) {
-    assert.doesNotMatch(read(file), /捕风司/, `${file} 仍含旧品牌`);
-  }
-  assert.match(read('renderer/index.html'), /<h1>摘星阁<\/h1>/);
-  assert.equal(pkg.productName, '摘星阁');
-  assert.equal(pkg.build.productName, '摘星阁');
-  assert.equal(pkg.build.nsis.shortcutName, '摘星阁');
-  assert.match(pkg.description, /^摘星阁/);
-  assert.equal(pkg.author, '摘星阁');
+test('canonical brand config is the single explicit identity map', () => {
+  const brand = JSON.parse(read('config/brand.json'));
+
+  assert.deepEqual({
+    displayName: brand.displayName,
+    englishName: brand.englishName,
+    packageName: brand.packageName,
+    appId: brand.appId,
+    executableName: brand.executableName,
+    databaseName: brand.databaseName,
+    envPrefix: brand.envPrefix
+  }, {
+    displayName: '摘星阁',
+    englishName: 'Star-Picking-Pavilion',
+    packageName: 'star-picking-pavilion',
+    appId: 'com.icdafy.star-picking-pavilion',
+    executableName: 'Star-Picking-Pavilion',
+    databaseName: 'star-picking-pavilion.db',
+    envPrefix: 'STAR_PICKING_PAVILION_'
+  });
+  assert.deepEqual(brand.storage, {
+    theme: 'star-picking-pavilion.theme',
+    realtime: 'star-picking-pavilion.realtime',
+    commonLinksFavorites: 'star-picking-pavilion.common-links.favorites'
+  });
+  assert.deepEqual(brand.legacyCompatibility.storage, {
+    theme: ['wc-theme'],
+    realtime: ['wc-realtime'],
+    commonLinksFavorites: ['zxg-common-links-favorites']
+  });
 });
 
-test('内部兼容标识保持不变', () => {
-  assert.equal(pkg.name, 'windcatcher');
-  assert.equal(pkg.build.appId, 'com.windcatcher.app');
-  assert.equal(pkg.build.win.artifactName, 'Windcatcher-Setup-${version}.${ext}');
-  assert.match(read('server/db.js'), /windcatcher\.db/);
-  assert.match(read('electron/preload.js'), /windcatcher/);
+test('package and installer metadata use the v0.0.1 canonical identity', () => {
+  assert.equal(pkg.name, 'star-picking-pavilion');
+  assert.equal(pkg.version, '0.0.1');
+  assert.match(pkg.description, /摘星阁/);
+  assert.match(pkg.description, /Star-Picking-Pavilion/);
+  assert.equal(pkg.homepage, 'https://github.com/Icdafy/Star-Picking-Pavilion');
+  assert.equal(pkg.repository.url, 'https://github.com/Icdafy/Star-Picking-Pavilion.git');
+  assert.equal(pkg.build.appId, 'com.icdafy.star-picking-pavilion');
+  assert.equal(pkg.build.productName, '摘星阁');
+  assert.equal(pkg.build.executableName, 'Star-Picking-Pavilion');
+  assert.equal(pkg.build.win.artifactName, 'Star-Picking-Pavilion-Setup-${version}.${ext}');
+  assert.equal(pkg.build.nsis.guid, '5fea1cfe-e72e-5af6-9770-01a551e1f773');
+  assert.equal(pkg.build.nsis.shortcutName, '摘星阁');
+  assert.equal(pkg.build.nsis.uninstallDisplayName, '摘星阁');
+  assert.equal(pkg.build.nsis.deleteAppDataOnUninstall, false);
+  assert.deepEqual(pkg.build.publish, [{
+    provider: 'github',
+    owner: 'Icdafy',
+    repo: 'Star-Picking-Pavilion'
+  }]);
 });
 
 test('云幄名称在常用网址功能中保持不变', () => {

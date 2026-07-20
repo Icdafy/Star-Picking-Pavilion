@@ -1,14 +1,14 @@
 {
-  "name": "windcatcher",
+  "name": "star-picking-pavilion",
   "productName": "摘星阁",
-  "version": "0.1.0",
-  "description": "摘星阁 · 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
+  "version": "0.0.1",
+  "description": "摘星阁（Star-Picking-Pavilion）· 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
   "author": "摘星阁",
   "license": "MIT",
-  "homepage": "https://github.com/Icdafy/Windcather",
+  "homepage": "https://github.com/Icdafy/Star-Picking-Pavilion",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Icdafy/Windcather.git"
+    "url": "https://github.com/Icdafy/Star-Picking-Pavilion.git"
   },
   "main": "electron/main.js",
   "scripts": {
@@ -32,8 +32,9 @@
     "electron-builder": "^26.15.2"
   },
   "build": {
-    "appId": "com.windcatcher.app",
+    "appId": "com.icdafy.star-picking-pavilion",
     "productName": "摘星阁",
+    "executableName": "Star-Picking-Pavilion",
     "copyright": "Copyright © 2026 摘星阁",
     "directories": {
       "output": "dist",
@@ -62,7 +63,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Windcatcher-Setup-${version}.${ext}"
+      "artifactName": "Star-Picking-Pavilion-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -71,6 +72,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "摘星阁",
+      "uninstallDisplayName": "摘星阁",
+      "guid": "5fea1cfe-e72e-5af6-9770-01a551e1f773",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
@@ -79,7 +82,7 @@
       {
         "provider": "github",
         "owner": "Icdafy",
-        "repo": "Windcather"
+        "repo": "Star-Picking-Pavilion"
       }
     ]
   }

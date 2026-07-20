@@ -6,7 +6,8 @@
   if (root) root.CommonLinks = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createCommonLinks() {
   const ALL_CATEGORY = '全部';
-  const STORAGE_KEY = 'zxg-common-links-favorites';
+  const STORAGE_KEY = 'star-picking-pavilion.common-links.favorites';
+  const LEGACY_STORAGE_KEYS = Object.freeze(['zxg-common-links-favorites']);
   const rawLinks = [
     {
       id: 'key-work-progress',
@@ -148,6 +149,15 @@
     return new Set(links.filter(item => item.pinned).map(item => item.id));
   }
 
+  function isValidFavoriteStorage(serialized) {
+    if (serialized == null) return false;
+    try {
+      return Array.isArray(JSON.parse(serialized));
+    } catch {
+      return false;
+    }
+  }
+
   function parseFavoriteIds(serialized, links = LINKS) {
     const fallback = () => getDefaultFavoriteIds(links);
     if (serialized == null) return fallback();
@@ -171,9 +181,11 @@
   return Object.freeze({
     ALL_CATEGORY,
     STORAGE_KEY,
+    LEGACY_STORAGE_KEYS,
     LINKS,
     getCategories,
     getDefaultFavoriteIds,
+    isValidFavoriteStorage,
     parseFavoriteIds,
     filterAndSortLinks
   });

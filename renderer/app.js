@@ -7,9 +7,25 @@ const $$ = s => [...document.querySelectorAll(s)];
 const API = '';
 const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
+const Bootstrap = window.StarPickingPavilionBootstrap;
+const Desktop = window.starPickingPavilion || window.windcatcher;
+
+Bootstrap.migrateStorage(
+  localStorage,
+  Bootstrap.STORAGE_KEYS.theme,
+  Bootstrap.LEGACY_STORAGE_KEYS.theme,
+  value => value === 'dark' || value === 'light'
+);
+Bootstrap.migrateStorage(
+  localStorage,
+  Bootstrap.STORAGE_KEYS.realtime,
+  Bootstrap.LEGACY_STORAGE_KEYS.realtime,
+  value => value === 'on' || value === 'off'
+);
 
 function loadCommonLinkFavorites() {
   try {
+    Bootstrap.migrateStorage(localStorage, CommonLinks.STORAGE_KEY, CommonLinks.LEGACY_STORAGE_KEYS, CommonLinks.isValidFavoriteStorage);
     return CommonLinks.parseFavoriteIds(localStorage.getItem(CommonLinks.STORAGE_KEY));
   } catch {
     return CommonLinks.getDefaultFavoriteIds();
@@ -28,7 +44,7 @@ const state = {
   loading: false,
   dailyDate: null,
   dailyDates: [],
-  realtime: localStorage.getItem('wc-realtime') !== 'off',  // 实时开关，默认开
+  realtime: localStorage.getItem(Bootstrap.STORAGE_KEYS.realtime) !== 'off',  // 实时开关，默认开
   knownIds: new Set(),  // 当前 feed 已显示的文章 id
   freshIds: new Set()   // 下次渲染要高亮的新 id
 };
@@ -39,7 +55,7 @@ function applyTheme(theme) {
   document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', theme === 'dark' ? '#04060e' : '#f6f4ee');
-  localStorage.setItem('wc-theme', theme);
+  localStorage.setItem(Bootstrap.STORAGE_KEYS.theme, theme);
 }
 $('#btnTheme').addEventListener('click', () => {
   const cur = document.documentElement.dataset.theme;
@@ -654,7 +670,7 @@ $('#btnRefresh').addEventListener('click', async function () {
 // ---------- 实时更新 ----------
 function setRealtime(on) {
   state.realtime = on;
-  localStorage.setItem('wc-realtime', on ? 'on' : 'off');
+  localStorage.setItem(Bootstrap.STORAGE_KEYS.realtime, on ? 'on' : 'off');
   const btn = $('#btnRealtime');
   btn.classList.toggle('active', on);
   btn.setAttribute('aria-pressed', String(on));
@@ -710,17 +726,17 @@ async function pollRealtime() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pollRealtime(); });
 
 // ---------- 自动更新提示（仅桌面壳内生效）----------
-if (window.windcatcher && window.windcatcher.onUpdateStatus) {
+if (Desktop && Desktop.onUpdateStatus) {
   const pill = $('#updatePill');
   let updState = 'idle';
-  window.windcatcher.onUpdateStatus(({ status, version, percent }) => {
+  Desktop.onUpdateStatus(({ status, version, percent }) => {
     updState = status;
     if (status === 'available') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `发现新版本 ${version}…`; }
     else if (status === 'downloading') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `下载更新 ${percent}%`; }
     else if (status === 'downloaded') { pill.hidden = false; pill.classList.add('ready'); pill.textContent = `▲ 重启安装 ${version}`; }
     // error 静默，不打扰用户
   });
-  pill.addEventListener('click', () => { if (updState === 'downloaded') window.windcatcher.installUpdate(); });
+  pill.addEventListener('click', () => { if (updState === 'downloaded') Desktop.installUpdate(); });
 }
 
 // ---------- 启动 ----------

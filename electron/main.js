@@ -94,6 +94,7 @@ function setupAutoUpdate() {
 
 // 渲染层点击「重启更新」
 ipcMain.handle('update:install', () => { try { autoUpdater && autoUpdater.quitAndInstall(); } catch {} });
+ipcMain.on('app:get-version', event => { event.returnValue = app.getVersion(); });
 
 app.whenReady().then(() => {
   startServer();

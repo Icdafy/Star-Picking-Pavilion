@@ -1,0 +1,26 @@
+{
+  "displayName": "摘星阁",
+  "englishName": "Star-Picking-Pavilion",
+  "packageName": "star-picking-pavilion",
+  "appId": "com.icdafy.star-picking-pavilion",
+  "executableName": "Star-Picking-Pavilion",
+  "databaseName": "star-picking-pavilion.db",
+  "envPrefix": "STAR_PICKING_PAVILION_",
+  "storage": {
+    "theme": "star-picking-pavilion.theme",
+    "realtime": "star-picking-pavilion.realtime",
+    "commonLinksFavorites": "star-picking-pavilion.common-links.favorites"
+  },
+  "legacyCompatibility": {
+    "packageName": "windcatcher",
+    "appId": "com.windcatcher.app",
+    "databaseName": "windcatcher.db",
+    "envPrefix": "WINDCATCHER_",
+    "desktopApiGlobal": "windcatcher",
+    "storage": {
+      "theme": ["wc-theme"],
+      "realtime": ["wc-realtime"],
+      "commonLinksFavorites": ["zxg-common-links-favorites"]
+    }
+  }
+}
