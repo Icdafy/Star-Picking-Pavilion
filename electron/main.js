@@ -18,9 +18,19 @@ let autoUpdateTimer = null;
 let backendReady = false;
 let quitAfterShutdown = false;
 let desktopShutdownPromise = null;
+const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
+  ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
+  : null;
 
-if (app.isPackaged) {
+if (testDataDir) {
+  app.setPath('userData', testDataDir);
+} else if (app.isPackaged) {
   app.setPath('userData', path.join(app.getPath('appData'), '摘星阁'));
+}
+
+function getDataDir() {
+  if (testDataDir) return testDataDir;
+  return app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -37,7 +47,7 @@ function reportUnexpectedServerExit({ code, signal }) {
 function startServer({ initialApiKey, credentialStore }) {
   const serverEntry = path.join(__dirname, '..', 'server', 'index.js');
   // 打包后数据写入 userData（可写、可保留）；开发期沿用项目内 ./data
-  const dataDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
+  const dataDir = getDataDir();
   const apiToken = crypto.randomBytes(32).toString('base64url');
   const serverNonce = crypto.randomBytes(32).toString('base64url');
   serverProc = utilityProcess.fork(serverEntry, [], {
@@ -231,12 +241,12 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   installPermissionPolicy();
   setupAutoUpdate();
   await migrateUserData({
-    isPackaged: app.isPackaged,
+    isPackaged: testDataDir ? false : app.isPackaged,
     appDataDir: app.getPath('appData'),
-    repoDataDir: path.join(__dirname, '..', 'data'),
+    repoDataDir: getDataDir(),
     chooseSource: chooseLegacyDatabase
   });
-  const dataDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
+  const dataDir = getDataDir();
   const credentialStore = createCredentialStore({ safeStorage, directory: dataDir });
   await credentialStore.migratePlaintextSettings(path.join(dataDir, 'settings.json'));
   const initialApiKey = await credentialStore.get();
