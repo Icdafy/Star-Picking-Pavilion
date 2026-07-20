@@ -5,12 +5,23 @@
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const API = '';
+const CommonLinks = window.CommonLinks;
+
+function loadCommonLinkFavorites() {
+  try {
+    return CommonLinks.parseFavoriteIds(localStorage.getItem(CommonLinks.STORAGE_KEY));
+  } catch {
+    return CommonLinks.getDefaultFavoriteIds();
+  }
+}
 
 // ---------- 状态 ----------
 const state = {
-  view: 'featured',     // featured | hot | all | daily | sources | settings
+  view: 'featured',     // featured | hot | all | daily | links | sources | settings
   domain: '',
   category: '',
+  linksCategory: CommonLinks.ALL_CATEGORY,
+  commonLinksFavorites: loadCommonLinkFavorites(),
   q: '',
   page: 0,
   loading: false,
@@ -488,6 +499,67 @@ $('#btnFeedback').addEventListener('click', async () => {
   toast('反馈已记录');
 });
 
+// ---------- 云幄 · 常用网址 ----------
+function persistCommonLinkFavorites() {
+  try {
+    localStorage.setItem(
+      CommonLinks.STORAGE_KEY,
+      JSON.stringify([...state.commonLinksFavorites])
+    );
+  } catch { /* 存储不可用时保留当前会话内状态 */ }
+}
+
+function renderCommonLinks() {
+  const categories = CommonLinks.getCategories();
+  $('#commonLinksCategories').innerHTML = categories.map(category => `
+    <button class="common-links-category${category === state.linksCategory ? ' is-active' : ''}"
+      data-links-category="${esc(category)}" type="button"
+      aria-pressed="${category === state.linksCategory}">${esc(category)}</button>
+  `).join('');
+
+  const items = CommonLinks.filterAndSortLinks({
+    category: state.linksCategory,
+    favoriteIds: state.commonLinksFavorites
+  });
+  $('#commonLinksCount').textContent = String(items.length);
+  $('#commonLinksGrid').innerHTML = items.map((item, index) => `
+    <article class="common-links-card glass" style="animation-delay:${Math.min(index * 28, 280)}ms">
+      <div class="common-links-card-head">
+        <div>
+          <span class="common-links-label">${esc(item.category)}</span>
+          <h3>${esc(item.name)}</h3>
+        </div>
+        <button class="common-links-favorite${item.isFavorite ? ' is-active' : ''}"
+          data-link-favorite="${esc(item.id)}" type="button"
+          aria-pressed="${item.isFavorite}" title="${item.isFavorite ? '取消常用' : '设为常用'}">
+          <span aria-hidden="true">${item.isFavorite ? '★' : '☆'}</span>
+          ${item.isFavorite ? '已常用' : '设为常用'}
+        </button>
+      </div>
+      <p>${esc(item.description)}</p>
+      <div class="common-links-tags">${item.tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
+      <a class="common-links-open" href="${esc(item.url)}" target="_blank" rel="noopener">打开 <span aria-hidden="true">↗</span></a>
+    </article>
+  `).join('');
+}
+
+$('#commonLinksCategories').addEventListener('click', event => {
+  const button = event.target.closest('button[data-links-category]');
+  if (!button) return;
+  state.linksCategory = button.dataset.linksCategory;
+  renderCommonLinks();
+});
+
+$('#commonLinksGrid').addEventListener('click', event => {
+  const button = event.target.closest('button[data-link-favorite]');
+  if (!button) return;
+  const id = button.dataset.linkFavorite;
+  if (state.commonLinksFavorites.has(id)) state.commonLinksFavorites.delete(id);
+  else state.commonLinksFavorites.add(id);
+  persistCommonLinkFavorites();
+  renderCommonLinks();
+});
+
 // ---------- 视图切换 ----------
 function switchView(view) {
   state.view = view;
@@ -505,11 +577,13 @@ function switchView(view) {
   }
   $('#viewFeed').hidden = !isFeed;
   $('#viewDaily').hidden = view !== 'daily';
+  $('#viewLinks').hidden = view !== 'links';
   $('#viewSources').hidden = view !== 'sources';
   $('#viewSettings').hidden = view !== 'settings';
   $('#feedFilters').style.display = isFeed ? '' : 'none';
   if (isFeed) { loadFeed(); loadHotRail(); }
   else if (view === 'daily') loadDaily(state.dailyDate);
+  else if (view === 'links') renderCommonLinks();
   else if (view === 'sources') loadSources();
   else if (view === 'settings') loadSettings();
   refreshStats();

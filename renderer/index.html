@@ -84,6 +84,7 @@
     <button class="tab" data-view="hot" role="tab" aria-selected="false">热点</button>
     <button class="tab" data-view="all" role="tab" aria-selected="false">全部动态</button>
     <button class="tab" data-view="daily" role="tab" aria-selected="false">情报日报</button>
+    <button class="tab" data-view="links" role="tab" aria-selected="false">常用网址</button>
     <button class="tab" data-view="sources" role="tab" aria-selected="false">信源</button>
     <button class="tab" data-view="settings" role="tab" aria-selected="false">设置</button>
   </div>
@@ -132,6 +133,24 @@
       <button class="btn-ghost" id="dailyRegen">重新生成</button>
     </div>
     <div id="dailyBody"></div>
+  </section>
+
+  <section id="viewLinks" class="view" hidden>
+    <header class="common-links-head glass">
+      <div>
+        <p class="common-links-kicker">云幄 · 常用网址</p>
+        <h2 class="view-title">让常用系统安静、有序、即刻可达</h2>
+        <p>统一收纳督办计划、项目投资、财税办公、综合办公、合同印鉴与 AI 工具入口。</p>
+      </div>
+      <div class="common-links-summary" aria-label="网址数量">
+        <strong id="commonLinksCount">14</strong>
+        <span>个常用入口</span>
+      </div>
+    </header>
+    <div class="common-links-toolbar glass" aria-label="网址分类">
+      <div id="commonLinksCategories" class="common-links-categories" role="group" aria-label="网址分类"></div>
+    </div>
+    <div id="commonLinksGrid" class="common-links-grid" aria-live="polite"></div>
   </section>
 
   <section id="viewSources" class="view" hidden>
@@ -224,6 +243,7 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="common-links.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

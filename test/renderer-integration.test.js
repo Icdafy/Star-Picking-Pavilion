@@ -1,0 +1,35 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8');
+
+test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
+  assert.match(html, /data-view="links"[^>]*>常用网址<\/button>/);
+  assert.match(html, /id="viewLinks"[^>]*class="view"[^>]*hidden/);
+  assert.match(html, /云幄\s*·\s*常用网址/);
+  assert.match(html, /id="commonLinksCategories"/);
+  assert.match(html, /id="commonLinksGrid"/);
+});
+
+test('领域模块在应用脚本之前加载', () => {
+  const moduleIndex = html.indexOf('<script src="common-links.js"></script>');
+  const appIndex = html.indexOf('<script src="app.js"></script>');
+  assert.ok(moduleIndex >= 0);
+  assert.ok(appIndex > moduleIndex);
+});
+
+test('视图切换、分类、星标和持久化均接入 app.js', () => {
+  assert.match(app, /view:\s*'featured'.*links/s);
+  assert.match(app, /#viewLinks/);
+  assert.match(app, /renderCommonLinks/);
+  assert.match(app, /commonLinksCategories/);
+  assert.match(app, /commonLinksGrid/);
+  assert.match(app, /CommonLinks\.STORAGE_KEY/);
+  assert.match(app, /localStorage\.setItem/);
+});
