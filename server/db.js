@@ -5,11 +5,20 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 // 数据目录：打包后由 Electron 主进程注入 userData 路径（可写）；开发/直跑回退到 ../data
-const DATA_DIR = process.env.WINDCATCHER_DATA_DIR || path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.STAR_PICKING_PAVILION_DATA_DIR
+  || process.env.WINDCATCHER_DATA_DIR
+  || path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new DatabaseSync(path.join(DATA_DIR, 'windcatcher.db'));
+const db = new DatabaseSync(path.join(DATA_DIR, 'star-picking-pavilion.db'));
+db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA journal_mode = WAL');
+
+const integrity = db.prepare('PRAGMA quick_check').get();
+if (integrity.quick_check !== 'ok') {
+  db.close();
+  throw new Error(`数据库完整性检查失败: ${integrity.quick_check}`);
+}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS sources (
@@ -118,4 +127,11 @@ function updateArticleFts(id, title, summary) {
     .run(id, title, summary || '');
 }
 
-module.exports = { db, now, insertArticle, updateArticleFts, DATA_DIR };
+let databaseClosed = false;
+function closeDatabase() {
+  if (databaseClosed) return;
+  databaseClosed = true;
+  db.close();
+}
+
+module.exports = { db, now, insertArticle, updateArticleFts, closeDatabase, DATA_DIR };

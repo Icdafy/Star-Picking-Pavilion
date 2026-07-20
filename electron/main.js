@@ -1,8 +1,9 @@
 'use strict';
 // Electron 主进程 —— 用内置 Node（utilityProcess）跑后端子进程，无需用户另装 Node；加载本地页面
-const { app, BrowserWindow, shell, utilityProcess, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, utilityProcess, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const http = require('node:http');
+const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -10,12 +11,21 @@ const PORT = Number(process.env.WINDCATCHER_PORT || 7644);
 let serverProc = null;
 let win = null;
 
+if (app.isPackaged) {
+  app.setPath('userData', path.join(app.getPath('appData'), '摘星阁'));
+}
+
 function startServer() {
   const serverEntry = path.join(__dirname, '..', 'server', 'index.js');
   // 打包后数据写入 userData（可写、可保留）；开发期沿用项目内 ./data
   const dataDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
   serverProc = utilityProcess.fork(serverEntry, [], {
-    env: { ...process.env, WINDCATCHER_PORT: String(PORT), WINDCATCHER_DATA_DIR: dataDir },
+    env: {
+      ...process.env,
+      WINDCATCHER_PORT: String(PORT),
+      STAR_PICKING_PAVILION_DATA_DIR: dataDir,
+      WINDCATCHER_DATA_DIR: dataDir
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   serverProc.stdout?.on('data', d => process.stdout.write('[后端] ' + d));
@@ -96,9 +106,35 @@ function setupAutoUpdate() {
 ipcMain.handle('update:install', () => { try { autoUpdater && autoUpdater.quitAndInstall(); } catch {} });
 ipcMain.on('app:get-version', event => { event.returnValue = app.getVersion(); });
 
-app.whenReady().then(() => {
+async function chooseLegacyDatabase() {
+  const result = await dialog.showMessageBox({
+    type: 'question',
+    title: '摘星阁数据迁移',
+    message: '检测到“摘星阁”和“捕风司”各有一份旧数据库，请选择要迁移的数据。',
+    detail: '迁移只会创建一致性备份，不会修改或删除任一旧数据库。',
+    buttons: ['使用当前“摘星阁”（推荐）', '使用旧“捕风司”', '取消启动'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true
+  });
+  return ['current', 'legacy', 'cancel'][result.response] || 'cancel';
+}
+
+app.whenReady().then(async () => {
+  await migrateUserData({
+    isPackaged: app.isPackaged,
+    appDataDir: app.getPath('appData'),
+    repoDataDir: path.join(__dirname, '..', 'data'),
+    chooseSource: chooseLegacyDatabase
+  });
   startServer();
-  createWindow();
+  await createWindow();
+}).catch(async error => {
+  if (!(error instanceof MigrationCancelledError)) {
+    console.error('[数据迁移] 启动失败:', error.message);
+    await dialog.showErrorBox('摘星阁启动失败', `无法安全准备本地数据：${error.message}`);
+  }
+  app.quit();
 });
 
 app.on('window-all-closed', () => {
