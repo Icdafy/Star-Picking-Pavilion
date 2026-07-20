@@ -32,3 +32,19 @@ test('Electron brokers encrypted credentials without exposing them to the render
   assert.match(source, /type: 'credential:result'/);
   assert.doesNotMatch(source, /webContents\.send\([^\n]*apiKey/);
 });
+
+test('Electron sandboxes renderers and denies every permission by default', () => {
+  assert.match(source, /sandbox:\s*true/);
+  assert.match(source, /setPermissionRequestHandler\([^\n]+callback\(false\)/);
+  assert.match(source, /setPermissionCheckHandler\(\(\) => false\)/);
+  assert.match(source, /render-process-gone/);
+  assert.match(source, /failure\.html/);
+});
+
+test('auto update starts independently and reports failures to the renderer', () => {
+  const readyIndex = source.indexOf('app.whenReady().then');
+  const updaterIndex = source.indexOf('setupAutoUpdate();', readyIndex);
+  const serverIndex = source.indexOf('await startServer(', readyIndex);
+  assert.ok(updaterIndex > readyIndex && updaterIndex < serverIndex);
+  assert.match(source, /checkForUpdatesAndNotify\(\)\.catch\([^)]*sendUpdateStatus\('error'/s);
+});

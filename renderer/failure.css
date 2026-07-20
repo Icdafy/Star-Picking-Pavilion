@@ -1,0 +1,16 @@
+:root { color-scheme: dark; font-family: "Microsoft YaHei UI", sans-serif; }
+* { box-sizing: border-box; }
+body {
+  min-height: 100vh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: #eaf0fd;
+  background: radial-gradient(circle at 50% 15%, #18254a, #04060e 60%);
+}
+main { width: min(560px, calc(100% - 48px)); padding: 40px; border: 1px solid #52658d; border-radius: 18px; background: #0b1226; }
+.eyebrow { color: #5eead4; letter-spacing: .18em; font-size: 12px; }
+h1 { margin: 10px 0 14px; }
+p { line-height: 1.7; color: #b8c4df; }
+a { display: inline-block; margin-top: 14px; padding: 11px 18px; border-radius: 9px; color: #07101c; background: #5eead4; text-decoration: none; font-weight: 700; }
+a:focus-visible { outline: 3px solid #fca35d; outline-offset: 4px; }

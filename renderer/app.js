@@ -76,6 +76,7 @@ async function api(path, opts) {
 function esc(s) {
   return DomUtils.escapeHTML(s);
 }
+const safeUrl = value => esc(DomUtils.safeHttpUrl(value));
 
 function timeAgo(iso) {
   if (!iso) return '时间未知';
@@ -173,7 +174,9 @@ function cardInner(item) {
       <span class="cr-label"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>情报研判</span>
       <span class="cr-text">${esc(item.reason)}</span>
     </div>` : '';
-  const thumb = item.image ? `<img class="card-thumb" src="${esc(item.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+  const thumb = DomUtils.safeHttpUrl(item.image) !== '#'
+    ? `<img class="card-thumb" src="${safeUrl(item.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+    : '';
 
   return `
     ${scorePill(item)}
@@ -184,8 +187,8 @@ function cardInner(item) {
       ${item.category ? `<span class="cat-tag">${esc(item.category)}</span>` : ''}
       <span>${timeAgo(item.publishedAt || item.fetchedAt)}</span>
     </div>
-    <a class="card-title" href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.title)}</a>
-    <div class="card-content${item.image ? ' has-thumb' : ''}">
+    <a class="card-title" href="${safeUrl(item.url)}" target="_blank" rel="noopener">${esc(item.title)}</a>
+    <div class="card-content${thumb ? ' has-thumb' : ''}">
       <div class="card-text">
         ${item.summary ? `<p class="card-summary">${esc(item.summary)}</p>` : ''}
         ${item.tags?.length ? `<div class="card-tags">${item.tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('')}</div>` : ''}
@@ -196,6 +199,10 @@ function cardInner(item) {
     ${cluster}
     ${dims ? `<div class="dims">${dims}</div>` : ''}`;
 }
+
+document.addEventListener('error', event => {
+  if (event.target?.matches?.('img.card-thumb')) event.target.remove();
+}, true);
 
 // 时间轴行（精选 / 全部动态）
 function renderTimeline(items, startIdx) {
@@ -301,7 +308,7 @@ async function loadHotRail() {
     const top = data.items.slice(0, 10);
     if (!top.length) { box.innerHTML = '<div class="hot-rail-sub">暂无热点</div>'; return; }
     box.innerHTML = top.map((it, i) => `
-      <a class="hot-item" href="${esc(it.url)}" target="_blank" rel="noopener" title="${esc(it.title)}">
+      <a class="hot-item" href="${safeUrl(it.url)}" target="_blank" rel="noopener" title="${esc(it.title)}">
         <span class="hi-rank">${i + 1}</span>
         <span>
           <span class="hi-title">${esc(it.title)}</span>
@@ -329,7 +336,7 @@ $('#feedList').addEventListener('click', async e => {
         const selfId = Number(tgl.dataset.self);
         box.innerHTML = items.filter(i => i.id !== selfId).map(i => `
           <div class="cluster-item">
-            <a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>
+            <a href="${safeUrl(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>
             <span class="ci-meta">${esc(i.source)} · <b class="ci-tier tier-${esc(i.tier)}">${esc(i.tier)}</b> · ${timeAgo(i.publishedAt || i.fetchedAt)}</span>
           </div>`).join('') || '<div class="cluster-item">（无其他报道）</div>';
         box.dataset.loaded = '1';
@@ -368,7 +375,7 @@ async function loadDaily(date) {
           <div class="daily-item">
             <span class="di-score">${Math.round(it.quality_score)}</span>
             <div>
-              <a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+              <a href="${safeUrl(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
               ${it.ai_summary ? `<div class="di-meta">${esc(it.ai_summary)}</div>` : ''}
               <div class="di-meta">${esc(it.source_name)} · ${esc(it.tier)} · ${DOMAIN_NAME[it.domain] || ''}</div>
             </div>
@@ -419,7 +426,7 @@ async function loadSources() {
         ${s.note ? `<div class="src-meta" style="margin-top:4px">${esc(s.note)}</div>` : ''}
         <div class="src-actions">
           <button data-act="toggle">${s.enabled ? '停用' : '启用'}</button>
-          <button data-act="delete" class="danger">删除</button>
+          <button data-act="remove" class="danger"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
         </div>
       </div>`;
     }).join('');
@@ -437,10 +444,11 @@ $('#sourcesList').addEventListener('click', async e => {
     await api(`/api/sources/${id}`, { method: 'PATCH', body: { enabled } });
     toast(enabled ? '信源已启用' : '信源已停用');
     loadSources();
-  } else if (btn.dataset.act === 'delete') {
-    if (!confirm('确定删除该信源？已采集的文章会保留。')) return;
+  } else if (btn.dataset.act === 'remove') {
+    if (btn.disabled) return;
+    if (!confirm('确定将该信源移出监控？已采集文章和信源记录都会保留。')) return;
     await api(`/api/sources/${id}`, { method: 'DELETE' });
-    toast('信源已删除');
+    toast('信源已移出监控');
     loadSources();
   }
 });
@@ -554,7 +562,7 @@ function renderCommonLinks(focusKey, fallbackTarget) {
       </div>
       <p>${esc(item.description)}</p>
       <div class="common-links-tags">${item.tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
-      <a class="common-links-open" href="${esc(DomUtils.safeHttpUrl(item.url))}" target="_blank" rel="noopener">打开 <span aria-hidden="true">↗</span></a>
+      <a class="common-links-open" href="${safeUrl(item.url)}" target="_blank" rel="noopener">打开 <span aria-hidden="true">↗</span></a>
     </article>
   `).join('');
   DomUtils.restoreFocusByKey(document, focusKey, fallbackTarget);
@@ -729,12 +737,18 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) poll
 if (Desktop && Desktop.onUpdateStatus) {
   const pill = $('#updatePill');
   let updState = 'idle';
-  Desktop.onUpdateStatus(({ status, version, percent }) => {
+  Desktop.onUpdateStatus(({ status, version, percent, message }) => {
     updState = status;
+    pill.classList.toggle('error', status === 'error');
     if (status === 'available') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `发现新版本 ${version}…`; }
     else if (status === 'downloading') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `下载更新 ${percent}%`; }
     else if (status === 'downloaded') { pill.hidden = false; pill.classList.add('ready'); pill.textContent = `▲ 重启安装 ${version}`; }
-    // error 静默，不打扰用户
+    else if (status === 'error') {
+      pill.hidden = false;
+      pill.classList.remove('ready');
+      pill.textContent = '更新检查失败';
+      pill.title = message || '稍后将自动重试';
+    }
   });
   pill.addEventListener('click', () => { if (updState === 'downloaded') Desktop.installUpdate(); });
 }

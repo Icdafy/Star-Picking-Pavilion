@@ -17,7 +17,8 @@ const {
   API_TOKEN_HEADER,
   HttpError,
   authorize,
-  readJsonBody
+  readJsonBody,
+  RESPONSE_SECURITY_HEADERS
 } = require('./http-security');
 
 const REQUESTED_PORT = Number(process.env.STAR_PICKING_PAVILION_PORT || process.env.WINDCATCHER_PORT || 7644);
@@ -32,7 +33,10 @@ const MIME = {
 };
 
 function json(res, code, data) {
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(code, {
+    ...RESPONSE_SECURITY_HEADERS,
+    'Content-Type': 'application/json; charset=utf-8'
+  });
   res.end(JSON.stringify(data));
 }
 
@@ -195,8 +199,11 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
       if (mSrc && req.method === 'DELETE') {
-        db.prepare('DELETE FROM sources WHERE id=?').run(Number(mSrc[1]));
-        return json(res, 200, { ok: true });
+        const sourceId = Number(mSrc[1]);
+        const existing = db.prepare('SELECT id FROM sources WHERE id=?').get(sourceId);
+        if (!existing) return json(res, 404, { error: '信源不存在' });
+        db.prepare('UPDATE sources SET enabled=0 WHERE id=?').run(sourceId);
+        return json(res, 200, { ok: true, disabled: true });
       }
 
       if (p === '/api/settings' && req.method === 'GET') {
@@ -237,9 +244,12 @@ const server = http.createServer(async (req, res) => {
     file = path.normalize(file).replace(/^([.][.][\\/])+/, '');
     const full = path.join(RENDERER_DIR, file);
     if (!full.startsWith(RENDERER_DIR) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
-      res.writeHead(404); return res.end('not found');
+      res.writeHead(404, RESPONSE_SECURITY_HEADERS); return res.end('not found');
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      ...RESPONSE_SECURITY_HEADERS,
+      'Content-Type': MIME[path.extname(full)] || 'application/octet-stream'
+    });
     fs.createReadStream(full).pipe(res);
   } catch (e) {
     console.error('[http]', e);

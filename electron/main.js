@@ -10,6 +10,9 @@ try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未
 
 let serverProc = null;
 let win = null;
+let latestUpdateStatus = null;
+let autoUpdateInitialized = false;
+let autoUpdateTimer = null;
 
 if (app.isPackaged) {
   app.setPath('userData', path.join(app.getPath('appData'), '摘星阁'));
@@ -86,6 +89,12 @@ function installApiAuthentication(serverPort, apiToken) {
   });
 }
 
+function installPermissionPolicy() {
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setDevicePermissionHandler?.(() => false);
+}
+
 function isAllowedExternalUrl(value) {
   try {
     const protocol = new URL(value).protocol;
@@ -108,6 +117,10 @@ async function createWindow(serverPort) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webviewTag: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
       preload: path.join(__dirname, 'preload.js')
     }
   });
@@ -125,10 +138,22 @@ async function createWindow(serverPort) {
       if (isAllowedExternalUrl(url)) shell.openExternal(url);
     }
   });
+  let recoveringRenderer = false;
+  win.webContents.on('render-process-gone', async (_event, details) => {
+    if (recoveringRenderer || win.isDestroyed() || details.reason === 'clean-exit') return;
+    recoveringRenderer = true;
+    try {
+      await win.loadURL(`${expectedOrigin}/failure.html`);
+    } catch (error) {
+      console.error('[渲染器] 恢复页面加载失败:', error.message);
+    } finally {
+      recoveringRenderer = false;
+    }
+  });
 
   try {
     await win.loadURL(`${expectedOrigin}/`);
-    setupAutoUpdate();
+    if (latestUpdateStatus) win.webContents.send('update:status', latestUpdateStatus);
   } catch (error) {
     await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
       `<body style="background:#04060e;color:#dfe7ff;font-family:sans-serif;display:grid;place-items:center;height:100vh">
@@ -138,17 +163,29 @@ async function createWindow(serverPort) {
 }
 
 // ---------- 自动更新（electron-updater + GitHub Releases）----------
+function sendUpdateStatus(status, data = {}) {
+  latestUpdateStatus = { status, ...data };
+  try { win?.webContents.send('update:status', latestUpdateStatus); } catch {}
+}
+
 function setupAutoUpdate() {
-  if (!autoUpdater || !app.isPackaged) return;   // 仅打包后生效
-  const send = (status, data) => { try { win && win.webContents.send('update:status', { status, ...data }); } catch {} };
+  if (autoUpdateInitialized || !autoUpdater || !app.isPackaged
+    || process.env.STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE === '1') return;
+  autoUpdateInitialized = true;
   autoUpdater.autoDownload = true;
-  autoUpdater.on('update-available', i => send('available', { version: i.version }));
-  autoUpdater.on('download-progress', p => send('downloading', { percent: Math.round(p.percent) }));
-  autoUpdater.on('update-downloaded', i => send('downloaded', { version: i.version }));
-  autoUpdater.on('error', err => send('error', { message: String(err && err.message || err) }));
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  autoUpdater.on('update-available', i => sendUpdateStatus('available', { version: i.version }));
+  autoUpdater.on('download-progress', p => sendUpdateStatus('downloading', { percent: Math.round(p.percent) }));
+  autoUpdater.on('update-downloaded', i => sendUpdateStatus('downloaded', { version: i.version }));
+  autoUpdater.on('error', error => sendUpdateStatus('error', { message: String(error?.message || error) }));
+  autoUpdater.checkForUpdatesAndNotify().catch(error => sendUpdateStatus('error', {
+    message: String(error?.message || error)
+  }));
   // 之后每 6 小时再查一次
-  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 3600 * 1000);
+  autoUpdateTimer = setInterval(() => {
+    autoUpdater.checkForUpdates().catch(error => sendUpdateStatus('error', {
+      message: String(error?.message || error)
+    }));
+  }, 6 * 3600 * 1000);
 }
 
 // 渲染层点击「重启更新」
@@ -170,6 +207,8 @@ async function chooseLegacyDatabase() {
 }
 
 app.whenReady().then(async () => {
+  installPermissionPolicy();
+  setupAutoUpdate();
   await migrateUserData({
     isPackaged: app.isPackaged,
     appDataDir: app.getPath('appData'),
@@ -195,4 +234,7 @@ app.on('window-all-closed', () => {
   if (serverProc) serverProc.kill();
   app.quit();
 });
-app.on('before-quit', () => { if (serverProc) serverProc.kill(); });
+app.on('before-quit', () => {
+  if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+  if (serverProc) serverProc.kill();
+});

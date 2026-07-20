@@ -68,7 +68,7 @@ async function startServer(t, { token = 'test-launch-token', nonce = 'test-ready
   });
 
   assertReadyMessage(ready, nonce);
-  return { ...ready, token, request: options => request({ port: ready.port, ...options }) };
+  return { ...ready, token, dataDir, request: options => request({ port: ready.port, ...options }) };
 }
 
 function assertReadyMessage(message, nonce) {

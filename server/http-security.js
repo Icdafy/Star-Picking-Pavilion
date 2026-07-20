@@ -4,6 +4,25 @@ const crypto = require('node:crypto');
 
 const API_TOKEN_HEADER = 'x-star-picking-pavilion-token';
 const MAX_JSON_BYTES = 64 * 1024;
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: http: https:",
+  "font-src 'self'",
+  "connect-src 'self'"
+].join('; ');
+const RESPONSE_SECURITY_HEADERS = Object.freeze({
+  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+});
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -88,6 +107,8 @@ function validateAiBaseUrl(value) {
 module.exports = {
   API_TOKEN_HEADER,
   MAX_JSON_BYTES,
+  CONTENT_SECURITY_POLICY,
+  RESPONSE_SECURITY_HEADERS,
   HttpError,
   authorize,
   readJsonBody,

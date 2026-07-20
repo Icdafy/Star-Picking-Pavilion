@@ -46,6 +46,14 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
   assert.match(app, /class="common-links-open"[^>]*target="_blank"[^>]*rel="noopener"/);
 });
 
+test('页面脚本全部外置且动态渲染不使用内联事件处理器', () => {
+  const scriptTags = [...html.matchAll(/<script\b([^>]*)>/gi)];
+  assert.ok(scriptTags.length > 0);
+  for (const [, attributes] of scriptTags) assert.match(attributes, /\bsrc="[^"]+"/);
+  assert.doesNotMatch(html, /\son[a-z]+\s*=/i);
+  assert.doesNotMatch(app, /\son[a-z]+\s*=/i);
+});
+
 test('应用使用规范存储键并只迁移有效的旧星标数组', () => {
   assert.match(app, /StarPickingPavilionBootstrap/);
   assert.match(app, /starPickingPavilion\s*\|\|\s*window\.windcatcher/);
@@ -109,7 +117,7 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
   const start = app.indexOf('function renderCommonLinks');
   const end = app.indexOf('// ---------- 视图切换 ----------');
   const install = new Function(
-    '$', 'CommonLinks', 'DomUtils', 'state', 'esc', 'document', 'persistCommonLinkFavorites',
+    '$', 'CommonLinks', 'DomUtils', 'state', 'esc', 'safeUrl', 'document', 'persistCommonLinkFavorites',
     `'use strict';\n${app.slice(start, end)}\nreturn renderCommonLinks;`
   );
   install(
@@ -117,6 +125,7 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
     CommonLinks,
     require('../renderer/dom-utils'),
     state,
+    value => String(value ?? ''),
     value => String(value ?? ''),
     fakeDocument,
     () => {}
@@ -140,7 +149,22 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
 
 test('常用网址渲染通过共享工具转义文本并限制外链协议', () => {
   assert.match(app, /function esc\(s\)\s*\{\s*return DomUtils\.escapeHTML\(s\);\s*\}/);
-  assert.match(app, /href="\$\{esc\(DomUtils\.safeHttpUrl\(item\.url\)\)\}"/);
+  assert.match(app, /const safeUrl = value => esc\(DomUtils\.safeHttpUrl\(value\)\);/);
+  assert.match(app, /href="\$\{safeUrl\(item\.url\)\}"/);
+});
+
+test('文章、图片、热点、事件簇和日报的远程地址全部通过安全 URL 工具', () => {
+  assert.match(app, /const safeUrl = value => esc\(DomUtils\.safeHttpUrl\(value\)\);/);
+  assert.match(app, /src="\$\{safeUrl\(item\.image\)\}"/);
+  for (const expression of ['item.url', 'it.url', 'i.url']) {
+    assert.match(app, new RegExp(`href="\\$\\{safeUrl\\(${expression.replace('.', '\\.') }\\)\\}"`));
+  }
+});
+
+test('信源移除操作明确说明为保留记录的软停用', () => {
+  assert.match(app, /移出监控/);
+  assert.match(app, /已采集文章和信源记录都会保留/);
+  assert.doesNotMatch(app, /确定删除该信源/);
 });
 
 test('常用网址沿用 Electron 的安全外链策略', () => {

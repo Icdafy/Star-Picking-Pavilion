@@ -477,6 +477,7 @@ main { max-width: 1360px; margin: 0 auto; padding: 0 16px 80px; }
 }
 .update-pill.ready:hover { transform: translateY(-1px); }
 [data-theme="dark"] .update-pill.ready { color: #ffc592; }
+.update-pill.error { color: var(--c-red); border-color: color-mix(in srgb, var(--c-red) 45%, transparent); }
 
 /* 「N 条新情报」可点横幅 */
 .new-flash:not([hidden]) { display: block; }
