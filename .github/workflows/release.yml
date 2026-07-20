@@ -1,28 +1,75 @@
 name: release
 
-# 打 tag（如 v0.1.1）即自动在 Windows runner 上构建并发布到 GitHub Releases，
-# 所有已安装用户的 app 下次启动会自动检测到新版本并提示更新。
 on:
   push:
     tags:
       - 'v*'
 
 jobs:
-  build-win:
+  release-windows:
     runs-on: windows-latest
+    timeout-minutes: 40
     permissions:
-      contents: write          # 允许创建 Release 并上传产物
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Install dependencies
+      - name: Install exact dependencies
         run: npm ci
 
-      - name: Build & publish (NSIS installer + latest.yml)
+      - name: Verify tag and package version
+        run: npm run verify:version -- --tag $env:GITHUB_REF_NAME
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Real Electron smoke test
+        run: npm run test:e2e
+
+      - name: Audit production dependencies
+        run: npm run audit:runtime
+
+      - name: Build Windows installer once
+        run: npm run dist
+
+      - name: Verify package boundary
+        run: npm run verify:package
+
+      - name: Verify built artifact versions
+        run: npm run verify:version -- --tag $env:GITHUB_REF_NAME --artifacts
+
+      - name: Generate third-party notices
+        run: npm run notices
+
+      - name: Generate SHA-256 checksum
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $installer = "dist\Star-Picking-Pavilion-Setup-$version.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
+          "$hash  Star-Picking-Pavilion-Setup-$version.exe" | Set-Content -Encoding ascii -LiteralPath 'dist\SHA256SUMS.txt'
+
+      - name: Generate CycloneDX SBOM
+        run: npx cyclonedx-npm --omit dev --spec-version 1.6 --output-reproducible --output-file dist/sbom.cdx.json --validate
+
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --publish always
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          gh release create $env:GITHUB_REF_NAME `
+            "dist\Star-Picking-Pavilion-Setup-$version.exe" `
+            "dist\Star-Picking-Pavilion-Setup-$version.exe.blockmap" `
+            "dist\latest.yml" `
+            "dist\SHA256SUMS.txt" `
+            "dist\sbom.cdx.json" `
+            "THIRD_PARTY_NOTICES.txt" `
+            --title "摘星阁 $env:GITHUB_REF_NAME" `
+            --notes-file RELEASE_NOTES.md `
+            --verify-tag

@@ -1,50 +1,60 @@
-# 发布新版本（维护者指南）
+# 摘星阁发布指南
 
-回答两个核心问题：**我怎么推送更新？别人怎么收到？**
+本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-## 一次性准备
+## 发布前授权门槛
 
-1. 仓库已就绪：[`Icdafy/Star-Picking-Pavilion`](https://github.com/Icdafy/Star-Picking-Pavilion)。`package.json`（`build.publish` / `repository` / `homepage`）与 `README.md` 下载链接均已指向该仓库，无需再改。
-2. 确认 `.gitignore` 已排除 `data/`（**你的 DeepSeek Key 在里面，绝不能入库**）、`dist/`、`.claude/`。
-3. （可选）以后若把仓库改名或换账号，记得同步改 `package.json` 的 `build.publish.owner/repo` 与 URL，否则自动更新会指错地址。
+在任何公开推送前，维护者必须确认：
 
-## 方式 A：GitHub Actions 自动发布（推荐，无需本地构建）
+1. 常用网址采用了用户明确授权的公开策略；若选择私有策略，内部分享链接只能存在于被 Git 忽略的本地配置中，且不得进入将要推送的 Git 对象。
+2. 本次首版未签名的事实已获接受，README 与发布说明保留 SmartScreen 警告。
+3. 目标仓库、分支和 tag 已逐项核对，无秘密、数据库、日志或用户数据。
+4. `main` 上的精确提交已经通过完整验证矩阵和安装/卸载烟测。
 
-已内置 `.github/workflows/release.yml`。流程：
+## 本地候选包验证
 
-```bash
-# 1. 改版本号
-npm version patch        # 0.0.1 → 0.0.2（或 minor / major）
-# 2. 推送代码与 tag
-git push && git push --tags
+在干净工作树中运行：
+
+```powershell
+npm ci
+npm run verify:version -- --tag v0.0.1
+npm test
+npm run test:e2e
+npm run audit:runtime
+npm run dist
+npm run verify:package
+npm run verify:version -- --tag v0.0.1 --artifacts
+npm run notices
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.0.1.exe
 ```
 
-推送 `v*` tag 后，GitHub Actions 会在 Windows runner 上自动构建并把
-安装包（首版为 `Star-Picking-Pavilion-Setup-0.0.1.exe`）+ `latest.yml` 发布到 Releases。用的是仓库自带的 `GITHUB_TOKEN`，**无需额外密钥**。
+v0.0.1 的签名状态预期为 `NotSigned`。ASAR 必须小于 12 MiB，安装包必须小于 110 MiB。
 
-## 方式 B：本地构建后发布
+## 版本与 tag
 
-```bash
-# 需要一个有 repo 权限的 GitHub Personal Access Token
-export GH_TOKEN=ghp_xxxxx        # Windows PowerShell: $env:GH_TOKEN="ghp_xxxxx"
-# 大陆网络首次构建经镜像拉构建资源
-export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
-npm version patch
-npm run release                  # 构建并发布到 GitHub Releases
+版本采用 SemVer。`package.json`、tag、安装包文件名和 `latest.yml` 必须一致。创建 tag 前先运行版本校验：
+
+```powershell
+npm run verify:version -- --tag v0.0.1
+git tag -a v0.0.1 -m "摘星阁 v0.0.1"
+git push origin v0.0.1
 ```
 
-只想本地出个安装包、先不发布：`npm run dist`（产物在 `dist/`）。
+推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、构建、包审计、SHA-256、SBOM 和第三方声明生成。全部成功后才会运行 `gh release create`。
 
-## 别人怎么收到更新？
+## 发布资产
 
-完全自动，你什么都不用通知：
+v0.0.1 Release 应包含：
 
-1. 用户已安装的 app **每次启动**（以及之后每 6 小时）会去你的 GitHub Releases 查 `latest.yml`。
-2. 发现版本比本地新 → **后台静默下载**安装包。
-3. 下载完，应用右上角出现 **「▲ 重启安装 vX.Y.Z」**，用户点一下就升级完成。
+- `Star-Picking-Pavilion-Setup-0.0.1.exe`
+- `Star-Picking-Pavilion-Setup-0.0.1.exe.blockmap`
+- `latest.yml`
+- `SHA256SUMS.txt`
+- `sbom.cdx.json`
+- `THIRD_PARTY_NOTICES.txt`
 
-> 要点：electron-updater 靠对比 `latest.yml` 里的版本号判断更新，所以**每次发布务必 `npm version` 抬高版本号**，否则用户端不会触发更新。
+发布完成后下载到新的临时目录，按 `SHA256SUMS.txt` 重新校验并执行一次安装、启动、单实例、退出和卸载烟测。
 
-## 版本号约定
+## 回滚
 
-`主.次.补丁`：修 bug → patch；加功能 → minor；不兼容改动 → major。
+不要覆盖或强推已经公开的版本资产。若候选 tag 尚未形成有效 Release，可以在确认精确目标后删除失败的远端 tag，再用包含修复的新提交重新创建；若用户已下载该版本，则发布更高的补丁版本并在变更日志中说明。

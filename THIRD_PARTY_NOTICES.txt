@@ -1,0 +1,185 @@
+THIRD-PARTY SOFTWARE NOTICES
+摘星阁 (Star-Picking-Pavilion) 0.0.1
+
+This distribution includes the following production dependencies.
+Each package remains subject to its own license terms.
+
+argparse@2.0.1
+License: Python-2.0
+Source: nodeca/argparse
+
+boolbase@1.0.0
+License: ISC
+Source: https://github.com/fb55/boolbase
+
+builder-util-runtime@9.7.0
+License: MIT
+Source: git+https://github.com/electron-userland/electron-builder.git
+
+cheerio-select@2.1.0
+License: BSD-2-Clause
+Source: git://github.com/cheeriojs/cheerio-select.git
+
+cheerio@1.2.0
+License: MIT
+Source: git://github.com/cheeriojs/cheerio.git
+
+css-select@5.2.2
+License: BSD-2-Clause
+Source: git://github.com/fb55/css-select.git
+
+css-what@6.2.2
+License: BSD-2-Clause
+Source: https://github.com/fb55/css-what
+
+debug@4.4.3
+License: MIT
+Source: git://github.com/debug-js/debug.git
+
+dom-serializer@2.0.0
+License: MIT
+Source: git://github.com/cheeriojs/dom-serializer.git
+
+domelementtype@2.3.0
+License: BSD-2-Clause
+Source: git://github.com/fb55/domelementtype.git
+
+domhandler@5.0.3
+License: BSD-2-Clause
+Source: git://github.com/fb55/domhandler.git
+
+domutils@3.2.2
+License: BSD-2-Clause
+Source: git://github.com/fb55/domutils.git
+
+electron-updater@6.8.9
+License: MIT
+Source: git+https://github.com/electron-userland/electron-builder.git
+
+encoding-sniffer@0.2.1
+License: MIT
+Source: git://github.com/fb55/encoding-sniffer.git
+
+entities@2.2.0
+License: BSD-2-Clause
+Source: git://github.com/fb55/entities.git
+
+entities@4.5.0
+License: BSD-2-Clause
+Source: git://github.com/fb55/entities.git
+
+entities@6.0.1
+License: BSD-2-Clause
+Source: git://github.com/fb55/entities.git
+
+entities@7.0.1
+License: BSD-2-Clause
+Source: https://github.com/fb55/entities.git
+
+fs-extra@10.1.0
+License: MIT
+Source: https://github.com/jprichardson/node-fs-extra
+
+graceful-fs@4.2.11
+License: ISC
+Source: https://github.com/isaacs/node-graceful-fs
+
+htmlparser2@10.1.0
+License: MIT
+Source: git://github.com/fb55/htmlparser2.git
+
+iconv-lite@0.6.3
+License: MIT
+Source: git://github.com/ashtuchkin/iconv-lite.git
+
+iconv-lite@0.7.3
+License: MIT
+Source: https://github.com/pillarjs/iconv-lite.git
+
+js-yaml@4.3.0
+License: MIT
+Source: nodeca/js-yaml
+
+jsonfile@6.2.1
+License: MIT
+Source: git@github.com:jprichardson/node-jsonfile.git
+
+lazy-val@1.0.5
+License: MIT
+Source: develar/lazy-val
+
+lodash.escaperegexp@4.1.2
+License: MIT
+Source: lodash/lodash
+
+lodash.isequal@4.5.0
+License: MIT
+Source: lodash/lodash
+
+ms@2.1.3
+License: MIT
+Source: vercel/ms
+
+node-cron@4.6.0
+License: ISC
+Source: git+https://github.com/node-cron/node-cron.git
+
+nth-check@2.1.1
+License: BSD-2-Clause
+Source: https://github.com/fb55/nth-check
+
+parse5-htmlparser2-tree-adapter@7.1.0
+License: MIT
+Source: git://github.com/inikulin/parse5.git
+
+parse5-parser-stream@7.1.2
+License: MIT
+Source: git://github.com/inikulin/parse5.git
+
+parse5@7.3.0
+License: MIT
+Source: git://github.com/inikulin/parse5.git
+
+rss-parser@3.13.0
+License: MIT
+Source: git+https://github.com/bobby-brennan/rss-parser.git
+
+safer-buffer@2.1.2
+License: MIT
+Source: git+https://github.com/ChALkeR/safer-buffer.git
+
+sax@1.6.0
+License: BlueOak-1.0.0
+Source: git+ssh://git@github.com/isaacs/sax-js.git
+
+semver@7.7.4
+License: ISC
+Source: git+https://github.com/npm/node-semver.git
+
+tiny-typed-emitter@2.1.0
+License: MIT
+Source: https://github.com/binier/tiny-typed-emitter.git
+
+undici@7.28.0
+License: MIT
+Source: git+https://github.com/nodejs/undici.git
+
+universalify@2.0.1
+License: MIT
+Source: git+https://github.com/RyanZim/universalify.git
+
+whatwg-encoding@3.1.1
+License: MIT
+Source: jsdom/whatwg-encoding
+
+whatwg-mimetype@4.0.0
+License: MIT
+Source: jsdom/whatwg-mimetype
+
+xml2js@0.5.0
+License: MIT
+Source: https://github.com/Leonidas-from-XIV/node-xml2js.git
+
+xmlbuilder@11.0.1
+License: MIT
+Source: git://github.com/oozcitak/xmlbuilder-js.git
