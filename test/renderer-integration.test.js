@@ -146,7 +146,7 @@ test('常用网址渲染通过共享工具转义文本并限制外链协议', ()
 test('常用网址沿用 Electron 的安全外链策略', () => {
   const electronMain = fs.readFileSync(path.join(root, 'electron', 'main.js'), 'utf8');
   assert.match(electronMain, /setWindowOpenHandler/);
-  assert.match(electronMain, /\^https\?:/);
+  assert.match(electronMain, /protocol === 'http:' \|\| protocol === 'https:'/);
   assert.match(electronMain, /shell\.openExternal\(url\)/);
   assert.match(electronMain, /return \{ action: 'deny' \}/);
 });

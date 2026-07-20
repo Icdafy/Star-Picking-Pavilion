@@ -12,8 +12,16 @@ const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
 const { CATEGORIES } = require('./ai/pipeline');
+const {
+  API_TOKEN_HEADER,
+  HttpError,
+  authorize,
+  readJsonBody
+} = require('./http-security');
 
-const PORT = Number(process.env.WINDCATCHER_PORT || 7644);
+const REQUESTED_PORT = Number(process.env.STAR_PICKING_PAVILION_PORT || process.env.WINDCATCHER_PORT || 7644);
+const API_TOKEN = process.env.STAR_PICKING_PAVILION_API_TOKEN || '';
+const SERVER_NONCE = process.env.STAR_PICKING_PAVILION_SERVER_NONCE || '';
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 
 const MIME = {
@@ -25,13 +33,6 @@ const MIME = {
 function json(res, code, data) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
-}
-
-async function readBody(req) {
-  const chunks = [];
-  for await (const c of req) chunks.push(c);
-  const raw = Buffer.concat(chunks).toString('utf8');
-  return raw ? JSON.parse(raw) : {};
 }
 
 // ---------- 文章查询 ----------
@@ -137,12 +138,17 @@ function getStats() {
 
 // ---------- 路由 ----------
 const server = http.createServer(async (req, res) => {
-  const u = new URL(req.url, `http://127.0.0.1:${PORT}`);
+  const activePort = server.address()?.port || REQUESTED_PORT;
+  const u = new URL(req.url, `http://127.0.0.1:${activePort}`);
   const p = u.pathname;
   try {
     if (p.startsWith('/api/')) {
-      // 仅本机访问
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      const permitted = authorize({
+        host: req.headers.host,
+        origin: req.headers.origin,
+        token: req.headers[API_TOKEN_HEADER]
+      }, { port: activePort, expectedToken: API_TOKEN });
+      if (!permitted) return json(res, 403, { error: 'forbidden' });
 
       if (p === '/api/feed' && req.method === 'GET') return json(res, 200, queryFeed(u.searchParams));
       if (p === '/api/stats' && req.method === 'GET') return json(res, 200, getStats());
@@ -156,7 +162,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { report: getDaily(date), dates: listDailyDates() });
       }
       if (p === '/api/daily/regenerate' && req.method === 'POST') {
-        const body = await readBody(req);
+        const body = await readJsonBody(req);
         return json(res, 200, generateDaily(body.date));
       }
 
@@ -169,7 +175,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, db.prepare('SELECT * FROM sources ORDER BY tier, id').all());
       }
       if (p === '/api/sources' && req.method === 'POST') {
-        const b = await readBody(req);
+        const b = await readJsonBody(req);
         if (!b.name || !b.url) return json(res, 400, { error: '需要 name 和 url' });
         const r = db.prepare(`INSERT INTO sources (name, type, url, tier, domain, enabled, selector_json, note)
           VALUES (?, ?, ?, ?, ?, 1, ?, ?)`).run(
@@ -179,7 +185,7 @@ const server = http.createServer(async (req, res) => {
       }
       const mSrc = p.match(/^\/api\/sources\/(\d+)$/);
       if (mSrc && req.method === 'PATCH') {
-        const b = await readBody(req);
+        const b = await readJsonBody(req);
         const cur = db.prepare('SELECT * FROM sources WHERE id=?').get(Number(mSrc[1]));
         if (!cur) return json(res, 404, { error: '不存在' });
         db.prepare(`UPDATE sources SET name=?, url=?, tier=?, domain=?, enabled=?, note=? WHERE id=?`)
@@ -200,7 +206,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, masked);
       }
       if (p === '/api/settings' && req.method === 'POST') {
-        const b = await readBody(req);
+        const b = await readJsonBody(req);
         const s = loadSettings();
         if (b.ai) {
           if (b.ai.apiKey !== undefined && !b.ai.apiKey.includes('****')) s.ai.apiKey = b.ai.apiKey.trim();
@@ -223,7 +229,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (p === '/api/feedback' && req.method === 'POST') {
-        const b = await readBody(req);
+        const b = await readJsonBody(req);
         db.prepare('INSERT INTO feedback (kind, content, created_at) VALUES (?, ?, ?)')
           .run(b.kind || 'feedback', String(b.content || '').slice(0, 2000), now());
         return json(res, 200, { ok: true });
@@ -243,12 +249,18 @@ const server = http.createServer(async (req, res) => {
     fs.createReadStream(full).pipe(res);
   } catch (e) {
     console.error('[http]', e);
-    json(res, 500, { error: String(e.message || e) });
+    json(res, e instanceof HttpError ? e.statusCode : 500, { error: String(e.message || e) });
   }
 });
 
 seedSources();
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[server] 摘星阁后端已启动: http://127.0.0.1:${PORT}`);
-  if (process.env.WINDCATCHER_NO_SCHEDULER !== '1') startScheduler();
+server.listen(REQUESTED_PORT, '127.0.0.1', () => {
+  const port = server.address().port;
+  const ready = { type: 'server:ready', port, nonce: SERVER_NONCE };
+  process.parentPort?.postMessage(ready);
+  if (typeof process.send === 'function') process.send(ready);
+  console.log(`[server:ready]${JSON.stringify(ready)}`);
+  console.log(`[server] 摘星阁后端已启动: http://127.0.0.1:${port}`);
+  if (process.env.STAR_PICKING_PAVILION_NO_SCHEDULER !== '1'
+    && process.env.WINDCATCHER_NO_SCHEDULER !== '1') startScheduler();
 });
