@@ -16,13 +16,12 @@
   }
 
   function safeHttpUrl(value) {
-    if (typeof value !== 'string') return '';
-    const candidate = value.trim();
+    if (typeof value !== 'string') return '#';
     try {
-      const parsed = new URL(candidate);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? candidate : '';
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '#';
     } catch {
-      return '';
+      return '#';
     }
   }
 
@@ -36,15 +35,18 @@
     return keyedControl.getAttribute('data-focus-key') || null;
   }
 
-  function restoreFocusByKey(root, focusKey) {
-    if (!root || !focusKey) return false;
-    const match = [...root.querySelectorAll('[data-focus-key]')]
-      .find(element => element.getAttribute('data-focus-key') === focusKey);
-    if (!match || typeof match.focus !== 'function') return false;
+  function restoreFocusByKey(root, focusKey, fallback) {
+    if (!root) return false;
+    const match = focusKey
+      ? [...root.querySelectorAll('[data-focus-key]')]
+        .find(element => element.getAttribute('data-focus-key') === focusKey)
+      : null;
+    const target = match || fallback;
+    if (!target || typeof target.focus !== 'function') return false;
     try {
-      match.focus({ preventScroll: true });
+      target.focus({ preventScroll: true });
     } catch {
-      match.focus();
+      target.focus();
     }
     return true;
   }

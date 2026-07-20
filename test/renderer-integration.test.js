@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+const CommonLinks = require('../renderer/common-links');
 const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
@@ -14,8 +15,8 @@ test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
   assert.match(html, /data-view="links"[^>]*>常用网址<\/button>/);
   assert.match(html, /id="viewLinks"[^>]*class="view"[^>]*hidden/);
   assert.match(html, /云幄\s*·\s*常用网址/);
-  assert.match(html, /id="commonLinksCategories"/);
-  assert.match(html, /id="commonLinksGrid"/);
+  assert.match(html, /id="commonLinksCategories"[^>]*tabindex="-1"/);
+  assert.match(html, /id="commonLinksGrid"[^>]*tabindex="-1"/);
 });
 
 test('领域模块在应用脚本之前加载', () => {
@@ -51,9 +52,83 @@ test('常用网址重渲染后将键盘焦点恢复到同一控制项', () => {
   assert.match(app, /data-focus-key="favorite:\$\{esc\(item\.id\)\}"/);
   assert.match(
     app,
-    /function renderCommonLinks\(\)\s*\{\s*const focusKey = DomUtils\.findFocusKey\(document\);/
+    /function renderCommonLinks\(focusKey, fallbackTarget\)\s*\{/
   );
-  assert.match(app, /DomUtils\.restoreFocusByKey\(document, focusKey\);\s*\}/);
+  assert.match(app, /DomUtils\.restoreFocusByKey\(document, focusKey, fallbackTarget\);\s*\}/);
+  assert.match(
+    app,
+    /const focusKey = button\.dataset\.focusKey;[\s\S]*renderCommonLinks\(focusKey, \$\('#commonLinksCategories'\)\);/
+  );
+  assert.match(
+    app,
+    /const focusKey = button\.dataset\.focusKey;[\s\S]*renderCommonLinks\(focusKey, \$\('#commonLinksGrid'\)\);/
+  );
+});
+
+test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或稳定区域', () => {
+  const listeners = {};
+  const makeRegion = name => ({
+    innerHTML: '',
+    textContent: '',
+    addEventListener(type, listener) { listeners[`${name}:${type}`] = listener; },
+    focus(options) {
+      fakeDocument.focusedRegion = name;
+      fakeDocument.focusOptions = options;
+    }
+  });
+  const categories = makeRegion('categories');
+  const grid = makeRegion('grid');
+  const count = makeRegion('count');
+  const elements = {
+    '#commonLinksCategories': categories,
+    '#commonLinksGrid': grid,
+    '#commonLinksCount': count
+  };
+  const fakeDocument = {
+    focusedKey: null,
+    focusedRegion: null,
+    querySelectorAll() {
+      const markup = `${categories.innerHTML}${grid.innerHTML}`;
+      return [...markup.matchAll(/data-focus-key="([^"]+)"/g)].map(match => ({
+        getAttribute: name => name === 'data-focus-key' ? match[1] : null,
+        focus: () => { fakeDocument.focusedKey = match[1]; }
+      }));
+    }
+  };
+  const state = {
+    linksCategory: CommonLinks.ALL_CATEGORY,
+    commonLinksFavorites: CommonLinks.getDefaultFavoriteIds()
+  };
+  const start = app.indexOf('function renderCommonLinks');
+  const end = app.indexOf('// ---------- 视图切换 ----------');
+  const install = new Function(
+    '$', 'CommonLinks', 'DomUtils', 'state', 'esc', 'document', 'persistCommonLinkFavorites',
+    `'use strict';\n${app.slice(start, end)}\nreturn renderCommonLinks;`
+  );
+  install(
+    selector => elements[selector],
+    CommonLinks,
+    require('../renderer/dom-utils'),
+    state,
+    value => String(value ?? ''),
+    fakeDocument,
+    () => {}
+  );
+
+  const categoryControl = {
+    dataset: { linksCategory: 'AI', focusKey: 'category:AI' }
+  };
+  listeners['categories:click']({ target: { closest: () => categoryControl } });
+  assert.equal(fakeDocument.focusedKey, 'category:AI');
+
+  fakeDocument.focusedKey = null;
+  const disappearedFavorite = {
+    dataset: { linkFavorite: 'missing-link', focusKey: 'favorite:missing-link' }
+  };
+  listeners['grid:click']({ target: { closest: () => disappearedFavorite } });
+  assert.equal(fakeDocument.focusedKey, null);
+  assert.equal(fakeDocument.focusedRegion, 'grid');
+  assert.deepEqual(fakeDocument.focusOptions, { preventScroll: true });
 });
 
 test('常用网址渲染通过共享工具转义文本并限制外链协议', () => {

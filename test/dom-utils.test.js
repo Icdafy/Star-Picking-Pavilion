@@ -18,7 +18,7 @@ test('escapeHTML escapes text used in rendered markup', () => {
 });
 
 test('safeHttpUrl permits only absolute HTTP and HTTPS URLs', () => {
-  assert.equal(safeHttpUrl(' https://example.com/a?b=1 '), 'https://example.com/a?b=1');
+  assert.equal(safeHttpUrl(' HTTP://Example.COM:80/a/../b '), 'http://example.com/b');
   assert.equal(safeHttpUrl('http://127.0.0.1:8080/path'), 'http://127.0.0.1:8080/path');
   for (const value of [
     'javascript:alert(1)',
@@ -27,7 +27,7 @@ test('safeHttpUrl permits only absolute HTTP and HTTPS URLs', () => {
     '/relative/path',
     'not a url',
     null
-  ]) assert.equal(safeHttpUrl(value), '');
+  ]) assert.equal(safeHttpUrl(value), '#');
 });
 
 test('findFocusKey returns the active descendant data-focus-key', () => {
@@ -66,6 +66,14 @@ test('restoreFocusByKey focuses the matching replacement without scrolling', () 
 
   assert.equal(restoreFocusByKey(root, 'favorite:work-plan'), true);
   assert.deepEqual(focusOptions, { preventScroll: true });
-  assert.equal(restoreFocusByKey(root, 'favorite:missing'), false);
+});
+
+test('restoreFocusByKey focuses a stable fallback when the keyed control disappeared', () => {
+  let fallbackOptions;
+  const fallback = { focus(options) { fallbackOptions = options; } };
+  const root = { querySelectorAll: () => [] };
+
+  assert.equal(restoreFocusByKey(root, 'favorite:missing', fallback), true);
+  assert.deepEqual(fallbackOptions, { preventScroll: true });
   assert.equal(restoreFocusByKey(root, null), false);
 });

@@ -509,8 +509,7 @@ function persistCommonLinkFavorites() {
   } catch { /* 存储不可用时保留当前会话内状态 */ }
 }
 
-function renderCommonLinks() {
-  const focusKey = DomUtils.findFocusKey(document);
+function renderCommonLinks(focusKey, fallbackTarget) {
   const categories = CommonLinks.getCategories();
   $('#commonLinksCategories').innerHTML = categories.map(category => `
     <button class="common-links-category${category === state.linksCategory ? ' is-active' : ''}"
@@ -542,24 +541,26 @@ function renderCommonLinks() {
       <a class="common-links-open" href="${esc(DomUtils.safeHttpUrl(item.url))}" target="_blank" rel="noopener">打开 <span aria-hidden="true">↗</span></a>
     </article>
   `).join('');
-  DomUtils.restoreFocusByKey(document, focusKey);
+  DomUtils.restoreFocusByKey(document, focusKey, fallbackTarget);
 }
 
 $('#commonLinksCategories').addEventListener('click', event => {
   const button = event.target.closest('button[data-links-category]');
   if (!button) return;
+  const focusKey = button.dataset.focusKey;
   state.linksCategory = button.dataset.linksCategory;
-  renderCommonLinks();
+  renderCommonLinks(focusKey, $('#commonLinksCategories'));
 });
 
 $('#commonLinksGrid').addEventListener('click', event => {
   const button = event.target.closest('button[data-link-favorite]');
   if (!button) return;
+  const focusKey = button.dataset.focusKey;
   const id = button.dataset.linkFavorite;
   if (state.commonLinksFavorites.has(id)) state.commonLinksFavorites.delete(id);
   else state.commonLinksFavorites.add(id);
   persistCommonLinkFavorites();
-  renderCommonLinks();
+  renderCommonLinks(focusKey, $('#commonLinksGrid'));
 });
 
 // ---------- 视图切换 ----------
