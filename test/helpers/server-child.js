@@ -37,7 +37,7 @@ async function startServer(t, { token = 'test-launch-token', nonce = 'test-ready
       STAR_PICKING_PAVILION_SERVER_NONCE: nonce,
       STAR_PICKING_PAVILION_NO_SCHEDULER: '1'
     },
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   });
 
   let stderr = '';
@@ -68,7 +68,7 @@ async function startServer(t, { token = 'test-launch-token', nonce = 'test-ready
   });
 
   assertReadyMessage(ready, nonce);
-  return { ...ready, token, dataDir, request: options => request({ port: ready.port, ...options }) };
+  return { ...ready, token, dataDir, child, request: options => request({ port: ready.port, ...options }) };
 }
 
 function assertReadyMessage(message, nonce) {

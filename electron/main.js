@@ -5,17 +5,33 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
 const { createCredentialStore } = require('./credential-store');
+const { focusExistingWindow, createServerProcessController } = require('./server-process');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
 let serverProc = null;
+let serverController = null;
 let win = null;
 let latestUpdateStatus = null;
 let autoUpdateInitialized = false;
 let autoUpdateTimer = null;
+let backendReady = false;
+let quitAfterShutdown = false;
+let desktopShutdownPromise = null;
 
 if (app.isPackaged) {
   app.setPath('userData', path.join(app.getPath('appData'), '摘星阁'));
+}
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
+else app.on('second-instance', () => focusExistingWindow(win));
+
+function reportUnexpectedServerExit({ code, signal }) {
+  if (!backendReady || quitAfterShutdown) return;
+  const detail = code != null ? `退出代码 ${code}` : `信号 ${signal || '未知'}`;
+  console.error(`[后端] 意外退出（${detail}）`);
+  dialog.showErrorBox('摘星阁服务已停止', `本地情报服务意外停止（${detail}）。请重启摘星阁。`);
 }
 
 function startServer({ initialApiKey, credentialStore }) {
@@ -36,6 +52,10 @@ function startServer({ initialApiKey, credentialStore }) {
       WINDCATCHER_DATA_DIR: dataDir
     },
     stdio: ['ignore', 'pipe', 'pipe']
+  });
+  serverController = createServerProcessController(serverProc, {
+    shutdownTimeoutMs: 5_000,
+    onUnexpectedExit: reportUnexpectedServerExit
   });
   serverProc.stdout?.on('data', d => process.stdout.write('[后端] ' + d));
   serverProc.stderr?.on('data', d => process.stderr.write('[后端!] ' + d));
@@ -64,6 +84,7 @@ function startServer({ initialApiKey, credentialStore }) {
         return;
       }
       ready = true;
+      backendReady = true;
       clearTimeout(timeout);
       resolve({ port: message.port, apiToken });
     });
@@ -206,7 +227,7 @@ async function chooseLegacyDatabase() {
   return ['current', 'legacy', 'cancel'][result.response] || 'cancel';
 }
 
-app.whenReady().then(async () => {
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
   installPermissionPolicy();
   setupAutoUpdate();
   await migrateUserData({
@@ -231,10 +252,30 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (serverProc) serverProc.kill();
   app.quit();
 });
-app.on('before-quit', () => {
+
+function shutdownDesktop() {
+  if (desktopShutdownPromise) return desktopShutdownPromise;
+  desktopShutdownPromise = (async () => {
+    backendReady = false;
+    if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+    autoUpdateTimer = null;
+    if (serverController) await serverController.shutdown();
+  })();
+  return desktopShutdownPromise;
+}
+
+app.on('before-quit', event => {
+  if (quitAfterShutdown) return;
+  event.preventDefault();
+  shutdownDesktop().catch(error => {
+    console.error('[退出] 后端关闭失败:', error.message);
+  }).finally(() => {
+    quitAfterShutdown = true;
+    app.quit();
+  });
+});
+app.on('will-quit', () => {
   if (autoUpdateTimer) clearInterval(autoUpdateTimer);
-  if (serverProc) serverProc.kill();
 });

@@ -48,3 +48,15 @@ test('auto update starts independently and reports failures to the renderer', ()
   assert.ok(updaterIndex > readyIndex && updaterIndex < serverIndex);
   assert.match(source, /checkForUpdatesAndNotify\(\)\.catch\([^)]*sendUpdateStatus\('error'/s);
 });
+
+test('desktop lifecycle is single-instance and shuts the utility process down cooperatively', () => {
+  const lockIndex = source.indexOf('requestSingleInstanceLock()');
+  const readyIndex = source.indexOf('app.whenReady()');
+  assert.ok(lockIndex >= 0 && lockIndex < readyIndex);
+  assert.match(source, /app\.on\('second-instance', \(\) => focusExistingWindow\(win\)\)/);
+  assert.match(source, /createServerProcessController\(serverProc/);
+  assert.match(source, /shutdownTimeoutMs:\s*5_000/);
+  assert.match(source, /if \(serverController\) await serverController\.shutdown\(\)/);
+  assert.match(source, /app\.on\('before-quit', event => \{[\s\S]*event\.preventDefault\(\)/);
+  assert.doesNotMatch(source, /window-all-closed[\s\S]{0,120}serverProc\.kill/);
+});

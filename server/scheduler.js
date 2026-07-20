@@ -14,6 +14,10 @@ let collectRunning = false;
 let analyzeRunning = false;
 let lastRun = null;        // 最近一次采集摘要
 let lastAnalyzeAt = null;  // 最近一次分析循环时间
+let schedulerStarted = false;
+let analyzeTimer = null;
+let startupTimer = null;
+const cronTasks = new Set();
 
 // ---------- 采集一次 ----------
 async function collectOnce(trigger = 'cron') {
@@ -71,25 +75,55 @@ async function runPipeline(trigger = 'manual') {
 }
 
 function startScheduler() {
+  if (schedulerStarted) return;
+  schedulerStarted = true;
   const settings = loadSettings();
   const interval = Math.max(5, settings.collect.intervalMinutes || 10);
   const analyzeSec = Math.max(20, settings.collect.analyzeIntervalSeconds || 75);
 
   // 采集循环（分钟级）
-  cron.schedule(`*/${interval} * * * *`, () => collectOnce('cron').catch(e => console.error('[collect]', e)));
+  cronTasks.add(cron.schedule(`*/${interval} * * * *`, () => collectOnce('cron').catch(e => console.error('[collect]', e))));
   // 分析循环（秒级，setInterval 自调度；锁防重入）
-  setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeSec * 1000);
+  analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeSec * 1000);
   // 日报（每天定点纯代码生成）
-  cron.schedule(`5 ${settings.dailyReportHour || 8} * * *`, () => {
+  cronTasks.add(cron.schedule(`5 ${settings.dailyReportHour || 8} * * *`, () => {
     try { generateDaily(); console.log('[daily] 日报已生成'); }
     catch (e) { console.error('[daily]', e); }
-  });
+  }));
   // 启动后先跑一轮全量
-  setTimeout(() => runPipeline('startup').catch(e => console.error('[pipeline]', e)), 2500);
+  startupTimer = setTimeout(() => runPipeline('startup').catch(e => console.error('[pipeline]', e)), 2500);
   console.log(`[scheduler] 已启动：每 ${interval} 分钟采集，每 ${analyzeSec} 秒分析一批，每天 ${settings.dailyReportHour || 8}:05 出日报`);
 }
 
+function stopScheduler() {
+  if (!schedulerStarted) return;
+  schedulerStarted = false;
+  if (analyzeTimer) clearInterval(analyzeTimer);
+  if (startupTimer) clearTimeout(startupTimer);
+  analyzeTimer = null;
+  startupTimer = null;
+  for (const task of cronTasks) {
+    task.stop?.();
+    task.destroy?.();
+  }
+  cronTasks.clear();
+  console.log('[scheduler] 已停止');
+}
+
+async function waitForSchedulerIdle() {
+  while (collectRunning || analyzeRunning) {
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
 module.exports = {
-  startScheduler, runPipeline, collectOnce, analyzeOnce,
-  getStatus: () => ({ running: collectRunning || analyzeRunning, collectRunning, analyzeRunning, lastRun, lastAnalyzeAt })
+  startScheduler, stopScheduler, waitForSchedulerIdle, runPipeline, collectOnce, analyzeOnce,
+  getStatus: () => ({
+    running: collectRunning || analyzeRunning,
+    schedulerStarted,
+    collectRunning,
+    analyzeRunning,
+    lastRun,
+    lastAnalyzeAt
+  })
 };

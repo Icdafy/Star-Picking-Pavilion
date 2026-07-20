@@ -4,11 +4,11 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { db, now } = require('./db');
+const { db, now, closeDatabase } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
 const { persistApiKey } = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
-const { runPipeline, startScheduler, getStatus } = require('./scheduler');
+const { runPipeline, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus } = require('./scheduler');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
@@ -256,6 +256,52 @@ const server = http.createServer(async (req, res) => {
     json(res, e instanceof HttpError ? e.statusCode : 500, { error: String(e.message || e) });
   }
 });
+
+let shutdownPromise = null;
+
+function closeHttpServer() {
+  if (!server.listening) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    server.close(error => error ? reject(error) : resolve());
+    server.closeIdleConnections?.();
+  });
+}
+
+function notifyStoppedAndExit() {
+  const stopped = { type: 'server:stopped' };
+  if (process.parentPort) {
+    process.parentPort.postMessage(stopped);
+    setImmediate(() => process.exit(0));
+    return;
+  }
+  if (typeof process.send === 'function') {
+    process.send(stopped, () => process.exit(0));
+    return;
+  }
+  process.exit(0);
+}
+
+function shutdownServer() {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    stopScheduler();
+    await Promise.all([closeHttpServer(), waitForSchedulerIdle()]);
+    closeDatabase();
+    notifyStoppedAndExit();
+  })().catch(error => {
+    console.error('[server] 关闭失败:', error);
+    process.exit(1);
+  });
+  return shutdownPromise;
+}
+
+function handleControlMessage(message) {
+  if (message?.type === 'server:shutdown') shutdownServer();
+}
+
+process.parentPort?.on('message', handleControlMessage);
+process.on('message', handleControlMessage);
+process.once('SIGTERM', shutdownServer);
 
 seedSources();
 server.listen(REQUESTED_PORT, '127.0.0.1', () => {
