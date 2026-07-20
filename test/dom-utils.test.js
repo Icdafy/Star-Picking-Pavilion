@@ -2,12 +2,31 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const {
   escapeHTML,
   safeHttpUrl,
   findFocusKey,
   restoreFocusByKey
 } = require('../renderer/dom-utils');
+
+test('CommonJS loading exports the API without creating a global DomUtils property', () => {
+  const modulePath = require.resolve('../renderer/dom-utils');
+  const result = spawnSync(process.execPath, ['-e', `
+    delete globalThis.DomUtils;
+    const api = require(${JSON.stringify(modulePath)});
+    process.stdout.write(JSON.stringify({
+      exported: typeof api.safeHttpUrl === 'function',
+      globalCreated: Object.prototype.hasOwnProperty.call(globalThis, 'DomUtils')
+    }));
+  `], { encoding: 'utf8' });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    exported: true,
+    globalCreated: false
+  });
+});
 
 test('escapeHTML escapes text used in rendered markup', () => {
   assert.equal(
