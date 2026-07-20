@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const expectedLinks = require('./fixtures/yunwo-common-links.json');
 const {
   ALL_CATEGORY,
   LINKS,
@@ -13,6 +14,7 @@ const {
 } = require('../renderer/common-links');
 
 test('迁入云幄源码中的全部 14 个合法网址', () => {
+  assert.deepEqual(LINKS, expectedLinks);
   assert.equal(LINKS.length, 14);
   assert.equal(new Set(LINKS.map(item => item.id)).size, 14);
   for (const item of LINKS) {

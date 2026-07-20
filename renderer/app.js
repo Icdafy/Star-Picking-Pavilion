@@ -5,6 +5,7 @@
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const API = '';
+const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
 
 function loadCommonLinkFavorites() {
@@ -57,8 +58,7 @@ async function api(path, opts) {
 }
 
 function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return DomUtils.escapeHTML(s);
 }
 
 function timeAgo(iso) {
@@ -510,10 +510,11 @@ function persistCommonLinkFavorites() {
 }
 
 function renderCommonLinks() {
+  const focusKey = DomUtils.findFocusKey(document);
   const categories = CommonLinks.getCategories();
   $('#commonLinksCategories').innerHTML = categories.map(category => `
     <button class="common-links-category${category === state.linksCategory ? ' is-active' : ''}"
-      data-links-category="${esc(category)}" type="button"
+      data-links-category="${esc(category)}" data-focus-key="category:${esc(category)}" type="button"
       aria-pressed="${category === state.linksCategory}">${esc(category)}</button>
   `).join('');
 
@@ -530,7 +531,7 @@ function renderCommonLinks() {
           <h3>${esc(item.name)}</h3>
         </div>
         <button class="common-links-favorite${item.isFavorite ? ' is-active' : ''}"
-          data-link-favorite="${esc(item.id)}" type="button"
+          data-link-favorite="${esc(item.id)}" data-focus-key="favorite:${esc(item.id)}" type="button"
           aria-pressed="${item.isFavorite}" title="${item.isFavorite ? '取消常用' : '设为常用'}">
           <span aria-hidden="true">${item.isFavorite ? '★' : '☆'}</span>
           ${item.isFavorite ? '已常用' : '设为常用'}
@@ -538,9 +539,10 @@ function renderCommonLinks() {
       </div>
       <p>${esc(item.description)}</p>
       <div class="common-links-tags">${item.tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
-      <a class="common-links-open" href="${esc(item.url)}" target="_blank" rel="noopener">打开 <span aria-hidden="true">↗</span></a>
+      <a class="common-links-open" href="${esc(DomUtils.safeHttpUrl(item.url))}" target="_blank" rel="noopener">打开 <span aria-hidden="true">↗</span></a>
     </article>
   `).join('');
+  DomUtils.restoreFocusByKey(document, focusKey);
 }
 
 $('#commonLinksCategories').addEventListener('click', event => {

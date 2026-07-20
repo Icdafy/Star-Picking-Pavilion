@@ -19,8 +19,11 @@ test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
 });
 
 test('领域模块在应用脚本之前加载', () => {
+  const domUtilsIndex = html.indexOf('<script src="dom-utils.js"></script>');
   const moduleIndex = html.indexOf('<script src="common-links.js"></script>');
   const appIndex = html.indexOf('<script src="app.js"></script>');
+  assert.ok(domUtilsIndex >= 0);
+  assert.ok(moduleIndex > domUtilsIndex);
   assert.ok(moduleIndex >= 0);
   assert.ok(appIndex > moduleIndex);
 });
@@ -40,6 +43,22 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
   assert.match(app, /CommonLinks\.STORAGE_KEY/);
   assert.match(app, /localStorage\.setItem/);
   assert.match(app, /class="common-links-open"[^>]*target="_blank"[^>]*rel="noopener"/);
+});
+
+test('常用网址重渲染后将键盘焦点恢复到同一控制项', () => {
+  assert.match(app, /const DomUtils = window\.DomUtils;/);
+  assert.match(app, /data-focus-key="category:\$\{esc\(category\)\}"/);
+  assert.match(app, /data-focus-key="favorite:\$\{esc\(item\.id\)\}"/);
+  assert.match(
+    app,
+    /function renderCommonLinks\(\)\s*\{\s*const focusKey = DomUtils\.findFocusKey\(document\);/
+  );
+  assert.match(app, /DomUtils\.restoreFocusByKey\(document, focusKey\);\s*\}/);
+});
+
+test('常用网址渲染通过共享工具转义文本并限制外链协议', () => {
+  assert.match(app, /function esc\(s\)\s*\{\s*return DomUtils\.escapeHTML\(s\);\s*\}/);
+  assert.match(app, /href="\$\{esc\(DomUtils\.safeHttpUrl\(item\.url\)\)\}"/);
 });
 
 test('常用网址沿用 Electron 的安全外链策略', () => {
