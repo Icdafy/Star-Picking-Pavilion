@@ -23,6 +23,7 @@ test('packaging config is a production allowlist with no broad glob or asar unpa
   assert.equal(Object.hasOwn(packageJson.build, 'asarUnpack'), false);
   assert.deepEqual(packageJson.build.electronLanguages, ['zh-CN', 'en-US']);
   assert.equal(packageJson.scripts['verify:package'], 'node scripts/verify-package.js');
+  assert.equal(packageJson.scripts['audit:runtime'], 'npm audit --omit=dev --audit-level=high');
 });
 
 test('package verifier accepts only application roots, production dependencies and metadata', () => {

@@ -18,6 +18,7 @@
     "pipeline": "node scripts/run-pipeline.js",
     "icon": "python build/make-icon.py",
     "verify:package": "node scripts/verify-package.js",
+    "audit:runtime": "npm audit --omit=dev --audit-level=high",
     "dist": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always"
   },
