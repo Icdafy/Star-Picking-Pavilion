@@ -1,9 +1,9 @@
 {
   "name": "windcatcher",
-  "productName": "捕风司",
+  "productName": "摘星阁",
   "version": "0.1.0",
-  "description": "捕风司 · 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
-  "author": "捕风司",
+  "description": "摘星阁 · 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
+  "author": "摘星阁",
   "license": "MIT",
   "homepage": "https://github.com/Icdafy/Windcather",
   "repository": {
@@ -33,8 +33,8 @@
   },
   "build": {
     "appId": "com.windcatcher.app",
-    "productName": "捕风司",
-    "copyright": "Copyright © 2026 捕风司",
+    "productName": "摘星阁",
+    "copyright": "Copyright © 2026 摘星阁",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -70,7 +70,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "捕风司",
+      "shortcutName": "摘星阁",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"

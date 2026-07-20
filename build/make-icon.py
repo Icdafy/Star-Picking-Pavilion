@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""生成捕风司应用图标（夜航塔台·雷达）—— 输出 build/icon.ico 与 build/icon.png
+"""生成摘星阁应用图标（夜航塔台·雷达）—— 输出 build/icon.ico 与 build/icon.png
    超采样渲染（4x）后缩放，得到平滑边缘；.ico 内嵌多尺寸。"""
 import os, math
 from PIL import Image, ImageDraw, ImageFilter

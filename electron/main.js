@@ -45,7 +45,7 @@ async function createWindow() {
     minWidth: 1080,
     minHeight: 680,
     backgroundColor: '#04060e',
-    title: '捕风司 · 低空经济与商业航天情报站',
+    title: '摘星阁 · 低空经济与商业航天情报站',
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,

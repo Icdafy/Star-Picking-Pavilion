@@ -13,7 +13,7 @@ const { computeQuality, isFeatured } = require('./scoring');
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 
 // ---------- 阶段 1：相关性预筛 ----------
-const PREFILTER_SYSTEM = `你是「捕风司」情报站的预筛员，只关注两个行业（国内外均要，不限中国）：
+const PREFILTER_SYSTEM = `你是「摘星阁」情报站的预筛员，只关注两个行业（国内外均要，不限中国）：
 A=低空经济（eVTOL/飞行汽车、无人机、通用航空、低空空域政策与基建、城市空中交通 UAM 等；含 Joby/Archer/Lilium/Volocopter/Wisk 等海外公司）
 B=商业航天（商业火箭、可回收火箭、卫星互联网与星座、商业发射、卫星制造与测控等；含 SpaceX/星链 Starlink/Blue Origin/Rocket Lab/OneWeb/ESA/NASA 商业项目等海外动态）
 判断每条资讯是否与 A 或 B 实质相关。判为无关(rel=false)的情形：
@@ -46,7 +46,7 @@ async function prefilterBatch(articles, settings) {
 }
 
 // ---------- 阶段 2：五维评分 ----------
-const SCORING_SYSTEM = `你是「捕风司」情报站的资深分析师，领域为低空经济与商业航天（国内外均覆盖）。
+const SCORING_SYSTEM = `你是「摘星阁」情报站的资深分析师，领域为低空经济与商业航天（国内外均覆盖）。
 对给出的一条资讯，输出 JSON（不要输出其他内容）：
 {
  "scores": {

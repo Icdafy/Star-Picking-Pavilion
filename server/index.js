@@ -249,6 +249,6 @@ const server = http.createServer(async (req, res) => {
 
 seedSources();
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[server] 捕风司后端已启动: http://127.0.0.1:${PORT}`);
+  console.log(`[server] 摘星阁后端已启动: http://127.0.0.1:${PORT}`);
   if (process.env.WINDCATCHER_NO_SCHEDULER !== '1') startScheduler();
 });

@@ -1,5 +1,5 @@
 'use strict';
-/* 捕风司 · 前端逻辑（零依赖原生 JS）
+/* 摘星阁 · 前端逻辑（零依赖原生 JS）
    v0.2：双主题切换 / 时间轴日期分组信息流 / 右侧热度栏 */
 
 const $ = s => document.querySelector(s);
