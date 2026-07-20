@@ -6,3 +6,12 @@ dist/
 .worktrees/
 .playwright-cli/
 output/playwright/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+screenshots/
+config/common-links.local.json
+dist/package-verification.json

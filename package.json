@@ -17,6 +17,7 @@
     "server": "node server/index.js",
     "pipeline": "node scripts/run-pipeline.js",
     "icon": "python build/make-icon.py",
+    "verify:package": "node scripts/verify-package.js",
     "dist": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always"
   },
@@ -41,19 +42,17 @@
       "buildResources": "build"
     },
     "files": [
-      "**/*",
-      "!**/*.md",
-      "!data/**",
-      "!dist/**",
-      "!.github/**",
-      "!.claude/**",
-      "!scripts/**",
-      "!**/.gitignore",
-      "!**/*.map"
+      "electron/**/*",
+      "server/**/*",
+      "renderer/**/*",
+      "config/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/*.test.js"
     ],
-    "asarUnpack": [
-      "renderer/**",
-      "config/**"
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
     ],
     "win": {
       "target": [
