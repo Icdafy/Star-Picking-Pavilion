@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="摘星阁" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="sky" cx="36%" cy="28%" r="78%">
+      <stop offset="0" stop-color="#172448"/>
+      <stop offset="1" stop-color="#04060e"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="32" y1="8" x2="52" y2="38">
+      <stop stop-color="#9ff7e8" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#5eead4" stop-opacity=".08"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#sky)"/>
+  <circle cx="32" cy="32" r="23" fill="none" stroke="#9db2df" stroke-opacity=".34" stroke-width="2"/>
+  <circle cx="32" cy="32" r="14" fill="none" stroke="#9db2df" stroke-opacity=".5" stroke-width="2"/>
+  <path d="M32 32V8a24 24 0 0 1 20.8 12Z" fill="url(#sweep)"/>
+  <circle cx="32" cy="32" r="3" fill="#5eead4"/>
+  <circle cx="45" cy="19" r="2.6" fill="#fca35d"/>
+  <circle cx="19" cy="42" r="2" fill="#aef3e6"/>
+</svg>

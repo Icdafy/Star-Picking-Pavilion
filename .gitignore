@@ -4,3 +4,5 @@ dist/
 *.log
 .claude/
 .worktrees/
+.playwright-cli/
+output/playwright/

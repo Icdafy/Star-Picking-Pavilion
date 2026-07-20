@@ -25,6 +25,12 @@ test('领域模块在应用脚本之前加载', () => {
   assert.ok(appIndex > moduleIndex);
 });
 
+test('页面声明可由现有静态路由提供的摘星阁图标', () => {
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg">/);
+  const favicon = fs.readFileSync(path.join(root, 'renderer', 'favicon.svg'), 'utf8');
+  assert.match(favicon, /^<svg[^>]*aria-label="摘星阁"/);
+});
+
 test('视图切换、分类、星标和持久化均接入 app.js', () => {
   assert.match(app, /view:\s*'featured'.*links/s);
   assert.match(app, /#viewLinks/);
@@ -33,6 +39,15 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
   assert.match(app, /commonLinksGrid/);
   assert.match(app, /CommonLinks\.STORAGE_KEY/);
   assert.match(app, /localStorage\.setItem/);
+  assert.match(app, /class="common-links-open"[^>]*target="_blank"[^>]*rel="noopener"/);
+});
+
+test('常用网址沿用 Electron 的安全外链策略', () => {
+  const electronMain = fs.readFileSync(path.join(root, 'electron', 'main.js'), 'utf8');
+  assert.match(electronMain, /setWindowOpenHandler/);
+  assert.match(electronMain, /\^https\?:/);
+  assert.match(electronMain, /shell\.openExternal\(url\)/);
+  assert.match(electronMain, /return \{ action: 'deny' \}/);
 });
 
 test('常用网址沿用摘星阁主题并具备响应式和交互状态', () => {
