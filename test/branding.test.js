@@ -32,12 +32,12 @@ test('canonical brand config is the single explicit identity map', () => {
   assert.deepEqual(brand.storage, {
     theme: 'star-picking-pavilion.theme',
     realtime: 'star-picking-pavilion.realtime',
-    commonLinksFavorites: 'star-picking-pavilion.common-links.favorites'
+    commonLinks: 'star-picking-pavilion.common-links.favorites'
   });
   assert.deepEqual(brand.legacyCompatibility.storage, {
     theme: ['wc-theme'],
     realtime: ['wc-realtime'],
-    commonLinksFavorites: ['zxg-common-links-favorites']
+    commonLinks: ['zxg-common-links-favorites']
   });
 });
 
