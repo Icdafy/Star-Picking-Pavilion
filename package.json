@@ -12,6 +12,7 @@
   },
   "main": "electron/main.js",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "start": "electron .",
     "server": "node server/index.js",
     "pipeline": "node scripts/run-pipeline.js",
