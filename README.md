@@ -11,7 +11,7 @@
 
 ## 下载安装（普通用户）
 
-1. 到 [Releases](https://github.com/Icdafy/Windcather/releases) 下载最新的 `Windcatcher-Setup-x.y.z.exe`
+1. 到 [Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.1.exe`
 2. 双击安装（未做代码签名，Windows SmartScreen 可能提示一次：点「更多信息 → 仍要运行」即可）
 3. 打开即用 —— **无需安装 Node、无需注册、无需配置**
 

@@ -4,7 +4,7 @@
 
 ## 一次性准备
 
-1. 仓库已就绪：[`Icdafy/Windcather`](https://github.com/Icdafy/Windcather)。`package.json`（`build.publish` / `repository` / `homepage`）与 `README.md` 下载链接均已指向该仓库，无需再改。
+1. 仓库已就绪：[`Icdafy/Star-Picking-Pavilion`](https://github.com/Icdafy/Star-Picking-Pavilion)。`package.json`（`build.publish` / `repository` / `homepage`）与 `README.md` 下载链接均已指向该仓库，无需再改。
 2. 确认 `.gitignore` 已排除 `data/`（**你的 DeepSeek Key 在里面，绝不能入库**）、`dist/`、`.claude/`。
 3. （可选）以后若把仓库改名或换账号，记得同步改 `package.json` 的 `build.publish.owner/repo` 与 URL，否则自动更新会指错地址。
 
@@ -14,13 +14,13 @@
 
 ```bash
 # 1. 改版本号
-npm version patch        # 0.1.0 → 0.1.1（或 minor / major）
+npm version patch        # 0.0.1 → 0.0.2（或 minor / major）
 # 2. 推送代码与 tag
 git push && git push --tags
 ```
 
 推送 `v*` tag 后，GitHub Actions 会在 Windows runner 上自动构建并把
-安装包 + `latest.yml` 发布到 Releases。用的是仓库自带的 `GITHUB_TOKEN`，**无需额外密钥**。
+安装包（首版为 `Star-Picking-Pavilion-Setup-0.0.1.exe`）+ `latest.yml` 发布到 Releases。用的是仓库自带的 `GITHUB_TOKEN`，**无需额外密钥**。
 
 ## 方式 B：本地构建后发布
 

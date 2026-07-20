@@ -66,3 +66,15 @@ test('package and installer metadata use the v0.0.1 canonical identity', () => {
 test('云幄名称在常用网址功能中保持不变', () => {
   assert.match(read('renderer/index.html'), /云幄\s*·\s*常用网址/);
 });
+
+test('release documentation points only to the canonical repository and installer', () => {
+  const readme = read('README.md');
+  const releasing = read('RELEASING.md');
+
+  assert.match(readme, /https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion\/releases/);
+  assert.match(releasing, /Icdafy\/Star-Picking-Pavilion/);
+  assert.match(readme, /Star-Picking-Pavilion-Setup-0\.0\.1\.exe/);
+  assert.match(releasing, /Star-Picking-Pavilion-Setup-0\.0\.1\.exe/);
+  assert.doesNotMatch(readme, /Icdafy\/Windcather|Windcatcher-Setup-/i);
+  assert.doesNotMatch(releasing, /Icdafy\/Windcather|Windcatcher-Setup-/i);
+});
