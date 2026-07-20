@@ -5,7 +5,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { db, now } = require('./db');
-const { loadSettings, saveSettings, loadScoring } = require('./config');
+const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
+const { persistApiKey } = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
 const { runPipeline, startScheduler, getStatus } = require('./scheduler');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
@@ -207,16 +208,9 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/settings' && req.method === 'POST') {
         const b = await readJsonBody(req);
-        const s = loadSettings();
-        if (b.ai) {
-          if (b.ai.apiKey !== undefined && !b.ai.apiKey.includes('****')) s.ai.apiKey = b.ai.apiKey.trim();
-          for (const k of ['baseUrl', 'prefilterModel', 'scoringModel']) {
-            if (b.ai[k] !== undefined) s.ai[k] = String(b.ai[k]).trim();
-          }
-        }
-        if (b.collect?.intervalMinutes) s.collect.intervalMinutes = Number(b.collect.intervalMinutes);
-        if (b.collect?.rsshubBase !== undefined) s.collect.rsshubBase = String(b.collect.rsshubBase).trim();
-        saveSettings(s);
+        const update = applySettingsPatch(loadSettings(), b);
+        if (update.credentialChanged) await persistApiKey(update.apiKey);
+        await saveSettings(update.settings);
         return json(res, 200, { ok: true });
       }
       if (p === '/api/settings/test' && req.method === 'POST') {

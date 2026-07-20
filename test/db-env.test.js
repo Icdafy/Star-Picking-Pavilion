@@ -63,7 +63,7 @@ test('Electron main fixes packaged userData before readiness, migrates before st
   const setPath = source.indexOf("app.setPath('userData'");
   const ready = source.indexOf('app.whenReady()');
   const migration = source.indexOf('migrateUserData(');
-  const start = source.indexOf('startServer();', ready);
+  const start = source.indexOf('startServer(', ready);
 
   assert.ok(setPath >= 0 && setPath < ready, 'stable userData must be set before whenReady');
   assert.ok(migration >= 0 && migration < start, 'migration must finish before server start');

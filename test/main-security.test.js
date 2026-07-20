@@ -23,3 +23,12 @@ test('Electron injects authentication only into the exact loopback API origin', 
   assert.match(source, /http:\/\/127\.0\.0\.1:\$\{serverPort\}\/api\/\*/);
   assert.match(source, /new URL\(url\)\.origin/);
 });
+
+test('Electron brokers encrypted credentials without exposing them to the renderer', () => {
+  assert.match(source, /safeStorage/);
+  assert.match(source, /createCredentialStore/);
+  assert.match(source, /STAR_PICKING_PAVILION_AI_API_KEY:\s*initialApiKey/);
+  assert.match(source, /message\?\.type === 'credential:set'/);
+  assert.match(source, /type: 'credential:result'/);
+  assert.doesNotMatch(source, /webContents\.send\([^\n]*apiKey/);
+});

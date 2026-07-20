@@ -1,9 +1,10 @@
 'use strict';
 // Electron 主进程 —— 用内置 Node（utilityProcess）跑后端子进程，无需用户另装 Node；加载本地页面
-const { app, BrowserWindow, shell, utilityProcess, ipcMain, dialog, session } = require('electron');
+const { app, BrowserWindow, shell, utilityProcess, ipcMain, dialog, session, safeStorage } = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
+const { createCredentialStore } = require('./credential-store');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -14,7 +15,7 @@ if (app.isPackaged) {
   app.setPath('userData', path.join(app.getPath('appData'), '摘星阁'));
 }
 
-function startServer() {
+function startServer({ initialApiKey, credentialStore }) {
   const serverEntry = path.join(__dirname, '..', 'server', 'index.js');
   // 打包后数据写入 userData（可写、可保留）；开发期沿用项目内 ./data
   const dataDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
@@ -26,6 +27,7 @@ function startServer() {
       STAR_PICKING_PAVILION_PORT: '0',
       STAR_PICKING_PAVILION_API_TOKEN: apiToken,
       STAR_PICKING_PAVILION_SERVER_NONCE: serverNonce,
+      STAR_PICKING_PAVILION_AI_API_KEY: initialApiKey,
       STAR_PICKING_PAVILION_DATA_DIR: dataDir,
       WINDCATCHER_PORT: '0',
       WINDCATCHER_DATA_DIR: dataDir
@@ -40,6 +42,18 @@ function startServer() {
       if (!ready) reject(new Error('后端启动握手超时'));
     }, 15_000);
     serverProc.on('message', message => {
+      if (message?.type === 'credential:set') {
+        credentialStore.set(message.apiKey).then(
+          () => serverProc.postMessage({ type: 'credential:result', requestId: message.requestId, ok: true }),
+          error => serverProc.postMessage({
+            type: 'credential:result',
+            requestId: message.requestId,
+            ok: false,
+            error: String(error.message || error)
+          })
+        );
+        return;
+      }
       if (message?.type !== 'server:ready') return;
       if (message.nonce !== serverNonce || !Number.isInteger(message.port) || message.port <= 0) {
         clearTimeout(timeout);
@@ -162,7 +176,11 @@ app.whenReady().then(async () => {
     repoDataDir: path.join(__dirname, '..', 'data'),
     chooseSource: chooseLegacyDatabase
   });
-  const { port: serverPort, apiToken } = await startServer();
+  const dataDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
+  const credentialStore = createCredentialStore({ safeStorage, directory: dataDir });
+  await credentialStore.migratePlaintextSettings(path.join(dataDir, 'settings.json'));
+  const initialApiKey = await credentialStore.get();
+  const { port: serverPort, apiToken } = await startServer({ initialApiKey, credentialStore });
   installApiAuthentication(serverPort, apiToken);
   await createWindow(serverPort);
 }).catch(async error => {

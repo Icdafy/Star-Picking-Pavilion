@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DATA_DIR } = require('./db');
+const { validateAiBaseUrl } = require('./http-security');
+const { getApiKey, setApiKey } = require('./runtime-credentials');
 
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
@@ -32,14 +34,64 @@ const DEFAULT_SETTINGS = {
 function loadSettings() {
   try {
     const raw = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
-    return deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
+    const legacyKey = String(raw?.ai?.apiKey || '').trim();
+    if (!getApiKey() && legacyKey) setApiKey(legacyKey);
+    const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
+    settings.ai.apiKey = getApiKey();
+    return settings;
   } catch {
-    return structuredClone(DEFAULT_SETTINGS);
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    settings.ai.apiKey = getApiKey();
+    return settings;
   }
 }
 
-function saveSettings(s) {
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf8');
+async function saveSettings(settings, options = {}) {
+  const sanitized = structuredClone(settings);
+  if (sanitized.ai) delete sanitized.ai.apiKey;
+  const temporary = `${SETTINGS_PATH}.${process.pid}-${Date.now()}.tmp`;
+  const rename = options.rename || fs.promises.rename;
+  await fs.promises.mkdir(path.dirname(SETTINGS_PATH), { recursive: true });
+  try {
+    await fs.promises.writeFile(temporary, JSON.stringify(sanitized, null, 2), 'utf8');
+    await rename(temporary, SETTINGS_PATH);
+  } catch (error) {
+    await fs.promises.rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+function applySettingsPatch(currentSettings, patch) {
+  const settings = structuredClone(currentSettings);
+  const currentKey = String(settings.ai.apiKey || getApiKey() || '');
+  let apiKey = currentKey;
+  let credentialChanged = false;
+
+  if (patch?.ai) {
+    const incomingKey = patch.ai.apiKey;
+    const suppliesKey = incomingKey !== undefined && !String(incomingKey).includes('****');
+    if (patch.ai.baseUrl !== undefined) {
+      const baseUrl = String(patch.ai.baseUrl).trim().replace(/\/$/, '');
+      if (!validateAiBaseUrl(baseUrl)) throw new Error('AI 基础地址必须使用 HTTPS（本机回环地址除外）');
+      if (baseUrl !== settings.ai.baseUrl && !suppliesKey) {
+        apiKey = '';
+        credentialChanged = Boolean(currentKey);
+      }
+      settings.ai.baseUrl = baseUrl;
+    }
+    if (suppliesKey) {
+      apiKey = String(incomingKey || '').trim();
+      credentialChanged = apiKey !== currentKey;
+    }
+    for (const key of ['prefilterModel', 'scoringModel']) {
+      if (patch.ai[key] !== undefined) settings.ai[key] = String(patch.ai[key]).trim();
+    }
+  }
+
+  if (patch?.collect?.intervalMinutes) settings.collect.intervalMinutes = Number(patch.collect.intervalMinutes);
+  if (patch?.collect?.rsshubBase !== undefined) settings.collect.rsshubBase = String(patch.collect.rsshubBase).trim();
+  settings.ai.apiKey = apiKey;
+  return { settings, apiKey, credentialChanged };
 }
 
 function deepMerge(base, over) {
@@ -57,4 +109,4 @@ function loadScoring() {
   return JSON.parse(fs.readFileSync(SCORING_PATH, 'utf8'));
 }
 
-module.exports = { loadSettings, saveSettings, loadScoring, SETTINGS_PATH };
+module.exports = { applySettingsPatch, loadSettings, saveSettings, loadScoring, SETTINGS_PATH };

@@ -56,3 +56,27 @@ test('real server enforces JSON media type and 64 KiB request limit', async t =>
   });
   assert.equal(malformed.status, 400);
 });
+
+test('settings API keeps an accepted key only in runtime memory', async t => {
+  const server = await startServer(t);
+  const auth = { [API_TOKEN_HEADER]: server.token, 'content-type': 'application/json' };
+
+  const saved = await server.request({
+    method: 'POST',
+    pathname: '/api/settings',
+    headers: auth,
+    body: JSON.stringify({ ai: { apiKey: 'sk-server-runtime-only' } })
+  });
+  assert.equal(saved.status, 200);
+  assert.doesNotMatch(saved.body, /sk-server-runtime-only/);
+
+  const loaded = await server.request({
+    pathname: '/api/settings',
+    headers: { [API_TOKEN_HEADER]: server.token }
+  });
+  assert.equal(loaded.status, 200);
+  const settings = JSON.parse(loaded.body);
+  assert.equal(settings.ai._hasKey, true);
+  assert.match(settings.ai.apiKey, /\*\*\*\*/);
+  assert.doesNotMatch(settings.ai.apiKey, /sk-server-runtime-only/);
+});
