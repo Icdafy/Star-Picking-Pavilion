@@ -11,6 +11,7 @@ const {
   assertRequiredLegalResources,
   assertNoEmbeddedSecrets,
   assertProductionDependencyEntries,
+  collectTextEntries,
   expectedInstallerName
 } = require('../scripts/verify-package');
 
@@ -62,6 +63,19 @@ test('package verifier rejects embedded credentials and development-only depende
   assert.throws(() => assertProductionDependencyEntries([
     '/node_modules/unlocked/package.json'
   ], lockPackages), /lockfile/);
+});
+
+test('package verifier preserves Windows ASAR separators while extracting files', () => {
+  const requested = [];
+  const files = collectTextEntries('app.asar', ['\\server\\ai\\cluster.js'], {
+    extractFile: (_archive, entry) => {
+      requested.push(entry);
+      if (entry !== 'server\\ai\\cluster.js') throw new Error('wrong separator');
+      return Buffer.from('module.exports = {};');
+    }
+  });
+  assert.deepEqual(requested, ['server\\ai\\cluster.js']);
+  assert.deepEqual(files, [{ path: '/server/ai/cluster.js', content: 'module.exports = {};' }]);
 });
 
 test('package verifier requires the application license and third-party notices beside the ASAR', () => {

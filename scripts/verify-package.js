@@ -69,6 +69,20 @@ function assertNoEmbeddedSecrets(files) {
   }
 }
 
+function collectTextEntries(archive, entries, asar) {
+  return entries
+    .map(rawEntry => ({
+      rawEntry: String(rawEntry).replace(/^[/\\]+/, ''),
+      entry: normalizeEntry(rawEntry)
+    }))
+    .filter(({ entry }) => !entry.startsWith('/node_modules/')
+      && (/\.(?:css|html|js|json|svg|txt)$/i.test(entry) || entry === '/package.json'))
+    .map(({ rawEntry, entry }) => ({
+      path: entry,
+      content: asar.extractFile(archive, rawEntry).toString('utf8')
+    }));
+}
+
 function assertProductionDependencyEntries(entries, lockPackages) {
   const manifestPattern = /^node_modules\/(?:@[^/]+\/)?[^/]+(?:\/node_modules\/(?:@[^/]+\/)?[^/]+)*\/package\.json$/;
   for (const rawEntry of entries) {
@@ -117,14 +131,7 @@ function verifyPackage(options = {}) {
   assertAllowedEntries(entries);
   const lock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'));
   assertProductionDependencyEntries(entries, lock.packages || {});
-  const textEntries = entries
-    .map(normalizeEntry)
-    .filter(entry => !entry.startsWith('/node_modules/')
-      && (/\.(?:css|html|js|json|svg|txt)$/i.test(entry) || entry === '/package.json'))
-    .map(entry => ({
-      path: entry,
-      content: asar.extractFile(archive, entry.slice(1).replace(/\\/g, '/')).toString('utf8')
-    }));
+  const textEntries = collectTextEntries(archive, entries, asar);
   assertNoEmbeddedSecrets(textEntries);
   assertAllowedResourceEntries(fs.readdirSync(resourcesDir));
   assertRequiredLegalResources(name => {
@@ -162,6 +169,7 @@ module.exports = {
   MAX_INSTALLER_BYTES,
   assertAllowedEntries,
   assertAllowedResourceEntries,
+  collectTextEntries,
   assertNoEmbeddedSecrets,
   assertProductionDependencyEntries,
   assertRequiredLegalResources,

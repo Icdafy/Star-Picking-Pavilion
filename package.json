@@ -29,7 +29,8 @@
     "electron-updater": "^6.8.9",
     "iconv-lite": "^0.7.3",
     "node-cron": "^4.6.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "semver": "~7.7.4"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "^6.0.0",
