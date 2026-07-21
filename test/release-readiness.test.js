@@ -83,6 +83,10 @@ test('CI and tag release workflows enforce every gate before publishing', () => 
   for (const command of ['npm ci', 'npm test', 'npm run test:e2e', 'npm run audit:runtime']) {
     assert.match(ci, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+  for (const workflow of [ci, release]) {
+    assert.ok(workflow.indexOf('npm run notices') < workflow.indexOf('npm run dist'));
+    assert.match(workflow, /git diff --exit-code -- THIRD_PARTY_NOTICES\.txt/);
+  }
 
   const ordered = [
     'npm ci',
@@ -90,6 +94,7 @@ test('CI and tag release workflows enforce every gate before publishing', () => 
     'npm test',
     'npm run test:e2e',
     'npm run audit:runtime',
+    'npm run notices',
     'npm run dist',
     'npm run verify:package',
     'Get-FileHash',

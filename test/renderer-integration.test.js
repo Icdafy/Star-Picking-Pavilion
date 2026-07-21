@@ -46,6 +46,29 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
   assert.match(app, /class="common-links-open"[^>]*target="_blank"[^>]*rel="noopener"/);
 });
 
+test('设置页不接收密钥内容，空输入不会覆盖已保存的密钥', () => {
+  assert.doesNotMatch(app, /setApiKey['"]\)\.value\s*=\s*s\.ai\.apiKey/);
+  assert.match(app, /if \(apiKey\) aiPatch\.apiKey = apiKey/);
+  assert.match(app, /apiKey:\s*null/);
+  assert.match(html, /id="btnClearAiKey"/);
+});
+
+test('界面展示后端的安全错误消息并捕获设置保存失败', () => {
+  assert.match(app, /const payload = await res\.json\(\)\.catch\(\(\) => null\)/);
+  assert.match(app, /throw new Error\(payload\?\.error \|\| `请求失败/);
+  assert.match(app, /AI 配置保存失败：/);
+  assert.match(app, /采集设置保存失败：/);
+  assert.match(app, /清除密钥失败：/);
+  assert.match(app, /日报重新生成失败：/);
+  assert.match(app, /信源操作失败：/);
+  assert.match(app, /反馈保存失败：/);
+});
+
+test('日报导航使用本地日历日期而不是 UTC 日期切片', () => {
+  assert.match(app, /function localDateString\(date = new Date\(\)\)/);
+  assert.doesNotMatch(app, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+});
+
 test('页面脚本全部外置且动态渲染不使用内联事件处理器', () => {
   const scriptTags = [...html.matchAll(/<script\b([^>]*)>/gi)];
   assert.ok(scriptTags.length > 0);
@@ -170,7 +193,8 @@ test('信源移除操作明确说明为保留记录的软停用', () => {
 test('常用网址沿用 Electron 的安全外链策略', () => {
   const electronMain = fs.readFileSync(path.join(root, 'electron', 'main.js'), 'utf8');
   assert.match(electronMain, /setWindowOpenHandler/);
-  assert.match(electronMain, /protocol === 'http:' \|\| protocol === 'https:'/);
+  assert.match(electronMain, /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:'/);
+  assert.match(electronMain, /parsed\.username \|\| parsed\.password/);
   assert.match(electronMain, /shell\.openExternal\(url\)/);
   assert.match(electronMain, /return \{ action: 'deny' \}/);
 });

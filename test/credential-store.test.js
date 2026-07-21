@@ -8,6 +8,11 @@ const path = require('node:path');
 
 const { createCredentialStore } = require('../electron/credential-store');
 
+test('plaintext migration never creates a second plaintext backup file', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'credential-store.js'), 'utf8');
+  assert.doesNotMatch(source, /plaintext-backup/);
+});
+
 function fakeSafeStorage() {
   return {
     isEncryptionAvailable: () => true,
@@ -60,5 +65,17 @@ test('credential store refuses to persist when OS encryption is unavailable', as
   });
 
   await assert.rejects(store.set('sk-test-secret'), /不可用|encryption/i);
+  assert.equal(fs.existsSync(store.file), false);
+});
+
+test('corrupt legacy settings do not prevent the desktop from starting', async t => {
+  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-credential-corrupt-'));
+  t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  const settingsFile = path.join(directory, 'settings.json');
+  await fs.promises.writeFile(settingsFile, '{not valid json', 'utf8');
+  const store = createCredentialStore({ safeStorage: fakeSafeStorage(), directory });
+
+  assert.equal(await store.migratePlaintextSettings(settingsFile), false);
+  assert.equal(await fs.promises.readFile(settingsFile, 'utf8'), '{not valid json');
   assert.equal(fs.existsSync(store.file), false);
 });

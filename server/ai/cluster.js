@@ -30,9 +30,9 @@ function clusterRecent() {
   const rows = db.prepare(`
     SELECT a.id, a.title, a.ai_summary, a.domain, a.cluster_id, a.quality_score, s.tier
     FROM articles a JOIN sources s ON s.id = a.source_id
-    WHERE a.relevant = 1 AND a.fetched_at > datetime('now', ?)
+    WHERE a.relevant = 1 AND julianday(a.fetched_at) > julianday('now', ?)
     ORDER BY a.id`).all(`-${windowH} hours`);
-  if (rows.length < 2) return { clusters: 0 };
+  if (!rows.length) return { clusters: 0 };
 
   // 标题 + AI 摘要一起算 bigram：东财式标题党标题差异大，但 AI 摘要对同一事件描述高度一致，靠摘要才能并簇
   for (const r of rows) r._bg = bigrams(r.title + ' ' + (r.ai_summary || ''));
@@ -58,30 +58,47 @@ function clusterRecent() {
   }
 
   let clusterCount = 0;
-  const txnBegin = db.prepare('UPDATE articles SET cluster_id=NULL WHERE id=?');
-  for (const members of groups.values()) {
-    if (members.length < 2) {
-      txnBegin.run(members[0].id);
-      continue;
+  const oldClusterIds = [...new Set(rows.map(row => row.cluster_id).filter(Boolean))];
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const clear = db.prepare('UPDATE articles SET cluster_id=NULL WHERE id=?');
+    for (const row of rows) clear.run(row.id);
+
+    const updateCluster = db.prepare('UPDATE articles SET cluster_id=? WHERE id=?');
+    for (const members of groups.values()) {
+      if (members.length < 2) continue;
+      // 主条：信源等级优先 > 质量分
+      members.sort((a, b) =>
+        (TIER_RANK[b.tier] - TIER_RANK[a.tier]) || ((b.quality_score || 0) - (a.quality_score || 0)));
+      const main = members[0];
+      const clusterId = db.prepare('INSERT INTO clusters (main_article_id, size, updated_at) VALUES (?, ?, ?)')
+        .run(main.id, members.length, now()).lastInsertRowid;
+      for (const member of members) updateCluster.run(clusterId, member.id);
+      clusterCount++;
     }
-    // 主条：信源等级优先 > 质量分
-    members.sort((a, b) =>
-      (TIER_RANK[b.tier] - TIER_RANK[a.tier]) || ((b.quality_score || 0) - (a.quality_score || 0)));
-    const main = members[0];
-    let clusterId = db.prepare('SELECT cluster_id FROM articles WHERE id=? AND cluster_id IS NOT NULL').get(main.id)?.cluster_id;
-    if (!clusterId) {
-      const r = db.prepare('INSERT INTO clusters (main_article_id, size, updated_at) VALUES (?, ?, ?)')
-        .run(main.id, members.length, now());
-      clusterId = r.lastInsertRowid;
-    } else {
+
+    for (const clusterId of oldClusterIds) {
+      const remaining = db.prepare(`SELECT a.id, a.quality_score, s.tier
+        FROM articles a JOIN sources s ON s.id=a.source_id WHERE a.cluster_id=?`).all(clusterId);
+      if (remaining.length < 2) {
+        db.prepare('UPDATE articles SET cluster_id=NULL WHERE cluster_id=?').run(clusterId);
+        db.prepare('DELETE FROM clusters WHERE id=?').run(clusterId);
+        continue;
+      }
+      remaining.sort((a, b) =>
+        (TIER_RANK[b.tier] - TIER_RANK[a.tier]) || ((b.quality_score || 0) - (a.quality_score || 0)));
       db.prepare('UPDATE clusters SET main_article_id=?, size=?, updated_at=? WHERE id=?')
-        .run(main.id, members.length, now(), clusterId);
+        .run(remaining[0].id, remaining.length, now(), clusterId);
     }
-    const upd = db.prepare('UPDATE articles SET cluster_id=? WHERE id=?');
-    for (const m of members) upd.run(clusterId, m.id);
-    clusterCount++;
+
+    db.exec(`DELETE FROM clusters
+      WHERE id NOT IN (SELECT DISTINCT cluster_id FROM articles WHERE cluster_id IS NOT NULL)`);
+    db.exec('COMMIT');
+    return { clusters: clusterCount };
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
   }
-  return { clusters: clusterCount };
 }
 
 module.exports = { clusterRecent };

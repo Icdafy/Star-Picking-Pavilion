@@ -33,12 +33,18 @@ test('Electron brokers encrypted credentials without exposing them to the render
   assert.doesNotMatch(source, /webContents\.send\([^\n]*apiKey/);
 });
 
+test('startup failure page never interpolates exception text into HTML', () => {
+  assert.doesNotMatch(source, /<p[^>]*>\$\{error\.message\}<\/p>/);
+  assert.match(source, /console\.error\('\[窗口\] 页面加载失败:'/);
+});
+
 test('Electron sandboxes renderers and denies every permission by default', () => {
   assert.match(source, /sandbox:\s*true/);
   assert.match(source, /setPermissionRequestHandler\([^\n]+callback\(false\)/);
   assert.match(source, /setPermissionCheckHandler\(\(\) => false\)/);
   assert.match(source, /render-process-gone/);
   assert.match(source, /failure\.html/);
+  assert.match(source, /if \(parsed\.username \|\| parsed\.password\) return false/);
 });
 
 test('auto update starts independently and reports failures to the renderer', () => {
@@ -59,4 +65,13 @@ test('desktop lifecycle is single-instance and shuts the utility process down co
   assert.match(source, /if \(serverController\) await serverController\.shutdown\(\)/);
   assert.match(source, /app\.on\('before-quit', event => \{[\s\S]*event\.preventDefault\(\)/);
   assert.doesNotMatch(source, /window-all-closed[\s\S]{0,120}serverProc\.kill/);
+});
+
+test('HTTP request-target parsing is covered by the server error boundary', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 'utf8');
+  const handler = serverSource.indexOf('http.createServer');
+  const errorBoundary = serverSource.indexOf('try {', handler);
+  const requestTargetParsing = serverSource.indexOf('new URL(req.url', handler);
+  assert.ok(handler >= 0 && errorBoundary >= 0 && requestTargetParsing >= 0);
+  assert.ok(errorBoundary < requestTargetParsing);
 });

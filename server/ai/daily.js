@@ -2,21 +2,22 @@
 // 每日情报日报 —— 学习 AIHOT：纯代码分桶排序，1 秒生成，无需大模型
 // 版块：政策法规 / 发射与任务 / 企业动态 / 技术研发 / 资本市场 / 应用场景 / 观点报告
 const { db, now } = require('../db');
+const { localDateString, localDateTimeToIso } = require('../date-time');
 
 const SECTION_ORDER = ['政策法规', '发射与任务', '企业动态', '技术研发', '资本市场', '应用场景', '观点报告'];
 const PER_SECTION = 8;
 
 function generateDaily(dateStr) {
   // dateStr: YYYY-MM-DD（日报覆盖该日期 8:00 往前 24 小时；默认今天）
-  const date = dateStr || new Date().toISOString().slice(0, 10);
-  const end = `${date}T08:00:00`;
+  const date = dateStr || localDateString();
+  const end = localDateTimeToIso(date, 8);
   const rows = db.prepare(`
     SELECT a.id, a.title, a.url, a.ai_summary, a.category, a.domain,
            a.quality_score, a.published_at, a.cluster_id, s.name AS source_name, s.tier
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.featured = 1
-      AND COALESCE(a.published_at, a.fetched_at) > datetime(?, '-24 hours')
-      AND COALESCE(a.published_at, a.fetched_at) <= datetime(?)
+      AND julianday(COALESCE(a.published_at, a.fetched_at)) > julianday(?, '-24 hours')
+      AND julianday(COALESCE(a.published_at, a.fetched_at)) <= julianday(?)
     ORDER BY a.quality_score DESC`).all(end, end);
 
   // 事件簇去重：每簇只留主条
@@ -37,6 +38,7 @@ function generateDaily(dateStr) {
 
   const content = {
     date,
+    windowVersion: 2,
     generatedAt: now(),
     total: deduped.length,
     byDomain: {
@@ -53,9 +55,15 @@ function generateDaily(dateStr) {
 }
 
 function getDaily(dateStr) {
-  const date = dateStr || new Date().toISOString().slice(0, 10);
+  const date = dateStr || localDateString();
   const row = db.prepare('SELECT content_json FROM daily_reports WHERE date=?').get(date);
-  if (row) return JSON.parse(row.content_json);
+  if (row) {
+    try {
+      const report = JSON.parse(row.content_json);
+      if (report && report.date === date && report.windowVersion === 2 && Number.isFinite(report.total)
+        && report.byDomain && Array.isArray(report.sections)) return report;
+    } catch {}
+  }
   return generateDaily(date);
 }
 

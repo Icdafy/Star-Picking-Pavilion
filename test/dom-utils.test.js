@@ -43,6 +43,7 @@ test('safeHttpUrl permits only absolute HTTP and HTTPS URLs', () => {
     'javascript:alert(1)',
     'data:text/html,hello',
     'file:///tmp/example',
+    'https://user:password@example.com/private',
     '/relative/path',
     'not a url',
     null

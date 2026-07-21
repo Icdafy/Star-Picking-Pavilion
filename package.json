@@ -59,6 +59,16 @@
       "!**/*.map",
       "!**/*.test.js"
     ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.txt",
+        "to": "THIRD_PARTY_NOTICES.txt"
+      }
+    ],
     "electronLanguages": [
       "zh-CN",
       "en-US"
@@ -86,7 +96,8 @@
       "guid": "5fea1cfe-e72e-5af6-9770-01a551e1f773",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "license": "LICENSE"
     },
     "publish": [
       {

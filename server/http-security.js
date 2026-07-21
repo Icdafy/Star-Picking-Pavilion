@@ -58,7 +58,7 @@ function authorize(request, policy) {
 
 async function readJsonBody(req) {
   const contentType = String(req.headers['content-type'] || '').toLowerCase();
-  if (!contentType.startsWith('application/json')) {
+  if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
     req.resume();
     throw new HttpError(415, '请求体必须使用 application/json');
   }

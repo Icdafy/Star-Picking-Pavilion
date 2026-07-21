@@ -79,7 +79,8 @@ async function migrateUserData(options) {
     repoDataDir,
     chooseSource,
     now = () => new Date(),
-    backupDatabase = (database, destination) => backup(database, destination)
+    backupDatabase = (database, destination) => backup(database, destination),
+    migrateSettingsFile = migrateSettings
   } = options || {};
 
   if (isPackaged && !appDataDir) throw new Error('Packaged migration requires appDataDir');
@@ -118,8 +119,8 @@ async function migrateUserData(options) {
 
   try {
     quickCheck(temporaryDestination);
+    await migrateSettingsFile(path.dirname(source), canonicalDirectory);
     await fs.promises.rename(temporaryDestination, destination);
-    await migrateSettings(path.dirname(source), canonicalDirectory);
     const record = {
       source,
       destination,

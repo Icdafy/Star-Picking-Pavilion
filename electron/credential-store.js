@@ -52,25 +52,17 @@ function createCredentialStore({ safeStorage, directory }) {
 
   async function migratePlaintextSettings(settingsFile) {
     if (!fs.existsSync(settingsFile)) return false;
-    const original = await fs.promises.readFile(settingsFile);
-    const settings = JSON.parse(original.toString('utf8'));
+    const serialized = await fs.promises.readFile(settingsFile, 'utf8');
+    let settings;
+    try { settings = JSON.parse(serialized); } catch { return false; }
     const legacyKey = String(settings?.ai?.apiKey || '').trim();
     if (!legacyKey) return false;
 
-    const backup = `${settingsFile}.plaintext-backup-${Date.now()}`;
-    await fs.promises.writeFile(backup, original, { mode: 0o600 });
-    try {
-      await set(legacyKey);
-      if (await get() !== legacyKey) throw new Error('加密凭据回读验证失败');
-      delete settings.ai.apiKey;
-      await atomicWrite(settingsFile, JSON.stringify(settings, null, 2));
-      await fs.promises.rm(backup, { force: true });
-      return true;
-    } catch (error) {
-      await fs.promises.copyFile(backup, settingsFile).catch(() => {});
-      await fs.promises.rm(backup, { force: true }).catch(() => {});
-      throw error;
-    }
+    await set(legacyKey);
+    if (await get() !== legacyKey) throw new Error('加密凭据回读验证失败');
+    delete settings.ai.apiKey;
+    await atomicWrite(settingsFile, JSON.stringify(settings, null, 2));
+    return true;
   }
 
   return Object.freeze({ file, get, set, migratePlaintextSettings });

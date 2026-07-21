@@ -220,6 +220,23 @@ test('copies settings atomically only from a different selected source directory
   );
 });
 
+test('settings migration completes before the canonical database becomes committed', async t => {
+  const sandbox = await makeSandbox(t);
+  const oldDir = path.join(sandbox.appDataDir, '捕风司');
+  const destination = path.join(sandbox.appDataDir, '摘星阁', CANONICAL_NAME);
+  await createDatabase(path.join(oldDir, LEGACY_NAME), ['old']);
+  await fs.promises.writeFile(path.join(oldDir, 'settings.json'), '{"theme":"legacy"}');
+
+  await assert.rejects(migrateUserData(migrationOptions(sandbox, {
+    migrateSettingsFile: async () => {
+      assert.equal(fs.existsSync(destination), false);
+      throw new Error('injected settings migration failure');
+    }
+  })), /injected settings migration failure/);
+
+  assert.equal(fs.existsSync(destination), false);
+});
+
 test('never overwrites existing canonical settings', async t => {
   const sandbox = await makeSandbox(t);
   const currentDir = path.join(sandbox.appDataDir, '摘星阁');

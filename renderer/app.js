@@ -69,8 +69,10 @@ async function api(path, opts) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts.body)
   } : opts);
-  if (!res.ok) throw new Error(`${res.status}`);
-  return res.json();
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(payload?.error || `请求失败（${res.status}）`);
+  if (payload === null) throw new Error('服务返回了无效响应');
+  return payload;
 }
 
 function esc(s) {
@@ -198,6 +200,15 @@ function cardInner(item) {
     ${reason}
     ${cluster}
     ${dims ? `<div class="dims">${dims}</div>` : ''}`;
+}
+
+function localDateString(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function parseLocalDate(value) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 document.addEventListener('error', event => {
@@ -387,18 +398,22 @@ async function loadDaily(date) {
 }
 
 function shiftDaily(days) {
-  const cur = new Date(state.dailyDate || new Date().toISOString().slice(0, 10));
+  const cur = state.dailyDate ? parseLocalDate(state.dailyDate) : new Date();
   cur.setDate(cur.getDate() + days);
-  const d = cur.toISOString().slice(0, 10);
-  if (new Date(d) > new Date()) return;
+  const d = localDateString(cur);
+  if (d > localDateString()) return;
   loadDaily(d);
 }
 $('#dailyPrev').addEventListener('click', () => shiftDaily(-1));
 $('#dailyNext').addEventListener('click', () => shiftDaily(1));
 $('#dailyRegen').addEventListener('click', async () => {
-  await api('/api/daily/regenerate', { body: { date: state.dailyDate } });
-  toast('日报已重新生成');
-  loadDaily(state.dailyDate);
+  try {
+    await api('/api/daily/regenerate', { body: { date: state.dailyDate } });
+    toast('日报已重新生成');
+    loadDaily(state.dailyDate);
+  } catch (error) {
+    toast('日报重新生成失败：' + error.message, true);
+  }
 });
 
 // ---------- 信源 ----------
@@ -439,17 +454,21 @@ $('#sourcesList').addEventListener('click', async e => {
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
   const id = btn.closest('.src-card').dataset.id;
-  if (btn.dataset.act === 'toggle') {
-    const enabled = btn.textContent === '启用';
-    await api(`/api/sources/${id}`, { method: 'PATCH', body: { enabled } });
-    toast(enabled ? '信源已启用' : '信源已停用');
-    loadSources();
-  } else if (btn.dataset.act === 'remove') {
-    if (btn.disabled) return;
-    if (!confirm('确定将该信源移出监控？已采集文章和信源记录都会保留。')) return;
-    await api(`/api/sources/${id}`, { method: 'DELETE' });
-    toast('信源已移出监控');
-    loadSources();
+  try {
+    if (btn.dataset.act === 'toggle') {
+      const enabled = btn.textContent === '启用';
+      await api(`/api/sources/${id}`, { method: 'PATCH', body: { enabled } });
+      toast(enabled ? '信源已启用' : '信源已停用');
+      loadSources();
+    } else if (btn.dataset.act === 'remove') {
+      if (btn.disabled) return;
+      if (!confirm('确定将该信源移出监控？已采集文章和信源记录都会保留。')) return;
+      await api(`/api/sources/${id}`, { method: 'DELETE' });
+      toast('信源已移出监控');
+      loadSources();
+    }
+  } catch (error) {
+    toast('信源操作失败：' + error.message, true);
   }
 });
 
@@ -469,10 +488,20 @@ $('#srcForm').addEventListener('submit', async e => {
 });
 
 // ---------- 设置 ----------
+function setAiCredentialState(hasKey) {
+  const input = $('#setApiKey');
+  input.value = '';
+  input.dataset.hasStoredKey = String(Boolean(hasKey));
+  input.placeholder = hasKey
+    ? '已由 Windows 安全保存；输入新值可替换'
+    : 'sk-…（留空则使用关键词启发式降级模式）';
+  $('#btnClearAiKey').disabled = !hasKey;
+}
+
 async function loadSettings() {
   try {
     const s = await api('/api/settings');
-    $('#setApiKey').value = s.ai._hasKey ? s.ai.apiKey : '';
+    setAiCredentialState(s.ai._hasKey);
     $('#setBaseUrl').value = s.ai.baseUrl;
     $('#setPrefilterModel').value = s.ai.prefilterModel;
     $('#setScoringModel').value = s.ai.scoringModel;
@@ -482,14 +511,33 @@ async function loadSettings() {
 }
 
 $('#btnSaveAi').addEventListener('click', async () => {
-  await api('/api/settings', { body: { ai: {
-    apiKey: $('#setApiKey').value,
-    baseUrl: $('#setBaseUrl').value || 'https://api.deepseek.com',
-    prefilterModel: $('#setPrefilterModel').value || 'deepseek-v4-flash',
-    scoringModel: $('#setScoringModel').value || 'deepseek-v4-pro'
-  } } });
-  toast('AI 配置已保存，下轮分析生效');
-  refreshStats();
+  try {
+    const apiKey = $('#setApiKey').value.trim();
+    const aiPatch = {
+      baseUrl: $('#setBaseUrl').value || 'https://api.deepseek.com',
+      prefilterModel: $('#setPrefilterModel').value || 'deepseek-v4-flash',
+      scoringModel: $('#setScoringModel').value || 'deepseek-v4-pro'
+    };
+    if (apiKey) aiPatch.apiKey = apiKey;
+    const result = await api('/api/settings', { body: { ai: aiPatch } });
+    setAiCredentialState(result.credentialConfigured);
+    toast('AI 配置已保存，下轮分析生效');
+    refreshStats();
+  } catch (error) {
+    toast('AI 配置保存失败：' + error.message, true);
+  }
+});
+
+$('#btnClearAiKey').addEventListener('click', async () => {
+  if (!confirm('确定清除已由 Windows 安全保存的 AI API Key？清除后将使用关键词启发式降级模式。')) return;
+  try {
+    await api('/api/settings', { body: { ai: { apiKey: null } } });
+    setAiCredentialState(false);
+    toast('AI API Key 已清除');
+    refreshStats();
+  } catch (error) {
+    toast('清除密钥失败：' + error.message, true);
+  }
 });
 
 $('#btnTestAi').addEventListener('click', async () => {
@@ -508,19 +556,27 @@ $('#btnTestAi').addEventListener('click', async () => {
 });
 
 $('#btnSaveCollect').addEventListener('click', async () => {
-  await api('/api/settings', { body: { collect: {
-    intervalMinutes: Number($('#setInterval').value) || 30,
-    rsshubBase: $('#setRsshub').value.trim()
-  } } });
-  toast('采集设置已保存（间隔重启后生效，RSSHub 立即生效）');
+  try {
+    await api('/api/settings', { body: { collect: {
+      intervalMinutes: Number($('#setInterval').value) || 30,
+      rsshubBase: $('#setRsshub').value.trim()
+    } } });
+    toast('采集设置已保存（间隔重启后生效，RSSHub 立即生效）');
+  } catch (error) {
+    toast('采集设置保存失败：' + error.message, true);
+  }
 });
 
 $('#btnFeedback').addEventListener('click', async () => {
   const t = $('#feedbackText').value.trim();
   if (!t) return toast('请先写点什么', true);
-  await api('/api/feedback', { body: { kind: 'feedback', content: t } });
-  $('#feedbackText').value = '';
-  toast('反馈已记录');
+  try {
+    await api('/api/feedback', { body: { kind: 'feedback', content: t } });
+    $('#feedbackText').value = '';
+    toast('反馈已记录');
+  } catch (error) {
+    toast('反馈保存失败：' + error.message, true);
+  }
 });
 
 // ---------- 云幄 · 常用网址 ----------

@@ -65,6 +65,17 @@ test('changing a remote AI base URL clears the credential unless a replacement i
   assert.equal(replaced.settings.ai.apiKey, 'sk-replacement');
 });
 
+test('blank credential input preserves the stored key and null explicitly clears it', () => {
+  const current = loadSettings();
+  const preserved = applySettingsPatch(current, { ai: { apiKey: '' } });
+  assert.equal(preserved.apiKey, 'sk-runtime-secret');
+  assert.equal(preserved.credentialChanged, false);
+
+  const cleared = applySettingsPatch(current, { ai: { apiKey: null } });
+  assert.equal(cleared.apiKey, '');
+  assert.equal(cleared.credentialChanged, true);
+});
+
 test('insecure remote AI base URLs are rejected', () => {
   assert.throws(
     () => applySettingsPatch(loadSettings(), { ai: { baseUrl: 'http://attacker.example/v1' } }),
@@ -73,4 +84,52 @@ test('insecure remote AI base URLs are rejected', () => {
   assert.doesNotThrow(
     () => applySettingsPatch(loadSettings(), { ai: { baseUrl: 'http://127.0.0.1:11434/v1' } })
   );
+});
+
+test('editable settings reject invalid numeric, URL, and model values', () => {
+  const current = loadSettings();
+  assert.throws(() => applySettingsPatch(current, []), /设置请求体/);
+  assert.throws(() => applySettingsPatch(current, { unexpected: true }), /设置字段/);
+  assert.throws(() => applySettingsPatch(current, { ai: [] }), /AI 设置/);
+  assert.throws(() => applySettingsPatch(current, { collect: { intervalMinutes: 0 } }), /采集间隔/);
+  assert.throws(() => applySettingsPatch(current, { collect: { intervalMinutes: 'ten' } }), /采集间隔/);
+  assert.throws(() => applySettingsPatch(current, { collect: { rsshubBase: 'file:///secret' } }), /RSSHub/);
+  assert.throws(() => applySettingsPatch(current, { ai: { scoringModel: '' } }), /模型/);
+
+  const valid = applySettingsPatch(current, {
+    collect: { intervalMinutes: 30, rsshubBase: 'https://rsshub.example/' }
+  });
+  assert.equal(valid.settings.collect.intervalMinutes, 30);
+  assert.equal(valid.settings.collect.rsshubBase, 'https://rsshub.example');
+});
+
+test('loading a malformed legacy settings file normalizes scheduler and request bounds', async () => {
+  await fs.promises.writeFile(SETTINGS_PATH, `{
+    "__proto__": { "polluted": true },
+    "unknown": "discard me",
+    "dailyReportHour": 99,
+    "ai": { "requestTimeoutMs": -1, "maxBatchPrefilter": 500, "prefilterModel": "" },
+    "collect": {
+      "intervalMinutes": 9999,
+      "analyzeIntervalSeconds": 0,
+      "keepDays": -20,
+      "requestTimeoutMs": "forever",
+      "userAgent": "bad\\nheader",
+      "rsshubBase": "file:///private"
+    }
+  }`, 'utf8');
+
+  const loaded = loadSettings();
+  assert.equal(loaded.dailyReportHour, 8);
+  assert.equal(loaded.ai.requestTimeoutMs, 60000);
+  assert.equal(loaded.ai.maxBatchPrefilter, 20);
+  assert.equal(loaded.ai.prefilterModel, 'deepseek-v4-flash');
+  assert.equal(loaded.collect.intervalMinutes, 10);
+  assert.equal(loaded.collect.analyzeIntervalSeconds, 75);
+  assert.equal(loaded.collect.keepDays, 30);
+  assert.equal(loaded.collect.requestTimeoutMs, 20000);
+  assert.match(loaded.collect.userAgent, /^Mozilla\//);
+  assert.equal(loaded.collect.rsshubBase, '');
+  assert.equal(Object.hasOwn(loaded, 'unknown'), false);
+  assert.equal({}.polluted, undefined);
 });

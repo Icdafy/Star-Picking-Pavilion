@@ -34,6 +34,11 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:runtime
 
+      - name: Verify third-party notices are current
+        run: |
+          npm run notices
+          git diff --exit-code -- THIRD_PARTY_NOTICES.txt
+
       - name: Build Windows installer once
         run: npm run dist
 
@@ -42,9 +47,6 @@ jobs:
 
       - name: Verify built artifact versions
         run: npm run verify:version -- --tag $env:GITHUB_REF_NAME --artifacts
-
-      - name: Generate third-party notices
-        run: npm run notices
 
       - name: Generate SHA-256 checksum
         shell: pwsh

@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DATA_DIR } = require('./db');
-const { validateAiBaseUrl } = require('./http-security');
+const { HttpError, validateAiBaseUrl } = require('./http-security');
 const { getApiKey, setApiKey } = require('./runtime-credentials');
 
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
@@ -31,12 +31,56 @@ const DEFAULT_SETTINGS = {
   dailyReportHour: 8                   // 每天 8 点生成日报
 };
 
+function boundedInteger(value, minimum, maximum, fallback) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= minimum && number <= maximum ? number : fallback;
+}
+
+function boundedText(value, fallback, maximum) {
+  return typeof value === 'string' && value.trim() && value.length <= maximum && !/\p{Cc}/u.test(value)
+    ? value.trim()
+    : fallback;
+}
+
+function normalizedRsshubBase(value) {
+  if (value == null || value === '') return '';
+  if (typeof value !== 'string' || value.length > 2048) return '';
+  const normalized = value.trim().replace(/\/$/, '');
+  try {
+    const url = new URL(normalized);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? normalized : '';
+  } catch {
+    return '';
+  }
+}
+
+function normalizeSettings(raw) {
+  const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
+  settings.ai.baseUrl = boundedText(settings.ai.baseUrl, DEFAULT_SETTINGS.ai.baseUrl, 2048);
+  settings.ai.prefilterModel = boundedText(settings.ai.prefilterModel, DEFAULT_SETTINGS.ai.prefilterModel, 120);
+  settings.ai.scoringModel = boundedText(settings.ai.scoringModel, DEFAULT_SETTINGS.ai.scoringModel, 120);
+  settings.ai.maxBatchPrefilter = boundedInteger(settings.ai.maxBatchPrefilter, 1, 50, DEFAULT_SETTINGS.ai.maxBatchPrefilter);
+  settings.ai.requestTimeoutMs = boundedInteger(settings.ai.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.ai.requestTimeoutMs);
+  settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 10, 720, DEFAULT_SETTINGS.collect.intervalMinutes);
+  settings.collect.analyzeIntervalSeconds = boundedInteger(
+    settings.collect.analyzeIntervalSeconds, 20, 3600, DEFAULT_SETTINGS.collect.analyzeIntervalSeconds
+  );
+  settings.collect.keepDays = boundedInteger(settings.collect.keepDays, 1, 3650, DEFAULT_SETTINGS.collect.keepDays);
+  settings.collect.requestTimeoutMs = boundedInteger(
+    settings.collect.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.collect.requestTimeoutMs
+  );
+  settings.collect.rsshubBase = normalizedRsshubBase(settings.collect.rsshubBase);
+  settings.collect.userAgent = boundedText(settings.collect.userAgent, DEFAULT_SETTINGS.collect.userAgent, 500);
+  settings.dailyReportHour = boundedInteger(settings.dailyReportHour, 0, 23, DEFAULT_SETTINGS.dailyReportHour);
+  return settings;
+}
+
 function loadSettings() {
   try {
     const raw = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
     const legacyKey = String(raw?.ai?.apiKey || '').trim();
     if (!getApiKey() && legacyKey) setApiKey(legacyKey);
-    const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
+    const settings = normalizeSettings(raw);
     settings.ai.apiKey = getApiKey();
     return settings;
   } catch {
@@ -47,7 +91,7 @@ function loadSettings() {
 }
 
 async function saveSettings(settings, options = {}) {
-  const sanitized = structuredClone(settings);
+  const sanitized = normalizeSettings(settings);
   if (sanitized.ai) delete sanitized.ai.apiKey;
   const temporary = `${SETTINGS_PATH}.${process.pid}-${Date.now()}.tmp`;
   const rename = options.rename || fs.promises.rename;
@@ -62,6 +106,24 @@ async function saveSettings(settings, options = {}) {
 }
 
 function applySettingsPatch(currentSettings, patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    throw new HttpError(400, '设置请求体必须是对象');
+  }
+  if (Object.keys(patch).some(key => !['ai', 'collect'].includes(key))) {
+    throw new HttpError(400, '包含不支持的设置字段');
+  }
+  if (patch.ai !== undefined && (!patch.ai || typeof patch.ai !== 'object' || Array.isArray(patch.ai))) {
+    throw new HttpError(400, 'AI 设置必须是对象');
+  }
+  if (patch.collect !== undefined && (!patch.collect || typeof patch.collect !== 'object' || Array.isArray(patch.collect))) {
+    throw new HttpError(400, '采集设置必须是对象');
+  }
+  if (patch.ai && Object.keys(patch.ai).some(key => !['apiKey', 'baseUrl', 'prefilterModel', 'scoringModel'].includes(key))) {
+    throw new HttpError(400, '包含不支持的 AI 设置字段');
+  }
+  if (patch.collect && Object.keys(patch.collect).some(key => !['intervalMinutes', 'rsshubBase'].includes(key))) {
+    throw new HttpError(400, '包含不支持的采集设置字段');
+  }
   const settings = structuredClone(currentSettings);
   const currentKey = String(settings.ai.apiKey || getApiKey() || '');
   let apiKey = currentKey;
@@ -69,33 +131,65 @@ function applySettingsPatch(currentSettings, patch) {
 
   if (patch?.ai) {
     const incomingKey = patch.ai.apiKey;
-    const suppliesKey = incomingKey !== undefined && !String(incomingKey).includes('****');
+    const replacementKey = typeof incomingKey === 'string' ? incomingKey.trim() : '';
+    const suppliesKey = replacementKey.length > 0;
     if (patch.ai.baseUrl !== undefined) {
       const baseUrl = String(patch.ai.baseUrl).trim().replace(/\/$/, '');
-      if (!validateAiBaseUrl(baseUrl)) throw new Error('AI 基础地址必须使用 HTTPS（本机回环地址除外）');
+      if (baseUrl.length > 2048 || !validateAiBaseUrl(baseUrl)) {
+        throw new HttpError(400, 'AI 基础地址必须使用 HTTPS（本机回环地址除外）');
+      }
       if (baseUrl !== settings.ai.baseUrl && !suppliesKey) {
         apiKey = '';
         credentialChanged = Boolean(currentKey);
       }
       settings.ai.baseUrl = baseUrl;
     }
-    if (suppliesKey) {
-      apiKey = String(incomingKey || '').trim();
+    if (incomingKey === null) {
+      apiKey = '';
+      credentialChanged = Boolean(currentKey);
+    } else if (suppliesKey) {
+      if (replacementKey.includes('****')) throw new Error('API Key 不能使用掩码值');
+      apiKey = replacementKey;
       credentialChanged = apiKey !== currentKey;
     }
     for (const key of ['prefilterModel', 'scoringModel']) {
-      if (patch.ai[key] !== undefined) settings.ai[key] = String(patch.ai[key]).trim();
+      if (patch.ai[key] !== undefined) {
+        const model = typeof patch.ai[key] === 'string' ? patch.ai[key].trim() : '';
+        if (!model || model.length > 120 || /\p{Cc}/u.test(model)) {
+          throw new HttpError(400, '模型名称必须是 1 到 120 个字符的文本');
+        }
+        settings.ai[key] = model;
+      }
     }
   }
 
-  if (patch?.collect?.intervalMinutes) settings.collect.intervalMinutes = Number(patch.collect.intervalMinutes);
-  if (patch?.collect?.rsshubBase !== undefined) settings.collect.rsshubBase = String(patch.collect.rsshubBase).trim();
+  if (patch?.collect && Object.hasOwn(patch.collect, 'intervalMinutes')) {
+    const interval = Number(patch.collect.intervalMinutes);
+    if (!Number.isInteger(interval) || interval < 10 || interval > 720) {
+      throw new HttpError(400, '采集间隔必须是 10 到 720 分钟之间的整数');
+    }
+    settings.collect.intervalMinutes = interval;
+  }
+  if (patch?.collect?.rsshubBase !== undefined) {
+    const rsshubBase = String(patch.collect.rsshubBase).trim().replace(/\/$/, '');
+    if (rsshubBase) {
+      let url;
+      try { url = new URL(rsshubBase); } catch {
+        throw new HttpError(400, 'RSSHub 地址不是有效 URL');
+      }
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || rsshubBase.length > 2048) {
+        throw new HttpError(400, 'RSSHub 地址必须是无内嵌凭据的 HTTP 或 HTTPS URL');
+      }
+    }
+    settings.collect.rsshubBase = rsshubBase;
+  }
   settings.ai.apiKey = apiKey;
   return { settings, apiKey, credentialChanged };
 }
 
 function deepMerge(base, over) {
   for (const k of Object.keys(over || {})) {
+    if (!Object.hasOwn(base, k) || k === '__proto__' || k === 'prototype' || k === 'constructor') continue;
     if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && base[k] && typeof base[k] === 'object') {
       deepMerge(base[k], over[k]);
     } else if (over[k] !== undefined) {

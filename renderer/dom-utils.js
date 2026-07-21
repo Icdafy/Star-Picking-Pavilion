@@ -19,6 +19,7 @@
     if (typeof value !== 'string') return '#';
     try {
       const parsed = new URL(value);
+      if (parsed.username || parsed.password) return '#';
       return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '#';
     } catch {
       return '#';

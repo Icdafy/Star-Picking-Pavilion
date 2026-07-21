@@ -19,6 +19,13 @@ test('static responses send a restrictive browser security policy', async t => {
   assert.equal(response.headers['x-content-type-options'], 'nosniff');
   assert.equal(response.headers['referrer-policy'], 'no-referrer');
   assert.equal(response.headers['x-frame-options'], 'DENY');
+
+  const traversal = await server.request({ pathname: '/..%2fpackage.json' });
+  assert.equal(traversal.status, 404);
+  assert.doesNotMatch(traversal.body, /"name"\s*:\s*"star-picking-pavilion"/);
+
+  const post = await server.request({ method: 'POST', pathname: '/' });
+  assert.equal(post.status, 405);
 });
 
 test('DELETE /api/sources/:id disables a source and preserves its articles', async t => {

@@ -128,8 +128,9 @@ function installPermissionPolicy() {
 
 function isAllowedExternalUrl(value) {
   try {
-    const protocol = new URL(value).protocol;
-    return protocol === 'http:' || protocol === 'https:';
+    const parsed = new URL(value);
+    if (parsed.username || parsed.password) return false;
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }
@@ -186,10 +187,11 @@ async function createWindow(serverPort) {
     await win.loadURL(`${expectedOrigin}/`);
     if (latestUpdateStatus) win.webContents.send('update:status', latestUpdateStatus);
   } catch (error) {
+    console.error('[窗口] 页面加载失败:', error.message);
     await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
       `<body style="background:#04060e;color:#dfe7ff;font-family:sans-serif;display:grid;place-items:center;height:100vh">
         <div style="text-align:center"><h2>后端启动失败</h2><p>情报服务未能启动，请重启应用重试。</p>
-        <p style="opacity:.6">${error.message}</p></div></body>`));
+        <p style="opacity:.6">如果问题持续存在，请查看应用日志。</p></div></body>`));
   }
 }
 

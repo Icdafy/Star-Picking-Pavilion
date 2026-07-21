@@ -29,6 +29,11 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:runtime
 
+      - name: Verify third-party notices are current
+        run: |
+          npm run notices
+          git diff --exit-code -- THIRD_PARTY_NOTICES.txt
+
       - name: Build Windows installer
         run: npm run dist
 

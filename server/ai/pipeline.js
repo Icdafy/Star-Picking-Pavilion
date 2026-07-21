@@ -9,6 +9,7 @@ const { loadSettings, loadScoring } = require('../config');
 const { chat, extractJson } = require('./deepseek');
 const kw = require('./keywords');
 const { computeQuality, isFeatured } = require('./scoring');
+const { normalizeModelResult } = require('./model-result');
 
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 
@@ -74,11 +75,6 @@ async function scoreArticle(article, settings) {
   ], { settings, model: settings.ai.scoringModel, maxTokens: 600 });
   const j = extractJson(out);
   if (!j || !j.scores) throw new Error('评分响应解析失败');
-  const s = j.scores;
-  for (const k of ['importance', 'novelty', 'credibility', 'impact', 'timeliness']) {
-    s[k] = Math.max(0, Math.min(100, Number(s[k]) || 0));
-  }
-  if (!CATEGORIES.includes(j.category)) j.category = '企业动态';
   return j;
 }
 
@@ -211,7 +207,7 @@ async function analyzePending(onProgress, limit = 200) {
   await Promise.all(Array.from({ length: CONC }, scoreWorker));
 
   featuredCount = db.prepare(
-    `SELECT COUNT(*) c FROM articles WHERE featured=1 AND fetched_at > datetime('now','-1 day')`).get().c;
+    `SELECT COUNT(*) c FROM articles WHERE featured=1 AND julianday(fetched_at) > julianday('now','-1 day')`).get().c;
   return { analyzed, featured: featuredCount, mode: 'full' };
 }
 
@@ -220,6 +216,7 @@ function markIrrelevant(id) {
 }
 
 function persistResult(a, domain, result, scoring, analyzedFlag) {
+  result = normalizeModelResult(result, CATEGORIES);
   const quality = computeQuality(result.scores, a.tier, scoring);
   const featured = isFeatured(quality, result.category, scoring, analyzedFlag === 3) ? 1 : 0;
   db.prepare(`UPDATE articles SET
