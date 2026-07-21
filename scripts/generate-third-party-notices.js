@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 function licenseName(value) {
@@ -52,7 +53,7 @@ function renderNotices(packageJson, packages) {
     if (item.source) lines.push(`Source: ${item.source}`);
     lines.push('');
   }
-  return `${lines.join('\n').trimEnd()}\n`;
+  return `${lines.join(os.EOL).trimEnd()}${os.EOL}`;
 }
 
 function generateNotices(projectRoot = path.join(__dirname, '..')) {

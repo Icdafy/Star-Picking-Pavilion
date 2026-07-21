@@ -29,6 +29,14 @@ test('public release documentation and compliance artifacts are complete', () =>
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
+test('third-party notices use the platform line ending', () => {
+  const { renderNotices } = require('../scripts/generate-third-party-notices');
+  const output = renderNotices({ version: '0.0.1' }, []);
+  const contentWithoutExpectedLineEndings = output.split(os.EOL).join('');
+
+  assert.doesNotMatch(contentWithoutExpectedLineEndings, /[\r\n]/);
+});
+
 test('README documents installation, privacy, recovery and security truthfully', () => {
   const readme = read('README.md');
   for (const required of [
