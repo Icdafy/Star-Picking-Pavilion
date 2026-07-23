@@ -148,6 +148,66 @@ test('non-array favorite storage falls back to a fresh default list', () => {
   assert.deepEqual(two.commonLinksFavorites, defaultFavoriteIds);
 });
 
+test('oversized favorite arrays normalize to defaults without iteration', () => {
+  const oversized = [];
+  oversized.length = CommonLinks.LINKS.length + 1;
+  oversized[0] = CommonLinks.LINKS[0].id;
+  Object.defineProperty(oversized, Symbol.iterator, {
+    get() {
+      throw new Error('oversized favorite array was iterated');
+    }
+  });
+
+  assert.deepEqual(
+    normalizeUiPreferences({ commonLinksFavorites: oversized }, { today: TODAY }).commonLinksFavorites,
+    defaultFavoriteIds
+  );
+});
+
+test('load treats oversized favorite arrays as corrupt storage', async t => {
+  const directory = await makeDirectory(t);
+  const store = createStore(directory);
+  const oversized = Array(CommonLinks.LINKS.length + 1).fill(null);
+  oversized[0] = CommonLinks.LINKS[0].id;
+  await fs.promises.writeFile(store.file, JSON.stringify({
+    commonLinksFavorites: oversized
+  }), 'utf8');
+
+  const loaded = await store.load();
+
+  assert.deepEqual(loaded.commonLinksFavorites, defaultFavoriteIds);
+});
+
+test('update synchronously rejects dense and sparse oversized favorite arrays', async t => {
+  const directory = await makeDirectory(t);
+  const store = createStore(directory, {
+    rename: async temporary => fs.promises.rm(temporary, { force: true })
+  });
+  const dense = Array(CommonLinks.LINKS.length + 1).fill(CommonLinks.LINKS[0].id);
+  const sparse = [];
+  sparse.length = CommonLinks.LINKS.length + 5;
+
+  async function captureSynchronousError(value) {
+    let error;
+    let pending;
+    try {
+      pending = store.update({ commonLinksFavorites: value });
+    } catch (caught) {
+      error = caught;
+    }
+    await pending?.catch(() => {});
+    return error;
+  }
+
+  for (const value of [dense, sparse]) {
+    const error = await captureSynchronousError(value);
+    assert.match(
+      error?.message || '',
+      /commonLinksFavorites.*at most|commonLinksFavorites.*最多/i
+    );
+  }
+});
+
 test('missing and corrupt files load defaults without writing or deleting anything', async t => {
   const missingDirectory = await makeDirectory(t);
   const missingStore = createStore(missingDirectory);
@@ -213,19 +273,17 @@ test('update rejects non-plain patches, unknown fields, and invalid explicit val
 
 test('rapid updates merge immediately in memory and serialize complete snapshots', async t => {
   const directory = await makeDirectory(t);
-  const store = createStore(directory);
-  await store.load();
   const originalWriteFile = fs.promises.writeFile;
   const observedModes = [];
-  fs.promises.writeFile = async (target, content, options) => {
-    if (path.dirname(target) === directory && target.endsWith('.tmp')) {
-      observedModes.push(options?.mode);
+  const store = createStore(directory, {
+    writeFile: async (target, content, options) => {
+      if (path.dirname(target) === directory && target.endsWith('.tmp')) {
+        observedModes.push(options?.mode);
+      }
+      return originalWriteFile(target, content, options);
     }
-    return originalWriteFile(target, content, options);
-  };
-  t.after(() => {
-    fs.promises.writeFile = originalWriteFile;
   });
+  await store.load();
 
   const firstWrite = store.update({ theme: 'light' });
   assert.equal(store.getSnapshot().theme, 'light');
@@ -266,5 +324,36 @@ test('atomic replacement failure preserves the prior file and cleans temporary f
   assert.equal(store.getSnapshot().theme, 'light');
   assert.equal(store.hasStoredPreferences(), true);
   assert.equal(await fs.promises.readFile(file, 'utf8'), baseline);
+  assert.deepEqual(await fs.promises.readdir(directory), ['ui-preferences.json']);
+});
+
+test('write queue recovers after one rename failure and persists the latest complete snapshot', async t => {
+  const directory = await makeDirectory(t);
+  let renameCalls = 0;
+  const store = createStore(directory, {
+    rename: async (temporary, destination) => {
+      renameCalls += 1;
+      if (renameCalls === 1) throw new Error('injected first rename failure');
+      await fs.promises.rename(temporary, destination);
+    }
+  });
+  await store.load();
+
+  const firstWrite = store.update({ theme: 'light' });
+  const secondWrite = store.update({ view: 'all' });
+
+  await assert.rejects(firstWrite, /injected first rename failure/);
+  await secondWrite;
+
+  assert.equal(renameCalls, 2);
+  assert.deepEqual(
+    JSON.parse(await fs.promises.readFile(store.file, 'utf8')),
+    {
+      ...getDefaultUiPreferences(),
+      theme: 'light',
+      view: 'all'
+    }
+  );
+  assert.equal(store.hasStoredPreferences(), true);
   assert.deepEqual(await fs.promises.readdir(directory), ['ui-preferences.json']);
 });

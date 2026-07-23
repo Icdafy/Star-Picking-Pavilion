@@ -10,6 +10,7 @@ const VIEWS = new Set(['featured', 'hot', 'all', 'daily', 'links', 'sources', 's
 const DOMAINS = new Set(['', 'lowaltitude', 'aerospace']);
 const LINK_CATEGORIES = new Set(CommonLinks.getCategories());
 const LINK_IDS = new Set(CommonLinks.LINKS.map(link => link.id));
+const MAX_FAVORITE_INPUT_LENGTH = CommonLinks.LINKS.length;
 const ALLOWED_FIELDS = new Set([
   'version',
   'theme',
@@ -85,7 +86,9 @@ function resolveToday(today) {
 }
 
 function normalizeFavoriteIds(value) {
-  if (!Array.isArray(value)) return [...CommonLinks.getDefaultFavoriteIds()];
+  if (!Array.isArray(value) || value.length > MAX_FAVORITE_INPUT_LENGTH) {
+    return [...CommonLinks.getDefaultFavoriteIds()];
+  }
   const seen = new Set();
   const normalized = [];
   for (const id of value) {
@@ -154,8 +157,15 @@ function validatePatch(patch, today) {
   if (Object.hasOwn(patch, 'linksCategory') && !LINK_CATEGORIES.has(patch.linksCategory)) {
     throw new TypeError('linksCategory is not supported');
   }
-  if (Object.hasOwn(patch, 'commonLinksFavorites') && !Array.isArray(patch.commonLinksFavorites)) {
-    throw new TypeError('commonLinksFavorites must be an array');
+  if (Object.hasOwn(patch, 'commonLinksFavorites')) {
+    if (!Array.isArray(patch.commonLinksFavorites)) {
+      throw new TypeError('commonLinksFavorites must be an array');
+    }
+    if (patch.commonLinksFavorites.length > MAX_FAVORITE_INPUT_LENGTH) {
+      throw new TypeError(
+        `commonLinksFavorites must contain at most ${MAX_FAVORITE_INPUT_LENGTH} items`
+      );
+    }
   }
   if (Object.hasOwn(patch, 'realtime') && typeof patch.realtime !== 'boolean') {
     throw new TypeError('realtime must be a boolean');
@@ -165,12 +175,14 @@ function validatePatch(patch, today) {
 function createUiPreferencesStore({
   directory,
   now = () => new Date(),
+  writeFile = fs.promises.writeFile,
   rename = fs.promises.rename
 } = {}) {
   if (typeof directory !== 'string' || directory.length === 0) {
     throw new TypeError('directory is required');
   }
   if (typeof now !== 'function') throw new TypeError('now must be a function');
+  if (typeof writeFile !== 'function') throw new TypeError('writeFile must be a function');
   if (typeof rename !== 'function') throw new TypeError('rename must be a function');
 
   const file = path.join(directory, 'ui-preferences.json');
@@ -222,7 +234,7 @@ function createUiPreferencesStore({
       `.ui-preferences.${process.pid}-${crypto.randomBytes(6).toString('hex')}.tmp`
     );
     try {
-      await fs.promises.writeFile(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
+      await writeFile(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
       await rename(temporary, file);
     } catch (error) {
       await fs.promises.rm(temporary, { force: true }).catch(() => {});
