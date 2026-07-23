@@ -4,17 +4,24 @@ async function persistSettingsUpdate({
   currentSettings,
   update,
   persistCredential,
-  saveSettings
+  saveSettings,
+  trace = () => {}
 }) {
-  if (!update?.credentialChanged) {
+  const saveSettingsWithTrace = async () => {
+    trace('settings-save-start');
     await saveSettings(update.settings);
+    trace('settings-save-complete');
+  };
+
+  if (!update?.credentialChanged) {
+    await saveSettingsWithTrace();
     return;
   }
 
   const previousKey = String(currentSettings?.ai?.apiKey || '');
   await persistCredential(update.apiKey);
   try {
-    await saveSettings(update.settings);
+    await saveSettingsWithTrace();
   } catch (error) {
     try {
       await persistCredential(previousKey);
@@ -40,11 +47,13 @@ function createSettingsUpdateCoordinator({
       const currentSettings = loadSettings();
       const update = applySettingsPatch(currentSettings, patch);
       trace('settings-patch-applied');
+      trace(update.credentialChanged ? 'credential-change-yes' : 'credential-change-no');
       await persistSettingsUpdate({
         currentSettings,
         update,
         persistCredential,
-        saveSettings
+        saveSettings,
+        trace
       });
       return update;
     });

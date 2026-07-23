@@ -26,12 +26,14 @@ test('credential changes roll back when the settings file cannot be committed', 
   await assert.rejects(persistSettingsUpdate({
     currentSettings,
     update,
+    trace: stage => { calls.push(['trace', stage]); },
     persistCredential: async value => { calls.push(['credential', value]); },
     saveSettings: async () => { calls.push(['settings']); throw new Error('disk full'); }
   }), /disk full/);
 
   assert.deepEqual(calls, [
     ['credential', 'new-secret'],
+    ['trace', 'settings-save-start'],
     ['settings'],
     ['credential', 'old-secret']
   ]);
@@ -42,10 +44,44 @@ test('unchanged credentials are not rewritten', async () => {
   await persistSettingsUpdate({
     currentSettings: { ai: { apiKey: 'same' } },
     update: { settings: { ai: { apiKey: 'same' } }, apiKey: 'same', credentialChanged: false },
+    trace: stage => { calls.push(['trace', stage]); },
     persistCredential: async value => { calls.push(['credential', value]); },
     saveSettings: async () => { calls.push(['settings']); }
   });
-  assert.deepEqual(calls, [['settings']]);
+  assert.deepEqual(calls, [
+    ['trace', 'settings-save-start'],
+    ['settings'],
+    ['trace', 'settings-save-complete']
+  ]);
+});
+
+test('traces the unchanged credential branch without exposing the credential', async () => {
+  const stages = [];
+  const secret = 'dummy-unchanged-secret';
+  const coordinator = createSettingsUpdateCoordinator({
+    trace: stage => { stages.push(stage); },
+    loadSettings: () => ({ ai: { apiKey: secret } }),
+    applySettingsPatch: currentSettings => ({
+      settings: currentSettings,
+      apiKey: secret,
+      credentialChanged: false
+    }),
+    persistCredential: async () => {
+      assert.fail('unchanged credentials must not be persisted');
+    },
+    saveSettings: async () => {}
+  });
+
+  await coordinator.submit({ collect: {} });
+
+  assert.deepEqual(stages, [
+    'settings-coordinator-enter',
+    'settings-patch-applied',
+    'credential-change-no',
+    'settings-save-start',
+    'settings-save-complete'
+  ]);
+  assert.equal(stages.join('\n').includes(secret), false);
 });
 
 test('serializes complete settings transactions and recovers the queue after failure', async () => {
@@ -105,7 +141,9 @@ test('serializes complete settings transactions and recovers the queue after fai
     ['load', 'old'],
     ['apply', 'A', 'old'],
     ['trace', 'settings-patch-applied'],
+    ['trace', 'credential-change-yes'],
     ['credential', 'dummy-a'],
+    ['trace', 'settings-save-start'],
     ['settings', 'A']
   ]);
 
@@ -117,7 +155,9 @@ test('serializes complete settings transactions and recovers the queue after fai
     ['load', 'old'],
     ['apply', 'A', 'old'],
     ['trace', 'settings-patch-applied'],
+    ['trace', 'credential-change-yes'],
     ['credential', 'dummy-a'],
+    ['trace', 'settings-save-start'],
     ['settings', 'A'],
     ['credential', 'dummy-old']
   ]);
@@ -134,14 +174,19 @@ test('serializes complete settings transactions and recovers the queue after fai
     ['load', 'old'],
     ['apply', 'A', 'old'],
     ['trace', 'settings-patch-applied'],
+    ['trace', 'credential-change-yes'],
     ['credential', 'dummy-a'],
+    ['trace', 'settings-save-start'],
     ['settings', 'A'],
     ['credential', 'dummy-old'],
     ['trace', 'settings-coordinator-enter'],
     ['load', 'old'],
     ['apply', 'B', 'old'],
     ['trace', 'settings-patch-applied'],
+    ['trace', 'credential-change-yes'],
     ['credential', 'dummy-b'],
-    ['settings', 'B']
+    ['trace', 'settings-save-start'],
+    ['settings', 'B'],
+    ['trace', 'settings-save-complete']
   ]);
 });

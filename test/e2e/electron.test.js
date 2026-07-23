@@ -61,7 +61,7 @@ async function closeElectronGracefully(app, child, description) {
 
 function captureAndForwardElectronOutput(child) {
   const stages = [];
-  const fixedStagePattern = /^(?:\[后端\] )?\[credential-ipc\] (received|stored|failed|ack-posted|settings-request-received|settings-body-read|settings-coordinator-enter|settings-patch-applied|credential-persist-start|credential-posted|credential-ack-received|credential-timeout)$/;
+  const fixedStagePattern = /^(?:\[后端\] )?\[credential-ipc\] (received|stored|failed|ack-posted|settings-request-received|settings-body-read|settings-coordinator-enter|settings-patch-applied|credential-change-yes|credential-change-no|settings-save-start|settings-save-complete|credential-persist-start|credential-posted|credential-ack-received|credential-timeout)$/;
   const sanitizeLine = line => line
     .replaceAll(DUMMY_API_KEY, '[redacted]')
     .replace(
@@ -102,6 +102,7 @@ function captureSettingsRequestProgress(page) {
   const stages = [];
   let finished = false;
   let failed = false;
+  let apiKeySupplied = false;
   const isSettingsPost = request => {
     try {
       return request.method() === 'POST'
@@ -110,14 +111,23 @@ function captureSettingsRequestProgress(page) {
       return false;
     }
   };
+  const captureApiKeySupplied = request => {
+    try {
+      apiKeySupplied = Boolean(request.postDataJSON()?.ai?.apiKey);
+    } catch {
+      apiKeySupplied = false;
+    }
+  };
 
   page.on('requestfinished', request => {
     if (!isSettingsPost(request)) return;
+    captureApiKeySupplied(request);
     finished = true;
     stages.push('request-finished');
   });
   page.on('requestfailed', request => {
     if (!isSettingsPost(request)) return;
+    captureApiKeySupplied(request);
     failed = true;
     stages.push('request-failed');
   });
@@ -125,7 +135,8 @@ function captureSettingsRequestProgress(page) {
   return {
     stages,
     get finished() { return finished; },
-    get failed() { return failed; }
+    get failed() { return failed; },
+    get apiKeySupplied() { return apiKeySupplied; }
   };
 }
 
@@ -216,6 +227,7 @@ async function collectStalledSaveDiagnostics({
     credentialIpcStages: [...credentialIpcOutput.stages],
     settingsRequestFinished: settingsRequestOutput.finished,
     settingsRequestFailed: settingsRequestOutput.failed,
+    settingsRequestApiKeySupplied: settingsRequestOutput.apiKeySupplied,
     settingsRequestStages: [...settingsRequestOutput.stages],
     dataDirReadable: false,
     topLevelFiles: []
@@ -519,6 +531,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   );
   assert.equal(settingsRequestOutput.finished, true);
   assert.equal(settingsRequestOutput.failed, false);
+  assert.equal(settingsRequestOutput.apiKeySupplied, true);
   assert.deepEqual(settingsRequestOutput.stages, ['request-finished']);
 
   await firstPage.locator('#btnTestAi').click();
