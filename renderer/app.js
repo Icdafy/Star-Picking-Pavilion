@@ -43,9 +43,7 @@ function applyTheme(theme, { persist = true } = {}) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', theme === 'dark' ? '#04060e' : '#f6f4ee');
   if (persist) {
-    persistUiPreferences(
-      Bootstrap.createUiPreferencePatch('theme', theme, CommonLinks)
-    );
+    preferenceActions.remember('theme', theme);
   }
 }
 $('#btnTheme').addEventListener('click', () => {
@@ -135,6 +133,12 @@ function persistUiPreferences(patch) {
     return Promise.resolve(null);
   }
 }
+
+const preferenceActions = Bootstrap.createUiPreferenceActions({
+  commonLinks: CommonLinks,
+  persist: persistUiPreferences,
+  today: () => localDateString()
+});
 
 const DOMAIN_NAME = { lowaltitude: '低空经济', aerospace: '商业航天' };
 const DIM_NAMES = {
@@ -419,9 +423,7 @@ function shiftDaily(days) {
   const d = localDateString(cur);
   if (d > localDateString()) return;
   state.dailyDate = d;
-  persistUiPreferences(
-    Bootstrap.createUiPreferencePatch('dailyDate', d, CommonLinks)
-  );
+  preferenceActions.remember('dailyDate', d);
   loadDaily(d);
 }
 $('#dailyPrev').addEventListener('click', () => shiftDaily(-1));
@@ -640,9 +642,7 @@ $('#commonLinksCategories').addEventListener('click', event => {
   if (!button) return;
   const focusKey = button.dataset.focusKey;
   state.linksCategory = button.dataset.linksCategory;
-  persistUiPreferences(
-    Bootstrap.createUiPreferencePatch('linksCategory', state.linksCategory, CommonLinks)
-  );
+  preferenceActions.remember('linksCategory', state.linksCategory);
   renderCommonLinks(focusKey, $('#commonLinksCategories'));
 });
 
@@ -653,12 +653,9 @@ $('#commonLinksGrid').addEventListener('click', event => {
   const id = button.dataset.linkFavorite;
   if (state.commonLinksFavorites.has(id)) state.commonLinksFavorites.delete(id);
   else state.commonLinksFavorites.add(id);
-  persistUiPreferences(
-    Bootstrap.createUiPreferencePatch(
-      'commonLinksFavorites',
-      [...state.commonLinksFavorites],
-      CommonLinks
-    )
+  preferenceActions.remember(
+    'commonLinksFavorites',
+    [...state.commonLinksFavorites]
   );
   renderCommonLinks(focusKey, $('#commonLinksGrid'));
 });
@@ -666,11 +663,7 @@ $('#commonLinksGrid').addEventListener('click', event => {
 // ---------- 视图切换 ----------
 function switchView(view, { persist = true } = {}) {
   state.view = view;
-  if (persist) {
-    persistUiPreferences(
-      Bootstrap.createUiPreferencePatch('view', view, CommonLinks)
-    );
-  }
+  if (persist) preferenceActions.remember('view', view);
   $$('.tab').forEach(t => {
     const on = t.dataset.view === view;
     t.classList.toggle('active', on);
@@ -707,11 +700,7 @@ function setDomain(domain, { persist = true, load = true } = {}) {
     pill.classList.toggle('active', on);
     pill.setAttribute('aria-pressed', String(on));
   });
-  if (persist) {
-    persistUiPreferences(
-      Bootstrap.createUiPreferencePatch('domain', domain, CommonLinks)
-    );
-  }
+  if (persist) preferenceActions.remember('domain', domain);
   if (load) {
     loadFeed();
     loadHotRail();
@@ -742,9 +731,7 @@ async function initCategories() {
         ch.setAttribute('aria-pressed', 'true');
       }
       state.category = on ? '' : ch.dataset.cat;
-      persistUiPreferences(
-        Bootstrap.createUiPreferencePatch('category', state.category, CommonLinks)
-      );
+      preferenceActions.remember('category', state.category);
       loadFeed();
     }));
   } catch {}
@@ -791,11 +778,7 @@ function setRealtime(on, { persist = true } = {}) {
   const btn = $('#btnRealtime');
   btn.classList.toggle('active', on);
   btn.setAttribute('aria-pressed', String(on));
-  if (persist) {
-    persistUiPreferences(
-      Bootstrap.createUiPreferencePatch('realtime', on, CommonLinks)
-    );
-  }
+  if (persist) preferenceActions.remember('realtime', on);
 }
 $('#btnRealtime').addEventListener('click', () => {
   setRealtime(!state.realtime);

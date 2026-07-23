@@ -269,6 +269,22 @@
     return sanitized;
   }
 
+  function createUiPreferenceActions({ commonLinks, persist, today } = {}) {
+    if (!commonLinks) throw new TypeError('commonLinks is required');
+    if (typeof persist !== 'function') throw new TypeError('persist must be a function');
+
+    function remember(field, value) {
+      const patch = createUiPreferencePatch(field, value, commonLinks, {
+        today: typeof today === 'function' ? today() : today
+      });
+      if (Object.keys(patch).length === 0) return null;
+      persist(patch);
+      return patch;
+    }
+
+    return Object.freeze({ remember });
+  }
+
   function writeBrowserUiPreferences(storage, patch, commonLinks, options) {
     const current = sanitizeUiPreferencesPatch(
       readBrowserUiPreferences(storage),
@@ -325,6 +341,7 @@
     resolveInitialUiPreferences,
     createUiPreferencePatch,
     sanitizeUiPreferencesPatch,
+    createUiPreferenceActions,
     writeBrowserUiPreferences,
     resolveDynamicCategory
   });

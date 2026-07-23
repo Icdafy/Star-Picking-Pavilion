@@ -167,8 +167,68 @@ test('desktop without stored preferences creates one complete legacy migration p
   assert.notEqual(result.migrationPatch, result.preferences);
 });
 
-test('each meaningful field creates an exact minimal patch and transient fields are discarded', () => {
+test('browser preferences restore every meaningful field from one namespaced JSON value', () => {
   const favoriteId = CommonLinks.LINKS[0].id;
+  const storedPreferences = {
+    theme: 'light',
+    view: 'daily',
+    domain: 'lowaltitude',
+    category: '产业',
+    dailyDate: '2026-07-22',
+    linksCategory: 'AI',
+    commonLinksFavorites: [favoriteId],
+    realtime: false
+  };
+  const result = Bootstrap.resolveInitialUiPreferences({
+    desktop: null,
+    storage: createStorage({
+      [Bootstrap.STORAGE_KEYS.uiPreferences]: JSON.stringify(storedPreferences)
+    }),
+    commonLinks: CommonLinks,
+    today: '2026-07-23'
+  });
+
+  assert.deepEqual(result, {
+    preferences: storedPreferences,
+    migrationPatch: null
+  });
+});
+
+test('browser preferences safely fall back to all readable legacy selections after corrupt JSON', () => {
+  const favoriteId = CommonLinks.LINKS[0].id;
+  const result = Bootstrap.resolveInitialUiPreferences({
+    desktop: null,
+    storage: createStorage({
+      [Bootstrap.STORAGE_KEYS.uiPreferences]: '{"theme":',
+      'wc-theme': 'light',
+      'wc-realtime': 'off',
+      'zxg-common-links-favorites': JSON.stringify([favoriteId, favoriteId, 'missing'])
+    }),
+    commonLinks: CommonLinks,
+    today: '2026-07-23'
+  });
+
+  assert.deepEqual(result.preferences, {
+    theme: 'light',
+    view: 'featured',
+    domain: '',
+    category: '',
+    dailyDate: null,
+    linksCategory: CommonLinks.ALL_CATEGORY,
+    commonLinksFavorites: [favoriteId],
+    realtime: false
+  });
+  assert.equal(result.migrationPatch, null);
+});
+
+test('production preference actions persist exactly eight minimal patches and ignore invalid or transient input', () => {
+  const favoriteId = CommonLinks.LINKS[0].id;
+  const persisted = [];
+  const actions = Bootstrap.createUiPreferenceActions({
+    commonLinks: CommonLinks,
+    persist: patch => { persisted.push(patch); },
+    today: () => '2026-07-23'
+  });
   const cases = [
     ['theme', 'light', { theme: 'light' }],
     ['view', 'daily', { view: 'daily' }],
@@ -180,18 +240,17 @@ test('each meaningful field creates an exact minimal patch and transient fields 
     ['realtime', false, { realtime: false }]
   ];
 
-  for (const [field, value, expected] of cases) {
-    assert.deepEqual(
-      Bootstrap.createUiPreferencePatch(field, value, CommonLinks, { today: '2026-07-23' }),
-      expected
-    );
-  }
+  assert.deepEqual(persisted, [], 'constructing actions must not persist during initialization');
+  for (const [field, value] of cases) actions.remember(field, value);
+  assert.deepEqual(persisted, cases.map(([, , expected]) => expected));
+
   for (const field of ['q', 'page', 'scrollY', 'expandedCard', 'draft', 'toast']) {
-    assert.deepEqual(
-      Bootstrap.createUiPreferencePatch(field, 'transient', CommonLinks, { today: '2026-07-23' }),
-      {}
-    );
+    assert.equal(actions.remember(field, 'transient'), null);
   }
+  assert.equal(actions.remember('theme', 'sepia'), null);
+  assert.equal(actions.remember('dailyDate', '2026-07-24'), null);
+  assert.equal(actions.remember('linksCategory', 'missing'), null);
+  assert.deepEqual(persisted, cases.map(([, , expected]) => expected));
 });
 
 test('dynamic category repair only persists a missing restored category', () => {
@@ -220,14 +279,15 @@ test('app wires every selection to a minimal patch, skips search view persistenc
     'commonLinksFavorites',
     'realtime'
   ]) {
-    assert.match(app, new RegExp(`createUiPreferencePatch\\(\\s*'${field}'`));
+    assert.match(app, new RegExp(`preferenceActions\\.remember\\(\\s*'${field}'`));
   }
+  assert.match(app, /const preferenceActions = Bootstrap\.createUiPreferenceActions\(/);
   assert.match(app, /switchView\('all',\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /applyTheme\(state\.theme,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /setRealtime\(state\.realtime,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /if \(initialPreferences\.migrationPatch\)\s*persistUiPreferences\(initialPreferences\.migrationPatch\)/);
-  assert.doesNotMatch(app, /createUiPreferencePatch\(['"](?:q|page|scroll|expanded|draft|toast)/);
+  assert.doesNotMatch(app, /preferenceActions\.remember\(['"](?:q|page|scroll|expanded|draft|toast)/);
 });
 
 test('常用网址重渲染后将键盘焦点恢复到同一控制项', () => {
@@ -284,23 +344,27 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
     commonLinksFavorites: CommonLinks.getDefaultFavoriteIds()
   };
   const preferencePatches = [];
+  const preferenceActions = Bootstrap.createUiPreferenceActions({
+    commonLinks: CommonLinks,
+    persist: patch => { preferencePatches.push(patch); },
+    today: () => '2026-07-23'
+  });
   const start = app.indexOf('function renderCommonLinks');
   const end = app.indexOf('// ---------- 视图切换 ----------');
   const install = new Function(
-    '$', 'CommonLinks', 'Bootstrap', 'DomUtils', 'state', 'esc', 'safeUrl', 'document',
-    'persistUiPreferences',
+    '$', 'CommonLinks', 'DomUtils', 'state', 'esc', 'safeUrl', 'document',
+    'preferenceActions',
     `'use strict';\n${app.slice(start, end)}\nreturn renderCommonLinks;`
   );
   install(
     selector => elements[selector],
     CommonLinks,
-    Bootstrap,
     require('../renderer/dom-utils'),
     state,
     value => String(value ?? ''),
     value => String(value ?? ''),
     fakeDocument,
-    patch => { preferencePatches.push(patch); }
+    preferenceActions
   );
 
   const categoryControl = {
