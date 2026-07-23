@@ -34,24 +34,34 @@
       throw new TypeError('clear API key button is required');
     }
 
-    const revisions = Object.fromEntries(FIELD_NAMES.map(name => [name, 0]));
+    const fieldStates = Object.fromEntries(FIELD_NAMES.map(name => [
+      name,
+      { revision: 0, dirty: false }
+    ]));
+    let latestLoadSequence = 0;
     for (const name of FIELD_NAMES) {
       elements[name].addEventListener('input', () => {
-        revisions[name] += 1;
+        fieldStates[name].revision += 1;
+        fieldStates[name].dirty = true;
       });
     }
 
     const snapshot = () => Object.fromEntries(
-      FIELD_NAMES.map(name => [name, revisions[name]])
+      FIELD_NAMES.map(name => [name, fieldStates[name].revision])
     );
-    const isUnchanged = (name, prior) => revisions[name] === prior[name];
-    const markSynchronized = names => {
-      for (const name of names) revisions[name] += 1;
+    const canApplyLoad = (name, prior) => (
+      !fieldStates[name].dirty
+      && fieldStates[name].revision === prior[name]
+    );
+    const markSynchronizedIfUnchanged = (name, prior) => {
+      if (fieldStates[name].revision !== prior[name]) return false;
+      fieldStates[name].revision += 1;
+      fieldStates[name].dirty = false;
+      return true;
     };
 
-    function setCredentialState(hasKey) {
+    function updateCredentialMetadata(hasKey) {
       const stored = Boolean(hasKey);
-      elements.apiKey.value = '';
       elements.apiKey.dataset.hasStoredKey = String(stored);
       elements.apiKey.placeholder = stored
         ? '已由 Windows 安全保存；输入新值可替换'
@@ -60,31 +70,35 @@
     }
 
     async function load() {
+      const sequence = ++latestLoadSequence;
       const prior = snapshot();
       const settings = await request('/api/settings');
+      if (sequence !== latestLoadSequence) return settings;
 
-      if (isUnchanged('apiKey', prior)) {
-        setCredentialState(settings.ai._hasKey);
+      if (canApplyLoad('apiKey', prior)) {
+        elements.apiKey.value = '';
+        updateCredentialMetadata(settings.ai._hasKey);
       }
-      if (isUnchanged('baseUrl', prior)) {
+      if (canApplyLoad('baseUrl', prior)) {
         elements.baseUrl.value = settings.ai.baseUrl;
       }
-      if (isUnchanged('prefilterModel', prior)) {
+      if (canApplyLoad('prefilterModel', prior)) {
         elements.prefilterModel.value = settings.ai.prefilterModel;
       }
-      if (isUnchanged('scoringModel', prior)) {
+      if (canApplyLoad('scoringModel', prior)) {
         elements.scoringModel.value = settings.ai.scoringModel;
       }
-      if (isUnchanged('intervalMinutes', prior)) {
+      if (canApplyLoad('intervalMinutes', prior)) {
         elements.intervalMinutes.value = settings.collect.intervalMinutes;
       }
-      if (isUnchanged('rsshubBase', prior)) {
+      if (canApplyLoad('rsshubBase', prior)) {
         elements.rsshubBase.value = settings.collect.rsshubBase || '';
       }
       return settings;
     }
 
     async function saveAi() {
+      const submitted = snapshot();
       const apiKey = elements.apiKey.value.trim();
       const aiPatch = {
         baseUrl: elements.baseUrl.value || 'https://api.deepseek.com',
@@ -93,21 +107,29 @@
       };
       if (apiKey) aiPatch.apiKey = apiKey;
       const result = await request('/api/settings', { body: { ai: aiPatch } });
-      markSynchronized(AI_FIELD_NAMES);
-      setCredentialState(result.credentialConfigured);
+      let apiKeySynchronized = false;
+      for (const name of AI_FIELD_NAMES) {
+        const synchronized = markSynchronizedIfUnchanged(name, submitted);
+        if (name === 'apiKey') apiKeySynchronized = synchronized;
+      }
+      updateCredentialMetadata(result.credentialConfigured);
+      if (apiKeySynchronized) elements.apiKey.value = '';
       return result;
     }
 
     async function clearApiKey() {
+      const submitted = snapshot();
       const result = await request('/api/settings', {
         body: { ai: { apiKey: null } }
       });
-      markSynchronized(['apiKey']);
-      setCredentialState(false);
+      const apiKeySynchronized = markSynchronizedIfUnchanged('apiKey', submitted);
+      updateCredentialMetadata(result.credentialConfigured);
+      if (apiKeySynchronized) elements.apiKey.value = '';
       return result;
     }
 
     async function saveCollect() {
+      const submitted = snapshot();
       const result = await request('/api/settings', {
         body: {
           collect: {
@@ -116,7 +138,9 @@
           }
         }
       });
-      markSynchronized(COLLECT_FIELD_NAMES);
+      for (const name of COLLECT_FIELD_NAMES) {
+        markSynchronizedIfUnchanged(name, submitted);
+      }
       return result;
     }
 
