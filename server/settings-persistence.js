@@ -25,4 +25,31 @@ async function persistSettingsUpdate({
   }
 }
 
-module.exports = { persistSettingsUpdate };
+function createSettingsUpdateCoordinator({
+  loadSettings,
+  applySettingsPatch,
+  persistCredential,
+  saveSettings
+}) {
+  let queue = Promise.resolve();
+
+  function submit(patch) {
+    const operation = queue.then(async () => {
+      const currentSettings = loadSettings();
+      const update = applySettingsPatch(currentSettings, patch);
+      await persistSettingsUpdate({
+        currentSettings,
+        update,
+        persistCredential,
+        saveSettings
+      });
+      return update;
+    });
+    queue = operation.catch(() => {});
+    return operation;
+  }
+
+  return Object.freeze({ submit });
+}
+
+module.exports = { createSettingsUpdateCoordinator, persistSettingsUpdate };

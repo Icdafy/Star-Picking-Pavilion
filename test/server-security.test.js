@@ -79,6 +79,7 @@ test('settings API keeps an accepted key only in runtime memory', async t => {
   });
   assert.equal(saved.status, 200);
   assert.doesNotMatch(saved.body, /sk-server-runtime-only/);
+  assert.deepEqual(JSON.parse(saved.body), { ok: true, credentialConfigured: true });
 
   const loaded = await server.request({
     pathname: '/api/settings',

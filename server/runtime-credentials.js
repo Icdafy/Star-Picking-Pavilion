@@ -10,8 +10,9 @@ function createRuntimeCredentials({
 } = {}) {
   let apiKey = String(initialApiKey || '');
   const pending = new Map();
+  let disposed = false;
 
-  parentPort?.on('message', messageEvent => {
+  function handleMessage(messageEvent) {
     const message = messageEvent?.data ?? messageEvent;
     if (message?.type !== 'credential:result') return;
     const request = pending.get(message.requestId);
@@ -20,7 +21,9 @@ function createRuntimeCredentials({
     clearTimeout(request.timeout);
     if (message.ok === true) request.resolve();
     else request.reject(new Error('凭据保存失败'));
-  });
+  }
+
+  parentPort?.on('message', handleMessage);
 
   function getApiKey() {
     return apiKey;
@@ -32,6 +35,7 @@ function createRuntimeCredentials({
 
   async function persistApiKey(value) {
     const next = String(value || '').trim();
+    if (disposed) throw new Error('凭据保存失败');
     if (!parentPort) {
       setApiKey(next);
       return;
@@ -57,7 +61,22 @@ function createRuntimeCredentials({
     setApiKey(next);
   }
 
-  return Object.freeze({ getApiKey, setApiKey, persistApiKey });
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    if (typeof parentPort?.off === 'function') {
+      parentPort.off('message', handleMessage);
+    } else {
+      parentPort?.removeListener?.('message', handleMessage);
+    }
+    for (const [requestId, request] of pending) {
+      pending.delete(requestId);
+      clearTimeout(request.timeout);
+      request.reject(new Error('凭据保存失败'));
+    }
+  }
+
+  return Object.freeze({ getApiKey, setApiKey, persistApiKey, dispose });
 }
 
 const initialApiKey = String(process.env.STAR_PICKING_PAVILION_AI_API_KEY || '');
@@ -68,4 +87,9 @@ const runtimeCredentials = createRuntimeCredentials({
   parentPort: process.parentPort
 });
 
-module.exports = { ...runtimeCredentials, createRuntimeCredentials };
+module.exports = {
+  getApiKey: runtimeCredentials.getApiKey,
+  setApiKey: runtimeCredentials.setApiKey,
+  persistApiKey: runtimeCredentials.persistApiKey,
+  createRuntimeCredentials
+};

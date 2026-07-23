@@ -35,7 +35,7 @@ test('accepts an Electron MessageEvent credential acknowledgement', async () => 
     initialApiKey: 'dummy-old-electron',
     parentPort,
     randomUUID: createIds('request-electron'),
-    confirmationTimeoutMs: 50
+    confirmationTimeoutMs: 5_000
   });
 
   const persisted = credentials.persistApiKey('dummy-new-electron');
@@ -59,7 +59,7 @@ test('accepts a direct Node credential acknowledgement', async () => {
     initialApiKey: 'dummy-old-direct',
     parentPort,
     randomUUID: createIds('request-direct'),
-    confirmationTimeoutMs: 50
+    confirmationTimeoutMs: 5_000
   });
 
   const persisted = credentials.persistApiKey('dummy-new-direct');
@@ -75,7 +75,7 @@ test('rejects a failed acknowledgement without changing the current key', async 
     initialApiKey: 'dummy-old-rejected',
     parentPort,
     randomUUID: createIds('request-rejected'),
-    confirmationTimeoutMs: 50
+    confirmationTimeoutMs: 5_000
   });
 
   const persisted = credentials.persistApiKey('dummy-new-rejected');
@@ -94,7 +94,7 @@ test('ignores mismatched and duplicate acknowledgements', async () => {
     initialApiKey: 'dummy-old-routing',
     parentPort,
     randomUUID: createIds('request-routing'),
-    confirmationTimeoutMs: 50
+    confirmationTimeoutMs: 5_000
   });
 
   let settled = false;
@@ -148,7 +148,7 @@ test('rejects promptly when postMessage throws and keeps the current key', async
     initialApiKey: 'dummy-old-transport',
     parentPort,
     randomUUID: createIds('request-transport'),
-    confirmationTimeoutMs: 50
+    confirmationTimeoutMs: 5_000
   });
 
   await assert.rejects(
@@ -158,13 +158,13 @@ test('rejects promptly when postMessage throws and keeps the current key', async
   assert.equal(credentials.getApiKey(), 'dummy-old-transport');
 });
 
-test('routes concurrent acknowledgements by request ID and applies keys in completion order', async () => {
+test('routes concurrent credential acknowledgements by request ID', async () => {
   const parentPort = new FakeParentPort();
   const credentials = createRuntimeCredentials({
     initialApiKey: 'dummy-old-concurrent',
     parentPort,
     randomUUID: createIds('request-first', 'request-second'),
-    confirmationTimeoutMs: 50
+    confirmationTimeoutMs: 5_000
   });
 
   const first = credentials.persistApiKey('dummy-key-first');
@@ -176,5 +176,34 @@ test('routes concurrent acknowledgements by request ID and applies keys in compl
 
   emitResult(parentPort, 'request-first');
   await first;
+  // This layer applies acknowledgements in completion order. The settings
+  // coordinator prevents production settings transactions from calling it concurrently.
   assert.equal(credentials.getApiKey(), 'dummy-key-first');
+});
+
+test('dispose removes its listener and safely rejects pending requests', async () => {
+  const parentPort = new FakeParentPort();
+  const first = createRuntimeCredentials({
+    initialApiKey: 'dummy-old-dispose',
+    parentPort,
+    randomUUID: createIds('request-dispose'),
+    confirmationTimeoutMs: 5_000
+  });
+  assert.equal(typeof first.dispose, 'function');
+  assert.equal(parentPort.listenerCount('message'), 1);
+
+  const rejected = assert.rejects(
+    first.persistApiKey('dummy-new-dispose'),
+    /凭据保存失败/
+  );
+  first.dispose();
+  first.dispose();
+  await rejected;
+  assert.equal(first.getApiKey(), 'dummy-old-dispose');
+  assert.equal(parentPort.listenerCount('message'), 0);
+
+  const second = createRuntimeCredentials({ parentPort });
+  assert.equal(parentPort.listenerCount('message'), 1);
+  second.dispose();
+  assert.equal(parentPort.listenerCount('message'), 0);
 });

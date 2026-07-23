@@ -16,7 +16,7 @@ const { CATEGORIES } = require('./ai/pipeline');
 const { parseFeedQuery, sanitizeDate, sanitizeFeedback, sanitizeSourceInput } = require('./input-validation');
 const { resolveStaticFile } = require('./static-files');
 const { startOfLocalDayIso } = require('./date-time');
-const { persistSettingsUpdate } = require('./settings-persistence');
+const { createSettingsUpdateCoordinator } = require('./settings-persistence');
 const {
   API_TOKEN_HEADER,
   HttpError,
@@ -29,6 +29,12 @@ const REQUESTED_PORT = Number(process.env.STAR_PICKING_PAVILION_PORT || process.
 const API_TOKEN = process.env.STAR_PICKING_PAVILION_API_TOKEN || '';
 const SERVER_NONCE = process.env.STAR_PICKING_PAVILION_SERVER_NONCE || '';
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+const settingsUpdateCoordinator = createSettingsUpdateCoordinator({
+  loadSettings,
+  applySettingsPatch,
+  persistCredential: persistApiKey,
+  saveSettings
+});
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -235,14 +241,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/settings' && req.method === 'POST') {
         const b = await readJsonBody(req);
-        const currentSettings = loadSettings();
-        const update = applySettingsPatch(currentSettings, b);
-        await persistSettingsUpdate({
-          currentSettings,
-          update,
-          persistCredential: persistApiKey,
-          saveSettings
-        });
+        const update = await settingsUpdateCoordinator.submit(b);
         return json(res, 200, { ok: true, credentialConfigured: !!update.apiKey });
       }
       if (p === '/api/settings/test' && req.method === 'POST') {
