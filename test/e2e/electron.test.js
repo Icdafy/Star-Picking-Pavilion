@@ -59,6 +59,45 @@ async function closeElectronGracefully(app, child, description) {
   return elapsedMs;
 }
 
+function captureAndForwardElectronOutput(child) {
+  const stages = [];
+  const fixedStagePattern = /^\[credential-ipc\] (received|stored|failed|ack-posted)$/;
+  const sanitizeLine = line => line
+    .replaceAll(DUMMY_API_KEY, '[redacted]')
+    .replace(
+      /("(?:nonce|apiKey|ciphertext)"\s*:\s*")[^"]*"/gi,
+      '$1[redacted]"'
+    )
+    .replace(/(Bearer\s+)\S+/gi, '$1[redacted]')
+    .replace(/(ws:\/\/127\.0\.0\.1:\d+\/)\S+/gi, '$1[redacted]');
+
+  function attach(stream, destination) {
+    if (!stream) return false;
+    let pending = '';
+    const inspectLine = line => {
+      const match = line.match(fixedStagePattern);
+      if (match) stages.push(match[1]);
+      destination.write(`${sanitizeLine(line)}\n`);
+    };
+    stream.on('data', chunk => {
+      pending += chunk.toString('utf8');
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop();
+      for (const line of lines) inspectLine(line);
+    });
+    stream.on('end', () => {
+      if (pending) inspectLine(pending);
+    });
+    return true;
+  }
+
+  return {
+    stages,
+    stdoutCaptured: attach(child.stdout, process.stdout),
+    stderrCaptured: attach(child.stderr, process.stderr)
+  };
+}
+
 function listen(server, options) {
   return new Promise((resolve, reject) => {
     const onError = error => {
@@ -124,7 +163,8 @@ function assertDoesNotContainSecret(serialized) {
 async function collectStalledSaveDiagnostics({
   dataDir,
   electronProcess,
-  expectedBaseUrl
+  expectedBaseUrl,
+  credentialIpcOutput
 }) {
   const credentialsFile = path.join(dataDir, 'credentials.v1.json');
   const settingsFile = path.join(dataDir, 'settings.json');
@@ -139,6 +179,9 @@ async function collectStalledSaveDiagnostics({
     settingsScoringModelMatches: false,
     electronChildAlive: electronProcess.exitCode === null
       && electronProcess.signalCode === null,
+    credentialIpcStdoutCaptured: credentialIpcOutput.stdoutCaptured,
+    credentialIpcStderrCaptured: credentialIpcOutput.stderrCaptured,
+    credentialIpcStages: [...credentialIpcOutput.stages],
     dataDirReadable: false,
     topLevelFiles: []
   };
@@ -309,6 +352,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
 
   firstApp = await electron.launch({ args: ['.'], cwd: projectRoot, env });
   const firstProcess = firstApp.process();
+  const credentialIpcOutput = captureAndForwardElectronOutput(firstProcess);
   const firstPage = await firstApp.firstWindow();
   await firstPage.waitForSelector('#feedList');
 
@@ -409,7 +453,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
     const diagnostics = await collectStalledSaveDiagnostics({
       dataDir,
       electronProcess: firstProcess,
-      expectedBaseUrl: mockBaseUrl
+      expectedBaseUrl: mockBaseUrl,
+      credentialIpcOutput
     });
     const serializedDiagnostics = JSON.stringify(diagnostics);
     console.log(`[e2e] stalled credential save diagnostics: ${serializedDiagnostics}`);

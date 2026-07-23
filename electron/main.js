@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
 const { createCredentialStore } = require('./credential-store');
+const { createCredentialIpcTracer } = require('./credential-ipc-trace');
 const {
   registerUiPreferencesIpc,
   loadUiPreferencesStore
@@ -26,6 +27,9 @@ let uiPreferencesStore = null;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
   ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
   : null;
+const traceCredentialIpc = createCredentialIpcTracer({
+  enabled: Boolean(testDataDir)
+});
 
 if (testDataDir) {
   app.setPath('userData', testDataDir);
@@ -81,14 +85,27 @@ function startServer({ initialApiKey, credentialStore }) {
     }, 15_000);
     serverProc.on('message', message => {
       if (message?.type === 'credential:set') {
+        traceCredentialIpc('received');
         credentialStore.set(message.apiKey).then(
-          () => serverProc.postMessage({ type: 'credential:result', requestId: message.requestId, ok: true }),
-          error => serverProc.postMessage({
-            type: 'credential:result',
-            requestId: message.requestId,
-            ok: false,
-            error: String(error.message || error)
-          })
+          () => {
+            traceCredentialIpc('stored');
+            serverProc.postMessage({
+              type: 'credential:result',
+              requestId: message.requestId,
+              ok: true
+            });
+            traceCredentialIpc('ack-posted');
+          },
+          error => {
+            traceCredentialIpc('failed');
+            serverProc.postMessage({
+              type: 'credential:result',
+              requestId: message.requestId,
+              ok: false,
+              error: String(error.message || error)
+            });
+            traceCredentialIpc('ack-posted');
+          }
         );
         return;
       }
