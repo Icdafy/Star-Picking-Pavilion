@@ -7,14 +7,6 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
 
-function extractIpcHandler(channel, method) {
-  const start = source.indexOf(`ipcMain.${method}('${channel}'`);
-  assert.ok(start >= 0, `missing ${method} handler for ${channel}`);
-  const end = source.indexOf('\n});', start);
-  assert.ok(end > start, `unterminated ${method} handler for ${channel}`);
-  return source.slice(start, end + 4);
-}
-
 test('Electron launches the service on a random port with secret token and nonce', () => {
   assert.match(source, /crypto\.randomBytes\(/);
   assert.match(source, /STAR_PICKING_PAVILION_PORT:\s*'0'/);
@@ -41,45 +33,22 @@ test('Electron brokers encrypted credentials without exposing them to the render
   assert.doesNotMatch(source, /webContents\.send\([^\n]*apiKey/);
 });
 
-test('Electron exposes only snapshot and storage state through preferences IPC', () => {
-  const getHandler = extractIpcHandler('preferences:get', 'on');
-
-  assert.match(getHandler, /event\.returnValue\s*=\s*\{/);
-  assert.match(getHandler, /preferences:\s*uiPreferencesStore\s*\?\s*uiPreferencesStore\.getSnapshot\(\)\s*:\s*getDefaultUiPreferences\(\)/);
-  assert.match(getHandler, /hasStoredPreferences:\s*uiPreferencesStore\s*\?\s*uiPreferencesStore\.hasStoredPreferences\(\)\s*:\s*false/);
-  assert.doesNotMatch(getHandler, /\b(path|directory|apiKey|readFile|writeFile)\b/);
-});
-
-test('Electron forwards only the preferences patch to the initialized store', () => {
-  const updateHandler = extractIpcHandler('preferences:update', 'handle');
-
-  assert.match(updateHandler, /\(_event,\s*patch\)\s*=>/);
-  assert.match(updateHandler, /if\s*\(!uiPreferencesStore\)\s*throw new Error\(/);
-  assert.match(updateHandler, /return uiPreferencesStore\.update\(patch\)/);
-  assert.doesNotMatch(updateHandler, /\b(path|directory|apiKey|readFile|writeFile)\b/);
-  assert.doesNotMatch(source, /ipcMain\.(?:on|handle)\(['"][^'"]*(?:file|path|directory)[^'"]*['"]/i);
-});
-
-test('Electron loads preferences from the migrated data directory before creating the window', () => {
-  assert.match(source, /createUiPreferencesStore/);
-  assert.match(source, /getDefaultUiPreferences/);
-
+test('Electron registers preference IPC and loads migrated preferences before creating the window', () => {
+  assert.match(source, /registerUiPreferencesIpc\(\{\s*ipcMain,\s*getStore:\s*\(\)\s*=>\s*uiPreferencesStore\s*\}\)/);
   const readyIndex = source.indexOf('app.whenReady().then');
   const migrationIndex = source.indexOf('await migrateUserData(', readyIndex);
   const dataDirIndex = source.indexOf('const dataDir = getDataDir();', migrationIndex);
-  const createStoreIndex = source.indexOf(
-    'uiPreferencesStore = createUiPreferencesStore({ directory: dataDir });',
+  const loadPreferencesIndex = source.indexOf(
+    'uiPreferencesStore = await loadUiPreferencesStore({ directory: dataDir });',
     dataDirIndex
   );
-  const loadIndex = source.indexOf('await uiPreferencesStore.load();', createStoreIndex);
-  const createWindowIndex = source.indexOf('await createWindow(serverPort);', loadIndex);
+  const createWindowIndex = source.indexOf('await createWindow(serverPort);', loadPreferencesIndex);
 
   assert.ok(readyIndex >= 0);
   assert.ok(migrationIndex > readyIndex);
   assert.ok(dataDirIndex > migrationIndex);
-  assert.ok(createStoreIndex > dataDirIndex);
-  assert.ok(loadIndex > createStoreIndex);
-  assert.ok(createWindowIndex > loadIndex);
+  assert.ok(loadPreferencesIndex > dataDirIndex);
+  assert.ok(createWindowIndex > loadPreferencesIndex);
 });
 
 test('startup failure page never interpolates exception text into HTML', () => {
