@@ -30,6 +30,12 @@ const EXPECTED_UI_PREFERENCE_KEYS = [
   'view'
 ];
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(resolvePromise => { resolve = resolvePromise; });
+  return { promise, resolve };
+}
+
 async function waitForExit(child, timeoutMs = 10_000, description = 'Electron process') {
   if (child.exitCode !== null || child.signalCode !== null) {
     return [child.exitCode, child.signalCode];
@@ -478,11 +484,50 @@ test('real Electron desktop flow is secure, persistent across restart and single
   await firstPage.locator('#btnRealtime').click();
   assert.equal(await firstPage.locator('#btnRealtime').getAttribute('aria-pressed'), 'false');
 
+  const settingsLoadStarted = deferred();
+  const releaseSettingsLoad = deferred();
+  let delayedSettingsLoad = false;
+  const delaySettingsLoad = async route => {
+    const request = route.request();
+    const isInitialSettingsLoad = !delayedSettingsLoad
+      && request.method() === 'GET'
+      && new URL(request.url()).pathname === '/api/settings';
+    if (isInitialSettingsLoad) {
+      delayedSettingsLoad = true;
+      settingsLoadStarted.resolve();
+      await releaseSettingsLoad.promise;
+    }
+    await route.continue();
+  };
+  await firstPage.route('**/api/settings', delaySettingsLoad);
   await firstPage.locator('.tab[data-view="settings"]').click();
-  await firstPage.locator('#setBaseUrl').fill(mockBaseUrl);
-  await firstPage.locator('#setApiKey').fill(DUMMY_API_KEY);
-  await firstPage.locator('#setPrefilterModel').fill(PREFILTER_MODEL);
-  await firstPage.locator('#setScoringModel').fill(SCORING_MODEL);
+  await settingsLoadStarted.promise;
+  try {
+    await firstPage.locator('#setBaseUrl').fill(mockBaseUrl);
+    await firstPage.locator('#setApiKey').fill(DUMMY_API_KEY);
+    await firstPage.locator('#setPrefilterModel').fill(PREFILTER_MODEL);
+    await firstPage.locator('#setScoringModel').fill(SCORING_MODEL);
+    await firstPage.locator('#setInterval').fill('45');
+    await firstPage.locator('#setRsshub').fill(`${mockBaseUrl}/rsshub`);
+
+    const settingsLoadFinished = firstPage.waitForResponse(response => (
+      response.request().method() === 'GET'
+        && new URL(response.url()).pathname === '/api/settings'
+    ));
+    releaseSettingsLoad.resolve();
+    await settingsLoadFinished;
+    await waitForTwoAnimationFrames(firstPage);
+
+    assert.equal(await firstPage.locator('#setApiKey').inputValue(), DUMMY_API_KEY);
+    assert.equal(await firstPage.locator('#setBaseUrl').inputValue(), mockBaseUrl);
+    assert.equal(await firstPage.locator('#setPrefilterModel').inputValue(), PREFILTER_MODEL);
+    assert.equal(await firstPage.locator('#setScoringModel').inputValue(), SCORING_MODEL);
+    assert.equal(await firstPage.locator('#setInterval').inputValue(), '45');
+    assert.equal(await firstPage.locator('#setRsshub').inputValue(), `${mockBaseUrl}/rsshub`);
+  } finally {
+    releaseSettingsLoad.resolve();
+    await firstPage.unroute('**/api/settings', delaySettingsLoad);
+  }
 
   await firstPage.locator('#btnSaveAi').click();
   try {

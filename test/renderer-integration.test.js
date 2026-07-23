@@ -10,6 +10,10 @@ const CommonLinks = require('../renderer/common-links');
 const Bootstrap = require('../renderer/bootstrap');
 const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8');
+const settingsFormController = fs.readFileSync(
+  path.join(root, 'renderer', 'settings-form-controller.js'),
+  'utf8'
+);
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 
 function createStorage(entries = {}) {
@@ -66,9 +70,20 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
 
 test('设置页不接收密钥内容，空输入不会覆盖已保存的密钥', () => {
   assert.doesNotMatch(app, /setApiKey['"]\)\.value\s*=\s*s\.ai\.apiKey/);
-  assert.match(app, /if \(apiKey\) aiPatch\.apiKey = apiKey/);
-  assert.match(app, /apiKey:\s*null/);
+  assert.match(settingsFormController, /if \(apiKey\) aiPatch\.apiKey = apiKey/);
+  assert.match(settingsFormController, /apiKey:\s*null/);
   assert.match(html, /id="btnClearAiKey"/);
+});
+
+test('设置页通过竞态安全控制器加载和保存全部可编辑字段', () => {
+  const controllerIndex = html.indexOf('<script src="settings-form-controller.js"></script>');
+  const appIndex = html.indexOf('<script src="app.js"></script>');
+  assert.ok(controllerIndex >= 0 && controllerIndex < appIndex);
+  assert.match(app, /SettingsFormController\.createSettingsFormController/);
+  assert.match(app, /settingsForm\.load\(\)/);
+  assert.match(app, /settingsForm\.saveAi\(\)/);
+  assert.match(app, /settingsForm\.clearApiKey\(\)/);
+  assert.match(app, /settingsForm\.saveCollect\(\)/);
 });
 
 test('界面展示后端的安全错误消息并捕获设置保存失败', () => {

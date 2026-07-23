@@ -7,6 +7,7 @@ const $$ = s => [...document.querySelectorAll(s)];
 const API = '';
 const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
+const SettingsFormController = window.SettingsFormController;
 const Bootstrap = window.StarPickingPavilionBootstrap;
 const Desktop = window.starPickingPavilion || window.windcatcher;
 const storage = Bootstrap.getSafeStorage(window);
@@ -515,39 +516,28 @@ $('#srcForm').addEventListener('submit', async e => {
 });
 
 // ---------- 设置 ----------
-function setAiCredentialState(hasKey) {
-  const input = $('#setApiKey');
-  input.value = '';
-  input.dataset.hasStoredKey = String(Boolean(hasKey));
-  input.placeholder = hasKey
-    ? '已由 Windows 安全保存；输入新值可替换'
-    : 'sk-…（留空则使用关键词启发式降级模式）';
-  $('#btnClearAiKey').disabled = !hasKey;
-}
+const settingsForm = SettingsFormController.createSettingsFormController({
+  elements: {
+    apiKey: $('#setApiKey'),
+    baseUrl: $('#setBaseUrl'),
+    prefilterModel: $('#setPrefilterModel'),
+    scoringModel: $('#setScoringModel'),
+    intervalMinutes: $('#setInterval'),
+    rsshubBase: $('#setRsshub'),
+    clearApiKeyButton: $('#btnClearAiKey')
+  },
+  request: api
+});
 
 async function loadSettings() {
   try {
-    const s = await api('/api/settings');
-    setAiCredentialState(s.ai._hasKey);
-    $('#setBaseUrl').value = s.ai.baseUrl;
-    $('#setPrefilterModel').value = s.ai.prefilterModel;
-    $('#setScoringModel').value = s.ai.scoringModel;
-    $('#setInterval').value = s.collect.intervalMinutes;
-    $('#setRsshub').value = s.collect.rsshubBase || '';
+    await settingsForm.load();
   } catch {}
 }
 
 $('#btnSaveAi').addEventListener('click', async () => {
   try {
-    const apiKey = $('#setApiKey').value.trim();
-    const aiPatch = {
-      baseUrl: $('#setBaseUrl').value || 'https://api.deepseek.com',
-      prefilterModel: $('#setPrefilterModel').value || 'deepseek-v4-flash',
-      scoringModel: $('#setScoringModel').value || 'deepseek-v4-pro'
-    };
-    if (apiKey) aiPatch.apiKey = apiKey;
-    const result = await api('/api/settings', { body: { ai: aiPatch } });
-    setAiCredentialState(result.credentialConfigured);
+    await settingsForm.saveAi();
     toast('AI 配置已保存，下轮分析生效');
     refreshStats();
   } catch (error) {
@@ -558,8 +548,7 @@ $('#btnSaveAi').addEventListener('click', async () => {
 $('#btnClearAiKey').addEventListener('click', async () => {
   if (!confirm('确定清除已由 Windows 安全保存的 AI API Key？清除后将使用关键词启发式降级模式。')) return;
   try {
-    await api('/api/settings', { body: { ai: { apiKey: null } } });
-    setAiCredentialState(false);
+    await settingsForm.clearApiKey();
     toast('AI API Key 已清除');
     refreshStats();
   } catch (error) {
@@ -584,10 +573,7 @@ $('#btnTestAi').addEventListener('click', async () => {
 
 $('#btnSaveCollect').addEventListener('click', async () => {
   try {
-    await api('/api/settings', { body: { collect: {
-      intervalMinutes: Number($('#setInterval').value) || 30,
-      rsshubBase: $('#setRsshub').value.trim()
-    } } });
+    await settingsForm.saveCollect();
     toast('采集设置已保存（间隔重启后生效，RSSHub 立即生效）');
   } catch (error) {
     toast('采集设置保存失败：' + error.message, true);
