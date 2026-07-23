@@ -259,6 +259,12 @@ test('real Electron desktop flow is secure, persistent across restart and single
   const firstPage = await firstApp.firstWindow();
   await firstPage.waitForSelector('#feedList');
 
+  const safeStorageAvailable = await firstApp.evaluate(({ safeStorage }) => (
+    safeStorage.isEncryptionAvailable()
+  ));
+  console.log(`[e2e] safeStorage encryption available: ${safeStorageAvailable}`);
+  assert.equal(safeStorageAvailable, true);
+
   assert.equal(await firstPage.title(), '摘星阁 · 低空经济与商业航天情报站');
   const firstOrigin = await firstPage.evaluate(() => location.origin);
   const firstUrl = new URL(firstOrigin);
@@ -337,10 +343,33 @@ test('real Electron desktop flow is secure, persistent across restart and single
   await firstPage.waitForFunction(() => {
     const input = document.querySelector('#setApiKey');
     const toast = document.querySelector('#toast');
-    return input?.dataset.hasStoredKey === 'true'
+    const toastText = toast?.textContent || '';
+    const success = input?.dataset.hasStoredKey === 'true'
       && toast?.classList.contains('show')
-      && toast.textContent.includes('AI 配置已保存');
+      && toastText.includes('AI 配置已保存');
+    const failure = toast?.classList.contains('show')
+      && toastText.startsWith('AI 配置保存失败');
+    return success || failure;
   }, undefined, { timeout: 15_000 });
+  const saveResult = await firstPage.evaluate(() => {
+    const input = document.querySelector('#setApiKey');
+    const toast = document.querySelector('#toast');
+    const toastText = toast?.textContent || '';
+    return {
+      success: input?.dataset.hasStoredKey === 'true'
+        && toast?.classList.contains('show')
+        && toastText.includes('AI 配置已保存'),
+      toastText
+    };
+  });
+  if (!saveResult.success) {
+    console.log(`[e2e] DeepSeek save failure toast: ${saveResult.toastText}`);
+  }
+  assert.equal(
+    saveResult.success,
+    true,
+    `DeepSeek settings save failed: ${saveResult.toastText}`
+  );
 
   await firstPage.locator('#btnTestAi').click();
   await firstPage.waitForFunction(() => {
