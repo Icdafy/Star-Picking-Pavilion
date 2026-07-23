@@ -21,10 +21,11 @@ npm run verify:version -- --tag v0.0.2
 npm test
 npm run test:e2e
 npm run audit:runtime
+npm run notices
+git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
 npm run verify:version -- --tag v0.0.2 --artifacts
-npm run notices
 Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.0.2.exe
 ```
 
@@ -40,7 +41,7 @@ git tag -a v0.0.2 -m "摘星阁 v0.0.2"
 git push origin v0.0.2
 ```
 
-推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、构建、包审计、SHA-256、SBOM 和第三方声明生成。全部成功后才会运行 `gh release create`。
+推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 

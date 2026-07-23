@@ -9,6 +9,15 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
+test('package and lockfile versions stay synchronized at v0.0.2', () => {
+  const packageJson = JSON.parse(read('package.json'));
+  const packageLock = JSON.parse(read('package-lock.json'));
+
+  assert.equal(packageJson.version, '0.0.2');
+  assert.equal(packageLock.version, packageJson.version);
+  assert.equal(packageLock.packages[''].version, packageJson.version);
+});
+
 test('public release documentation and compliance artifacts are complete', () => {
   for (const file of [
     'LICENSE',
@@ -88,6 +97,7 @@ test('version verifier matches package, tag, installer and latest metadata', asy
 test('CI and tag release workflows enforce every gate before publishing', () => {
   const ci = read('.github/workflows/ci.yml');
   const release = read('.github/workflows/release.yml');
+  const releasingGuide = read('RELEASING.md');
   assert.match(ci, /pull_request:/);
   assert.match(ci, /push:/);
   for (const command of ['npm ci', 'npm test', 'npm run test:e2e', 'npm run audit:runtime']) {
@@ -96,6 +106,17 @@ test('CI and tag release workflows enforce every gate before publishing', () => 
   for (const workflow of [ci, release]) {
     assert.ok(workflow.indexOf('npm run notices') < workflow.indexOf('npm run dist'));
     assert.match(workflow, /git diff --exit-code -- THIRD_PARTY_NOTICES\.txt/);
+  }
+  const localReleaseOrder = [
+    'npm run notices',
+    'git diff --exit-code -- THIRD_PARTY_NOTICES.txt',
+    'npm run dist'
+  ];
+  let previousLocal = -1;
+  for (const value of localReleaseOrder) {
+    const index = releasingGuide.indexOf(value);
+    assert.ok(index > previousLocal, `${value} missing or out of order in RELEASING.md`);
+    previousLocal = index;
   }
 
   const ordered = [
