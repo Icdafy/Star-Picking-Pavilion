@@ -61,6 +61,13 @@ CREATE INDEX IF NOT EXISTS idx_articles_pub ON articles(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_articles_feat ON articles(featured, quality_score DESC);
 CREATE INDEX IF NOT EXISTS idx_articles_cluster ON articles(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_articles_analyzed ON articles(analyzed, relevant);
+-- 统计面板每 18 秒按 fetched_at 计数；无此索引会全表扫描
+CREATE INDEX IF NOT EXISTS idx_articles_fetched ON articles(fetched_at);
+-- 信息流时间线按 COALESCE(published_at, fetched_at) 倒序；表达式索引让排序走索引而非全表排序
+CREATE INDEX IF NOT EXISTS idx_articles_timeline
+  ON articles(COALESCE(published_at, fetched_at) DESC);
+-- 保留清理与聚类窗口都按「相关性 + 时间」取子集
+CREATE INDEX IF NOT EXISTS idx_articles_relevant_fetched ON articles(relevant, fetched_at);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
   title, summary, tokenize='trigram'
@@ -102,6 +109,11 @@ function migrate() {
   // sources 表补 intl 列（标记国外情报源）
   const srcCols = new Set(db.prepare('PRAGMA table_info(sources)').all().map(c => c.name));
   if (!srcCols.has('intl')) db.exec('ALTER TABLE sources ADD COLUMN intl INTEGER NOT NULL DEFAULT 0');
+  // 失败退避：连续失败次数与下次允许采集时间（长期挂掉的源不再每轮空转）
+  if (!srcCols.has('consecutive_errors')) {
+    db.exec('ALTER TABLE sources ADD COLUMN consecutive_errors INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!srcCols.has('next_fetch_at')) db.exec('ALTER TABLE sources ADD COLUMN next_fetch_at TEXT');
 }
 migrate();
 
@@ -127,6 +139,37 @@ function updateArticleFts(id, title, summary) {
     .run(id, title, summary || '');
 }
 
+// 删除文章时必须同步删掉 FTS 影子行，否则 trigram 索引会越积越大且检索到已删条目
+function deleteArticles(ids) {
+  if (!ids.length) return 0;
+  const removeFts = db.prepare('DELETE FROM articles_fts WHERE rowid = ?');
+  const removeArticle = db.prepare('DELETE FROM articles WHERE id = ?');
+  let removed = 0;
+  for (const id of ids) {
+    removeFts.run(id);
+    removed += removeArticle.run(id).changes;
+  }
+  return removed;
+}
+
+// WAL 在长期运行中只增不减，清理后主动截断，让磁盘占用真正回落
+function checkpointWal() {
+  try {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function databaseFileBytes() {
+  let total = 0;
+  for (const suffix of ['', '-wal', '-shm']) {
+    try { total += fs.statSync(path.join(DATA_DIR, `star-picking-pavilion.db${suffix}`)).size; } catch {}
+  }
+  return total;
+}
+
 let databaseClosed = false;
 function closeDatabase() {
   if (databaseClosed) return;
@@ -134,4 +177,7 @@ function closeDatabase() {
   db.close();
 }
 
-module.exports = { db, now, insertArticle, updateArticleFts, closeDatabase, DATA_DIR };
+module.exports = {
+  db, now, insertArticle, updateArticleFts, deleteArticles,
+  checkpointWal, databaseFileBytes, closeDatabase, DATA_DIR
+};

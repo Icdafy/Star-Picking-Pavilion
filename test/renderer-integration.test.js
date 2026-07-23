@@ -484,3 +484,56 @@ test('常用网址沿用摘星阁主题并具备响应式和交互状态', () =>
   assert.match(css, /\.common-links-card[\s\S]*var\(--glass-border\)/);
   assert.match(css, /\.common-links-favorite\.is-active[\s\S]*var\(--c-teal\)/);
 });
+
+test('信息流重载以最后一次请求为准，加载途中切换筛选不会被丢弃', () => {
+  // 旧实现是 `if (state.loading) return;`，会把加载期间的筛选点击静默吞掉
+  assert.doesNotMatch(app, /async function loadFeed[\s\S]{0,200}?if \(state\.loading\) return;/);
+  assert.match(app, /const feedRequestGuard = Bootstrap\.createLatestRequestGuard\(\);/);
+  assert.match(app, /if \(!reset && state\.loading\) return;/);
+  assert.match(app, /const request = feedRequestGuard\.begin\(\);/);
+  // 过期响应既不能改 DOM，也不能提前解除 loading 标志
+  assert.match(app, /const data = await api\('\/api\/feed\?' \+ params\);\s*\n\s*if \(!request\.isCurrent\(\)\) return;/);
+  assert.match(app, /if \(request\.isCurrent\(\)\) state\.loading = false;/);
+});
+
+test('右侧热度栏同样丢弃过期响应', () => {
+  assert.match(app, /const hotRailRequestGuard = Bootstrap\.createLatestRequestGuard\(\);/);
+  assert.match(app, /async function loadHotRail[\s\S]{0,400}?if \(!request\.isCurrent\(\)\) return;/);
+});
+
+test('信源卡片展示失败退避状态并提供立即重试', () => {
+  assert.match(app, /health\.pausedUntil/);
+  assert.match(app, /暂停至/);
+  assert.match(app, /连续失败 \$\{health\.consecutiveErrors\} 次/);
+  assert.match(app, /data-act="retry"/);
+  assert.match(app, /\/api\/sources\/\$\{id\}\/retry/);
+  assert.ok(css.includes('.src-backoff'), '缺少 .src-backoff 样式');
+  assert.ok(css.includes('.src-card.is-failing'), '缺少 .src-card.is-failing 样式');
+});
+
+test('设置页提供数据保留配置与本地库体积视图', () => {
+  assert.match(html, /id="setRetentionDays"[^>]*type="number"[^>]*min="7"[^>]*max="3650"/);
+  assert.match(html, /id="setIrrelevantRetentionDays"[^>]*type="number"[^>]*min="1"[^>]*max="3650"/);
+  assert.match(html, /id="btnSaveRetention"/);
+  assert.match(html, /id="btnPruneNow"/);
+  for (const id of ['msArticles', 'msSize', 'msExpiring']) {
+    assert.ok(html.includes(`id="${id}"`), `缺少统计位 ${id}`);
+  }
+  assert.match(app, /await api\('\/api\/maintenance'\)/);
+  assert.match(app, /'\/api\/maintenance\/prune'/);
+  assert.match(app, /await settingsForm\.saveRetention\(\)/);
+  assert.match(settingsFormController, /RETENTION_FIELD_NAMES/);
+  assert.match(settingsFormController, /retentionDays: Number\(elements\.retentionDays\.value\)/);
+  assert.ok(css.includes('.maintenance-stats'), '缺少 .maintenance-stats 样式');
+});
+
+test('库体积展示对空库和各量级都给出可读结果', () => {
+  const source = app.match(/function formatBytes\(bytes\)[\s\S]*?\n\}/)[0];
+  const formatBytes = new Function(`${source}\nreturn formatBytes;`)();
+  assert.equal(formatBytes(0), '0 MB');
+  assert.equal(formatBytes(-5), '0 MB');
+  assert.equal(formatBytes(NaN), '0 MB');
+  assert.equal(formatBytes(2048), '2 KB');
+  assert.equal(formatBytes(10 * 1024 * 1024), '10.0 MB');
+  assert.equal(formatBytes(3 * 1024 * 1024 * 1024), '3.00 GB');
+});

@@ -5,6 +5,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { db, now, insertArticle } = require('../db');
 const { loadSettings } = require('../config');
+const { collectionIntervalMs } = require('../schedule-policy');
+const { isDue, nextFetchAtIso } = require('../source-health');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
@@ -68,10 +70,15 @@ async function collectSource(source, settings) {
 }
 
 // 采集全部启用信源（带并发限制）
-async function collectAll(onProgress) {
+// force=true 时忽略失败退避 —— 用户点「立即采集分析」意味着他要的就是现在全量重试一次
+async function collectAll(onProgress, { force = false } = {}) {
   seedSources();
   const settings = loadSettings();
-  const sources = db.prepare('SELECT * FROM sources WHERE enabled = 1').all();
+  const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
+  const enabled = db.prepare('SELECT * FROM sources WHERE enabled = 1').all();
+  const startedAt = Date.now();
+  const sources = force ? enabled : enabled.filter(source => isDue(source, startedAt));
+  const skipped = enabled.length - sources.length;
   const results = [];
   const CONCURRENCY = 4;
   let idx = 0;
@@ -82,22 +89,26 @@ async function collectAll(onProgress) {
       try {
         const r = await collectSource(source, settings);
         db.prepare(`UPDATE sources SET last_fetch_at=?, last_status='ok',
-          fetch_count=fetch_count+1, item_count=item_count+? WHERE id=?`)
+          fetch_count=fetch_count+1, item_count=item_count+?,
+          consecutive_errors=0, next_fetch_at=NULL WHERE id=?`)
           .run(now(), r.added, source.id);
         results.push({ source: source.name, ...r, ms: Date.now() - started });
         onProgress && onProgress({ source: source.name, ...r });
       } catch (e) {
         const msg = String(e.message || e).slice(0, 200);
+        const consecutive = (Number(source.consecutive_errors) || 0) + 1;
         db.prepare(`UPDATE sources SET last_fetch_at=?, last_status=?,
-          fetch_count=fetch_count+1, error_count=error_count+1 WHERE id=?`)
-          .run(now(), 'error: ' + msg, source.id);
-        results.push({ source: source.name, error: msg });
-        onProgress && onProgress({ source: source.name, error: msg });
+          fetch_count=fetch_count+1, error_count=error_count+1,
+          consecutive_errors=?, next_fetch_at=? WHERE id=?`)
+          .run(now(), 'error: ' + msg, consecutive,
+            nextFetchAtIso(consecutive, intervalMs, Date.now()), source.id);
+        results.push({ source: source.name, error: msg, consecutiveErrors: consecutive });
+        onProgress && onProgress({ source: source.name, error: msg, consecutiveErrors: consecutive });
       }
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  return results;
+  return { results, skipped };
 }
 
 module.exports = { collectAll, seedSources };

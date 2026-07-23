@@ -142,6 +142,8 @@ const preferenceActions = Bootstrap.createUiPreferenceActions({
   today: () => localDateString()
 });
 const dailyRequestGuard = Bootstrap.createLatestRequestGuard();
+const feedRequestGuard = Bootstrap.createLatestRequestGuard();
+const hotRailRequestGuard = Bootstrap.createLatestRequestGuard();
 
 const DOMAIN_NAME = { lowaltitude: '低空经济', aerospace: '商业航天' };
 const DIM_NAMES = {
@@ -291,7 +293,10 @@ function skeletons(n = 5) {
 }
 
 async function loadFeed(reset = true) {
-  if (state.loading) return;
+  // 分页追加不能并发，否则两批结果会交错；整表重载则以最后一次请求为准，
+  // 这样在加载途中切换领域/分类不会被静默丢弃。
+  if (!reset && state.loading) return;
+  const request = feedRequestGuard.begin();
   state.loading = true;
   const list = $('#feedList');
   if (reset) { state.page = 0; list.innerHTML = skeletons(); $('#newFlash').hidden = true; }
@@ -301,6 +306,7 @@ async function loadFeed(reset = true) {
     if (state.category) params.set('category', state.category);
     if (state.q) params.set('q', state.q);
     const data = await api('/api/feed?' + params);
+    if (!request.isCurrent()) return;
     const startIdx = state.page * 30;
     const html = state.view === 'hot'
       ? renderRanked(data.items, startIdx)
@@ -326,19 +332,22 @@ async function loadFeed(reset = true) {
     $('#btnMore').hidden = !data.hasMore;
     $('#feedEnd').hidden = data.hasMore || !data.items.length;
   } catch (e) {
+    if (!request.isCurrent()) return;
     if (reset) list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>后端连接失败：${esc(e.message)}</p></div>`;
   } finally {
-    state.loading = false;
+    if (request.isCurrent()) state.loading = false;
   }
 }
 
 // ---------- 右侧热度栏 ----------
 async function loadHotRail() {
   const box = $('#hotRailList');
+  const request = hotRailRequestGuard.begin();
   try {
     const params = new URLSearchParams({ view: 'hot', page: 0 });
     if (state.domain) params.set('domain', state.domain);
     const data = await api('/api/feed?' + params);
+    if (!request.isCurrent()) return;
     const top = data.items.slice(0, 10);
     if (!top.length) { box.innerHTML = '<div class="hot-rail-sub">暂无热点</div>'; return; }
     box.innerHTML = top.map((it, i) => `
@@ -353,7 +362,7 @@ async function loadHotRail() {
           </span>
         </span>
       </a>`).join('');
-  } catch { box.innerHTML = ''; }
+  } catch { if (request.isCurrent()) box.innerHTML = ''; }
 }
 
 // 卡片交互：展开五维 / 事件簇
@@ -452,23 +461,32 @@ async function loadSources() {
     const sources = await api('/api/sources');
     list.innerHTML = sources.map(s => {
       const st = !s.enabled ? 'idle' : s.last_status?.startsWith('error') ? 'err' : s.last_status === 'ok' ? 'ok' : 'idle';
+      const health = s.health || {};
+      const paused = health.pausedUntil
+        ? `<span class="src-backoff" title="连续失败后自动拉长重试间隔，避免每轮空转">
+             暂停至 ${esc(hhmm(health.pausedUntil))}</span>`
+        : '';
       return `
-      <div class="src-card glass" data-id="${s.id}">
+      <div class="src-card glass${health.state === 'failing' ? ' is-failing' : ''}" data-id="${s.id}">
         <div class="src-row1">
           <span class="src-status ${st}" title="${esc(s.last_status || '未采集')}"></span>
           <span class="src-name" title="${esc(s.url)}">${esc(s.name)}</span>
           <span class="tier-chip tier-${esc(s.tier)}">${esc(s.tier)}</span>
+          ${paused}
         </div>
         <div class="src-meta">
           <span>${esc(s.type.toUpperCase())}</span>
           <span>${DOMAIN_NAME[s.domain] || '双领域'}</span>
           <span>累计 ${s.item_count} 条</span>
-          ${s.error_count ? `<span style="color:var(--c-red)">失败 ${s.error_count} 次</span>` : ''}
+          ${health.consecutiveErrors
+            ? `<span style="color:var(--c-red)">连续失败 ${health.consecutiveErrors} 次</span>`
+            : s.error_count ? `<span>累计失败 ${s.error_count} 次</span>` : ''}
           <span>${s.last_fetch_at ? timeAgo(s.last_fetch_at) : '未采集'}</span>
         </div>
         ${s.note ? `<div class="src-meta" style="margin-top:4px">${esc(s.note)}</div>` : ''}
         <div class="src-actions">
           <button data-act="toggle">${s.enabled ? '停用' : '启用'}</button>
+          ${health.pausedUntil ? '<button data-act="retry">立即重试</button>' : ''}
           <button data-act="remove" class="danger"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
         </div>
       </div>`;
@@ -487,6 +505,10 @@ $('#sourcesList').addEventListener('click', async e => {
       const enabled = btn.textContent === '启用';
       await api(`/api/sources/${id}`, { method: 'PATCH', body: { enabled } });
       toast(enabled ? '信源已启用' : '信源已停用');
+      loadSources();
+    } else if (btn.dataset.act === 'retry') {
+      await api(`/api/sources/${id}/retry`, { body: {} });
+      toast('已清除退避，下轮采集会重新尝试');
       loadSources();
     } else if (btn.dataset.act === 'remove') {
       if (btn.disabled) return;
@@ -524,15 +546,40 @@ const settingsForm = SettingsFormController.createSettingsFormController({
     scoringModel: $('#setScoringModel'),
     intervalMinutes: $('#setInterval'),
     rsshubBase: $('#setRsshub'),
+    retentionDays: $('#setRetentionDays'),
+    irrelevantRetentionDays: $('#setIrrelevantRetentionDays'),
     clearApiKeyButton: $('#btnClearAiKey')
   },
   request: api
 });
 
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return '0 MB';
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+  if (value < 1024 * 1024 * 1024) return `${(value / 1048576).toFixed(1)} MB`;
+  return `${(value / 1073741824).toFixed(2)} GB`;
+}
+
+async function loadMaintenance() {
+  try {
+    const m = await api('/api/maintenance');
+    $('#msArticles').textContent = m.articles.toLocaleString('zh-CN');
+    $('#msSize').textContent = formatBytes(m.databaseBytes);
+    $('#msExpiring').textContent = m.expiring.toLocaleString('zh-CN');
+    if (m.lastPruneAt) {
+      $('#lastPruneHint').innerHTML =
+        `上次清理：${esc(timeAgo(m.lastPruneAt))} · 情报保留 ${m.retentionDays} 天、无关内容保留 ${m.irrelevantRetentionDays} 天。`
+        + '过期情报连同全文检索索引会自动清除，WAL 随之截断。';
+    }
+  } catch {}
+}
+
 async function loadSettings() {
   try {
     await settingsForm.load();
   } catch {}
+  loadMaintenance();
 }
 
 $('#btnSaveAi').addEventListener('click', async () => {
@@ -577,6 +624,37 @@ $('#btnSaveCollect').addEventListener('click', async () => {
     toast('采集设置已保存（间隔重启后生效，RSSHub 立即生效）');
   } catch (error) {
     toast('采集设置保存失败：' + error.message, true);
+  }
+});
+
+$('#btnSaveRetention').addEventListener('click', async () => {
+  try {
+    await settingsForm.saveRetention();
+    toast('数据保留设置已保存');
+    loadMaintenance();
+  } catch (error) {
+    toast('数据保留设置保存失败：' + error.message, true);
+  }
+});
+
+$('#btnPruneNow').addEventListener('click', async () => {
+  const el = $('#pruneResult');
+  el.textContent = '清理中…';
+  el.className = 'test-result';
+  $('#btnPruneNow').disabled = true;
+  try {
+    const r = await api('/api/maintenance/prune', { body: {} });
+    el.textContent = r.skipped
+      ? '清理已在进行中，请稍候'
+      : r.removedArticles ? `✓ 已清理 ${r.removedArticles} 条` : '✓ 没有需要清理的内容';
+    el.classList.add(r.skipped ? 'fail' : 'ok');
+    loadMaintenance();
+    refreshStats();
+  } catch (error) {
+    el.textContent = '✗ ' + error.message;
+    el.classList.add('fail');
+  } finally {
+    $('#btnPruneNow').disabled = false;
   }
 });
 

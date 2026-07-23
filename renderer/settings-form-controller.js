@@ -11,7 +11,9 @@
     'prefilterModel',
     'scoringModel',
     'intervalMinutes',
-    'rsshubBase'
+    'rsshubBase',
+    'retentionDays',
+    'irrelevantRetentionDays'
   ]);
   const AI_FIELD_NAMES = Object.freeze([
     'apiKey',
@@ -20,6 +22,8 @@
     'scoringModel'
   ]);
   const COLLECT_FIELD_NAMES = Object.freeze(['intervalMinutes', 'rsshubBase']);
+  const RETENTION_FIELD_NAMES = Object.freeze(['retentionDays', 'irrelevantRetentionDays']);
+  const RETENTION_DEFAULTS = Object.freeze({ retentionDays: 180, irrelevantRetentionDays: 21 });
 
   function createSettingsFormController({ elements, request } = {}) {
     if (!elements || typeof request !== 'function') {
@@ -94,6 +98,11 @@
       if (canApplyLoad('rsshubBase', prior)) {
         elements.rsshubBase.value = settings.collect.rsshubBase || '';
       }
+      for (const name of RETENTION_FIELD_NAMES) {
+        if (canApplyLoad(name, prior)) {
+          elements[name].value = settings.collect[name] ?? RETENTION_DEFAULTS[name];
+        }
+      }
       return settings;
     }
 
@@ -144,7 +153,24 @@
       return result;
     }
 
-    return Object.freeze({ load, saveAi, clearApiKey, saveCollect });
+    async function saveRetention() {
+      const submitted = snapshot();
+      const result = await request('/api/settings', {
+        body: {
+          collect: {
+            retentionDays: Number(elements.retentionDays.value) || RETENTION_DEFAULTS.retentionDays,
+            irrelevantRetentionDays:
+              Number(elements.irrelevantRetentionDays.value) || RETENTION_DEFAULTS.irrelevantRetentionDays
+          }
+        }
+      });
+      for (const name of RETENTION_FIELD_NAMES) {
+        markSynchronizedIfUnchanged(name, submitted);
+      }
+      return result;
+    }
+
+    return Object.freeze({ load, saveAi, clearApiKey, saveCollect, saveRetention });
   }
 
   return Object.freeze({ createSettingsFormController });

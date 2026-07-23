@@ -767,6 +767,13 @@ main { max-width: 1360px; margin: 0 auto; padding: 0 16px 80px; }
 .src-status.idle { background: var(--c-fg-faint); }
 .src-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .src-meta { font-size: 12px; color: var(--c-fg-faint); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+.src-card.is-failing { border-color: color-mix(in srgb, var(--c-red) 40%, transparent); }
+.src-backoff {
+  margin-left: auto; font-size: 11.5px; letter-spacing: .3px; padding: 2px 9px;
+  border-radius: 999px; color: var(--c-red);
+  border: 1px solid color-mix(in srgb, var(--c-red) 35%, transparent);
+  background: color-mix(in srgb, var(--c-red) 10%, transparent);
+}
 .src-actions { display: flex; gap: 8px; margin-top: 10px; }
 .src-actions button {
   font-size: 12.5px; padding: 4px 12px; border-radius: 99px; cursor: pointer;
@@ -803,6 +810,17 @@ main { max-width: 1360px; margin: 0 auto; padding: 0 16px 80px; }
 .test-result { font-size: 13px; }
 .test-result.ok { color: var(--c-green); }
 .test-result.fail { color: var(--c-red); }
+
+.maintenance-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px;
+}
+.ms-item {
+  display: flex; flex-direction: column; gap: 3px; padding: 12px 14px;
+  border-radius: var(--radius-md); border: 1px solid var(--glass-border); background: var(--input-bg);
+}
+.ms-num { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+.ms-num.accent { color: var(--c-orange); }
+.ms-label { font-size: 11.5px; color: var(--c-fg-dim); letter-spacing: .5px; }
 .hint { font-size: 12.5px; color: var(--c-fg-faint); margin-top: 14px; line-height: 1.8; }
 
 /* ---------- 弹窗 / Toast ---------- */

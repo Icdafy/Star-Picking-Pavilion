@@ -46,6 +46,8 @@ function createElements() {
     scoringModel: new FakeInput(),
     intervalMinutes: new FakeInput(),
     rsshubBase: new FakeInput(),
+    retentionDays: new FakeInput(),
+    irrelevantRetentionDays: new FakeInput(),
     clearApiKeyButton: { disabled: true }
   };
 }

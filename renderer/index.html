@@ -199,6 +199,28 @@
         </label>
         <div class="btn-row"><button class="btn-ghost" id="btnFeedback">提交反馈</button></div>
       </div>
+      <div class="glass card-pad">
+        <h3>数据维护 <span class="muted">本地情报库</span></h3>
+        <div class="maintenance-stats" id="maintenanceStats" aria-live="polite">
+          <div class="ms-item"><span class="ms-num" id="msArticles">–</span><span class="ms-label">库内情报</span></div>
+          <div class="ms-item"><span class="ms-num" id="msSize">–</span><span class="ms-label">占用空间</span></div>
+          <div class="ms-item"><span class="ms-num accent" id="msExpiring">–</span><span class="ms-label">待清理</span></div>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>情报保留天数</span>
+            <input id="setRetentionDays" type="number" min="7" max="3650" step="1">
+          </label>
+          <label class="field"><span>无关内容保留天数</span>
+            <input id="setIrrelevantRetentionDays" type="number" min="1" max="3650" step="1">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" id="btnSaveRetention">保存</button>
+          <button class="btn-ghost" id="btnPruneNow">立即清理</button>
+          <span id="pruneResult" class="test-result" role="status"></span>
+        </div>
+        <p class="hint" id="lastPruneHint">桌面端长期驻留运行，过期情报连同全文检索索引会在每天 <b id="pruneHour">08</b>:25 自动清理，WAL 随之截断。判为无关的噪声用更短的保留期，避免撑大本地库。</p>
+      </div>
     </div>
   </section>
 </main>

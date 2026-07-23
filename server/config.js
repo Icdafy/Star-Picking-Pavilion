@@ -24,6 +24,8 @@ const DEFAULT_SETTINGS = {
     intervalMinutes: 10,               // 采集循环间隔（缩短以更实时）
     analyzeIntervalSeconds: 75,        // 分析循环间隔（秒）：持续给新采集项打分，实时跟上
     keepDays: 30,                      // 入库保留天数（过老的抓取项直接丢弃）
+    retentionDays: 180,                // 已入库情报的保留天数（到期自动清理，含 FTS 索引）
+    irrelevantRetentionDays: 21,       // 判为无关的噪声保留天数（更短，避免噪声撑大库）
     requestTimeoutMs: 20000,
     rsshubBase: '',                    // RSSHub 实例地址（如 https://rsshub.app）；填后 rsshub:// 型信源生效
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
@@ -66,6 +68,12 @@ function normalizeSettings(raw) {
     settings.collect.analyzeIntervalSeconds, 20, 3600, DEFAULT_SETTINGS.collect.analyzeIntervalSeconds
   );
   settings.collect.keepDays = boundedInteger(settings.collect.keepDays, 1, 3650, DEFAULT_SETTINGS.collect.keepDays);
+  settings.collect.retentionDays = boundedInteger(
+    settings.collect.retentionDays, 7, 3650, DEFAULT_SETTINGS.collect.retentionDays
+  );
+  settings.collect.irrelevantRetentionDays = boundedInteger(
+    settings.collect.irrelevantRetentionDays, 1, 3650, DEFAULT_SETTINGS.collect.irrelevantRetentionDays
+  );
   settings.collect.requestTimeoutMs = boundedInteger(
     settings.collect.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.collect.requestTimeoutMs
   );
@@ -121,7 +129,9 @@ function applySettingsPatch(currentSettings, patch) {
   if (patch.ai && Object.keys(patch.ai).some(key => !['apiKey', 'baseUrl', 'prefilterModel', 'scoringModel'].includes(key))) {
     throw new HttpError(400, '包含不支持的 AI 设置字段');
   }
-  if (patch.collect && Object.keys(patch.collect).some(key => !['intervalMinutes', 'rsshubBase'].includes(key))) {
+  if (patch.collect && Object.keys(patch.collect).some(
+    key => !['intervalMinutes', 'rsshubBase', 'retentionDays', 'irrelevantRetentionDays'].includes(key)
+  )) {
     throw new HttpError(400, '包含不支持的采集设置字段');
   }
   const settings = structuredClone(currentSettings);
@@ -169,6 +179,20 @@ function applySettingsPatch(currentSettings, patch) {
       throw new HttpError(400, '采集间隔必须是 10 到 720 分钟之间的整数');
     }
     settings.collect.intervalMinutes = interval;
+  }
+  if (patch?.collect && Object.hasOwn(patch.collect, 'retentionDays')) {
+    const days = Number(patch.collect.retentionDays);
+    if (!Number.isInteger(days) || days < 7 || days > 3650) {
+      throw new HttpError(400, '情报保留天数必须是 7 到 3650 之间的整数');
+    }
+    settings.collect.retentionDays = days;
+  }
+  if (patch?.collect && Object.hasOwn(patch.collect, 'irrelevantRetentionDays')) {
+    const days = Number(patch.collect.irrelevantRetentionDays);
+    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+      throw new HttpError(400, '无关内容保留天数必须是 1 到 3650 之间的整数');
+    }
+    settings.collect.irrelevantRetentionDays = days;
   }
   if (patch?.collect?.rsshubBase !== undefined) {
     const rsshubBase = String(patch.collect.rsshubBase).trim().replace(/\/$/, '');

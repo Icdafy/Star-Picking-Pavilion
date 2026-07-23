@@ -6,11 +6,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createCredentialIpcTracer } = require('../electron/credential-ipc-trace');
 const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
-const { db, now, closeDatabase } = require('./db');
+const { db, now, closeDatabase, databaseFileBytes } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
 const { persistApiKey } = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
-const { runPipeline, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus } = require('./scheduler');
+const { describeHealth } = require('./source-health');
+const { getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
+const {
+  runPipeline, pruneOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
+} = require('./scheduler');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
@@ -91,12 +95,25 @@ function articleRow(r, scoring, nowMs) {
   };
 }
 
+// LIKE 里的通配符必须转义，否则用户检索 "100%" 之类会被当成模式匹配
+function escapeLikePattern(value) {
+  return value.replace(/[\\%_]/g, character => `\\${character}`);
+}
+
+// 热度 = 质量分 × 指数时间衰减。与 scoring.heatScore 同式，放进 SQL 才能只取需要的一页，
+// 否则每次请求都要把上千行读进内存再在 JS 里排序（实时轮询每 18 秒会请求两次）。
+const HEAT_EXPRESSION = `COALESCE(a.quality_score, 0) * pow(
+  0.5,
+  max(0.0, (julianday('now') - julianday(COALESCE(a.published_at, a.fetched_at))) * 24.0) / ?
+)`;
+// 半衰期 36 小时下，超出此窗口的条目热度已衰减到千分之一以下，排进热榜没有意义
+const HOT_WINDOW_DAYS = 45;
+
 function queryFeed(q) {
   const scoring = loadScoring();
   const nowMs = Date.now();
   const { view, domain, category, search, page } = parseFeedQuery(q, CATEGORIES);
   const SIZE = 30;
-  const HOT_CANDIDATES = 1000;
 
   const where = [];
   const params = [];
@@ -117,34 +134,46 @@ function queryFeed(q) {
       } catch { ids = null; }
     }
     if (!ids) {
-      ids = db.prepare('SELECT id FROM articles WHERE title LIKE ? OR ai_summary LIKE ? LIMIT 500')
-        .all(`%${search}%`, `%${search}%`).map(r => r.id);
+      const pattern = `%${escapeLikePattern(search)}%`;
+      ids = db.prepare(`SELECT id FROM articles
+        WHERE title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' LIMIT 500`)
+        .all(pattern, pattern).map(r => r.id);
     }
     if (!ids.length) return { items: [], page, hasMore: false };
     idFilter = `AND a.id IN (${ids.join(',')})`;
   }
 
   // 事件簇折叠：簇内只返回主条
-  const sql = `
+  const buildSql = (order, extraWhere) => `
     SELECT a.*, s.name AS source_name, s.tier, c.size AS cluster_size
     FROM articles a
     JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters c ON c.id = a.cluster_id
-    WHERE ${where.join(' AND ') || '1=1'} ${idFilter}
+    WHERE ${where.join(' AND ') || '1=1'} ${idFilter} ${extraWhere}
       AND (a.cluster_id IS NULL OR a.id = c.main_article_id)
-    ORDER BY ${view === 'hot' ? 'a.quality_score DESC' : 'COALESCE(a.published_at, a.fetched_at) DESC'}
-    LIMIT ${view === 'hot' ? HOT_CANDIDATES + 1 : SIZE + 1}
-    OFFSET ${view === 'hot' ? 0 : page * SIZE}`;
-  let rows = db.prepare(sql).all(...params);
+    ORDER BY ${order}
+    LIMIT ${SIZE + 1} OFFSET ${page * SIZE}`;
 
-  let items = rows.map(r => articleRow(r, scoring, nowMs));
-  // 精选/全部 = 时间线（按时间倒序）；热点 = 热度榜（质量分×时间衰减）
+  let rows;
   if (view === 'hot') {
-    items.sort((a, b) => (b.heat || 0) - (a.heat || 0));
+    const halfLife = Number(scoring.heatDecayHalfLifeHours) || 36;
+    const windowStart = new Date(nowMs - HOT_WINDOW_DAYS * 86_400_000).toISOString();
+    // 占位符按 SQL 文本位置绑定：先 WHERE 的过滤条件，再时间窗，最后 ORDER BY 里的半衰期
+    rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`,
+      'AND COALESCE(a.published_at, a.fetched_at) >= ?'))
+      .all(...params, windowStart, halfLife);
+    // 窗口内已经取空时退回不限时间的热度榜：既覆盖长期未采集的库，也让「加载更多」能翻到更早的内容。
+    // 热度排序是全局的，因此续翻的偏移量与窗口版一致，不会重复或跳条。
+    if (!rows.length) {
+      rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`, '')).all(...params, halfLife);
+    }
+  } else {
+    rows = db.prepare(buildSql('COALESCE(a.published_at, a.fetched_at) DESC', '')).all(...params);
   }
-  const start = view === 'hot' ? page * SIZE : 0;
-  const hasMore = items.length > start + SIZE;
-  return { items: items.slice(start, start + SIZE), page, hasMore };
+
+  const items = rows.map(r => articleRow(r, scoring, nowMs));
+  const hasMore = items.length > SIZE;
+  return { items: items.slice(0, SIZE), page, hasMore };
 }
 
 function getCluster(id) {
@@ -156,7 +185,7 @@ function getCluster(id) {
   return rows.map(r => articleRow(r, scoring, Date.now()));
 }
 
-function getStats() {
+function countStats() {
   const g = (sql, ...params) => db.prepare(sql).get(...params);
   const todayStart = startOfLocalDayIso();
   return {
@@ -166,10 +195,28 @@ function getStats() {
     today: g('SELECT COUNT(*) c FROM articles WHERE fetched_at >= ?', todayStart).c,
     relevantToday: g('SELECT COUNT(*) c FROM articles WHERE relevant=1 AND fetched_at >= ?', todayStart).c,
     featuredToday: g('SELECT COUNT(*) c FROM articles WHERE featured=1 AND fetched_at >= ?', todayStart).c,
-    pending: g('SELECT COUNT(*) c FROM articles WHERE analyzed=0').c,
+    pending: g('SELECT COUNT(*) c FROM articles WHERE analyzed=0').c
+  };
+}
+
+// 界面每 18 秒轮询一次 /api/stats，这些计数都是全表聚合；短 TTL 缓存足以让面板保持“实时”，
+// 又不至于在库变大后每轮都重扫。管线状态与 AI 配置本身很便宜，始终取最新值。
+const STATS_CACHE_TTL_MS = 5_000;
+let statsCache = null;
+
+function getStats(nowMs = Date.now()) {
+  if (!statsCache || nowMs - statsCache.at >= STATS_CACHE_TTL_MS) {
+    statsCache = { at: nowMs, counts: countStats() };
+  }
+  return {
+    ...statsCache.counts,
     pipeline: getStatus(),
     aiConfigured: !!loadSettings().ai.apiKey
   };
+}
+
+function invalidateStatsCache() {
+  statsCache = null;
 }
 
 // ---------- 路由 ----------
@@ -203,12 +250,40 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (p === '/api/collect' && req.method === 'POST') {
+        invalidateStatsCache();
         runPipeline('manual').catch(e => console.error(e));
         return json(res, 202, { started: true });
       }
 
+      // 数据维护：让用户看得到本地库的真实体积，并能手动触发一次保留清理
+      if (p === '/api/maintenance' && req.method === 'GET') {
+        const settings = loadSettings();
+        const plan = resolveRetentionPlan({
+          retentionDays: settings.collect.retentionDays,
+          irrelevantRetentionDays: settings.collect.irrelevantRetentionDays
+        });
+        return json(res, 200, {
+          databaseBytes: databaseFileBytes(),
+          articles: db.prepare('SELECT COUNT(*) c FROM articles').get().c,
+          irrelevant: db.prepare('SELECT COUNT(*) c FROM articles WHERE relevant=0').get().c,
+          expiring: db.prepare(`SELECT COUNT(*) c FROM articles
+            WHERE fetched_at < ? OR (relevant = 0 AND fetched_at < ?)`)
+            .get(plan.articleCutoff, plan.irrelevantCutoff).c,
+          retentionDays: plan.retentionDays,
+          irrelevantRetentionDays: plan.irrelevantRetentionDays,
+          ...getMaintenanceSnapshot()
+        });
+      }
+      if (p === '/api/maintenance/prune' && req.method === 'POST') {
+        const result = pruneOnce('manual');
+        invalidateStatsCache();
+        return json(res, 200, { ok: true, ...result, databaseBytes: databaseFileBytes() });
+      }
+
       if (p === '/api/sources' && req.method === 'GET') {
-        return json(res, 200, db.prepare('SELECT * FROM sources ORDER BY tier, id').all());
+        const nowMs = Date.now();
+        return json(res, 200, db.prepare('SELECT * FROM sources ORDER BY tier, id').all()
+          .map(source => ({ ...source, health: describeHealth(source, nowMs) })));
       }
       if (p === '/api/sources' && req.method === 'POST') {
         const b = await readJsonBody(req);
@@ -217,6 +292,7 @@ const server = http.createServer(async (req, res) => {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
           source.name, source.type, source.url, source.tier, source.domain,
           source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note);
+        invalidateStatsCache();
         return json(res, 200, { id: r.lastInsertRowid });
       }
       const mSrc = p.match(/^\/api\/sources\/(\d+)$/);
@@ -228,6 +304,19 @@ const server = http.createServer(async (req, res) => {
         db.prepare(`UPDATE sources SET name=?, type=?, url=?, tier=?, domain=?, enabled=?, selector_json=?, note=? WHERE id=?`)
           .run(source.name, source.type, source.url, source.tier, source.domain,
             source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note, cur.id);
+        // 用户重新启用或改了地址，视为「我已处理」，清掉退避让它下一轮立刻重试
+        if (source.enabled !== Boolean(cur.enabled) || source.url !== cur.url) {
+          db.prepare('UPDATE sources SET consecutive_errors=0, next_fetch_at=NULL WHERE id=?').run(cur.id);
+        }
+        invalidateStatsCache();
+        return json(res, 200, { ok: true });
+      }
+      const mSrcRetry = p.match(/^\/api\/sources\/(\d+)\/retry$/);
+      if (mSrcRetry && req.method === 'POST') {
+        const sourceId = Number(mSrcRetry[1]);
+        const changed = db.prepare(
+          'UPDATE sources SET consecutive_errors=0, next_fetch_at=NULL WHERE id=?').run(sourceId).changes;
+        if (!changed) return json(res, 404, { error: '信源不存在' });
         return json(res, 200, { ok: true });
       }
       if (mSrc && req.method === 'DELETE') {
@@ -235,6 +324,7 @@ const server = http.createServer(async (req, res) => {
         const existing = db.prepare('SELECT id FROM sources WHERE id=?').get(sourceId);
         if (!existing) return json(res, 404, { error: '信源不存在' });
         db.prepare('UPDATE sources SET enabled=0 WHERE id=?').run(sourceId);
+        invalidateStatsCache();
         return json(res, 200, { ok: true, disabled: true });
       }
 
