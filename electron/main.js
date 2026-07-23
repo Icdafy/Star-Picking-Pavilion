@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
 const { createCredentialStore } = require('./credential-store');
+const { createUiPreferencesStore, getDefaultUiPreferences } = require('./ui-preferences');
 const { focusExistingWindow, createServerProcessController } = require('./server-process');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
@@ -18,6 +19,7 @@ let autoUpdateTimer = null;
 let backendReady = false;
 let quitAfterShutdown = false;
 let desktopShutdownPromise = null;
+let uiPreferencesStore = null;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
   ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
   : null;
@@ -224,6 +226,20 @@ function setupAutoUpdate() {
 // 渲染层点击「重启更新」
 ipcMain.handle('update:install', () => { try { autoUpdater && autoUpdater.quitAndInstall(); } catch {} });
 ipcMain.on('app:get-version', event => { event.returnValue = app.getVersion(); });
+ipcMain.on('preferences:get', event => {
+  event.returnValue = {
+    preferences: uiPreferencesStore
+      ? uiPreferencesStore.getSnapshot()
+      : getDefaultUiPreferences(),
+    hasStoredPreferences: uiPreferencesStore
+      ? uiPreferencesStore.hasStoredPreferences()
+      : false
+  };
+});
+ipcMain.handle('preferences:update', async (_event, patch) => {
+  if (!uiPreferencesStore) throw new Error('UI preferences are not ready');
+  return uiPreferencesStore.update(patch);
+});
 
 async function chooseLegacyDatabase() {
   const result = await dialog.showMessageBox({
@@ -249,6 +265,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     chooseSource: chooseLegacyDatabase
   });
   const dataDir = getDataDir();
+  uiPreferencesStore = createUiPreferencesStore({ directory: dataDir });
+  await uiPreferencesStore.load();
   const credentialStore = createCredentialStore({ safeStorage, directory: dataDir });
   await credentialStore.migratePlaintextSettings(path.join(dataDir, 'settings.json'));
   const initialApiKey = await credentialStore.get();
