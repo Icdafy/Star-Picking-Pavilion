@@ -9,9 +9,10 @@ const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
 const Bootstrap = window.StarPickingPavilionBootstrap;
 const Desktop = window.starPickingPavilion || window.windcatcher;
+const storage = Bootstrap.getSafeStorage(window);
 const initialPreferences = Bootstrap.resolveInitialUiPreferences({
   desktop: Desktop,
-  storage: localStorage,
+  storage,
   commonLinks: CommonLinks,
   today: localDateString()
 });
@@ -119,7 +120,7 @@ function persistUiPreferences(patch) {
     const operation = Desktop?.updatePreferences
       ? Desktop.updatePreferences(sanitized)
       : Bootstrap.writeBrowserUiPreferences(
-        localStorage,
+        storage,
         sanitized,
         CommonLinks,
         { today: localDateString() }
@@ -139,6 +140,7 @@ const preferenceActions = Bootstrap.createUiPreferenceActions({
   persist: persistUiPreferences,
   today: () => localDateString()
 });
+const dailyRequestGuard = Bootstrap.createLatestRequestGuard();
 
 const DOMAIN_NAME = { lowaltitude: '低空经济', aerospace: '商业航天' };
 const DIM_NAMES = {
@@ -385,10 +387,12 @@ $('#btnMore').addEventListener('click', () => { state.page++; loadFeed(false); }
 
 // ---------- 日报 ----------
 async function loadDaily(date) {
+  const request = dailyRequestGuard.begin();
   const body = $('#dailyBody');
   body.innerHTML = skeletons(3);
   try {
     const data = await api('/api/daily' + (date ? `?date=${date}` : ''));
+    if (!request.isCurrent()) return;
     const r = data.report;
     state.dailyDate = r.date;
     state.dailyDates = data.dates;
@@ -413,6 +417,7 @@ async function loadDaily(date) {
           </div>`).join('')}
       </div>`).join('');
   } catch (e) {
+    if (!request.isCurrent()) return;
     body.innerHTML = `<div class="empty-state glass"><p>日报加载失败：${esc(e.message)}</p></div>`;
   }
 }
@@ -856,9 +861,14 @@ async function start() {
   setDomain(state.domain, { persist: false, load: false });
   setRealtime(state.realtime, { persist: false });
   if (initialPreferences.migrationPatch) persistUiPreferences(initialPreferences.migrationPatch);
-  await initCategories();
-  switchView(state.view, { persist: false });
+  if (FEED_VIEWS.includes(state.view)) {
+    await initCategories();
+    switchView(state.view, { persist: false });
+  } else {
+    switchView(state.view, { persist: false });
+    initCategories();
+  }
   pollTimer = setTimeout(pollRealtime, 18000);   // 自调度实时增量循环
 }
 
-start();
+start().catch(() => toast('界面初始化失败，请刷新重试', true));

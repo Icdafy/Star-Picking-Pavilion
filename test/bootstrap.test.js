@@ -8,6 +8,16 @@ const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const bootstrapPath = path.join(root, 'renderer', 'bootstrap.js');
+const schemaPath = path.join(root, 'renderer', 'ui-preference-schema.js');
+
+function runBrowserBootstrap(context) {
+  vm.runInContext(fs.readFileSync(schemaPath, 'utf8'), context, { filename: schemaPath });
+  return vm.runInContext(
+    fs.readFileSync(bootstrapPath, 'utf8'),
+    context,
+    { filename: bootstrapPath }
+  );
+}
 
 function createStorage(entries = {}) {
   const values = new Map(Object.entries(entries));
@@ -59,12 +69,11 @@ test('invalid legacy values never overwrite the current key', () => {
 });
 
 test('browser head load migrates a valid legacy theme and applies it', () => {
-  const source = fs.readFileSync(bootstrapPath, 'utf8');
   const localStorage = createStorage({ 'wc-theme': 'light' });
   const document = { documentElement: { dataset: {}, style: {} } };
   const context = vm.createContext({ localStorage, document });
 
-  vm.runInContext(source, context, { filename: bootstrapPath });
+  runBrowserBootstrap(context);
 
   assert.equal(context.StarPickingPavilionBootstrap.STORAGE_KEYS.theme, 'star-picking-pavilion.theme');
   assert.equal(Object.isFrozen(context.StarPickingPavilionBootstrap), true);
@@ -73,13 +82,12 @@ test('browser head load migrates a valid legacy theme and applies it', () => {
 });
 
 test('browser head load applies a valid desktop theme before CSS instead of legacy storage', () => {
-  const source = fs.readFileSync(bootstrapPath, 'utf8');
   const localStorage = createStorage({ 'wc-theme': 'dark' });
   const document = { documentElement: { dataset: {}, style: {} } };
   const starPickingPavilion = { preferences: { theme: 'light' } };
   const context = vm.createContext({ localStorage, document, starPickingPavilion });
 
-  vm.runInContext(source, context, { filename: bootstrapPath });
+  runBrowserBootstrap(context);
 
   assert.equal(document.documentElement.dataset.theme, 'light');
   assert.equal(document.documentElement.style.colorScheme, 'light');
@@ -87,7 +95,6 @@ test('browser head load applies a valid desktop theme before CSS instead of lega
 });
 
 test('browser head load safely ignores corrupt preference JSON and retains legacy migration', () => {
-  const source = fs.readFileSync(bootstrapPath, 'utf8');
   const localStorage = createStorage({
     'star-picking-pavilion.ui-preferences': '{"theme":',
     'wc-theme': 'light'
@@ -95,9 +102,40 @@ test('browser head load safely ignores corrupt preference JSON and retains legac
   const document = { documentElement: { dataset: {}, style: {} } };
   const context = vm.createContext({ localStorage, document });
 
-  assert.doesNotThrow(() => vm.runInContext(source, context, { filename: bootstrapPath }));
+  assert.doesNotThrow(() => runBrowserBootstrap(context));
   assert.equal(localStorage.values.get('star-picking-pavilion.theme'), 'light');
   assert.equal(document.documentElement.dataset.theme, 'light');
+});
+
+test('browser head load survives a SecurityError localStorage getter and applies dark', () => {
+  const document = { documentElement: { dataset: {}, style: {} } };
+  const sandbox = { document };
+  Object.defineProperty(sandbox, 'localStorage', {
+    get() {
+      const error = new Error('blocked storage');
+      error.name = 'SecurityError';
+      throw error;
+    }
+  });
+  const context = vm.createContext(sandbox);
+
+  assert.doesNotThrow(() => runBrowserBootstrap(context));
+  assert.equal(typeof context.StarPickingPavilionBootstrap.getSafeStorage, 'function');
+  assert.equal(document.documentElement.dataset.theme, 'dark');
+  assert.equal(document.documentElement.style.colorScheme, 'dark');
+});
+
+test('null storage helpers read, migrate, and write without throwing', () => {
+  const api = require('../renderer/bootstrap');
+
+  assert.equal(api.migrateStorage(null, 'current', ['legacy']), null);
+  assert.deepEqual(api.readBrowserUiPreferences(null), {});
+  assert.doesNotThrow(() => api.writeBrowserUiPreferences(
+    null,
+    { theme: 'light' },
+    require('../renderer/common-links'),
+    { today: '2026-07-23' }
+  ));
 });
 
 test('bootstrap is external, precedes the stylesheet, and replaces the inline theme script', () => {

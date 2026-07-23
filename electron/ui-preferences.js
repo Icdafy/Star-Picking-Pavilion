@@ -4,36 +4,17 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const CommonLinks = require('../renderer/common-links');
+const UiPreferenceSchema = require('../renderer/ui-preference-schema');
 
-const THEMES = new Set(['light', 'dark']);
-const VIEWS = new Set(['featured', 'hot', 'all', 'daily', 'links', 'sources', 'settings']);
-const DOMAINS = new Set(['', 'lowaltitude', 'aerospace']);
-const LINK_CATEGORIES = new Set(CommonLinks.getCategories());
-const LINK_IDS = new Set(CommonLinks.LINKS.map(link => link.id));
-const MAX_FAVORITE_INPUT_LENGTH = CommonLinks.LINKS.length;
 const ALLOWED_FIELDS = new Set([
   'version',
-  'theme',
-  'view',
-  'domain',
-  'category',
-  'dailyDate',
-  'linksCategory',
-  'commonLinksFavorites',
-  'realtime'
+  ...UiPreferenceSchema.UI_PREFERENCE_FIELDS
 ]);
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
-
+const schemaDefaults = UiPreferenceSchema.getDefaultUiPreferences(CommonLinks);
 const DEFAULT_UI_PREFERENCES = Object.freeze({
   version: 1,
-  theme: 'dark',
-  view: 'featured',
-  domain: '',
-  category: '',
-  dailyDate: null,
-  linksCategory: CommonLinks.ALL_CATEGORY,
-  commonLinksFavorites: Object.freeze([...CommonLinks.getDefaultFavoriteIds()]),
-  realtime: true
+  ...schemaDefaults,
+  commonLinksFavorites: Object.freeze([...schemaDefaults.commonLinksFavorites])
 });
 
 function clonePreferences(preferences) {
@@ -47,82 +28,22 @@ function getDefaultUiPreferences() {
   return clonePreferences(DEFAULT_UI_PREFERENCES);
 }
 
-function isPlainObject(value) {
-  if (value === null || typeof value !== 'object') return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
-
-function isValidCategory(value) {
-  return typeof value === 'string'
-    && Array.from(value).length <= 120
-    && !CONTROL_CHARACTERS.test(value);
-}
-
-function isRealDateString(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  if (year < 1) return false;
-  const date = new Date(0);
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getUTCFullYear() === year
-    && date.getUTCMonth() === month - 1
-    && date.getUTCDate() === day;
-}
-
 function formatLocalDate(value) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     throw new TypeError('now must return a valid Date');
   }
-  const year = String(value.getFullYear()).padStart(4, '0');
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function resolveToday(today) {
-  return isRealDateString(today) ? today : formatLocalDate(new Date());
-}
-
-function normalizeFavoriteIds(value) {
-  if (!Array.isArray(value) || value.length > MAX_FAVORITE_INPUT_LENGTH) {
-    return [...CommonLinks.getDefaultFavoriteIds()];
-  }
-  const seen = new Set();
-  const normalized = [];
-  for (const id of value) {
-    if (typeof id !== 'string' || !LINK_IDS.has(id) || seen.has(id)) continue;
-    seen.add(id);
-    normalized.push(id);
-  }
-  return normalized;
+  return UiPreferenceSchema.formatLocalDate(value);
 }
 
 function normalizeUiPreferences(raw, { today } = {}) {
-  const source = isPlainObject(raw) ? raw : {};
-  const cutoff = resolveToday(today);
   return {
     version: 1,
-    theme: THEMES.has(source.theme) ? source.theme : DEFAULT_UI_PREFERENCES.theme,
-    view: VIEWS.has(source.view) ? source.view : DEFAULT_UI_PREFERENCES.view,
-    domain: DOMAINS.has(source.domain) ? source.domain : DEFAULT_UI_PREFERENCES.domain,
-    category: isValidCategory(source.category) ? source.category : DEFAULT_UI_PREFERENCES.category,
-    dailyDate: isRealDateString(source.dailyDate) && source.dailyDate <= cutoff
-      ? source.dailyDate
-      : DEFAULT_UI_PREFERENCES.dailyDate,
-    linksCategory: LINK_CATEGORIES.has(source.linksCategory)
-      ? source.linksCategory
-      : DEFAULT_UI_PREFERENCES.linksCategory,
-    commonLinksFavorites: normalizeFavoriteIds(source.commonLinksFavorites),
-    realtime: typeof source.realtime === 'boolean'
-      ? source.realtime
-      : DEFAULT_UI_PREFERENCES.realtime
+    ...UiPreferenceSchema.normalizeUiPreferences(raw, CommonLinks, { today })
   };
 }
 
 function validatePatch(patch, today) {
-  if (!isPlainObject(patch)) {
+  if (!UiPreferenceSchema.isPlainObject(patch)) {
     throw new TypeError('UI preferences patch must be a plain object');
   }
 
@@ -135,39 +56,71 @@ function validatePatch(patch, today) {
   if (Object.hasOwn(patch, 'version') && patch.version !== 1) {
     throw new TypeError('version must be 1');
   }
-  if (Object.hasOwn(patch, 'theme') && !THEMES.has(patch.theme)) {
+  if (
+    Object.hasOwn(patch, 'theme')
+    && !UiPreferenceSchema.isValidUiPreferenceValue('theme', patch.theme, CommonLinks, { today })
+  ) {
     throw new TypeError('theme must be light or dark');
   }
-  if (Object.hasOwn(patch, 'view') && !VIEWS.has(patch.view)) {
+  if (
+    Object.hasOwn(patch, 'view')
+    && !UiPreferenceSchema.isValidUiPreferenceValue('view', patch.view, CommonLinks, { today })
+  ) {
     throw new TypeError('view is not supported');
   }
-  if (Object.hasOwn(patch, 'domain') && !DOMAINS.has(patch.domain)) {
+  if (
+    Object.hasOwn(patch, 'domain')
+    && !UiPreferenceSchema.isValidUiPreferenceValue('domain', patch.domain, CommonLinks, { today })
+  ) {
     throw new TypeError('domain is not supported');
   }
-  if (Object.hasOwn(patch, 'category') && !isValidCategory(patch.category)) {
+  if (
+    Object.hasOwn(patch, 'category')
+    && !UiPreferenceSchema.isValidUiPreferenceValue('category', patch.category, CommonLinks, { today })
+  ) {
     throw new TypeError('category must be control-free text of at most 120 characters');
   }
   if (
     Object.hasOwn(patch, 'dailyDate')
-    && patch.dailyDate !== null
-    && (!isRealDateString(patch.dailyDate) || patch.dailyDate > today)
+    && !UiPreferenceSchema.isValidUiPreferenceValue(
+      'dailyDate',
+      patch.dailyDate,
+      CommonLinks,
+      { today }
+    )
   ) {
     throw new TypeError('dailyDate must be a real, non-future YYYY-MM-DD date or null');
   }
-  if (Object.hasOwn(patch, 'linksCategory') && !LINK_CATEGORIES.has(patch.linksCategory)) {
+  if (
+    Object.hasOwn(patch, 'linksCategory')
+    && !UiPreferenceSchema.isValidUiPreferenceValue(
+      'linksCategory',
+      patch.linksCategory,
+      CommonLinks,
+      { today }
+    )
+  ) {
     throw new TypeError('linksCategory is not supported');
   }
   if (Object.hasOwn(patch, 'commonLinksFavorites')) {
     if (!Array.isArray(patch.commonLinksFavorites)) {
       throw new TypeError('commonLinksFavorites must be an array');
     }
-    if (patch.commonLinksFavorites.length > MAX_FAVORITE_INPUT_LENGTH) {
+    if (!UiPreferenceSchema.isValidUiPreferenceValue(
+      'commonLinksFavorites',
+      patch.commonLinksFavorites,
+      CommonLinks,
+      { today }
+    )) {
       throw new TypeError(
-        `commonLinksFavorites must contain at most ${MAX_FAVORITE_INPUT_LENGTH} items`
+        `commonLinksFavorites must contain at most ${CommonLinks.LINKS.length} items`
       );
     }
   }
-  if (Object.hasOwn(patch, 'realtime') && typeof patch.realtime !== 'boolean') {
+  if (
+    Object.hasOwn(patch, 'realtime')
+    && !UiPreferenceSchema.isValidUiPreferenceValue('realtime', patch.realtime, CommonLinks, { today })
+  ) {
     throw new TypeError('realtime must be a boolean');
   }
 }

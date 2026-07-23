@@ -31,8 +31,13 @@ test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
 
 test('领域模块在应用脚本之前加载', () => {
   const domUtilsIndex = html.indexOf('<script src="dom-utils.js"></script>');
+  const schemaIndex = html.indexOf('<script src="ui-preference-schema.js"></script>');
+  const bootstrapIndex = html.indexOf('<script src="bootstrap.js"></script>');
+  const styleIndex = html.indexOf('<link rel="stylesheet" href="styles.css">');
   const moduleIndex = html.indexOf('<script src="common-links.js"></script>');
   const appIndex = html.indexOf('<script src="app.js"></script>');
+  assert.ok(schemaIndex >= 0 && schemaIndex < bootstrapIndex);
+  assert.ok(bootstrapIndex < styleIndex);
   assert.ok(domUtilsIndex >= 0);
   assert.ok(moduleIndex > domUtilsIndex);
   assert.ok(moduleIndex >= 0);
@@ -224,9 +229,15 @@ test('browser preferences safely fall back to all readable legacy selections aft
 test('production preference actions persist exactly eight minimal patches and ignore invalid or transient input', () => {
   const favoriteId = CommonLinks.LINKS[0].id;
   const persisted = [];
+  const persistResults = [];
   const actions = Bootstrap.createUiPreferenceActions({
     commonLinks: CommonLinks,
-    persist: patch => { persisted.push(patch); },
+    persist: patch => {
+      persisted.push(patch);
+      const result = Promise.resolve(patch);
+      persistResults.push(result);
+      return result;
+    },
     today: () => '2026-07-23'
   });
   const cases = [
@@ -241,8 +252,9 @@ test('production preference actions persist exactly eight minimal patches and ig
   ];
 
   assert.deepEqual(persisted, [], 'constructing actions must not persist during initialization');
-  for (const [field, value] of cases) actions.remember(field, value);
+  const actionResults = cases.map(([field, value]) => actions.remember(field, value));
   assert.deepEqual(persisted, cases.map(([, , expected]) => expected));
+  assert.deepEqual(actionResults, persistResults);
 
   for (const field of ['q', 'page', 'scrollY', 'expandedCard', 'draft', 'toast']) {
     assert.equal(actions.remember(field, 'transient'), null);
@@ -251,6 +263,17 @@ test('production preference actions persist exactly eight minimal patches and ig
   assert.equal(actions.remember('dailyDate', '2026-07-24'), null);
   assert.equal(actions.remember('linksCategory', 'missing'), null);
   assert.deepEqual(persisted, cases.map(([, , expected]) => expected));
+});
+
+test('latest request guard rejects an older daily response completed after the latest one', () => {
+  const guard = Bootstrap.createLatestRequestGuard();
+  const committed = [];
+  const older = guard.begin();
+  const latest = guard.begin();
+
+  assert.equal(latest.commit(() => committed.push('latest')), true);
+  assert.equal(older.commit(() => committed.push('older')), false);
+  assert.deepEqual(committed, ['latest']);
 });
 
 test('dynamic category repair only persists a missing restored category', () => {
@@ -282,12 +305,28 @@ test('app wires every selection to a minimal patch, skips search view persistenc
     assert.match(app, new RegExp(`preferenceActions\\.remember\\(\\s*'${field}'`));
   }
   assert.match(app, /const preferenceActions = Bootstrap\.createUiPreferenceActions\(/);
+  assert.match(app, /const storage = Bootstrap\.getSafeStorage\(window\)/);
+  assert.doesNotMatch(app, /storage:\s*localStorage/);
   assert.match(app, /switchView\('all',\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /applyTheme\(state\.theme,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /setRealtime\(state\.realtime,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /if \(initialPreferences\.migrationPatch\)\s*persistUiPreferences\(initialPreferences\.migrationPatch\)/);
   assert.doesNotMatch(app, /preferenceActions\.remember\(['"](?:q|page|scroll|expanded|draft|toast)/);
+  assert.match(app, /if \(FEED_VIEWS\.includes\(state\.view\)\)\s*\{[\s\S]*await initCategories\(\);[\s\S]*switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\)/);
+  assert.match(app, /else\s*\{[\s\S]*switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\);[\s\S]*initCategories\(\)/);
+  assert.match(app, /start\(\)\.catch\(\(\) => toast\('界面初始化失败，请刷新重试', true\)\)/);
+});
+
+test('daily loading begins a production request token and guards response and error commits', () => {
+  const start = app.indexOf('async function loadDaily');
+  const end = app.indexOf('function shiftDaily');
+  const source = app.slice(start, end);
+
+  assert.match(source, /const request = dailyRequestGuard\.begin\(\)/);
+  assert.match(source, /const data = await api\(/);
+  assert.match(source, /if \(!request\.isCurrent\(\)\) return/);
+  assert.match(source, /catch \(e\)\s*\{[\s\S]*if \(!request\.isCurrent\(\)\) return/);
 });
 
 test('常用网址重渲染后将键盘焦点恢复到同一控制项', () => {
