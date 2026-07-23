@@ -41,9 +41,9 @@ test('canonical brand config is the single explicit identity map', () => {
   });
 });
 
-test('package and installer metadata use the v0.0.1 canonical identity', () => {
+test('package and installer metadata use the v0.0.2 canonical identity', () => {
   assert.equal(pkg.name, 'star-picking-pavilion');
-  assert.equal(pkg.version, '0.0.1');
+  assert.equal(pkg.version, '0.0.2');
   assert.match(pkg.description, /摘星阁/);
   assert.match(pkg.description, /Star-Picking-Pavilion/);
   assert.equal(pkg.homepage, 'https://github.com/Icdafy/Star-Picking-Pavilion');
@@ -73,8 +73,8 @@ test('release documentation points only to the canonical repository and installe
 
   assert.match(readme, /https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion\/releases/);
   assert.match(releasing, /Icdafy\/Star-Picking-Pavilion/);
-  assert.match(readme, /Star-Picking-Pavilion-Setup-0\.0\.1\.exe/);
-  assert.match(releasing, /Star-Picking-Pavilion-Setup-0\.0\.1\.exe/);
+  assert.match(readme, /Star-Picking-Pavilion-Setup-0\.0\.2\.exe/);
+  assert.match(releasing, /Star-Picking-Pavilion-Setup-0\.0\.2\.exe/);
   assert.doesNotMatch(readme, /Icdafy\/Windcather|Windcatcher-Setup-/i);
   assert.doesNotMatch(releasing, /Icdafy\/Windcather|Windcatcher-Setup-/i);
 });

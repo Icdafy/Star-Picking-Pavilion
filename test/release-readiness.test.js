@@ -22,16 +22,18 @@ test('public release documentation and compliance artifacts are complete', () =>
   ]) assert.equal(fs.existsSync(path.join(root, file)), true, `missing ${file}`);
 
   assert.match(read('LICENSE'), /MIT License[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
+  assert.equal(require('../package.json').version, '0.0.2');
+  assert.match(read('CHANGELOG.md'), /\[0\.0\.2\].*2026-07-23/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.1\].*2026-07-21/);
   assert.match(read('SECURITY.md'), /Security Advisories/);
-  assert.match(read('RELEASE_NOTES.md'), /v0\.0\.1[\s\S]*未签名/);
+  assert.match(read('RELEASE_NOTES.md'), /v0\.0\.2[\s\S]*选择[\s\S]*DeepSeek[\s\S]*未签名/);
   assert.match(read('THIRD_PARTY_NOTICES.txt'), /cheerio@1\.2\.0/);
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
 test('third-party notices use the platform line ending', () => {
   const { renderNotices } = require('../scripts/generate-third-party-notices');
-  const output = renderNotices({ version: '0.0.1' }, []);
+  const output = renderNotices({ version: '0.0.2' }, []);
   const contentWithoutExpectedLineEndings = output.split(os.EOL).join('');
 
   assert.doesNotMatch(contentWithoutExpectedLineEndings, /[\r\n]/);
@@ -41,7 +43,7 @@ test('README documents installation, privacy, recovery and security truthfully',
   const readme = read('README.md');
   for (const required of [
     /Windows 10\/11.*x64/,
-    /Star-Picking-Pavilion-Setup-0\.0\.1\.exe/,
+    /Star-Picking-Pavilion-Setup-0\.0\.2\.exe/,
     /SmartScreen/,
     /Get-FileHash/,
     /云幄\s*·\s*常用网址/,
@@ -63,22 +65,22 @@ test('version verifier matches package, tag, installer and latest metadata', asy
   const { verifyVersion } = require('../scripts/verify-version');
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-version-'));
   t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.0.1\n');
-  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.0.1.exe'), 'fixture');
+  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.0.2\n');
+  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.0.2.exe'), 'fixture');
 
   assert.deepEqual(verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.0.1',
+    tag: 'v0.0.2',
     distDir: directory,
     requireArtifacts: true
   }), {
-    version: '0.0.1',
-    tag: 'v0.0.1',
-    installer: 'Star-Picking-Pavilion-Setup-0.0.1.exe'
+    version: '0.0.2',
+    tag: 'v0.0.2',
+    installer: 'Star-Picking-Pavilion-Setup-0.0.2.exe'
   });
   assert.throws(() => verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.0.2',
+    tag: 'v0.0.1',
     distDir: directory
   }), /tag.*package/i);
 });
