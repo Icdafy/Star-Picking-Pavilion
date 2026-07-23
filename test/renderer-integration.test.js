@@ -7,9 +7,19 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const CommonLinks = require('../renderer/common-links');
+const Bootstrap = require('../renderer/bootstrap');
 const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
+
+function createStorage(entries = {}) {
+  const values = new Map(Object.entries(entries));
+  return {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    values
+  };
+}
 
 test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
   assert.match(html, /data-view="links"[^>]*>常用网址<\/button>/);
@@ -36,13 +46,16 @@ test('页面声明可由现有静态路由提供的摘星阁图标', () => {
 });
 
 test('视图切换、分类、星标和持久化均接入 app.js', () => {
-  assert.match(app, /view:\s*'featured'.*links/s);
+  assert.match(app, /view:\s*restoredPreferences\.view.*links/s);
   assert.match(app, /#viewLinks/);
   assert.match(app, /renderCommonLinks/);
   assert.match(app, /commonLinksCategories/);
   assert.match(app, /commonLinksGrid/);
-  assert.match(app, /CommonLinks\.STORAGE_KEY/);
-  assert.match(app, /localStorage\.setItem/);
+  assert.match(
+    fs.readFileSync(path.join(root, 'renderer', 'bootstrap.js'), 'utf8'),
+    /commonLinks\.STORAGE_KEY/
+  );
+  assert.match(app, /writeBrowserUiPreferences/);
   assert.match(app, /class="common-links-open"[^>]*target="_blank"[^>]*rel="noopener"/);
 });
 
@@ -80,8 +93,141 @@ test('页面脚本全部外置且动态渲染不使用内联事件处理器', ()
 test('应用使用规范存储键并只迁移有效的旧星标数组', () => {
   assert.match(app, /StarPickingPavilionBootstrap/);
   assert.match(app, /starPickingPavilion\s*\|\|\s*window\.windcatcher/);
-  assert.match(app, /migrateStorage\(localStorage,\s*CommonLinks\.STORAGE_KEY,\s*CommonLinks\.LEGACY_STORAGE_KEYS,\s*CommonLinks\.isValidFavoriteStorage\)/);
+  assert.match(app, /resolveInitialUiPreferences\(\{[\s\S]*commonLinks:\s*CommonLinks/);
+  assert.match(
+    fs.readFileSync(path.join(root, 'renderer', 'bootstrap.js'), 'utf8'),
+    /migrateStorage\(\s*storage,\s*commonLinks\.STORAGE_KEY,\s*commonLinks\.LEGACY_STORAGE_KEYS,\s*commonLinks\.isValidFavoriteStorage/
+  );
   assert.doesNotMatch(app, /localStorage\.setItem\(['"]wc-(?:theme|realtime)/);
+});
+
+test('desktop stored preference snapshot defensively becomes the complete initial UI state', () => {
+  const favoriteId = CommonLinks.LINKS[0].id;
+  const result = Bootstrap.resolveInitialUiPreferences({
+    desktop: {
+      hasStoredPreferences: true,
+      preferences: {
+        theme: 'light',
+        view: 'links',
+        domain: 'aerospace',
+        category: '政策',
+        dailyDate: '2026-07-22',
+        linksCategory: 'AI',
+        commonLinksFavorites: [favoriteId, favoriteId, 'missing'],
+        realtime: false,
+        q: 'must-not-restore',
+        page: 99
+      }
+    },
+    storage: createStorage({ 'wc-theme': 'dark' }),
+    commonLinks: CommonLinks,
+    today: '2026-07-23'
+  });
+
+  assert.deepEqual(result.preferences, {
+    theme: 'light',
+    view: 'links',
+    domain: 'aerospace',
+    category: '政策',
+    dailyDate: '2026-07-22',
+    linksCategory: 'AI',
+    commonLinksFavorites: [favoriteId],
+    realtime: false
+  });
+  assert.equal(result.migrationPatch, null);
+  assert.equal(Object.hasOwn(result.preferences, 'q'), false);
+  assert.equal(Object.hasOwn(result.preferences, 'page'), false);
+});
+
+test('desktop without stored preferences creates one complete legacy migration patch', () => {
+  const favoriteId = CommonLinks.LINKS[0].id;
+  const storage = createStorage({
+    'wc-theme': 'light',
+    'wc-realtime': 'off',
+    'zxg-common-links-favorites': JSON.stringify([favoriteId])
+  });
+  const result = Bootstrap.resolveInitialUiPreferences({
+    desktop: { hasStoredPreferences: false, preferences: { theme: 'dark', realtime: true } },
+    storage,
+    commonLinks: CommonLinks,
+    today: '2026-07-23'
+  });
+
+  assert.deepEqual(result.preferences, {
+    theme: 'light',
+    view: 'featured',
+    domain: '',
+    category: '',
+    dailyDate: null,
+    linksCategory: CommonLinks.ALL_CATEGORY,
+    commonLinksFavorites: [favoriteId],
+    realtime: false
+  });
+  assert.deepEqual(result.migrationPatch, result.preferences);
+  assert.notEqual(result.migrationPatch, result.preferences);
+});
+
+test('each meaningful field creates an exact minimal patch and transient fields are discarded', () => {
+  const favoriteId = CommonLinks.LINKS[0].id;
+  const cases = [
+    ['theme', 'light', { theme: 'light' }],
+    ['view', 'daily', { view: 'daily' }],
+    ['domain', 'lowaltitude', { domain: 'lowaltitude' }],
+    ['category', '政策', { category: '政策' }],
+    ['dailyDate', '2026-07-22', { dailyDate: '2026-07-22' }],
+    ['linksCategory', 'AI', { linksCategory: 'AI' }],
+    ['commonLinksFavorites', [favoriteId, favoriteId, 'missing'], { commonLinksFavorites: [favoriteId] }],
+    ['realtime', false, { realtime: false }]
+  ];
+
+  for (const [field, value, expected] of cases) {
+    assert.deepEqual(
+      Bootstrap.createUiPreferencePatch(field, value, CommonLinks, { today: '2026-07-23' }),
+      expected
+    );
+  }
+  for (const field of ['q', 'page', 'scrollY', 'expandedCard', 'draft', 'toast']) {
+    assert.deepEqual(
+      Bootstrap.createUiPreferencePatch(field, 'transient', CommonLinks, { today: '2026-07-23' }),
+      {}
+    );
+  }
+});
+
+test('dynamic category repair only persists a missing restored category', () => {
+  assert.deepEqual(
+    Bootstrap.resolveDynamicCategory('已下线分类', ['政策', '产业']),
+    { category: '', patch: { category: '' } }
+  );
+  assert.deepEqual(
+    Bootstrap.resolveDynamicCategory('政策', ['政策', '产业']),
+    { category: '政策', patch: null }
+  );
+  assert.deepEqual(
+    Bootstrap.resolveDynamicCategory('', ['政策', '产业']),
+    { category: '', patch: null }
+  );
+});
+
+test('app wires every selection to a minimal patch, skips search view persistence, and does not write on normal startup', () => {
+  for (const field of [
+    'theme',
+    'view',
+    'domain',
+    'category',
+    'dailyDate',
+    'linksCategory',
+    'commonLinksFavorites',
+    'realtime'
+  ]) {
+    assert.match(app, new RegExp(`createUiPreferencePatch\\(\\s*'${field}'`));
+  }
+  assert.match(app, /switchView\('all',\s*\{\s*persist:\s*false\s*\}\)/);
+  assert.match(app, /applyTheme\(state\.theme,\s*\{\s*persist:\s*false\s*\}\)/);
+  assert.match(app, /setRealtime\(state\.realtime,\s*\{\s*persist:\s*false\s*\}\)/);
+  assert.match(app, /switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\)/);
+  assert.match(app, /if \(initialPreferences\.migrationPatch\)\s*persistUiPreferences\(initialPreferences\.migrationPatch\)/);
+  assert.doesNotMatch(app, /createUiPreferencePatch\(['"](?:q|page|scroll|expanded|draft|toast)/);
 });
 
 test('常用网址重渲染后将键盘焦点恢复到同一控制项', () => {
@@ -137,21 +283,24 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
     linksCategory: CommonLinks.ALL_CATEGORY,
     commonLinksFavorites: CommonLinks.getDefaultFavoriteIds()
   };
+  const preferencePatches = [];
   const start = app.indexOf('function renderCommonLinks');
   const end = app.indexOf('// ---------- 视图切换 ----------');
   const install = new Function(
-    '$', 'CommonLinks', 'DomUtils', 'state', 'esc', 'safeUrl', 'document', 'persistCommonLinkFavorites',
+    '$', 'CommonLinks', 'Bootstrap', 'DomUtils', 'state', 'esc', 'safeUrl', 'document',
+    'persistUiPreferences',
     `'use strict';\n${app.slice(start, end)}\nreturn renderCommonLinks;`
   );
   install(
     selector => elements[selector],
     CommonLinks,
+    Bootstrap,
     require('../renderer/dom-utils'),
     state,
     value => String(value ?? ''),
     value => String(value ?? ''),
     fakeDocument,
-    () => {}
+    patch => { preferencePatches.push(patch); }
   );
 
   const categoryControl = {
@@ -159,6 +308,7 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
   };
   listeners['categories:click']({ target: { closest: () => categoryControl } });
   assert.equal(fakeDocument.focusedKey, 'category:AI');
+  assert.deepEqual(preferencePatches[0], { linksCategory: 'AI' });
 
   fakeDocument.focusedKey = null;
   const disappearedFavorite = {
@@ -168,6 +318,10 @@ test('点击控件的 focus key 被显式传入渲染并恢复到替换控件或
   assert.equal(fakeDocument.focusedKey, null);
   assert.equal(fakeDocument.focusedRegion, 'grid');
   assert.deepEqual(fakeDocument.focusOptions, { preventScroll: true });
+  assert.deepEqual(
+    preferencePatches[1],
+    { commonLinksFavorites: [...CommonLinks.getDefaultFavoriteIds()] }
+  );
 });
 
 test('常用网址渲染通过共享工具转义文本并限制外链协议', () => {

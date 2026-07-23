@@ -9,57 +9,49 @@ const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
 const Bootstrap = window.StarPickingPavilionBootstrap;
 const Desktop = window.starPickingPavilion || window.windcatcher;
-
-Bootstrap.migrateStorage(
-  localStorage,
-  Bootstrap.STORAGE_KEYS.theme,
-  Bootstrap.LEGACY_STORAGE_KEYS.theme,
-  value => value === 'dark' || value === 'light'
-);
-Bootstrap.migrateStorage(
-  localStorage,
-  Bootstrap.STORAGE_KEYS.realtime,
-  Bootstrap.LEGACY_STORAGE_KEYS.realtime,
-  value => value === 'on' || value === 'off'
-);
-
-function loadCommonLinkFavorites() {
-  try {
-    Bootstrap.migrateStorage(localStorage, CommonLinks.STORAGE_KEY, CommonLinks.LEGACY_STORAGE_KEYS, CommonLinks.isValidFavoriteStorage);
-    return CommonLinks.parseFavoriteIds(localStorage.getItem(CommonLinks.STORAGE_KEY));
-  } catch {
-    return CommonLinks.getDefaultFavoriteIds();
-  }
-}
+const initialPreferences = Bootstrap.resolveInitialUiPreferences({
+  desktop: Desktop,
+  storage: localStorage,
+  commonLinks: CommonLinks,
+  today: localDateString()
+});
+const restoredPreferences = initialPreferences.preferences;
 
 // ---------- 状态 ----------
 const state = {
-  view: 'featured',     // featured | hot | all | daily | links | sources | settings
-  domain: '',
-  category: '',
-  linksCategory: CommonLinks.ALL_CATEGORY,
-  commonLinksFavorites: loadCommonLinkFavorites(),
+  theme: restoredPreferences.theme,
+  view: restoredPreferences.view,  // featured | hot | all | daily | links | sources | settings
+  domain: restoredPreferences.domain,
+  category: restoredPreferences.category,
+  linksCategory: restoredPreferences.linksCategory,
+  commonLinksFavorites: new Set(restoredPreferences.commonLinksFavorites),
   q: '',
   page: 0,
   loading: false,
-  dailyDate: null,
+  dailyDate: restoredPreferences.dailyDate,
   dailyDates: [],
-  realtime: localStorage.getItem(Bootstrap.STORAGE_KEYS.realtime) !== 'off',  // 实时开关，默认开
+  realtime: restoredPreferences.realtime,
   knownIds: new Set(),  // 当前 feed 已显示的文章 id
   freshIds: new Set()   // 下次渲染要高亮的新 id
 };
 
 // ---------- 主题 ----------
-function applyTheme(theme) {
+function applyTheme(theme, { persist = true } = {}) {
+  state.theme = theme;
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', theme === 'dark' ? '#04060e' : '#f6f4ee');
-  localStorage.setItem(Bootstrap.STORAGE_KEYS.theme, theme);
+  if (persist) {
+    persistUiPreferences(
+      Bootstrap.createUiPreferencePatch('theme', theme, CommonLinks)
+    );
+  }
 }
 $('#btnTheme').addEventListener('click', () => {
   const cur = document.documentElement.dataset.theme;
-  applyTheme(cur === 'light' ? 'dark' : 'light');
+  const next = cur === 'light' ? 'dark' : 'light';
+  applyTheme(next);
 });
 
 // ---------- 工具 ----------
@@ -118,6 +110,30 @@ function toast(msg, isError) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+function persistUiPreferences(patch) {
+  const sanitized = Bootstrap.sanitizeUiPreferencesPatch(patch, CommonLinks, {
+    today: localDateString()
+  });
+  if (Object.keys(sanitized).length === 0) return Promise.resolve(null);
+  try {
+    const operation = Desktop?.updatePreferences
+      ? Desktop.updatePreferences(sanitized)
+      : Bootstrap.writeBrowserUiPreferences(
+        localStorage,
+        sanitized,
+        CommonLinks,
+        { today: localDateString() }
+      );
+    return Promise.resolve(operation).catch(() => {
+      toast('界面选择保存失败，请重试', true);
+      return null;
+    });
+  } catch {
+    toast('界面选择保存失败，请重试', true);
+    return Promise.resolve(null);
+  }
 }
 
 const DOMAIN_NAME = { lowaltitude: '低空经济', aerospace: '商业航天' };
@@ -402,6 +418,10 @@ function shiftDaily(days) {
   cur.setDate(cur.getDate() + days);
   const d = localDateString(cur);
   if (d > localDateString()) return;
+  state.dailyDate = d;
+  persistUiPreferences(
+    Bootstrap.createUiPreferencePatch('dailyDate', d, CommonLinks)
+  );
   loadDaily(d);
 }
 $('#dailyPrev').addEventListener('click', () => shiftDaily(-1));
@@ -580,15 +600,6 @@ $('#btnFeedback').addEventListener('click', async () => {
 });
 
 // ---------- 云幄 · 常用网址 ----------
-function persistCommonLinkFavorites() {
-  try {
-    localStorage.setItem(
-      CommonLinks.STORAGE_KEY,
-      JSON.stringify([...state.commonLinksFavorites])
-    );
-  } catch { /* 存储不可用时保留当前会话内状态 */ }
-}
-
 function renderCommonLinks(focusKey, fallbackTarget) {
   const categories = CommonLinks.getCategories();
   $('#commonLinksCategories').innerHTML = categories.map(category => `
@@ -629,6 +640,9 @@ $('#commonLinksCategories').addEventListener('click', event => {
   if (!button) return;
   const focusKey = button.dataset.focusKey;
   state.linksCategory = button.dataset.linksCategory;
+  persistUiPreferences(
+    Bootstrap.createUiPreferencePatch('linksCategory', state.linksCategory, CommonLinks)
+  );
   renderCommonLinks(focusKey, $('#commonLinksCategories'));
 });
 
@@ -639,13 +653,24 @@ $('#commonLinksGrid').addEventListener('click', event => {
   const id = button.dataset.linkFavorite;
   if (state.commonLinksFavorites.has(id)) state.commonLinksFavorites.delete(id);
   else state.commonLinksFavorites.add(id);
-  persistCommonLinkFavorites();
+  persistUiPreferences(
+    Bootstrap.createUiPreferencePatch(
+      'commonLinksFavorites',
+      [...state.commonLinksFavorites],
+      CommonLinks
+    )
+  );
   renderCommonLinks(focusKey, $('#commonLinksGrid'));
 });
 
 // ---------- 视图切换 ----------
-function switchView(view) {
+function switchView(view, { persist = true } = {}) {
   state.view = view;
+  if (persist) {
+    persistUiPreferences(
+      Bootstrap.createUiPreferencePatch('view', view, CommonLinks)
+    );
+  }
   $$('.tab').forEach(t => {
     const on = t.dataset.view === view;
     t.classList.toggle('active', on);
@@ -675,24 +700,51 @@ function switchView(view) {
 
 $$('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
 
-$$('.pill').forEach(p => p.addEventListener('click', () => {
-  $$('.pill').forEach(x => x.classList.remove('active'));
-  p.classList.add('active');
-  state.domain = p.dataset.domain;
-  loadFeed();
-  loadHotRail();
-}));
+function setDomain(domain, { persist = true, load = true } = {}) {
+  state.domain = domain;
+  $$('.pill').forEach(pill => {
+    const on = pill.dataset.domain === domain;
+    pill.classList.toggle('active', on);
+    pill.setAttribute('aria-pressed', String(on));
+  });
+  if (persist) {
+    persistUiPreferences(
+      Bootstrap.createUiPreferencePatch('domain', domain, CommonLinks)
+    );
+  }
+  if (load) {
+    loadFeed();
+    loadHotRail();
+  }
+}
+
+$$('.pill').forEach(p => p.addEventListener('click', () => setDomain(p.dataset.domain)));
 
 // 分类 chips
 async function initCategories() {
   try {
     const cats = await api('/api/categories');
-    $('#catChips').innerHTML = cats.map(c => `<button class="chip" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+    const resolved = Bootstrap.resolveDynamicCategory(state.category, cats);
+    state.category = resolved.category;
+    if (resolved.patch) persistUiPreferences(resolved.patch);
+    $('#catChips').innerHTML = cats.map(c => {
+      const on = c === state.category;
+      return `<button class="chip${on ? ' active' : ''}" data-cat="${esc(c)}" aria-pressed="${on}">${esc(c)}</button>`;
+    }).join('');
     $$('.chip').forEach(ch => ch.addEventListener('click', () => {
       const on = ch.classList.contains('active');
-      $$('.chip').forEach(x => x.classList.remove('active'));
-      if (!on) ch.classList.add('active');
+      $$('.chip').forEach(x => {
+        x.classList.remove('active');
+        x.setAttribute('aria-pressed', 'false');
+      });
+      if (!on) {
+        ch.classList.add('active');
+        ch.setAttribute('aria-pressed', 'true');
+      }
       state.category = on ? '' : ch.dataset.cat;
+      persistUiPreferences(
+        Bootstrap.createUiPreferencePatch('category', state.category, CommonLinks)
+      );
       loadFeed();
     }));
   } catch {}
@@ -704,7 +756,9 @@ $('#searchInput').addEventListener('input', e => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     state.q = e.target.value.trim();
-    if (!['featured', 'hot', 'all'].includes(state.view)) switchView('all');
+    if (!['featured', 'hot', 'all'].includes(state.view)) {
+      switchView('all', { persist: false });
+    }
     else loadFeed();
   }, 350);
 });
@@ -732,12 +786,16 @@ $('#btnRefresh').addEventListener('click', async function () {
 });
 
 // ---------- 实时更新 ----------
-function setRealtime(on) {
+function setRealtime(on, { persist = true } = {}) {
   state.realtime = on;
-  localStorage.setItem(Bootstrap.STORAGE_KEYS.realtime, on ? 'on' : 'off');
   const btn = $('#btnRealtime');
   btn.classList.toggle('active', on);
   btn.setAttribute('aria-pressed', String(on));
+  if (persist) {
+    persistUiPreferences(
+      Bootstrap.createUiPreferencePatch('realtime', on, CommonLinks)
+    );
+  }
 }
 $('#btnRealtime').addEventListener('click', () => {
   setRealtime(!state.realtime);
@@ -810,9 +868,14 @@ if (Desktop && Desktop.onUpdateStatus) {
 }
 
 // ---------- 启动 ----------
-setRealtime(state.realtime);
-initCategories();
-refreshStats();
-loadFeed();
-loadHotRail();
-pollTimer = setTimeout(pollRealtime, 18000);   // 自调度实时增量循环
+async function start() {
+  applyTheme(state.theme, { persist: false });
+  setDomain(state.domain, { persist: false, load: false });
+  setRealtime(state.realtime, { persist: false });
+  if (initialPreferences.migrationPatch) persistUiPreferences(initialPreferences.migrationPatch);
+  await initCategories();
+  switchView(state.view, { persist: false });
+  pollTimer = setTimeout(pollRealtime, 18000);   // 自调度实时增量循环
+}
+
+start();

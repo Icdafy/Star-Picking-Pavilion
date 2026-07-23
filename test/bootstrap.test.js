@@ -27,7 +27,8 @@ test('CommonJS loading exports a frozen API without global pollution', () => {
   assert.deepEqual(api.STORAGE_KEYS, {
     theme: 'star-picking-pavilion.theme',
     realtime: 'star-picking-pavilion.realtime',
-    commonLinksFavorites: 'star-picking-pavilion.common-links.favorites'
+    commonLinksFavorites: 'star-picking-pavilion.common-links.favorites',
+    uiPreferences: 'star-picking-pavilion.ui-preferences'
   });
 });
 
@@ -67,6 +68,34 @@ test('browser head load migrates a valid legacy theme and applies it', () => {
 
   assert.equal(context.StarPickingPavilionBootstrap.STORAGE_KEYS.theme, 'star-picking-pavilion.theme');
   assert.equal(Object.isFrozen(context.StarPickingPavilionBootstrap), true);
+  assert.equal(localStorage.values.get('star-picking-pavilion.theme'), 'light');
+  assert.equal(document.documentElement.dataset.theme, 'light');
+});
+
+test('browser head load applies a valid desktop theme before CSS instead of legacy storage', () => {
+  const source = fs.readFileSync(bootstrapPath, 'utf8');
+  const localStorage = createStorage({ 'wc-theme': 'dark' });
+  const document = { documentElement: { dataset: {}, style: {} } };
+  const starPickingPavilion = { preferences: { theme: 'light' } };
+  const context = vm.createContext({ localStorage, document, starPickingPavilion });
+
+  vm.runInContext(source, context, { filename: bootstrapPath });
+
+  assert.equal(document.documentElement.dataset.theme, 'light');
+  assert.equal(document.documentElement.style.colorScheme, 'light');
+  assert.equal(localStorage.values.has('star-picking-pavilion.theme'), false);
+});
+
+test('browser head load safely ignores corrupt preference JSON and retains legacy migration', () => {
+  const source = fs.readFileSync(bootstrapPath, 'utf8');
+  const localStorage = createStorage({
+    'star-picking-pavilion.ui-preferences': '{"theme":',
+    'wc-theme': 'light'
+  });
+  const document = { documentElement: { dataset: {}, style: {} } };
+  const context = vm.createContext({ localStorage, document });
+
+  assert.doesNotThrow(() => vm.runInContext(source, context, { filename: bootstrapPath }));
   assert.equal(localStorage.values.get('star-picking-pavilion.theme'), 'light');
   assert.equal(document.documentElement.dataset.theme, 'light');
 });
