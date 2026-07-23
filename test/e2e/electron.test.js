@@ -17,6 +17,7 @@ const DUMMY_API_KEY = 'sk-e2e-dummy-secret';
 const PREFILTER_MODEL = 'deepseek-v4-flash';
 const SCORING_MODEL = 'deepseek-v4-pro';
 const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
+const MAX_GRACEFUL_CLOSE_MS = 4_000;
 const EXPECTED_UI_PREFERENCE_KEYS = [
   'category',
   'commonLinksFavorites',
@@ -44,6 +45,18 @@ async function waitForExit(child, timeoutMs = 10_000, description = 'Electron pr
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+async function closeElectronGracefully(app, child, description) {
+  const startedAt = Date.now();
+  await app.close();
+  await waitForExit(child, MAX_GRACEFUL_CLOSE_MS, description);
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(
+    elapsedMs < MAX_GRACEFUL_CLOSE_MS,
+    `${description} took ${elapsedMs} ms; graceful shutdown must beat the 5 s force-kill fallback`
+  );
+  return elapsedMs;
 }
 
 function listen(server, options) {
@@ -188,6 +201,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
   let singleInstanceProcess;
   let mockServer;
   let portBlocker;
+  let firstCloseMs;
+  let secondCloseMs;
 
   t.after(async () => {
     if (singleInstanceProcess && singleInstanceProcess.exitCode === null) {
@@ -397,8 +412,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   assert.equal(firstApp.windows().length, 1);
   singleInstanceProcess = null;
 
-  await firstApp.close();
-  await waitForExit(firstProcess, 10_000, 'first Electron app');
+  firstCloseMs = await closeElectronGracefully(firstApp, firstProcess, 'first Electron app');
   firstApp = null;
 
   portBlocker = http.createServer((_request, response) => {
@@ -495,8 +509,10 @@ test('real Electron desktop flow is secure, persistent across restart and single
   });
   assert.equal(mockCalls.length, 2);
 
-  await secondApp.close();
-  await waitForExit(secondProcess, 10_000, 'second Electron app');
+  secondCloseMs = await closeElectronGracefully(secondApp, secondProcess, 'second Electron app');
   secondApp = null;
-  t.diagnostic(`restart ports ${firstPort} -> ${secondPort}; mock calls ${mockCalls.length}`);
+  t.diagnostic(
+    `restart ports ${firstPort} -> ${secondPort}; mock calls ${mockCalls.length}; `
+      + `graceful closes ${firstCloseMs} ms / ${secondCloseMs} ms`
+  );
 });

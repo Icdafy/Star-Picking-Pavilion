@@ -4,6 +4,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
 const { db, now, closeDatabase } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
 const { persistApiKey } = require('./runtime-credentials');
@@ -286,8 +287,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-let shutdownPromise = null;
-
 function closeHttpServer() {
   if (!server.listening) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -296,8 +295,7 @@ function closeHttpServer() {
   });
 }
 
-function notifyStoppedAndExit() {
-  const stopped = { type: 'server:stopped' };
+function notifyStoppedAndExit(stopped) {
   if (process.parentPort) {
     process.parentPort.postMessage(stopped);
     setImmediate(() => process.exit(0));
@@ -310,23 +308,20 @@ function notifyStoppedAndExit() {
   process.exit(0);
 }
 
-function shutdownServer() {
-  if (shutdownPromise) return shutdownPromise;
-  shutdownPromise = (async () => {
-    stopScheduler();
-    await Promise.all([closeHttpServer(), waitForSchedulerIdle()]);
-    closeDatabase();
-    notifyStoppedAndExit();
-  })().catch(error => {
+const shutdownLifecycle = createServerShutdownLifecycle({
+  stopScheduler,
+  closeHttpServer,
+  waitForSchedulerIdle,
+  closeDatabase,
+  notifyStoppedAndExit,
+  onError: error => {
     console.error('[server] 关闭失败:', error);
     process.exit(1);
-  });
-  return shutdownPromise;
-}
+  }
+});
 
-function handleControlMessage(message) {
-  if (message?.type === 'server:shutdown') shutdownServer();
-}
+const shutdownServer = shutdownLifecycle.shutdown;
+const handleControlMessage = shutdownLifecycle.handleControlMessage;
 
 process.parentPort?.on('message', handleControlMessage);
 process.on('message', handleControlMessage);
