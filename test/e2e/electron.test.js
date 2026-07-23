@@ -14,8 +14,8 @@ const { _electron: electron } = require('playwright');
 const projectRoot = path.join(__dirname, '..', '..');
 const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
 const DUMMY_API_KEY = 'sk-e2e-dummy-secret';
-const PREFILTER_MODEL = 'deepseek-e2e-flash';
-const SCORING_MODEL = 'deepseek-e2e-pro';
+const PREFILTER_MODEL = 'deepseek-v4-flash';
+const SCORING_MODEL = 'deepseek-v4-pro';
 const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
 const EXPECTED_UI_PREFERENCE_KEYS = [
   'category',
