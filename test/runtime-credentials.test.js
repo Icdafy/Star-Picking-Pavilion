@@ -31,11 +31,13 @@ function emitResult(parentPort, requestId, options = {}) {
 
 test('accepts an Electron MessageEvent credential acknowledgement', async () => {
   const parentPort = new FakeParentPort();
+  const tracedStages = [];
   const credentials = createRuntimeCredentials({
     initialApiKey: 'dummy-old-electron',
     parentPort,
     randomUUID: createIds('request-electron'),
-    confirmationTimeoutMs: 5_000
+    confirmationTimeoutMs: 5_000,
+    trace: stage => tracedStages.push(stage)
   });
 
   const persisted = credentials.persistApiKey('dummy-new-electron');
@@ -44,12 +46,22 @@ test('accepts an Electron MessageEvent credential acknowledgement', async () => 
     requestId: 'request-electron',
     apiKey: 'dummy-new-electron'
   }]);
+  assert.deepEqual(tracedStages, [
+    'credential-persist-start',
+    'credential-posted'
+  ]);
 
   parentPort.emit('message', {
     data: { type: 'credential:result', requestId: 'request-electron', ok: true }
   });
 
   await persisted;
+  assert.deepEqual(tracedStages, [
+    'credential-persist-start',
+    'credential-posted',
+    'credential-ack-received'
+  ]);
+  assert.equal(tracedStages.join('\n').includes('dummy-new-electron'), false);
   assert.equal(credentials.getApiKey(), 'dummy-new-electron');
 });
 
@@ -114,17 +126,24 @@ test('ignores mismatched and duplicate acknowledgements', async () => {
 
 test('times out and ignores a late acknowledgement', async () => {
   const parentPort = new FakeParentPort();
+  const tracedStages = [];
   const credentials = createRuntimeCredentials({
     initialApiKey: 'dummy-old-timeout',
     parentPort,
     randomUUID: createIds('request-timeout'),
-    confirmationTimeoutMs: 5
+    confirmationTimeoutMs: 5,
+    trace: stage => tracedStages.push(stage)
   });
 
   await assert.rejects(
     credentials.persistApiKey('dummy-new-timeout'),
     /凭据保存确认超时/
   );
+  assert.deepEqual(tracedStages, [
+    'credential-persist-start',
+    'credential-posted',
+    'credential-timeout'
+  ]);
   emitResult(parentPort, 'request-timeout');
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(credentials.getApiKey(), 'dummy-old-timeout');

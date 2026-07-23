@@ -61,7 +61,7 @@ async function closeElectronGracefully(app, child, description) {
 
 function captureAndForwardElectronOutput(child) {
   const stages = [];
-  const fixedStagePattern = /^\[credential-ipc\] (received|stored|failed|ack-posted)$/;
+  const fixedStagePattern = /^(?:\[后端\] )?\[credential-ipc\] (received|stored|failed|ack-posted|settings-request-received|credential-persist-start|credential-posted|credential-ack-received|credential-timeout)$/;
   const sanitizeLine = line => line
     .replaceAll(DUMMY_API_KEY, '[redacted]')
     .replace(

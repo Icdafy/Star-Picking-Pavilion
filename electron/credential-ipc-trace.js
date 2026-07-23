@@ -4,7 +4,12 @@ const CREDENTIAL_IPC_STAGES = Object.freeze([
   'received',
   'stored',
   'failed',
-  'ack-posted'
+  'ack-posted',
+  'settings-request-received',
+  'credential-persist-start',
+  'credential-posted',
+  'credential-ack-received',
+  'credential-timeout'
 ]);
 const ALLOWED_STAGES = new Set(CREDENTIAL_IPC_STAGES);
 

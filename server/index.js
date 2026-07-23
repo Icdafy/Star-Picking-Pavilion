@@ -4,6 +4,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createCredentialIpcTracer } = require('../electron/credential-ipc-trace');
 const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
 const { db, now, closeDatabase } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
@@ -30,6 +31,9 @@ const REQUESTED_PORT = Number(process.env.STAR_PICKING_PAVILION_PORT || process.
 const API_TOKEN = process.env.STAR_PICKING_PAVILION_API_TOKEN || '';
 const SERVER_NONCE = process.env.STAR_PICKING_PAVILION_SERVER_NONCE || '';
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+const traceCredentialIpc = createCredentialIpcTracer({
+  enabled: Boolean(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
+});
 const settingsUpdateCoordinator = createSettingsUpdateCoordinator({
   loadSettings,
   applySettingsPatch,
@@ -241,6 +245,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, masked);
       }
       if (p === '/api/settings' && req.method === 'POST') {
+        traceCredentialIpc('settings-request-received');
         const b = await readJsonBody(req);
         const update = await settingsUpdateCoordinator.submit(b);
         return json(res, 200, { ok: true, credentialConfigured: !!update.apiKey });
