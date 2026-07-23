@@ -38,7 +38,8 @@ const settingsUpdateCoordinator = createSettingsUpdateCoordinator({
   loadSettings,
   applySettingsPatch,
   persistCredential: persistApiKey,
-  saveSettings
+  saveSettings,
+  trace: traceCredentialIpc
 });
 
 const MIME = {
@@ -247,6 +248,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/settings' && req.method === 'POST') {
         traceCredentialIpc('settings-request-received');
         const b = await readJsonBody(req);
+        traceCredentialIpc('settings-body-read');
         const update = await settingsUpdateCoordinator.submit(b);
         return json(res, 200, { ok: true, credentialConfigured: !!update.apiKey });
       }

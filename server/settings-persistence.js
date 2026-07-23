@@ -29,14 +29,17 @@ function createSettingsUpdateCoordinator({
   loadSettings,
   applySettingsPatch,
   persistCredential,
-  saveSettings
+  saveSettings,
+  trace = () => {}
 }) {
   let queue = Promise.resolve();
 
   function submit(patch) {
     const operation = queue.then(async () => {
+      trace('settings-coordinator-enter');
       const currentSettings = loadSettings();
       const update = applySettingsPatch(currentSettings, patch);
+      trace('settings-patch-applied');
       await persistSettingsUpdate({
         currentSettings,
         update,

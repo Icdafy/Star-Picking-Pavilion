@@ -61,7 +61,7 @@ async function closeElectronGracefully(app, child, description) {
 
 function captureAndForwardElectronOutput(child) {
   const stages = [];
-  const fixedStagePattern = /^(?:\[后端\] )?\[credential-ipc\] (received|stored|failed|ack-posted|settings-request-received|credential-persist-start|credential-posted|credential-ack-received|credential-timeout)$/;
+  const fixedStagePattern = /^(?:\[后端\] )?\[credential-ipc\] (received|stored|failed|ack-posted|settings-request-received|settings-body-read|settings-coordinator-enter|settings-patch-applied|credential-persist-start|credential-posted|credential-ack-received|credential-timeout)$/;
   const sanitizeLine = line => line
     .replaceAll(DUMMY_API_KEY, '[redacted]')
     .replace(
@@ -95,6 +95,37 @@ function captureAndForwardElectronOutput(child) {
     stages,
     stdoutCaptured: attach(child.stdout, process.stdout),
     stderrCaptured: attach(child.stderr, process.stderr)
+  };
+}
+
+function captureSettingsRequestProgress(page) {
+  const stages = [];
+  let finished = false;
+  let failed = false;
+  const isSettingsPost = request => {
+    try {
+      return request.method() === 'POST'
+        && new URL(request.url()).pathname === '/api/settings';
+    } catch {
+      return false;
+    }
+  };
+
+  page.on('requestfinished', request => {
+    if (!isSettingsPost(request)) return;
+    finished = true;
+    stages.push('request-finished');
+  });
+  page.on('requestfailed', request => {
+    if (!isSettingsPost(request)) return;
+    failed = true;
+    stages.push('request-failed');
+  });
+
+  return {
+    stages,
+    get finished() { return finished; },
+    get failed() { return failed; }
   };
 }
 
@@ -164,7 +195,8 @@ async function collectStalledSaveDiagnostics({
   dataDir,
   electronProcess,
   expectedBaseUrl,
-  credentialIpcOutput
+  credentialIpcOutput,
+  settingsRequestOutput
 }) {
   const credentialsFile = path.join(dataDir, 'credentials.v1.json');
   const settingsFile = path.join(dataDir, 'settings.json');
@@ -182,6 +214,9 @@ async function collectStalledSaveDiagnostics({
     credentialIpcStdoutCaptured: credentialIpcOutput.stdoutCaptured,
     credentialIpcStderrCaptured: credentialIpcOutput.stderrCaptured,
     credentialIpcStages: [...credentialIpcOutput.stages],
+    settingsRequestFinished: settingsRequestOutput.finished,
+    settingsRequestFailed: settingsRequestOutput.failed,
+    settingsRequestStages: [...settingsRequestOutput.stages],
     dataDirReadable: false,
     topLevelFiles: []
   };
@@ -354,6 +389,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   const firstProcess = firstApp.process();
   const credentialIpcOutput = captureAndForwardElectronOutput(firstProcess);
   const firstPage = await firstApp.firstWindow();
+  const settingsRequestOutput = captureSettingsRequestProgress(firstPage);
   await firstPage.waitForSelector('#feedList');
 
   const safeStorageAvailable = await firstApp.evaluate(({ safeStorage }) => (
@@ -454,7 +490,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
       dataDir,
       electronProcess: firstProcess,
       expectedBaseUrl: mockBaseUrl,
-      credentialIpcOutput
+      credentialIpcOutput,
+      settingsRequestOutput
     });
     const serializedDiagnostics = JSON.stringify(diagnostics);
     console.log(`[e2e] stalled credential save diagnostics: ${serializedDiagnostics}`);
@@ -480,6 +517,9 @@ test('real Electron desktop flow is secure, persistent across restart and single
     true,
     `DeepSeek settings save failed: ${saveResult.toastText}`
   );
+  assert.equal(settingsRequestOutput.finished, true);
+  assert.equal(settingsRequestOutput.failed, false);
+  assert.deepEqual(settingsRequestOutput.stages, ['request-finished']);
 
   await firstPage.locator('#btnTestAi').click();
   await firstPage.waitForFunction(() => {

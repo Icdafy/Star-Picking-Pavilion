@@ -58,6 +58,9 @@ test('serializes complete settings transactions and recovers the queue after fai
   let storedSettings = { ai: { apiKey: 'dummy-old' }, revision: 'old' };
 
   const coordinator = createSettingsUpdateCoordinator({
+    trace: stage => {
+      calls.push(['trace', stage]);
+    },
     loadSettings: () => {
       calls.push(['load', storedSettings.revision]);
       return structuredClone(storedSettings);
@@ -98,8 +101,10 @@ test('serializes complete settings transactions and recovers the queue after fai
   const updateBPromise = coordinator.submit({ revision: 'B', apiKey: 'dummy-b' });
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(calls, [
+    ['trace', 'settings-coordinator-enter'],
     ['load', 'old'],
     ['apply', 'A', 'old'],
+    ['trace', 'settings-patch-applied'],
     ['credential', 'dummy-a'],
     ['settings', 'A']
   ]);
@@ -108,8 +113,10 @@ test('serializes complete settings transactions and recovers the queue after fai
   await rollbackStarted.promise;
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(calls, [
+    ['trace', 'settings-coordinator-enter'],
     ['load', 'old'],
     ['apply', 'A', 'old'],
+    ['trace', 'settings-patch-applied'],
     ['credential', 'dummy-a'],
     ['settings', 'A'],
     ['credential', 'dummy-old']
@@ -123,13 +130,17 @@ test('serializes complete settings transactions and recovers the queue after fai
   assert.equal(runtimeKey, 'dummy-b');
   assert.equal(storedSettings.revision, 'B');
   assert.deepEqual(calls, [
+    ['trace', 'settings-coordinator-enter'],
     ['load', 'old'],
     ['apply', 'A', 'old'],
+    ['trace', 'settings-patch-applied'],
     ['credential', 'dummy-a'],
     ['settings', 'A'],
     ['credential', 'dummy-old'],
+    ['trace', 'settings-coordinator-enter'],
     ['load', 'old'],
     ['apply', 'B', 'old'],
+    ['trace', 'settings-patch-applied'],
     ['credential', 'dummy-b'],
     ['settings', 'B']
   ]);
