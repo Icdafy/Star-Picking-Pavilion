@@ -121,6 +121,59 @@ function assertDoesNotContainSecret(serialized) {
   assert.equal(serialized.includes(DUMMY_API_KEY), false);
 }
 
+async function collectStalledSaveDiagnostics({
+  dataDir,
+  electronProcess,
+  expectedBaseUrl
+}) {
+  const credentialsFile = path.join(dataDir, 'credentials.v1.json');
+  const settingsFile = path.join(dataDir, 'settings.json');
+  const diagnostics = {
+    credentialsExists: false,
+    credentialsParseable: false,
+    credentialCiphertextNonEmpty: false,
+    settingsExists: false,
+    settingsParseable: false,
+    settingsBaseUrlMatches: false,
+    settingsPrefilterModelMatches: false,
+    settingsScoringModelMatches: false,
+    electronChildAlive: electronProcess.exitCode === null
+      && electronProcess.signalCode === null,
+    dataDirReadable: false,
+    topLevelFiles: []
+  };
+
+  diagnostics.credentialsExists = await fs.promises.access(credentialsFile)
+    .then(() => true, () => false);
+  if (diagnostics.credentialsExists) {
+    try {
+      const credentials = JSON.parse(await fs.promises.readFile(credentialsFile, 'utf8'));
+      diagnostics.credentialsParseable = true;
+      diagnostics.credentialCiphertextNonEmpty = typeof credentials?.ciphertext === 'string'
+        && credentials.ciphertext.length > 0;
+    } catch {}
+  }
+
+  diagnostics.settingsExists = await fs.promises.access(settingsFile)
+    .then(() => true, () => false);
+  if (diagnostics.settingsExists) {
+    try {
+      const settings = JSON.parse(await fs.promises.readFile(settingsFile, 'utf8'));
+      diagnostics.settingsParseable = true;
+      diagnostics.settingsBaseUrlMatches = settings?.ai?.baseUrl === expectedBaseUrl;
+      diagnostics.settingsPrefilterModelMatches = settings?.ai?.prefilterModel === PREFILTER_MODEL;
+      diagnostics.settingsScoringModelMatches = settings?.ai?.scoringModel === SCORING_MODEL;
+    } catch {}
+  }
+
+  try {
+    diagnostics.topLevelFiles = (await fs.promises.readdir(dataDir)).sort();
+    diagnostics.dataDirReadable = true;
+  } catch {}
+
+  return diagnostics;
+}
+
 async function assertPersistedFiles(dataDir, expected) {
   const settingsFile = path.join(dataDir, 'settings.json');
   const credentialsFile = path.join(dataDir, 'credentials.v1.json');
@@ -340,17 +393,29 @@ test('real Electron desktop flow is secure, persistent across restart and single
   await firstPage.locator('#setScoringModel').fill(SCORING_MODEL);
 
   await firstPage.locator('#btnSaveAi').click();
-  await firstPage.waitForFunction(() => {
-    const input = document.querySelector('#setApiKey');
-    const toast = document.querySelector('#toast');
-    const toastText = toast?.textContent || '';
-    const success = input?.dataset.hasStoredKey === 'true'
-      && toast?.classList.contains('show')
-      && toastText.includes('AI 配置已保存');
-    const failure = toast?.classList.contains('show')
-      && toastText.startsWith('AI 配置保存失败');
-    return success || failure;
-  }, undefined, { timeout: 15_000 });
+  try {
+    await firstPage.waitForFunction(() => {
+      const input = document.querySelector('#setApiKey');
+      const toast = document.querySelector('#toast');
+      const toastText = toast?.textContent || '';
+      const success = input?.dataset.hasStoredKey === 'true'
+        && toast?.classList.contains('show')
+        && toastText.includes('AI 配置已保存');
+      const failure = toast?.classList.contains('show')
+        && toastText.startsWith('AI 配置保存失败');
+      return success || failure;
+    }, undefined, { timeout: 15_000 });
+  } catch (error) {
+    const diagnostics = await collectStalledSaveDiagnostics({
+      dataDir,
+      electronProcess: firstProcess,
+      expectedBaseUrl: mockBaseUrl
+    });
+    const serializedDiagnostics = JSON.stringify(diagnostics);
+    console.log(`[e2e] stalled credential save diagnostics: ${serializedDiagnostics}`);
+    error.message = `${error.message}; diagnostics=${serializedDiagnostics}`;
+    throw error;
+  }
   const saveResult = await firstPage.evaluate(() => {
     const input = document.querySelector('#setApiKey');
     const toast = document.querySelector('#toast');
