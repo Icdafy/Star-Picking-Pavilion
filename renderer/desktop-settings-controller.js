@@ -7,6 +7,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createDesktopSettingsModule() {
   const SETTING_FIELDS = Object.freeze(['closeToTray', 'launchAtLogin']);
   const SAVE_ERROR = '桌面运行设置保存失败，请重试。';
+  const STATUS_BASE_CLASS = 'test-result desktop-settings-result desktop-settings-status';
   const DEFAULT_SNAPSHOT = Object.freeze({
     closeToTray: false,
     launchAtLogin: false,
@@ -59,13 +60,13 @@
 
       if (error) {
         elements.status.textContent = SAVE_ERROR;
-        elements.status.className = 'desktop-settings-status error';
+        elements.status.className = `${STATUS_BASE_CLASS} error`;
         return;
       }
       elements.status.textContent = confirmedSnapshot.warnings.join('；');
       elements.status.className = confirmedSnapshot.warnings.length
-        ? 'desktop-settings-status warning'
-        : 'desktop-settings-status';
+        ? `${STATUS_BASE_CLASS} warning`
+        : STATUS_BASE_CLASS;
     }
 
     function setPending(value) {

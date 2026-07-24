@@ -90,6 +90,10 @@ test('load renders the confirmed desktop snapshot', async () => {
   assert.equal(fixture.closeToTray.disabled, false);
   assert.equal(fixture.launchAtLogin.disabled, false);
   assert.equal(fixture.status.textContent, '');
+  assert.equal(
+    fixture.status.className,
+    'test-result desktop-settings-result desktop-settings-status'
+  );
   assert.equal(fixture.status.getAttribute('aria-busy'), 'false');
 });
 
@@ -154,7 +158,10 @@ test('unsupported login disables only that switch and warnings use warning statu
     fixture.status.textContent,
     '仅 Windows 安装版支持登录启动；托盘暂不可用'
   );
-  assert.equal(fixture.status.className, 'desktop-settings-status warning');
+  assert.equal(
+    fixture.status.className,
+    'test-result desktop-settings-result desktop-settings-status warning'
+  );
 });
 
 test('failed update restores actual settings and shows a fixed error', async () => {
@@ -185,7 +192,10 @@ test('failed update restores actual settings and shows a fixed error', async () 
   assert.equal(fixture.closeToTray.disabled, false);
   assert.equal(fixture.launchAtLogin.disabled, false);
   assert.equal(fixture.status.textContent, '桌面运行设置保存失败，请重试。');
-  assert.equal(fixture.status.className, 'desktop-settings-status error');
+  assert.equal(
+    fixture.status.className,
+    'test-result desktop-settings-result desktop-settings-status error'
+  );
   assert.doesNotMatch(fixture.status.textContent, /sensitive/);
 });
 

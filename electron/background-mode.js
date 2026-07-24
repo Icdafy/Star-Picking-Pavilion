@@ -66,21 +66,25 @@ function createBackgroundModeController({
     try { logError(error instanceof Error ? error : new Error(String(error))); } catch {}
   }
 
-  function readLaunchAtLogin() {
-    if (!launchAtLoginSupported) return false;
+  function queryLaunchAtLogin() {
+    if (!launchAtLoginSupported) return { confirmed: true, value: false };
     try {
-      return app.getLoginItemSettings().openAtLogin === true;
+      return {
+        confirmed: true,
+        value: app.getLoginItemSettings().openAtLogin === true
+      };
     } catch (error) {
       recordError(error);
       addWarning(LOGIN_WARNING);
-      return false;
+      return { confirmed: false, value: false };
     }
   }
 
   function getSettings() {
+    const login = queryLaunchAtLogin();
     return {
-      closeToTray: closeToTray === true && tray !== null && !disposed,
-      launchAtLogin: readLaunchAtLogin(),
+      closeToTray: closeToTray === true && hasUsableTray() && !disposed,
+      launchAtLogin: login.value,
       launchAtLoginSupported,
       warnings: [...warnings]
     };
@@ -94,12 +98,27 @@ function createBackgroundModeController({
     const current = tray;
     tray = null;
     if (!current) return;
-    try { current.destroy(); } catch (error) { recordError(error); }
+    try {
+      if (current.isDestroyed?.() !== true) current.destroy();
+    } catch (error) {
+      recordError(error);
+    }
+  }
+
+  function hasUsableTray() {
+    if (!tray) return false;
+    try {
+      if (tray.isDestroyed?.() !== true) return true;
+    } catch (error) {
+      recordError(error);
+    }
+    tray = null;
+    return false;
   }
 
   function ensureTray() {
     if (disposed) return false;
-    if (tray) return true;
+    if (hasUsableTray()) return true;
     try {
       const created = new Tray(iconPath);
       created.setToolTip('摘星阁 · 情报站');
@@ -134,7 +153,7 @@ function createBackgroundModeController({
   }
 
   function handleWindowClose(event) {
-    if (disposed || !closeToTray || !tray || isQuitting()) return false;
+    if (disposed || !closeToTray || !hasUsableTray() || isQuitting()) return false;
     const window = getWindow();
     if (!window || window.isDestroyed?.() || typeof window.hide !== 'function') return false;
     event?.preventDefault?.();
@@ -144,7 +163,7 @@ function createBackgroundModeController({
   }
 
   function shouldStartHidden(argv = process.argv) {
-    return !disposed && closeToTray && tray !== null
+    return !disposed && closeToTray && hasUsableTray()
       && Array.isArray(argv) && argv.includes('--hidden');
   }
 
@@ -165,7 +184,8 @@ function createBackgroundModeController({
       addWarning(LOGIN_WARNING);
       throw new Error(LOGIN_CONFIRM_ERROR);
     }
-    if (readLaunchAtLogin() !== openAtLogin) {
+    const readback = queryLaunchAtLogin();
+    if (!readback.confirmed || readback.value !== openAtLogin) {
       addWarning(LOGIN_WARNING);
       throw new Error(LOGIN_CONFIRM_ERROR);
     }
@@ -173,7 +193,7 @@ function createBackgroundModeController({
 
   async function updateCloseToTray(nextValue) {
     const previousValue = closeToTray;
-    const createdForUpdate = nextValue && !tray;
+    const createdForUpdate = nextValue && !hasUsableTray();
     if (nextValue && !ensureTray()) throw new Error(BACKGROUND_WARNING);
 
     try {
@@ -188,7 +208,8 @@ function createBackgroundModeController({
     closeToTray = nextValue;
     if (!nextValue) destroyTray();
 
-    if (launchAtLoginSupported && readLaunchAtLogin()) {
+    const login = queryLaunchAtLogin();
+    if (login.confirmed && login.value) {
       try {
         writeLaunchAtLogin(true);
       } catch (error) {

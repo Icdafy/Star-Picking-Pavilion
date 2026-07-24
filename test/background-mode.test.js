@@ -29,6 +29,7 @@ function createFixture({
   const logs = [];
   let preferences = { closeToTray };
   let loginEnabled = launchAtLogin;
+  let loginReadFails = false;
   let quitting = false;
   let quitRequests = 0;
 
@@ -60,13 +61,18 @@ function createFixture({
       this.iconPath = iconPath;
       this.handlers = new Map();
       this.destroyCount = 0;
+      this.destroyed = false;
       trays.push(this);
     }
 
     setToolTip(value) { this.tooltip = value; }
     setContextMenu(value) { this.menu = value; }
     on(event, listener) { this.handlers.set(event, listener); }
-    destroy() { this.destroyCount += 1; }
+    isDestroyed() { return this.destroyed; }
+    destroy() {
+      this.destroyed = true;
+      this.destroyCount += 1;
+    }
     emit(event) { this.handlers.get(event)?.(); }
   }
 
@@ -91,6 +97,7 @@ function createFixture({
   const app = {
     isPackaged,
     getLoginItemSettings() {
+      if (loginReadFails) throw new Error('injected login read failure');
       return { openAtLogin: loginEnabled };
     },
     setLoginItemSettings(settings) {
@@ -139,6 +146,7 @@ function createFixture({
     get preferences() { return preferences; },
     get loginEnabled() { return loginEnabled; },
     get quitRequests() { return quitRequests; },
+    setLoginReadFails(value) { loginReadFails = value; },
     setQuitting(value) { quitting = value; }
   };
 }
@@ -322,6 +330,42 @@ test('login readback mismatch rejects without claiming success', async () => {
   const snapshot = await controller.getSettings();
   assert.equal(snapshot.launchAtLogin, false);
   assert.deepEqual(snapshot.warnings, [LOGIN_WARNING]);
+});
+
+test('a login readback error cannot masquerade as confirmed disabled state', async () => {
+  const fixture = createFixture({ launchAtLogin: true });
+  const controller = createBackgroundModeController(fixture.dependencies);
+  await controller.initialize();
+  fixture.setLoginReadFails(true);
+
+  await assert.rejects(
+    controller.updateSettings({ launchAtLogin: false }),
+    /Windows 登录启动设置未能确认/
+  );
+  assert.deepEqual(fixture.loginWrites.at(-1), {
+    openAtLogin: false,
+    path: fixture.execPath,
+    args: []
+  });
+  assert.deepEqual((await controller.getSettings()).warnings, [LOGIN_WARNING]);
+});
+
+test('an externally destroyed tray never permits an inaccessible hidden window', async () => {
+  const fixture = createFixture({ closeToTray: true });
+  const controller = createBackgroundModeController(fixture.dependencies);
+  await controller.initialize();
+  fixture.trays[0].destroyed = true;
+
+  assert.equal(controller.handleWindowClose({ preventDefault() {} }), false);
+  assert.equal(controller.shouldStartHidden(['--hidden']), false);
+  assert.equal((await controller.getSettings()).closeToTray, false);
+
+  const recovered = await controller.updateSettings({ closeToTray: true });
+  assert.equal(recovered.closeToTray, true);
+  assert.equal(fixture.trays.length, 2);
+  controller.dispose();
+  assert.equal(fixture.trays[0].destroyCount, 0);
+  assert.equal(fixture.trays[1].destroyCount, 1);
 });
 
 test('notification failures degrade silently and dispose is idempotent', async () => {
