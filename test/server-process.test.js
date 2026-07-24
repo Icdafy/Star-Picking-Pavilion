@@ -6,6 +6,7 @@ const { EventEmitter } = require('node:events');
 
 const {
   focusExistingWindow,
+  showExistingWindow,
   createServerProcessController
 } = require('../electron/server-process');
 const { startServer } = require('./helpers/server-child');
@@ -35,6 +36,7 @@ test('second instance restores, shows and focuses the existing window', () => {
   assert.equal(focusExistingWindow(window), true);
   assert.deepEqual(calls, ['restore', 'show', 'focus']);
   assert.equal(focusExistingWindow(null), false);
+  assert.equal(showExistingWindow, focusExistingWindow);
 });
 
 test('unexpected child exit is reported exactly once', () => {

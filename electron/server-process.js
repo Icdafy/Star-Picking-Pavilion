@@ -1,12 +1,14 @@
 'use strict';
 
-function focusExistingWindow(window) {
+function showExistingWindow(window) {
   if (!window || window.isDestroyed?.()) return false;
   if (window.isMinimized?.()) window.restore();
   if (window.isVisible && !window.isVisible()) window.show();
   window.focus();
   return true;
 }
+
+const focusExistingWindow = showExistingWindow;
 
 function createServerProcessController(child, {
   shutdownTimeoutMs = 5_000,
@@ -65,4 +67,8 @@ function createServerProcessController(child, {
   return Object.freeze({ shutdown, getPhase: () => phase });
 }
 
-module.exports = { focusExistingWindow, createServerProcessController };
+module.exports = {
+  focusExistingWindow,
+  showExistingWindow,
+  createServerProcessController
+};
