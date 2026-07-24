@@ -22,7 +22,14 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
     dailyDate: null,
     linksCategory: '全部',
     commonLinksFavorites: ['caac', 'miit'],
-    realtime: true
+    realtime: true,
+    closeToTray: false
+  };
+  const desktopSnapshot = {
+    closeToTray: false,
+    launchAtLogin: false,
+    launchAtLoginSupported: true,
+    warnings: []
   };
   const electron = {
     contextBridge: {
@@ -43,6 +50,13 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
       on(channel, listener) { ipcCalls.push(['on', channel]); updateListener = listener; },
       invoke(channel, ...args) {
         ipcCalls.push(['invoke', channel, ...args]);
+        if (channel === 'desktop-settings:get') return Promise.resolve(desktopSnapshot);
+        if (channel === 'desktop-settings:update') {
+          return Promise.resolve({
+            ...desktopSnapshot,
+            closeToTray: args[0]?.closeToTray === true
+          });
+        }
         return Promise.resolve('invoked');
       }
     }
@@ -74,6 +88,20 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   const patch = { theme: 'light', commonLinksFavorites: ['caac'] };
   await api.updatePreferences(patch);
   assert.deepEqual(ipcCalls.at(-1), ['invoke', 'preferences:update', patch]);
+
+  const desktopSettings = await api.getDesktopSettings();
+  assert.equal(Object.isFrozen(desktopSettings), true);
+  assert.equal(Object.isFrozen(desktopSettings.warnings), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(desktopSettings)), desktopSnapshot);
+
+  const updated = await api.updateDesktopSettings({ closeToTray: true });
+  assert.equal(Object.isFrozen(updated), true);
+  assert.equal(updated.closeToTray, true);
+  assert.deepEqual(ipcCalls.at(-1), [
+    'invoke',
+    'desktop-settings:update',
+    { closeToTray: true }
+  ]);
 
   let payload;
   api.onUpdateStatus(value => { payload = value; });

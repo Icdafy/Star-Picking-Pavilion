@@ -22,6 +22,12 @@ const desktopApi = Object.freeze({
   preferences: cloneAndFreeze(initialPreferencesState.preferences),
   hasStoredPreferences: initialPreferencesState.hasStoredPreferences === true,
   updatePreferences: patch => ipcRenderer.invoke('preferences:update', patch),
+  getDesktopSettings: () => ipcRenderer
+    .invoke('desktop-settings:get')
+    .then(cloneAndFreeze),
+  updateDesktopSettings: patch => ipcRenderer
+    .invoke('desktop-settings:update', patch)
+    .then(cloneAndFreeze),
   // 主进程推送更新状态：available / downloading / downloaded / error
   onUpdateStatus: cb => ipcRenderer.on('update:status', (_e, payload) => cb(payload)),
   // 渲染层请求「重启并安装更新」
