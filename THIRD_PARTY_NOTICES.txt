@@ -1,5 +1,5 @@
 THIRD-PARTY SOFTWARE NOTICES
-摘星阁 (Star-Picking-Pavilion) 0.0.3
+摘星阁 (Star-Picking-Pavilion) 0.0.4
 
 This distribution includes the following production dependencies.
 Each package remains subject to its own license terms.

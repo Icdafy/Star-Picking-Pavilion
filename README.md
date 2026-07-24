@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.3.exe`，双击并按向导安装。v0.0.3 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.4.exe`，双击并按向导安装。v0.0.4 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.3.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.4.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -29,10 +29,20 @@ Get-Content .\SHA256SUMS.txt
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
 - 深色和浅色主题
 - 自动记住主题、最后视图、领域与分类、日报日期、常用网址分类与星标、实时更新开关
+- 可选的关闭到系统托盘与 Windows 登录自动启动，两项默认关闭、可独立设置
 - 数据保留策略与本地库体积视图，过期情报连同全文索引自动清理
 - 失效信源自动退避重试，避免长期不可达的信源每轮空转
 
 信源被“移出监控”时只会停用，既有信源记录和历史文章不会被删除。
+
+## 桌面后台运行
+
+「设置 → 桌面运行」提供两个相互独立的开关，升级后均保持关闭：
+
+- 关闭主窗口后在后台运行：关闭窗口时继续采集，可从系统托盘选择“打开摘星阁”；要彻底结束应用和本地后端，请在托盘菜单选择“退出摘星阁”。
+- 登录 Windows 时自动启动：仅正式安装的 Windows 版本支持。若同时开启后台运行，登录后会静默启动；否则照常显示主窗口。
+
+托盘初始化失败时，摘星阁会保留可见主窗口并显示固定提示，避免应用在没有恢复入口时隐藏。登录启动状态以 Windows 系统设置的回读结果为准，不写入 `ui-preferences.json`。这两项设置不会改变凭据加密、网络访问、AI 分析、数据保留或信源策略。
 
 ## 数据保留与信源健康
 
@@ -100,7 +110,7 @@ npm run server              # 独立开发服务器，默认 http://127.0.0.1:76
 npm run pipeline            # 手动采集、分析、聚类
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.3 --artifacts
+npm run verify:version -- --tag v0.0.4 --artifacts
 npm run notices
 ```
 
