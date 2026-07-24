@@ -1,6 +1,7 @@
 'use strict';
 /* 摘星阁 · 前端逻辑（零依赖原生 JS）
-   v0.2：双主题切换 / 时间轴日期分组信息流 / 右侧热度栏 */
+   v0.3：双主题切换 / 时间轴日期分组信息流 / 右侧热度栏
+        / 键盘快捷键 / 滑动导航指示 / 检索上下文 / 回到顶部 */
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -30,6 +31,7 @@ const state = {
   commonLinksFavorites: new Set(restoredPreferences.commonLinksFavorites),
   q: '',
   page: 0,
+  listed: 0,             // 当前信息流已列出的条数（用于检索上下文计数）
   loading: false,
   dailyDate: restoredPreferences.dailyDate,
   dailyDates: [],
@@ -37,6 +39,16 @@ const state = {
   knownIds: new Set(),  // 当前 feed 已显示的文章 id
   freshIds: new Set()   // 下次渲染要高亮的新 id
 };
+
+// ---------- 动效与滚动 ----------
+const reducedMotionQuery = window.matchMedia
+  ? window.matchMedia('(prefers-reduced-motion: reduce)')
+  : null;
+const prefersReducedMotion = () => Boolean(reducedMotionQuery?.matches);
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+}
 
 // ---------- 主题 ----------
 function applyTheme(theme, { persist = true } = {}) {
@@ -49,11 +61,11 @@ function applyTheme(theme, { persist = true } = {}) {
     preferenceActions.remember('theme', theme);
   }
 }
-$('#btnTheme').addEventListener('click', () => {
+function toggleTheme() {
   const cur = document.documentElement.dataset.theme;
-  const next = cur === 'light' ? 'dark' : 'light';
-  applyTheme(next);
-});
+  applyTheme(cur === 'light' ? 'dark' : 'light');
+}
+$('#btnTheme').addEventListener('click', toggleTheme);
 
 // ---------- 工具 ----------
 async function api(path, opts) {
@@ -105,6 +117,7 @@ function hhmm(iso) {
 
 let toastTimer;
 function toast(msg, isError) {
+  // 文本必须与消息完全一致：桌面端 E2E 会按前缀断言保存结果，图标一律走 CSS
   const el = $('#toast');
   el.textContent = msg;
   el.classList.toggle('error', !!isError);
@@ -153,12 +166,32 @@ const DIM_NAMES = {
 };
 
 // ---------- 塔台状态 ----------
+// 统计数字变化时做一次短促补间，避免刷新瞬间的跳字
+function setStat(el, value) {
+  const target = Number(value);
+  if (!Number.isFinite(target)) { el.textContent = '–'; return; }
+  const previous = Number(el.dataset.value);
+  el.dataset.value = String(target);
+  if (!Number.isFinite(previous) || previous === target || prefersReducedMotion()) {
+    el.textContent = target.toLocaleString('zh-CN');
+    return;
+  }
+  const startedAt = performance.now();
+  const tick = at => {
+    const progress = Math.min(1, (at - startedAt) / 520);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(previous + (target - previous) * eased).toLocaleString('zh-CN');
+    if (progress < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 async function refreshStats() {
   try {
     const s = await api('/api/stats');
-    $('#statSources').textContent = s.sources;
-    $('#statToday').textContent = s.today;
-    $('#statFeatured').textContent = s.featuredToday;
+    setStat($('#statSources'), s.sources);
+    setStat($('#statToday'), s.today);
+    setStat($('#statFeatured'), s.featuredToday);
     const busy = s.pipeline?.running;
     $('#statStatus').innerHTML = `<span class="pulse-dot${busy ? ' busy' : ''}"></span>`;
     $('#statStatusLabel').textContent = busy ? '采集中' : (s.aiConfigured ? 'AI 在线' : '启发模式');
@@ -193,10 +226,18 @@ function cardInner(item) {
       <div class="dim-bar"><i style="width:${Math.min(100, item.scores[k] ?? 0)}%"></i></div>
     </div>`).join('') : '';
   const cluster = item.clusterSize > 1 ? `
-    <button class="cluster-toggle" data-cluster="${item.clusterId}" data-self="${item.id}">
+    <button class="cluster-toggle" data-cluster="${item.clusterId}" data-self="${item.id}" type="button" aria-expanded="false">
       <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       ${item.clusterSize} 个信源 · 关联报道
-    </button><div class="cluster-items" hidden></div>` : '';
+    </button>` : '';
+  // 五维分解此前只能靠"盲点"卡片才展开，现在给出显式的可聚焦入口
+  const dimsToggle = dims ? `
+    <button class="dims-toggle" type="button" aria-expanded="false">五维研判
+      <svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>` : '';
+  const foot = cluster || dimsToggle
+    ? `<div class="card-foot">${cluster}${dimsToggle}</div>${cluster ? '<div class="cluster-items" hidden></div>' : ''}`
+    : '';
   const reason = item.reason ? `
     <div class="card-reason">
       <span class="cr-label"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>情报研判</span>
@@ -207,13 +248,15 @@ function cardInner(item) {
     : '';
 
   return `
-    ${scorePill(item)}
-    <div class="card-meta">
-      <span class="meta-source">${esc(item.source)}</span>
-      <span class="tier-chip tier-${esc(item.tier)}">${esc(item.tier)}</span>
-      ${d ? `<span class="domain-dot ${d === 'lowaltitude' ? 'la' : 'ae'}"><i></i>${DOMAIN_NAME[d] || ''}</span>` : ''}
-      ${item.category ? `<span class="cat-tag">${esc(item.category)}</span>` : ''}
-      <span>${timeAgo(item.publishedAt || item.fetchedAt)}</span>
+    <div class="card-head">
+      <div class="card-meta">
+        <span class="meta-source">${esc(item.source)}</span>
+        <span class="tier-chip tier-${esc(item.tier)}">${esc(item.tier)}</span>
+        ${d ? `<span class="domain-dot ${d === 'lowaltitude' ? 'la' : 'ae'}"><i></i>${DOMAIN_NAME[d] || ''}</span>` : ''}
+        ${item.category ? `<span class="cat-tag">${esc(item.category)}</span>` : ''}
+        <span>${timeAgo(item.publishedAt || item.fetchedAt)}</span>
+      </div>
+      ${scorePill(item)}
     </div>
     <a class="card-title" href="${safeUrl(item.url)}" target="_blank" rel="noopener">${esc(item.title)}</a>
     <div class="card-content${thumb ? ' has-thumb' : ''}">
@@ -224,7 +267,7 @@ function cardInner(item) {
       ${thumb}
     </div>
     ${reason}
-    ${cluster}
+    ${foot}
     ${dims ? `<div class="dims">${dims}</div>` : ''}`;
 }
 
@@ -293,6 +336,20 @@ function skeletons(n = 5) {
     </div>`).join('');
 }
 
+// 检索上下文条：明确当前处于检索态，并给出一键退出
+function renderSearchContext() {
+  const box = $('#searchContext');
+  if (!state.q) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `检索 <strong>「${esc(state.q)}」</strong>`
+    + ` · 已列出 <span class="sc-count">${state.listed}</span> 条`
+    + '<button type="button" data-act="clear-search">清除检索</button>';
+}
+
 async function loadFeed(reset = true) {
   // 分页追加不能并发，否则两批结果会交错；整表重载则以最后一次请求为准，
   // 这样在加载途中切换领域/分类不会被静默丢弃。
@@ -300,7 +357,7 @@ async function loadFeed(reset = true) {
   const request = feedRequestGuard.begin();
   state.loading = true;
   const list = $('#feedList');
-  if (reset) { state.page = 0; list.innerHTML = skeletons(); $('#newFlash').hidden = true; }
+  if (reset) { state.page = 0; state.listed = 0; list.innerHTML = skeletons(); $('#newFlash').hidden = true; }
   try {
     const params = new URLSearchParams({ view: state.view, page: state.page });
     if (state.domain) params.set('domain', state.domain);
@@ -314,6 +371,8 @@ async function loadFeed(reset = true) {
       : renderTimeline(data.items, 0);
     if (reset) list.innerHTML = html;
     else list.insertAdjacentHTML('beforeend', html);
+    state.listed = reset ? data.items.length : state.listed + data.items.length;
+    renderSearchContext();
     // 记录已知 id；高亮本次新到达的条目（实时插入）
     if (reset) state.knownIds = new Set(data.items.map(i => i.id));
     else data.items.forEach(i => state.knownIds.add(i.id));
@@ -368,9 +427,16 @@ async function loadHotRail() {
 
 // 卡片交互：展开五维 / 事件簇
 $('#feedList').addEventListener('click', async e => {
+  const dimsBtn = e.target.closest('.dims-toggle');
+  if (dimsBtn) {
+    const card = dimsBtn.closest('.card');
+    dimsBtn.setAttribute('aria-expanded', String(card.classList.toggle('expanded')));
+    return;
+  }
   const tgl = e.target.closest('.cluster-toggle');
   if (tgl) {
-    const box = tgl.nextElementSibling;
+    const box = tgl.closest('.card').querySelector('.cluster-items');
+    if (!box) return;
     tgl.classList.toggle('open');
     if (box.hidden && !box.dataset.loaded) {
       box.hidden = false;
@@ -388,13 +454,30 @@ $('#feedList').addEventListener('click', async e => {
     } else {
       box.hidden = !box.hidden;
     }
+    tgl.setAttribute('aria-expanded', String(!box.hidden));
     return;
   }
   const card = e.target.closest('.card');
-  if (card && !e.target.closest('a, button')) card.classList.toggle('expanded');
+  if (card && !e.target.closest('a, button')) {
+    const expanded = card.classList.toggle('expanded');
+    card.querySelector('.dims-toggle')?.setAttribute('aria-expanded', String(expanded));
+  }
 });
 
-$('#btnMore').addEventListener('click', () => { state.page++; loadFeed(false); });
+$('#btnMore').addEventListener('click', async () => {
+  const btn = $('#btnMore');
+  btn.disabled = true;
+  btn.classList.add('is-busy');
+  btn.textContent = '加载中…';
+  state.page++;
+  try {
+    await loadFeed(false);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('is-busy');
+    btn.textContent = '加载更多';
+  }
+});
 
 // ---------- 日报 ----------
 async function loadDaily(date) {
@@ -445,12 +528,18 @@ function shiftDaily(days) {
 $('#dailyPrev').addEventListener('click', () => shiftDaily(-1));
 $('#dailyNext').addEventListener('click', () => shiftDaily(1));
 $('#dailyRegen').addEventListener('click', async () => {
+  const btn = $('#dailyRegen');
+  btn.disabled = true;
+  btn.classList.add('is-busy');
   try {
     await api('/api/daily/regenerate', { body: { date: state.dailyDate } });
     toast('日报已重新生成');
     loadDaily(state.dailyDate);
   } catch (error) {
     toast('日报重新生成失败：' + error.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('is-busy');
   }
 });
 
@@ -480,7 +569,7 @@ async function loadSources() {
           <span>${DOMAIN_NAME[s.domain] || '双领域'}</span>
           <span>累计 ${s.item_count} 条</span>
           ${health.consecutiveErrors
-            ? `<span style="color:var(--c-red)">连续失败 ${health.consecutiveErrors} 次</span>`
+            ? `<span style="color:var(--danger-ink)">连续失败 ${health.consecutiveErrors} 次</span>`
             : s.error_count ? `<span>累计失败 ${s.error_count} 次</span>` : ''}
           <span>${s.last_fetch_at ? timeAgo(s.last_fetch_at) : '未采集'}</span>
         </div>
@@ -762,6 +851,27 @@ $('#commonLinksGrid').addEventListener('click', event => {
 });
 
 // ---------- 视图切换 ----------
+// 导航激活块跟随当前标签滑动，切换时是连续位移而不是跳变
+function syncTabIndicator() {
+  const active = $('.tab.active');
+  const bar = $('.tab-indicator');
+  if (!active || !bar) return;
+  bar.style.setProperty('--ti-x', `${active.offsetLeft}px`);
+  bar.style.setProperty('--ti-y', `${active.offsetTop}px`);
+  bar.style.setProperty('--ti-w', `${active.offsetWidth}px`);
+  bar.style.setProperty('--ti-h', `${active.offsetHeight}px`);
+  bar.style.setProperty('--ti-o', '1');
+}
+
+// sticky 日期标题与热度栏的偏移量取决于导航条实际高度（换行时会变）
+function syncNavHeight() {
+  const nav = $('.nav');
+  if (!nav) return;
+  document.documentElement.style.setProperty(
+    '--nav-h', `${Math.round(nav.getBoundingClientRect().height)}px`
+  );
+}
+
 function switchView(view, { persist = true } = {}) {
   state.view = view;
   if (persist) preferenceActions.remember('view', view);
@@ -770,6 +880,7 @@ function switchView(view, { persist = true } = {}) {
     t.classList.toggle('active', on);
     t.setAttribute('aria-selected', on);
   });
+  syncTabIndicator();
   const isFeed = ['featured', 'hot', 'all'].includes(view);
   // 重放入场动画
   for (const sec of $$('.view')) {
@@ -789,7 +900,7 @@ function switchView(view, { persist = true } = {}) {
   else if (view === 'sources') loadSources();
   else if (view === 'settings') loadSettings();
   refreshStats();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  scrollToTop();
 }
 
 $$('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
@@ -835,12 +946,30 @@ async function initCategories() {
       preferenceActions.remember('category', state.category);
       loadFeed();
     }));
+    syncNavHeight();
   } catch {}
 }
 
-// 检索（防抖）
+// ---------- 检索 ----------
+const searchInput = $('#searchInput');
+
+function syncSearchBox() {
+  $('#searchBox').classList.toggle('has-value', Boolean(searchInput.value));
+}
+
+function clearSearch() {
+  const hadQuery = Boolean(state.q);
+  clearTimeout(searchTimer);   // 丢掉尚未触发的防抖，避免清空后又跑一次空检索
+  searchInput.value = '';
+  state.q = '';
+  syncSearchBox();
+  renderSearchContext();
+  if (hadQuery) loadFeed();
+}
+
 let searchTimer;
-$('#searchInput').addEventListener('input', e => {
+searchInput.addEventListener('input', e => {
+  syncSearchBox();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     state.q = e.target.value.trim();
@@ -849,6 +978,15 @@ $('#searchInput').addEventListener('input', e => {
     }
     else loadFeed();
   }, 350);
+});
+
+$('#searchClear').addEventListener('click', () => {
+  clearSearch();
+  searchInput.focus();
+});
+
+$('#searchContext').addEventListener('click', event => {
+  if (event.target.closest('button[data-act="clear-search"]')) clearSearch();
 });
 
 // 手动采集
@@ -873,6 +1011,68 @@ $('#btnRefresh').addEventListener('click', async function () {
   }
 });
 
+// ---------- 键盘快捷键 ----------
+function isTypingTarget(element) {
+  if (!element) return false;
+  const tag = element.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable === true;
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    if (document.activeElement === searchInput) {
+      clearSearch();
+      searchInput.blur();
+      event.preventDefault();
+    }
+    return;
+  }
+  if (event.altKey && !event.ctrlKey && !event.metaKey) {
+    const tabIndex = '1234567'.indexOf(event.key);
+    if (tabIndex >= 0) {
+      const tab = $$('.tab')[tabIndex];
+      if (tab) { switchView(tab.dataset.view); event.preventDefault(); }
+      return;
+    }
+    const letter = String(event.key).toLowerCase();
+    if (letter === 't') { toggleTheme(); event.preventDefault(); return; }
+    if (letter === 'r') { $('#btnRefresh').click(); event.preventDefault(); return; }
+    return;
+  }
+  if (isTypingTarget(document.activeElement)) return;
+  const focusesSearch = event.key === '/'
+    || ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'k');
+  if (focusesSearch) {
+    searchInput.focus();
+    searchInput.select();
+    event.preventDefault();
+    return;
+  }
+  if (event.key === 'Home') { scrollToTop(); event.preventDefault(); }
+});
+
+// ---------- 滚动态：导航加重、回到顶部 ----------
+// 直接在事件里判定：滚动回调本就在布局之后，读 scrollY 不额外触发重排；
+// 而 requestAnimationFrame 在窗口隐藏（托盘后台运行）时会被暂停，用它反而会漏更新。
+let scrolledState = null;
+let toTopState = null;
+function syncScrollState() {
+  const y = window.scrollY;
+  const scrolled = y > 8;
+  const showTop = y > 560;
+  if (scrolled !== scrolledState) {
+    scrolledState = scrolled;
+    document.body.classList.toggle('is-scrolled', scrolled);
+  }
+  if (showTop !== toTopState) {
+    toTopState = showTop;
+    $('#toTop').classList.toggle('show', showTop);
+  }
+}
+window.addEventListener('scroll', syncScrollState, { passive: true });
+window.addEventListener('resize', () => { syncNavHeight(); syncTabIndicator(); });
+$('#toTop').addEventListener('click', scrollToTop);
+
 // ---------- 实时更新 ----------
 function setRealtime(on, { persist = true } = {}) {
   state.realtime = on;
@@ -894,7 +1094,7 @@ function showNewFlash(n) {
 }
 $('#newFlash').addEventListener('click', () => {
   $('#newFlash').hidden = true;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  scrollToTop();
   loadFeed();           // freshIds 已在轮询中设置，渲染后会高亮
   loadHotRail();
 });
@@ -956,6 +1156,13 @@ async function start() {
   applyTheme(state.theme, { persist: false });
   setDomain(state.domain, { persist: false, load: false });
   setRealtime(state.realtime, { persist: false });
+  syncSearchBox();
+  syncNavHeight();
+  syncScrollState();
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { syncNavHeight(); syncTabIndicator(); }).observe($('.nav'));
+  }
+  if (document.fonts?.ready) document.fonts.ready.then(syncTabIndicator).catch(() => {});
   if (initialPreferences.migrationPatch) persistUiPreferences(initialPreferences.migrationPatch);
   if (FEED_VIEWS.includes(state.view)) {
     await initCategories();

@@ -55,18 +55,22 @@
 
   <div class="tower-actions">
     <button class="update-pill" id="updatePill" hidden></button>
-    <div class="searchbox">
+    <div class="searchbox" id="searchBox">
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M13.5 13.5 L17.5 17.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input id="searchInput" type="search" placeholder="检索情报库…" aria-label="检索情报库" autocomplete="off">
+      <input id="searchInput" type="search" placeholder="检索情报库…" aria-label="检索情报库" title="按下斜杠键或 Ctrl+K 快速聚焦" autocomplete="off">
+      <span class="search-hint" aria-hidden="true">/</span>
+      <button class="search-clear" id="searchClear" type="button" aria-label="清除检索词">
+        <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
     </div>
     <button class="rt-toggle active" id="btnRealtime" title="实时更新：自动捕捉新情报并跟上评分" aria-pressed="true">
       <span class="rt-dot" aria-hidden="true"></span>实时
     </button>
-    <button class="btn-icon" id="btnTheme" title="切换浅色 / 深色主题" aria-label="切换浅色或深色主题">
+    <button class="btn-icon" id="btnTheme" title="切换浅色 / 深色主题（Alt+T）" aria-label="切换浅色或深色主题">
       <svg class="icon-sun" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       <svg class="icon-moon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 11.5A7.5 7.5 0 0 1 8.5 3 7.5 7.5 0 1 0 17 11.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
     </button>
-    <button class="btn-icon" id="btnRefresh" title="立即采集分析" aria-label="立即采集分析">
+    <button class="btn-icon" id="btnRefresh" title="立即采集分析（Alt+R）" aria-label="立即采集分析">
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-1.9-4.6M16.5 2.5v3.4h-3.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
   </div>
@@ -75,13 +79,14 @@
 <!-- 导航 -->
 <nav class="nav glass" aria-label="主导航">
   <div class="nav-tabs" role="tablist">
-    <button class="tab active" data-view="featured" role="tab" aria-selected="true">精选</button>
-    <button class="tab" data-view="hot" role="tab" aria-selected="false">热点</button>
-    <button class="tab" data-view="all" role="tab" aria-selected="false">全部动态</button>
-    <button class="tab" data-view="daily" role="tab" aria-selected="false">情报日报</button>
-    <button class="tab" data-view="links" role="tab" aria-selected="false">常用网址</button>
-    <button class="tab" data-view="sources" role="tab" aria-selected="false">信源</button>
-    <button class="tab" data-view="settings" role="tab" aria-selected="false">设置</button>
+    <span class="tab-indicator" aria-hidden="true"></span>
+    <button class="tab active" data-view="featured" aria-controls="viewFeed" role="tab" aria-selected="true">精选</button>
+    <button class="tab" data-view="hot" aria-controls="viewFeed" role="tab" aria-selected="false">热点</button>
+    <button class="tab" data-view="all" aria-controls="viewFeed" role="tab" aria-selected="false">全部动态</button>
+    <button class="tab" data-view="daily" aria-controls="viewDaily" role="tab" aria-selected="false">情报日报</button>
+    <button class="tab" data-view="links" aria-controls="viewLinks" role="tab" aria-selected="false">常用网址</button>
+    <button class="tab" data-view="sources" aria-controls="viewSources" role="tab" aria-selected="false">信源</button>
+    <button class="tab" data-view="settings" aria-controls="viewSettings" role="tab" aria-selected="false">设置</button>
   </div>
   <div class="nav-filters" id="feedFilters">
     <div class="domain-pills" role="group" aria-label="领域筛选">
@@ -95,7 +100,8 @@
 
 <!-- 主内容 -->
 <main id="main">
-  <section id="viewFeed" class="view">
+  <section id="viewFeed" class="view" role="tabpanel">
+    <div class="search-context" id="searchContext" hidden></div>
     <div class="feed-banner" id="feedBanner" hidden></div>
     <button class="new-flash" id="newFlash" hidden></button>
     <div class="feed-layout">
@@ -117,7 +123,7 @@
     </div>
   </section>
 
-  <section id="viewDaily" class="view" hidden>
+  <section id="viewDaily" class="view" role="tabpanel" hidden>
     <div class="daily-head glass">
       <button class="btn-icon" id="dailyPrev" aria-label="前一天"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 4 L6.5 10 L12.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="daily-title">
@@ -130,7 +136,7 @@
     <div id="dailyBody"></div>
   </section>
 
-  <section id="viewLinks" class="view" hidden>
+  <section id="viewLinks" class="view" role="tabpanel" hidden>
     <header class="common-links-head glass">
       <div>
         <p class="common-links-kicker">云幄 · 常用网址</p>
@@ -148,7 +154,7 @@
     <div id="commonLinksGrid" class="common-links-grid" aria-live="polite" tabindex="-1"></div>
   </section>
 
-  <section id="viewSources" class="view" hidden>
+  <section id="viewSources" class="view" role="tabpanel" hidden>
     <div class="src-head">
       <h2 class="view-title">信源监控台</h2>
       <button class="btn-primary" id="btnAddSource">+ 提报信源</button>
@@ -156,7 +162,7 @@
     <div id="sourcesList" class="src-list"></div>
   </section>
 
-  <section id="viewSettings" class="view" hidden>
+  <section id="viewSettings" class="view" role="tabpanel" hidden>
     <h2 class="view-title">设置</h2>
     <div class="settings-grid">
       <div class="glass card-pad">
@@ -245,6 +251,18 @@
            aria-live="polite"></p>
         <p class="hint">两项默认关闭且相互独立。托盘菜单始终提供“退出摘星阁”。</p>
       </div>
+      <div class="glass card-pad">
+        <h3>键盘快捷键 <span class="muted">全局生效</span></h3>
+        <ul class="shortcut-list">
+          <li><span>聚焦检索框</span><kbd>/</kbd><kbd>Ctrl</kbd><kbd>K</kbd></li>
+          <li><span>清空检索并退出输入</span><kbd>Esc</kbd></li>
+          <li><span>切换第 1–7 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>7</kbd></li>
+          <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
+          <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
+          <li><span>回到顶部</span><kbd>Home</kbd></li>
+        </ul>
+        <p class="hint">在输入框内录入文字时，除 <code>Esc</code> 外的快捷键不会被触发。</p>
+      </div>
     </div>
   </section>
 </main>
@@ -282,6 +300,10 @@
     </div>
   </form>
 </dialog>
+
+<button class="to-top" id="toTop" type="button" aria-label="回到顶部" title="回到顶部（Home）">
+  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
