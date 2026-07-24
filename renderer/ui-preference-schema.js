@@ -16,7 +16,8 @@
     'dailyDate',
     'linksCategory',
     'commonLinksFavorites',
-    'realtime'
+    'realtime',
+    'closeToTray'
   ]);
   const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
 
@@ -67,7 +68,8 @@
       dailyDate: null,
       linksCategory: commonLinks.ALL_CATEGORY,
       commonLinksFavorites: [...commonLinks.getDefaultFavoriteIds()],
-      realtime: true
+      realtime: true,
+      closeToTray: false
     };
   }
 
@@ -134,6 +136,12 @@
         secondary.realtime,
         value => typeof value === 'boolean',
         defaults.realtime
+      ),
+      closeToTray: chooseValue(
+        source.closeToTray,
+        secondary.closeToTray,
+        value => typeof value === 'boolean',
+        defaults.closeToTray
       )
     };
   }
@@ -152,6 +160,7 @@
       return Array.isArray(value) && value.length <= commonLinks.LINKS.length;
     }
     if (field === 'realtime') return typeof value === 'boolean';
+    if (field === 'closeToTray') return typeof value === 'boolean';
     return false;
   }
 

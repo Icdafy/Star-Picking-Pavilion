@@ -41,7 +41,8 @@ test('default preferences have the complete version 1 shape and are deeply isola
     dailyDate: null,
     linksCategory: CommonLinks.ALL_CATEGORY,
     commonLinksFavorites: defaultFavoriteIds,
-    realtime: true
+    realtime: true,
+    closeToTray: false
   });
 
   const first = getDefaultUiPreferences();
@@ -66,6 +67,7 @@ test('normalizes every supported field and discards unknown fields', () => {
     linksCategory: CommonLinks.getCategories()[1],
     commonLinksFavorites: knownIds,
     realtime: false,
+    closeToTray: true,
     apiKey: 'must-not-survive',
     unknown: true
   }, { today: TODAY });
@@ -79,7 +81,8 @@ test('normalizes every supported field and discards unknown fields', () => {
     dailyDate: TODAY,
     linksCategory: CommonLinks.getCategories()[1],
     commonLinksFavorites: knownIds,
-    realtime: false
+    realtime: false,
+    closeToTray: true
   });
   assert.equal(Object.hasOwn(normalized, 'apiKey'), false);
   assert.equal(Object.hasOwn(normalized, 'unknown'), false);
@@ -93,12 +96,23 @@ test('invalid scalar values fall back to defaults', () => {
     category: `bad\u0000text`,
     dailyDate: 123,
     linksCategory: 'unknown category',
-    realtime: 'yes'
+    realtime: 'yes',
+    closeToTray: 'yes'
   }, { today: TODAY });
 
   assert.deepEqual(normalized, getDefaultUiPreferences());
   assert.equal(normalizeUiPreferences({ category: 'x'.repeat(121) }, { today: TODAY }).category, '');
   assert.equal(normalizeUiPreferences({ category: 'x'.repeat(120) }, { today: TODAY }).category.length, 120);
+});
+
+test('closeToTray accepts only booleans and persists atomically', async t => {
+  const directory = await makeDirectory(t);
+  const store = createStore(directory);
+  await store.load();
+
+  assert.equal((await store.update({ closeToTray: true })).closeToTray, true);
+  assert.equal(JSON.parse(await fs.promises.readFile(store.file, 'utf8')).closeToTray, true);
+  assert.throws(() => store.update({ closeToTray: 'yes' }), /closeToTray.*boolean/i);
 });
 
 test('accepts only real non-future YYYY-MM-DD daily dates', () => {
@@ -268,6 +282,7 @@ test('update rejects non-plain patches, unknown fields, and invalid explicit val
   assert.throws(() => store.update({ version: 2 }), /version/i);
   assert.throws(() => store.update({ dailyDate: '2026-07-24' }), /dailyDate/i);
   assert.throws(() => store.update({ commonLinksFavorites: 'broken' }), /commonLinksFavorites/i);
+  assert.throws(() => store.update({ closeToTray: 'yes' }), /closeToTray.*boolean/i);
   assert.equal(fs.existsSync(store.file), false);
 });
 

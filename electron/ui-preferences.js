@@ -123,6 +123,17 @@ function validatePatch(patch, today) {
   ) {
     throw new TypeError('realtime must be a boolean');
   }
+  if (
+    Object.hasOwn(patch, 'closeToTray')
+    && !UiPreferenceSchema.isValidUiPreferenceValue(
+      'closeToTray',
+      patch.closeToTray,
+      CommonLinks,
+      { today }
+    )
+  ) {
+    throw new TypeError('closeToTray must be a boolean');
+  }
 }
 
 function createUiPreferencesStore({

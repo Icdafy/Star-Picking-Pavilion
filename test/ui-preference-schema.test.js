@@ -40,7 +40,8 @@ test('renderer and Electron normalize normal and damaged snapshots identically',
       dailyDate: '2026-07-22',
       linksCategory: 'AI',
       commonLinksFavorites: [second.id, 'missing', second.id, first.id],
-      realtime: false
+      realtime: false,
+      closeToTray: true
     },
     {
       theme: 'sepia',
@@ -50,7 +51,8 @@ test('renderer and Electron normalize normal and damaged snapshots identically',
       dailyDate: '2026-07-24',
       linksCategory: 'missing',
       commonLinksFavorites: 'broken',
-      realtime: 'yes'
+      realtime: 'yes',
+      closeToTray: 'yes'
     }
   ];
 
