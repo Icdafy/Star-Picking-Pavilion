@@ -810,6 +810,66 @@ main { max-width: 1360px; margin: 0 auto; padding: 0 16px 80px; }
 .test-result { font-size: 13px; }
 .test-result.ok { color: var(--c-green); }
 .test-result.fail { color: var(--c-red); }
+.desktop-switch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--rail-line);
+  cursor: pointer;
+}
+.desktop-switch:last-of-type { border-bottom: 0; }
+.desktop-switch:has(input:disabled) { cursor: not-allowed; }
+.switch-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.switch-copy strong { font-size: 14px; color: var(--c-fg); }
+.switch-copy small { color: var(--c-fg-faint); line-height: 1.6; }
+.desktop-switch input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  clip-path: inset(50%);
+}
+.switch-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--input-bg);
+  transition: all var(--dur) var(--ease);
+}
+.switch-track::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: var(--c-fg-faint);
+  transition: all var(--dur) var(--ease-spring);
+}
+.desktop-switch input:checked + .switch-track {
+  border-color: var(--c-teal);
+  background: color-mix(in srgb, var(--c-teal) 24%, var(--input-bg));
+}
+.desktop-switch input:checked + .switch-track::after {
+  transform: translateX(20px);
+  background: var(--c-teal);
+}
+.desktop-switch input:focus-visible + .switch-track {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-teal) 24%, transparent);
+}
+.desktop-switch input:disabled + .switch-track {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.desktop-settings-result { min-height: 20px; margin-top: 14px; }
+.desktop-settings-status.warning,
+.desktop-settings-result.warning { color: var(--c-orange); }
+.desktop-settings-status.error { color: var(--c-red); }
 
 .maintenance-stats {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px;

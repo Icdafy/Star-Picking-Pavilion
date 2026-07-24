@@ -8,6 +8,7 @@ const API = '';
 const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
 const SettingsFormController = window.SettingsFormController;
+const DesktopSettingsController = window.DesktopSettingsController;
 const Bootstrap = window.StarPickingPavilionBootstrap;
 const Desktop = window.starPickingPavilion || window.windcatcher;
 const storage = Bootstrap.getSafeStorage(window);
@@ -553,6 +554,34 @@ const settingsForm = SettingsFormController.createSettingsFormController({
   request: api
 });
 
+const desktopSettings = (
+  DesktopSettingsController
+  && Desktop?.getDesktopSettings
+  && Desktop?.updateDesktopSettings
+) ? DesktopSettingsController.createDesktopSettingsController({
+    elements: {
+      closeToTray: $('#setCloseToTray'),
+      launchAtLogin: $('#setLaunchAtLogin'),
+      status: $('#desktopSettingsResult')
+    },
+    getSettings: () => Desktop.getDesktopSettings(),
+    updateSettings: patch => Desktop.updateDesktopSettings(patch)
+  }) : null;
+
+if (!desktopSettings) {
+  $('#setCloseToTray').disabled = true;
+  $('#setLaunchAtLogin').disabled = true;
+  $('#desktopSettingsResult').textContent = '桌面运行设置仅在安装版中可用。';
+  $('#desktopSettingsResult').className = 'test-result desktop-settings-result warning';
+}
+
+$('#setCloseToTray').addEventListener('change', event => {
+  desktopSettings?.update('closeToTray', event.currentTarget.checked).catch(() => {});
+});
+$('#setLaunchAtLogin').addEventListener('change', event => {
+  desktopSettings?.update('launchAtLogin', event.currentTarget.checked).catch(() => {});
+});
+
 function formatBytes(bytes) {
   const value = Number(bytes);
   if (!Number.isFinite(value) || value <= 0) return '0 MB';
@@ -577,7 +606,10 @@ async function loadMaintenance() {
 
 async function loadSettings() {
   try {
-    await settingsForm.load();
+    await Promise.all([
+      settingsForm.load(),
+      desktopSettings?.load()
+    ]);
   } catch {}
   loadMaintenance();
 }

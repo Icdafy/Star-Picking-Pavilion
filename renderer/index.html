@@ -221,6 +221,30 @@
         </div>
         <p class="hint" id="lastPruneHint">桌面端长期驻留运行，过期情报连同全文检索索引会在每天 <b id="pruneHour">08</b>:25 自动清理，WAL 随之截断。判为无关的噪声用更短的保留期，避免撑大本地库。</p>
       </div>
+      <div class="glass card-pad">
+        <h3>桌面运行 <span class="muted">Windows</span></h3>
+        <label class="desktop-switch">
+          <span class="switch-copy">
+            <strong>关闭主窗口后在后台运行</strong>
+            <small>关闭窗口时继续采集，可从系统托盘重新打开或彻底退出。</small>
+          </span>
+          <input id="setCloseToTray" type="checkbox" role="switch">
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+        <label class="desktop-switch">
+          <span class="switch-copy">
+            <strong>登录 Windows 时自动启动</strong>
+            <small>若同时开启后台运行，登录后不会弹出主窗口。</small>
+          </span>
+          <input id="setLaunchAtLogin" type="checkbox" role="switch">
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+        <p id="desktopSettingsResult"
+           class="test-result desktop-settings-result"
+           role="status"
+           aria-live="polite"></p>
+        <p class="hint">两项默认关闭且相互独立。托盘菜单始终提供“退出摘星阁”。</p>
+      </div>
     </div>
   </section>
 </main>
@@ -264,6 +288,7 @@
 <script src="dom-utils.js"></script>
 <script src="common-links.js"></script>
 <script src="settings-form-controller.js"></script>
+<script src="desktop-settings-controller.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

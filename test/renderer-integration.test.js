@@ -86,6 +86,18 @@ test('设置页通过竞态安全控制器加载和保存全部可编辑字段',
   assert.match(app, /settingsForm\.saveCollect\(\)/);
 });
 
+test('设置页提供可访问的桌面运行开关', () => {
+  assert.match(html, /<script src="desktop-settings-controller\.js"><\/script>/);
+  assert.match(html, /id="setCloseToTray"[^>]*type="checkbox"[^>]*role="switch"/);
+  assert.match(html, /id="setLaunchAtLogin"[^>]*type="checkbox"[^>]*role="switch"/);
+  assert.match(html, /id="desktopSettingsResult"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(app, /DesktopSettingsController\.createDesktopSettingsController/);
+  assert.match(app, /Desktop\.getDesktopSettings/);
+  assert.match(app, /Desktop\.updateDesktopSettings/);
+  assert.ok(css.includes('.desktop-switch'));
+  assert.ok(css.includes('.switch-track'));
+});
+
 test('界面展示后端的安全错误消息并捕获设置保存失败', () => {
   assert.match(app, /const payload = await res\.json\(\)\.catch\(\(\) => null\)/);
   assert.match(app, /throw new Error\(payload\?\.error \|\| `请求失败/);
@@ -135,6 +147,7 @@ test('desktop stored preference snapshot defensively becomes the complete initia
         linksCategory: 'AI',
         commonLinksFavorites: [favoriteId, favoriteId, 'missing'],
         realtime: false,
+        closeToTray: true,
         q: 'must-not-restore',
         page: 99
       }
@@ -152,7 +165,8 @@ test('desktop stored preference snapshot defensively becomes the complete initia
     dailyDate: '2026-07-22',
     linksCategory: 'AI',
     commonLinksFavorites: [favoriteId],
-    realtime: false
+    realtime: false,
+    closeToTray: true
   });
   assert.equal(result.migrationPatch, null);
   assert.equal(Object.hasOwn(result.preferences, 'q'), false);
@@ -181,7 +195,8 @@ test('desktop without stored preferences creates one complete legacy migration p
     dailyDate: null,
     linksCategory: CommonLinks.ALL_CATEGORY,
     commonLinksFavorites: [favoriteId],
-    realtime: false
+    realtime: false,
+    closeToTray: false
   });
   assert.deepEqual(result.migrationPatch, result.preferences);
   assert.notEqual(result.migrationPatch, result.preferences);
@@ -197,7 +212,8 @@ test('browser preferences restore every meaningful field from one namespaced JSO
     dailyDate: '2026-07-22',
     linksCategory: 'AI',
     commonLinksFavorites: [favoriteId],
-    realtime: false
+    realtime: false,
+    closeToTray: false
   };
   const result = Bootstrap.resolveInitialUiPreferences({
     desktop: null,
@@ -236,7 +252,8 @@ test('browser preferences safely fall back to all readable legacy selections aft
     dailyDate: null,
     linksCategory: CommonLinks.ALL_CATEGORY,
     commonLinksFavorites: [favoriteId],
-    realtime: false
+    realtime: false,
+    closeToTray: false
   });
   assert.equal(result.migrationPatch, null);
 });
