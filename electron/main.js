@@ -1,6 +1,18 @@
 'use strict';
 // Electron 主进程 —— 用内置 Node（utilityProcess）跑后端子进程，无需用户另装 Node；加载本地页面
-const { app, BrowserWindow, shell, utilityProcess, ipcMain, dialog, session, safeStorage } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  Notification,
+  Tray,
+  shell,
+  utilityProcess,
+  ipcMain,
+  dialog,
+  session,
+  safeStorage
+} = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
@@ -10,6 +22,8 @@ const {
   registerUiPreferencesIpc,
   loadUiPreferencesStore
 } = require('./ui-preferences-ipc');
+const { createBackgroundModeController } = require('./background-mode');
+const { registerDesktopSettingsIpc } = require('./desktop-settings-ipc');
 const { focusExistingWindow, createServerProcessController } = require('./server-process');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
@@ -24,6 +38,7 @@ let backendReady = false;
 let quitAfterShutdown = false;
 let desktopShutdownPromise = null;
 let uiPreferencesStore = null;
+let backgroundMode = null;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
   ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
   : null;
@@ -44,7 +59,9 @@ function getDataDir() {
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
-else app.on('second-instance', () => focusExistingWindow(win));
+else app.on('second-instance', () => {
+  backgroundMode?.showMainWindow() || focusExistingWindow(win);
+});
 
 function reportUnexpectedServerExit({ code, signal }) {
   if (!backendReady || quitAfterShutdown) return;
@@ -160,6 +177,7 @@ function isAllowedExternalUrl(value) {
 
 async function createWindow(serverPort) {
   const expectedOrigin = `http://127.0.0.1:${serverPort}`;
+  const startHidden = backgroundMode?.shouldStartHidden(process.argv) === true;
   win = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -168,6 +186,7 @@ async function createWindow(serverPort) {
     backgroundColor: '#04060e',
     title: '摘星阁 · 低空经济与商业航天情报站',
     autoHideMenuBar: true,
+    show: !startHidden,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -177,6 +196,9 @@ async function createWindow(serverPort) {
       allowRunningInsecureContent: false,
       preload: path.join(__dirname, 'preload.js')
     }
+  });
+  win.on('close', event => {
+    backgroundMode?.handleWindowClose(event);
   });
 
   // 外链一律用系统浏览器打开
@@ -247,6 +269,10 @@ function setupAutoUpdate() {
 ipcMain.handle('update:install', () => { try { autoUpdater && autoUpdater.quitAndInstall(); } catch {} });
 ipcMain.on('app:get-version', event => { event.returnValue = app.getVersion(); });
 registerUiPreferencesIpc({ ipcMain, getStore: () => uiPreferencesStore });
+registerDesktopSettingsIpc({
+  ipcMain,
+  getController: () => backgroundMode
+});
 
 async function chooseLegacyDatabase() {
   const result = await dialog.showMessageBox({
@@ -273,6 +299,20 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   });
   const dataDir = getDataDir();
   uiPreferencesStore = await loadUiPreferencesStore({ directory: dataDir });
+  backgroundMode = createBackgroundModeController({
+    app,
+    Tray,
+    Menu,
+    Notification,
+    getWindow: () => win,
+    preferenceStore: uiPreferencesStore,
+    iconPath: app.isPackaged
+      ? path.join(process.resourcesPath, 'tray-icon.ico')
+      : path.join(__dirname, '..', 'build', 'icon.ico'),
+    isQuitting: () => quitAfterShutdown,
+    requestQuit: () => app.quit()
+  });
+  await backgroundMode.initialize();
   const credentialStore = createCredentialStore({ safeStorage, directory: dataDir });
   await credentialStore.migratePlaintextSettings(path.join(dataDir, 'settings.json'));
   const initialApiKey = await credentialStore.get();
@@ -313,5 +353,6 @@ app.on('before-quit', event => {
   });
 });
 app.on('will-quit', () => {
+  backgroundMode?.dispose();
   if (autoUpdateTimer) clearInterval(autoUpdateTimer);
 });

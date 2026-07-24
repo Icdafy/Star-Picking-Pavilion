@@ -29,7 +29,8 @@ test('packaging config is a production allowlist with no broad glob or asar unpa
   assert.deepEqual(packageJson.build.electronLanguages, ['zh-CN', 'en-US']);
   assert.deepEqual(packageJson.build.extraResources, [
     { from: 'LICENSE', to: 'LICENSE.txt' },
-    { from: 'THIRD_PARTY_NOTICES.txt', to: 'THIRD_PARTY_NOTICES.txt' }
+    { from: 'THIRD_PARTY_NOTICES.txt', to: 'THIRD_PARTY_NOTICES.txt' },
+    { from: 'build/icon.ico', to: 'tray-icon.ico' }
   ]);
   assert.equal(packageJson.build.nsis.license, 'LICENSE');
   assert.equal(packageJson.scripts['verify:package'], 'node scripts/verify-package.js');
@@ -88,7 +89,12 @@ test('package verifier requires the application license and third-party notices 
   assert.throws(() => assertRequiredLegalResources(() => 'wrong content'), /LICENSE/);
 
   assert.doesNotThrow(() => assertAllowedResourceEntries([
-    'app.asar', 'app-update.yml', 'elevate.exe', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt'
+    'app.asar',
+    'app-update.yml',
+    'elevate.exe',
+    'LICENSE.txt',
+    'THIRD_PARTY_NOTICES.txt',
+    'tray-icon.ico'
   ]));
   assert.throws(() => assertAllowedResourceEntries(['app.asar', 'copied-user-data.db']), /copied-user-data/);
 });

@@ -20,6 +20,7 @@ const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
 const MAX_GRACEFUL_CLOSE_MS = 4_000;
 const EXPECTED_UI_PREFERENCE_KEYS = [
   'category',
+  'closeToTray',
   'commonLinksFavorites',
   'dailyDate',
   'domain',
@@ -51,6 +52,19 @@ async function waitForExit(child, timeoutMs = 10_000, description = 'Electron pr
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+async function waitForWindowVisibility(electronApp, expected, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  let actual = null;
+  while (Date.now() < deadline) {
+    actual = await electronApp.evaluate(
+      ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() ?? null
+    );
+    if (actual === expected) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.equal(actual, expected, `window visibility did not become ${expected}`);
 }
 
 async function closeElectronGracefully(app, child, description) {
@@ -608,7 +622,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
       category: '政策法规',
       dailyDate: savedDailyDate,
       linksCategory: 'AI',
-      realtime: false
+      realtime: false,
+      closeToTray: false
     }
   });
 
@@ -632,6 +647,20 @@ test('real Electron desktop flow is secure, persistent across restart and single
   assert.equal(await firstPage.evaluate(() => window.__sppJavascriptExecuted), false);
   assert.equal(firstApp.windows().length, 1);
 
+  const backgroundSnapshot = await firstPage.evaluate(() => (
+    window.starPickingPavilion.updateDesktopSettings({ closeToTray: true })
+  ));
+  assert.equal(backgroundSnapshot.closeToTray, true);
+  await waitForJson(
+    path.join(dataDir, 'ui-preferences.json'),
+    preferences => preferences.closeToTray === true
+  );
+  await firstApp.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].close();
+  });
+  await waitForWindowVisibility(firstApp, false);
+  assert.equal(firstProcess.exitCode, null);
+
   singleInstanceProcess = spawn(require('electron'), ['.'], {
     cwd: projectRoot,
     env,
@@ -645,6 +674,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   );
   assert.equal(singleInstanceExitCode, 0);
   assert.equal(firstApp.windows().length, 1);
+  await waitForWindowVisibility(firstApp, true);
   singleInstanceProcess = null;
 
   firstCloseMs = await closeElectronGracefully(firstApp, firstProcess, 'first Electron app');
@@ -656,10 +686,26 @@ test('real Electron desktop flow is secure, persistent across restart and single
   });
   await listen(portBlocker, { host: '127.0.0.1', port: firstPort, exclusive: true });
 
-  secondApp = await electron.launch({ args: ['.'], cwd: projectRoot, env });
+  secondApp = await electron.launch({ args: ['.', '--hidden'], cwd: projectRoot, env });
   const secondProcess = secondApp.process();
   const secondPage = await secondApp.firstWindow();
   await secondPage.waitForSelector('.tab[data-view="links"][aria-selected="true"]');
+  await waitForWindowVisibility(secondApp, false);
+
+  singleInstanceProcess = spawn(require('electron'), ['.'], {
+    cwd: projectRoot,
+    env,
+    stdio: 'ignore',
+    windowsHide: true
+  });
+  const [hiddenInstanceExitCode] = await waitForExit(
+    singleInstanceProcess,
+    10_000,
+    'hidden second Electron instance'
+  );
+  assert.equal(hiddenInstanceExitCode, 0);
+  await waitForWindowVisibility(secondApp, true);
+  singleInstanceProcess = null;
 
   const secondOrigin = await secondPage.evaluate(() => location.origin);
   const secondPort = Number(new URL(secondOrigin).port);
@@ -698,7 +744,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
       category: '政策法规',
       dailyDate: savedDailyDate,
       linksCategory: 'AI',
-      realtime: false
+      realtime: false,
+      closeToTray: true
     }
   });
   assert.equal(

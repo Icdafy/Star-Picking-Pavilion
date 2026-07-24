@@ -77,12 +77,35 @@ test('desktop lifecycle is single-instance and shuts the utility process down co
   const lockIndex = source.indexOf('requestSingleInstanceLock()');
   const readyIndex = source.indexOf('app.whenReady()');
   assert.ok(lockIndex >= 0 && lockIndex < readyIndex);
-  assert.match(source, /app\.on\('second-instance', \(\) => focusExistingWindow\(win\)\)/);
+  assert.match(source, /app\.on\('second-instance'/);
   assert.match(source, /createServerProcessController\(serverProc/);
   assert.match(source, /shutdownTimeoutMs:\s*5_000/);
   assert.match(source, /if \(serverController\) await serverController\.shutdown\(\)/);
   assert.match(source, /app\.on\('before-quit', event => \{[\s\S]*event\.preventDefault\(\)/);
   assert.doesNotMatch(source, /window-all-closed[\s\S]{0,120}serverProc\.kill/);
+});
+
+test('main process assembles background mode after preferences and before the window', () => {
+  assert.match(source, /\bTray\b/);
+  assert.match(source, /\bMenu\b/);
+  assert.match(source, /\bNotification\b/);
+  assert.match(source, /registerDesktopSettingsIpc/);
+  assert.match(source, /createBackgroundModeController/);
+  assert.match(source, /backgroundMode\.initialize\(\)/);
+  assert.match(source, /backgroundMode\?\.handleWindowClose\(event\)/);
+  assert.match(source, /backgroundMode\?\.shouldStartHidden\(process\.argv\)/);
+  assert.match(source, /backgroundMode\?\.dispose\(\)/);
+  assert.match(
+    source,
+    /backgroundMode\?\.showMainWindow\(\)\s*\|\|\s*focusExistingWindow\(win\)/
+  );
+
+  const loadPreferences = source.indexOf('uiPreferencesStore = await loadUiPreferencesStore');
+  const initializeBackground = source.indexOf('await backgroundMode.initialize()', loadPreferences);
+  const createWindow = source.indexOf('await createWindow(serverPort)', initializeBackground);
+  assert.ok(loadPreferences >= 0);
+  assert.ok(initializeBackground > loadPreferences);
+  assert.ok(createWindow > initializeBackground);
 });
 
 test('HTTP request-target parsing is covered by the server error boundary', () => {

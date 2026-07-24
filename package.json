@@ -68,6 +68,10 @@
       {
         "from": "THIRD_PARTY_NOTICES.txt",
         "to": "THIRD_PARTY_NOTICES.txt"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "tray-icon.ico"
       }
     ],
     "electronLanguages": [

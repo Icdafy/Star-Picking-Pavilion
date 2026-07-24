@@ -19,7 +19,8 @@ const ALLOWED_RESOURCE_ENTRIES = new Set([
   'app-update.yml',
   'elevate.exe',
   'LICENSE.txt',
-  'THIRD_PARTY_NOTICES.txt'
+  'THIRD_PARTY_NOTICES.txt',
+  'tray-icon.ico'
 ]);
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
