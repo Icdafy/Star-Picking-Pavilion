@@ -1,7 +1,7 @@
 {
   "name": "star-picking-pavilion",
   "productName": "摘星阁",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "摘星阁（Star-Picking-Pavilion）· 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
   "author": "摘星阁",
   "license": "MIT",
@@ -13,7 +13,7 @@
   "main": "electron/main.js",
   "scripts": {
     "test": "node --test --test-concurrency=4 test/*.test.js",
-    "test:e2e": "node --test test/e2e/*.test.js",
+    "test:e2e": "node --test --test-concurrency=1 test/e2e/*.test.js",
     "start": "electron .",
     "server": "node server/index.js",
     "pipeline": "node scripts/run-pipeline.js",
