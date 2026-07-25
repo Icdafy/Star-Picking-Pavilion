@@ -17,7 +17,7 @@
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.0.9
+npm run verify:version -- --tag v0.0.10
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -26,30 +26,30 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.0.9 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.0.9.exe
+npm run verify:version -- --tag v0.0.10 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.0.10.exe
 ```
 
-v0.0.9 的签名状态预期为 `NotSigned`。ASAR 必须小于 18 MiB，安装包必须小于 120 MiB（v0.0.8 起随包内置思源黑体，约 4.6 MiB）。
+v0.0.10 的签名状态预期为 `NotSigned`。ASAR 必须小于 18 MiB，安装包必须小于 120 MiB（v0.0.8 起随包内置思源黑体，约 4.6 MiB）。
 
 ## 版本与 tag
 
 版本采用 SemVer。`package.json`、tag、安装包文件名和 `latest.yml` 必须一致。创建 tag 前先运行版本校验：
 
 ```powershell
-npm run verify:version -- --tag v0.0.9
-git tag -a v0.0.9 -m "摘星阁 v0.0.9"
-git push origin v0.0.9
+npm run verify:version -- --tag v0.0.10
+git tag -a v0.0.10 -m "摘星阁 v0.0.10"
+git push origin v0.0.10
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.0.9 Release 应包含：
+v0.0.10 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.0.9.exe`
-- `Star-Picking-Pavilion-Setup-0.0.9.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.0.10.exe`
+- `Star-Picking-Pavilion-Setup-0.0.10.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`

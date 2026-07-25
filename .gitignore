@@ -5,7 +5,7 @@ dist/
 .claude/
 .worktrees/
 .playwright-cli/
-output/playwright/
+output/
 *.db
 *.db-shm
 *.db-wal

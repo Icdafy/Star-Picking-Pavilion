@@ -230,7 +230,7 @@ test('日报导出返回可直接落盘的文件名与两种格式的正文', as
   assert.match(markdown.content, new RegExp(`^# 摘星阁 · 情报日报 ${date}\n`));
   assert.match(markdown.content, /## 政策法规/);
   assert.match(markdown.content, /\*\*\[当日头条级情报\]\(https:\/\/example\.com\//);
-  assert.match(markdown.content, /由 摘星阁 v0\.0\.9 生成/);
+  assert.match(markdown.content, /由 摘星阁 v0\.0\.10 生成/);
   assert.doesNotMatch(markdown.content, /窗口外的情报/);
 
   const text = await getJson(server, `/api/export?kind=daily&date=${date}&format=text`);
