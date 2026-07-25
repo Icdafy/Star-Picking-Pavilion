@@ -10,8 +10,12 @@
     'featured', 'hot', 'all', 'starred', 'daily', 'links', 'sources', 'settings'
   ]);
   const DOMAINS = new Set(['', 'lowaltitude', 'aerospace']);
+  // 界面缩放档位。存的是档位名而不是倍率数字：倍率写死在 CSS 的
+  // :root[data-ui-scale=…] 里，将来调比例只改样式表，不必迁移用户已存的偏好。
+  const TEXT_SCALES = new Set(['sm', 'md', 'lg', 'xl']);
   const UI_PREFERENCE_FIELDS = Object.freeze([
     'theme',
+    'textScale',
     'view',
     'domain',
     'category',
@@ -64,6 +68,7 @@
   function getDefaultUiPreferences(commonLinks) {
     return {
       theme: 'dark',
+      textScale: 'md',
       view: 'featured',
       domain: '',
       category: '',
@@ -112,6 +117,12 @@
 
     return {
       theme: chooseValue(source.theme, secondary.theme, value => THEMES.has(value), defaults.theme),
+      textScale: chooseValue(
+        source.textScale,
+        secondary.textScale,
+        value => TEXT_SCALES.has(value),
+        defaults.textScale
+      ),
       view: chooseValue(source.view, secondary.view, value => VIEWS.has(value), defaults.view),
       domain: chooseValue(source.domain, secondary.domain, value => DOMAINS.has(value), defaults.domain),
       category: chooseValue(
@@ -150,6 +161,7 @@
 
   function isValidUiPreferenceValue(field, value, commonLinks, { today } = {}) {
     if (field === 'theme') return THEMES.has(value);
+    if (field === 'textScale') return TEXT_SCALES.has(value);
     if (field === 'view') return VIEWS.has(value);
     if (field === 'domain') return DOMAINS.has(value);
     if (field === 'category') return isValidCategory(value);
@@ -192,6 +204,7 @@
 
   return Object.freeze({
     UI_PREFERENCE_FIELDS,
+    TEXT_SCALES: Object.freeze([...TEXT_SCALES]),
     isPlainObject,
     isRealDateString,
     formatLocalDate,

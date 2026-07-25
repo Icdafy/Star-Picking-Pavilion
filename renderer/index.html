@@ -8,6 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <script src="ui-preference-schema.js"></script>
 <script src="bootstrap.js"></script>
+<link rel="stylesheet" href="fonts/source-han-sans-sc/index.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -244,7 +245,7 @@
         </label>
         <div class="btn-row"><button class="btn-primary" id="btnSaveCollect">保存</button></div>
         <p class="hint">日报每天 08:05 自动生成。信源等级 T1（官方一手）/T1.5（官方社媒）/T2（媒体聚合）影响计分权重。填入 RSSHub 地址后，可把公众号 / 媒体经 RSSHub 转成 RSS 接入（信源页提报 <code>rsshub://路由</code> 即可）。</p>
-        <h3 style="margin-top:24px">情报备忘 <span class="muted">仅存本机</span></h3>
+        <h3 style="margin-top:1.5rem">情报备忘 <span class="muted">仅存本机</span></h3>
         <label class="field"><span>问题、建议或随手笔记</span>
           <textarea id="feedbackText" rows="3" placeholder="记录在本地情报库中，随时可以回看和删除"></textarea>
         </label>
@@ -299,6 +300,20 @@
         <p class="hint">两项默认关闭且相互独立。托盘菜单始终提供“退出摘星阁”。</p>
       </div>
       <div class="glass card-pad">
+        <h3>显示与排版 <span class="muted">立即生效</span></h3>
+        <div class="field">
+          <span>界面缩放</span>
+          <div class="scale-options" id="textScaleOptions" role="group" aria-label="界面缩放档位">
+            <button class="scale-option" type="button" data-text-scale="sm" aria-pressed="false">小</button>
+            <button class="scale-option" type="button" data-text-scale="md" aria-pressed="true">标准</button>
+            <button class="scale-option" type="button" data-text-scale="lg" aria-pressed="false">大</button>
+            <button class="scale-option" type="button" data-text-scale="xl" aria-pressed="false">特大</button>
+          </div>
+        </div>
+        <p class="hint">调的是整套版面的比例尺，不只是字号：字号、行距、留白、圆角、栏宽按同一比例一起变，所以放大之后版面不会散架。也可以随时用 <code>Ctrl</code> <code>+</code> / <code>Ctrl</code> <code>-</code> 增减，<code>Ctrl</code> <code>0</code> 回到标准档。</p>
+        <p class="hint">正文中文用<b>思源黑体</b>、英文与数字用 <b>Times New Roman</b>，字体随安装包内置，不依赖本机是否装过中文字体。</p>
+      </div>
+      <div class="glass card-pad">
         <h3>键盘快捷键 <span class="muted">全局生效</span></h3>
         <ul class="shortcut-list">
           <li><span>聚焦检索框</span><kbd>/</kbd><kbd>Ctrl</kbd><kbd>K</kbd></li>
@@ -307,6 +322,9 @@
           <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
           <li><span>复制当前列表为文本</span><kbd>Alt</kbd><kbd>C</kbd></li>
+          <li><span>放大界面</span><kbd>Ctrl</kbd><kbd>+</kbd></li>
+          <li><span>缩小界面</span><kbd>Ctrl</kbd><kbd>-</kbd></li>
+          <li><span>界面缩放回到标准档</span><kbd>Ctrl</kbd><kbd>0</kbd></li>
           <li><span>回到顶部</span><kbd>Home</kbd></li>
         </ul>
         <p class="hint">在输入框内录入文字时，除 <code>Esc</code> 外的快捷键不会被触发。</p>

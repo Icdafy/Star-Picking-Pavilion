@@ -35,6 +35,7 @@ test('default preferences have the complete version 1 shape and are deeply isola
   assert.deepEqual(DEFAULT_UI_PREFERENCES, {
     version: 1,
     theme: 'dark',
+    textScale: 'md',
     view: 'featured',
     domain: '',
     category: '',
@@ -60,6 +61,7 @@ test('normalizes every supported field and discards unknown fields', () => {
   const normalized = normalizeUiPreferences({
     version: 999,
     theme: 'light',
+    textScale: 'lg',
     view: 'daily',
     domain: 'aerospace',
     category: '商业航天',
@@ -75,6 +77,7 @@ test('normalizes every supported field and discards unknown fields', () => {
   assert.deepEqual(normalized, {
     version: 1,
     theme: 'light',
+    textScale: 'lg',
     view: 'daily',
     domain: 'aerospace',
     category: '商业航天',
@@ -91,6 +94,7 @@ test('normalizes every supported field and discards unknown fields', () => {
 test('invalid scalar values fall back to defaults', () => {
   const normalized = normalizeUiPreferences({
     theme: 'system',
+    textScale: 'huge',
     view: 'archive',
     domain: 'other',
     category: `bad\u0000text`,

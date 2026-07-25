@@ -26,6 +26,7 @@ const EXPECTED_UI_PREFERENCE_KEYS = [
   'domain',
   'linksCategory',
   'realtime',
+  'textScale',
   'theme',
   'version',
   'view'

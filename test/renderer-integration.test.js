@@ -140,6 +140,7 @@ test('desktop stored preference snapshot defensively becomes the complete initia
       hasStoredPreferences: true,
       preferences: {
         theme: 'light',
+        textScale: 'xl',
         view: 'links',
         domain: 'aerospace',
         category: '政策',
@@ -159,6 +160,7 @@ test('desktop stored preference snapshot defensively becomes the complete initia
 
   assert.deepEqual(result.preferences, {
     theme: 'light',
+    textScale: 'xl',
     view: 'links',
     domain: 'aerospace',
     category: '政策',
@@ -189,6 +191,7 @@ test('desktop without stored preferences creates one complete legacy migration p
 
   assert.deepEqual(result.preferences, {
     theme: 'light',
+    textScale: 'md',
     view: 'featured',
     domain: '',
     category: '',
@@ -206,6 +209,7 @@ test('browser preferences restore every meaningful field from one namespaced JSO
   const favoriteId = CommonLinks.LINKS[0].id;
   const storedPreferences = {
     theme: 'light',
+    textScale: 'lg',
     view: 'daily',
     domain: 'lowaltitude',
     category: '产业',
@@ -246,6 +250,7 @@ test('browser preferences safely fall back to all readable legacy selections aft
 
   assert.deepEqual(result.preferences, {
     theme: 'light',
+    textScale: 'md',
     view: 'featured',
     domain: '',
     category: '',

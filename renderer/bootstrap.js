@@ -9,11 +9,10 @@
     module.exports = api;
   } else if (root) {
     root.StarPickingPavilionBootstrap = api;
-    api.initializeTheme(
-      api.getSafeStorage(root),
-      root.document,
-      root.starPickingPavilion?.preferences
-    );
+    const storage = api.getSafeStorage(root);
+    const desktopPreferences = root.starPickingPavilion?.preferences;
+    api.initializeTheme(storage, root.document, desktopPreferences);
+    api.initializeTextScale(storage, root.document, desktopPreferences);
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createBootstrap(Schema) {
   if (!Schema) throw new Error('UI preference schema is required');
@@ -221,12 +220,31 @@
     return theme;
   }
 
+  // 与主题同理：缩放档位必须在样式表生效前就写到 <html> 上，否则界面会先按
+  // 标准档画一帧再跳到用户的档位，整页跟着抖一下。
+  function initializeTextScale(storage, document, desktopPreferences) {
+    const isValid = value => Schema.isValidUiPreferenceValue('textScale', value);
+    let scale = null;
+    if (desktopPreferences && isValid(desktopPreferences.textScale)) {
+      scale = desktopPreferences.textScale;
+    } else {
+      try {
+        const stored = readBrowserUiPreferences(storage).textScale;
+        if (isValid(stored)) scale = stored;
+      } catch { /* localStorage may be unavailable; retain the safe default */ }
+    }
+    if (!isValid(scale)) scale = 'md';
+    document.documentElement.dataset.uiScale = scale;
+    return scale;
+  }
+
   return Object.freeze({
     STORAGE_KEYS,
     LEGACY_STORAGE_KEYS,
     getSafeStorage,
     migrateStorage,
     initializeTheme,
+    initializeTextScale,
     readBrowserUiPreferences,
     normalizeUiPreferences: Schema.normalizeUiPreferences,
     resolveInitialUiPreferences,

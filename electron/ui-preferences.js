@@ -63,6 +63,17 @@ function validatePatch(patch, today) {
     throw new TypeError('theme must be light or dark');
   }
   if (
+    Object.hasOwn(patch, 'textScale')
+    && !UiPreferenceSchema.isValidUiPreferenceValue(
+      'textScale',
+      patch.textScale,
+      CommonLinks,
+      { today }
+    )
+  ) {
+    throw new TypeError('textScale must be sm, md, lg or xl');
+  }
+  if (
     Object.hasOwn(patch, 'view')
     && !UiPreferenceSchema.isValidUiPreferenceValue('view', patch.view, CommonLinks, { today })
   ) {

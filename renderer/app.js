@@ -24,6 +24,7 @@ const restoredPreferences = initialPreferences.preferences;
 // ---------- 状态 ----------
 const state = {
   theme: restoredPreferences.theme,
+  textScale: restoredPreferences.textScale,   // sm | md | lg | xl —— 整套版面的比例尺
   view: restoredPreferences.view,  // featured | hot | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,
@@ -66,6 +67,36 @@ function toggleTheme() {
   applyTheme(cur === 'light' ? 'dark' : 'light');
 }
 $('#btnTheme').addEventListener('click', toggleTheme);
+
+// ---------- 界面缩放 ----------
+// 档位只写到 <html data-ui-scale> 上，倍率与全部尺寸由 CSS 的 rem 体系派生，
+// 所以这里不需要逐个元素改字号——字号、行距、留白、圆角、栏宽是一起动的。
+const TEXT_SCALES = ['sm', 'md', 'lg', 'xl'];
+function applyTextScale(scale, { persist = true } = {}) {
+  if (!TEXT_SCALES.includes(scale)) return;
+  state.textScale = scale;
+  document.documentElement.dataset.uiScale = scale;
+  $$('[data-text-scale]').forEach(button => {
+    const on = button.dataset.textScale === scale;
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-pressed', String(on));
+  });
+  // 缩放会改变导航条高度与标签位置，粘顶偏移和指示块要跟着重算
+  syncNavHeight();
+  syncTabIndicator();
+  if (persist) preferenceActions.remember('textScale', scale);
+}
+function stepTextScale(delta) {
+  const next = TEXT_SCALES[TEXT_SCALES.indexOf(state.textScale) + delta];
+  if (!next) return;
+  applyTextScale(next);
+  toast(`界面缩放：${TEXT_SCALE_LABELS[next]}`);
+}
+const TEXT_SCALE_LABELS = { sm: '小', md: '标准', lg: '大', xl: '特大' };
+$('#textScaleOptions').addEventListener('click', event => {
+  const button = event.target.closest('[data-text-scale]');
+  if (button) applyTextScale(button.dataset.textScale);
+});
 
 // ---------- 工具 ----------
 async function api(path, opts) {
@@ -1084,7 +1115,9 @@ $$('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.v
 
 function setDomain(domain, { persist = true, load = true } = {}) {
   state.domain = domain;
-  $$('.pill').forEach(pill => {
+  // 选择器必须限定在领域胶囊内：页面上还有别处用同一视觉形态的按钮（如设置页的
+  // 缩放档位），全局抓 .pill 会把它们的选中态一起清掉，还会给它们绑上领域筛选。
+  $$('.domain-pills .pill').forEach(pill => {
     const on = pill.dataset.domain === domain;
     pill.classList.toggle('active', on);
     pill.setAttribute('aria-pressed', String(on));
@@ -1096,7 +1129,7 @@ function setDomain(domain, { persist = true, load = true } = {}) {
   }
 }
 
-$$('.pill').forEach(p => p.addEventListener('click', () => setDomain(p.dataset.domain)));
+$$('.domain-pills .pill').forEach(p => p.addEventListener('click', () => setDomain(p.dataset.domain)));
 
 // 分类 chips
 async function initCategories() {
@@ -1369,6 +1402,13 @@ document.addEventListener('keydown', event => {
     }
     return;
   }
+  // 缩放快捷键放在「是否正在输入」判定之前：Ctrl +/- 是全局手势，
+  // 光标停在检索框里时也该管用。
+  if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+    if (event.key === '=' || event.key === '+') { stepTextScale(1); event.preventDefault(); return; }
+    if (event.key === '-' || event.key === '_') { stepTextScale(-1); event.preventDefault(); return; }
+    if (event.key === '0') { applyTextScale('md'); toast('界面缩放：标准'); event.preventDefault(); return; }
+  }
   if (isTypingTarget(document.activeElement)) return;
   const focusesSearch = event.key === '/'
     || ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'k');
@@ -1483,6 +1523,7 @@ if (Desktop && Desktop.onUpdateStatus) {
 // ---------- 启动 ----------
 async function start() {
   applyTheme(state.theme, { persist: false });
+  applyTextScale(state.textScale, { persist: false });
   setDomain(state.domain, { persist: false, load: false });
   setRealtime(state.realtime, { persist: false });
   syncSearchBox();

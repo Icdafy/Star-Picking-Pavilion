@@ -9,7 +9,7 @@ const {
 
 const BRAND = {
   productName: '摘星阁',
-  version: '0.0.7',
+  version: '0.0.8',
   homepage: 'https://github.com/Icdafy/Star-Picking-Pavilion'
 };
 
@@ -72,7 +72,7 @@ test('Markdown 日报保留标题、分组、链接、来源与研判', () => {
   assert.match(output, /- 研判：首个全国统一口径的空域管理规则。/);
   // 多信源事件簇要在导出里保留「这条被几家报了」的信息
   assert.match(output, /质量分 71 · 4 个信源/);
-  assert.match(output, /由 摘星阁 v0\.0\.7 生成 · https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion/);
+  assert.match(output, /由 摘星阁 v0\.0\.8 生成 · https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion/);
 });
 
 test('纯文本日报把链接单独成行，不留任何 Markdown 语法', () => {

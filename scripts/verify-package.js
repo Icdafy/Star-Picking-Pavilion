@@ -3,8 +3,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const MAX_ASAR_BYTES = 12 * 1024 * 1024;
-const MAX_INSTALLER_BYTES = 110 * 1024 * 1024;
+// v0.0.8 起随包内置思源黑体（约 4.6 MiB 的 woff2 分片），上限相应抬高。
+// 这两个数的作用不是压体积，而是拦住「数据库 / 日志 / 开发依赖被顺手打进包里」
+// 这类意外膨胀，所以留的余量刚好够一次正常的功能迭代，不该随手再往上调。
+const MAX_ASAR_BYTES = 18 * 1024 * 1024;
+const MAX_INSTALLER_BYTES = 120 * 1024 * 1024;
 const ALLOWED_ROOTS = new Set([
   'electron',
   'server',

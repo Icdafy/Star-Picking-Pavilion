@@ -104,7 +104,8 @@ test('package verifier accepts only application roots, production dependencies a
     '/electron/main.js',
     '/server/index.js',
     '/renderer/index.html',
-    '/renderer/fonts/SmileySans-Oblique.woff2',
+    '/renderer/fonts/source-han-sans-sc/index.css',
+    '/renderer/fonts/source-han-sans-sc/noto-sans-sc-42-wght-normal.woff2',
     '/config/scoring.json',
     '/node_modules/cheerio/package.json',
     '/package.json'
@@ -138,6 +139,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical package version', () => {
-  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.7.exe');
+  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.8.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.version)), '.exe');
 });

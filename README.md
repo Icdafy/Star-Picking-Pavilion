@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.7.exe`，双击并按向导安装。v0.0.7 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.8.exe`，双击并按向导安装。v0.0.8 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.7.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.8.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -32,7 +32,9 @@ Get-Content .\SHA256SUMS.txt
 - 可选的 AI 五维评分、摘要与研判
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
 - 深色和浅色主题
-- 自动记住主题、最后视图、领域与分类、日报日期、常用网址分类与星标、实时更新开关
+- 中文思源黑体、英文 Times New Roman，字体随安装包内置，不依赖本机是否装过中文字体
+- 四档界面缩放（小 / 标准 / 大 / 特大，<kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd>），字号、行距、留白、圆角、栏宽等比例同步缩放
+- 自动记住主题、界面缩放档位、最后视图、领域与分类、日报日期、常用网址分类与星标、实时更新开关
 - 可选的关闭到系统托盘与 Windows 登录自动启动，两项默认关闭、可独立设置
 - 数据保留策略与本地库体积视图，过期情报连同全文索引自动清理
 - 失效信源自动退避重试，避免长期不可达的信源每轮空转
@@ -161,7 +163,7 @@ npm run server              # 独立开发服务器，默认 http://127.0.0.1:76
 npm run pipeline            # 手动采集、分析、聚类
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.7 --artifacts
+npm run verify:version -- --tag v0.0.8 --artifacts
 npm run notices
 ```
 
@@ -170,5 +172,7 @@ npm run notices
 ## 许可证与致谢
 
 项目以 [MIT License](LICENSE) 发布。生产依赖许可见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+
+内置的思源黑体（Source Han Sans SC，Google Fonts 发行名 Noto Sans SC）遵循 [SIL Open Font License 1.1](renderer/fonts/source-han-sans-sc/LICENSE)，来源与改动说明见 [renderer/fonts/README.md](renderer/fonts/README.md)。英文使用 Windows 自带的 Times New Roman，不随包分发。
 
 信息筛选理念参考 [AIHOT](https://aihot.virxact.com/)；“云幄 · 常用网址”视图来源于原云幄工作流的本地整合。
