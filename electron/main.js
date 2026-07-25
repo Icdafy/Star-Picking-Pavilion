@@ -232,10 +232,16 @@ async function createWindow(serverPort) {
     if (latestUpdateStatus) win.webContents.send('update:status', latestUpdateStatus);
   } catch (error) {
     console.error('[窗口] 页面加载失败:', error.message);
-    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
-      `<body style="background:#04060e;color:#dfe7ff;font-family:sans-serif;display:grid;place-items:center;height:100vh">
-        <div style="text-align:center"><h2>后端启动失败</h2><p>情报服务未能启动，请重启应用重试。</p>
-        <p style="opacity:.6">如果问题持续存在，请查看应用日志。</p></div></body>`));
+    // 兜底页必须走 file://。此前这里用的是 data:text/html —— Chromium 从 M60 起
+    // 就禁止顶层导航到 data: URL，这个兜底永远只会得到 ERR_FAILED；而后端 origin
+    // 恰恰是刚刚加载失败的那个，也不能再依赖它。
+    try {
+      await win.loadFile(path.join(__dirname, '..', 'renderer', 'startup-failure.html'));
+    } catch (fallbackError) {
+      // 兜底页再失败就只剩记录。绝不能让异常抛回启动链路：外层会把「界面没加载出来」
+      // 误判成「数据迁移失败」，进而弹出模态错误框——无人值守环境里那会永远阻塞。
+      console.error('[窗口] 兜底页加载失败:', fallbackError.message);
+    }
   }
 }
 
@@ -321,8 +327,14 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   await createWindow(serverPort);
 }).catch(async error => {
   if (!(error instanceof MigrationCancelledError)) {
-    console.error('[数据迁移] 启动失败:', error.message);
-    await dialog.showErrorBox('摘星阁启动失败', `无法安全准备本地数据：${error.message}`);
+    console.error('[启动] 失败:', error.message);
+    // showErrorBox 是模态阻塞调用：没有交互桌面会话时（CI、无人值守、服务账户）
+    // 它会一直挡着，进程永远退不出去——CI 上就是这样静默烧掉整个 job 预算的。
+    // 只有装机版才弹框给真人看；开发与测试环境留日志即可。
+    if (app.isPackaged) {
+      try { dialog.showErrorBox('摘星阁启动失败', `无法安全准备本地数据：${error.message}`); }
+      catch (dialogError) { console.error('[启动] 错误提示框弹出失败:', dialogError.message); }
+    }
   }
   app.quit();
 });

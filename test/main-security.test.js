@@ -17,6 +17,27 @@ test('Electron launches the service on a random port with secret token and nonce
   assert.doesNotMatch(source, /waitForServer|WINDCATCHER_PORT\s*\|\|\s*7644/);
 });
 
+test('启动失败路径不会挂住进程：兜底页走 file://、异常不外溢、无人值守不弹模态框', () => {
+  // 这三条守的是 2026-07-25 让 CI 连挂三次的那条链：
+  //   loadURL(origin) 被 abort → 兜底 data: URL 必然 ERR_FAILED（Chromium 禁止顶层
+  //   导航到 data:）→ 异常逃出 createWindow → 外层当成「数据迁移失败」→ 调用模态的
+  //   showErrorBox → 无交互桌面会话时永远阻塞 → 进程不退出 → 整个 job 预算烧光。
+  assert.doesNotMatch(source, /loadURL\(\s*'data:text\/html/);
+  assert.match(source, /loadFile\(path\.join\(__dirname, '\.\.', 'renderer', 'startup-failure\.html'\)\)/);
+  assert.equal(
+    fs.existsSync(path.join(__dirname, '..', 'renderer', 'startup-failure.html')),
+    true,
+    '兜底页必须随包存在，否则 file:// 也加载不出来'
+  );
+
+  // 兜底失败必须就地吞掉，不能抛回启动链路
+  assert.match(source, /catch \(fallbackError\) \{[\s\S]{0,200}?console\.error\('\[窗口\] 兜底页加载失败:'/);
+
+  // 模态错误框只在装机版弹；开发与 CI 留日志
+  assert.match(source, /if \(app\.isPackaged\) \{[\s\S]{0,200}?dialog\.showErrorBox\(/);
+  assert.doesNotMatch(source, /await dialog\.showErrorBox\(/);
+});
+
 test('Electron injects authentication only into the exact loopback API origin', () => {
   assert.match(source, /onBeforeSendHeaders/);
   assert.match(source, /x-star-picking-pavilion-token/);
