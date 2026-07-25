@@ -25,7 +25,11 @@ function request({ port, method = 'GET', pathname = '/', headers = {}, body }) {
   });
 }
 
-async function startServer(t, { token = 'test-launch-token', nonce = 'test-ready-nonce' } = {}) {
+async function startServer(t, {
+  token = 'test-launch-token',
+  nonce = 'test-ready-nonce',
+  readyTimeoutMs = 30_000
+} = {}) {
   const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-server-'));
   const child = spawn(process.execPath, [path.join(projectRoot, 'server', 'index.js')], {
     cwd: projectRoot,
@@ -40,11 +44,35 @@ async function startServer(t, { token = 'test-launch-token', nonce = 'test-ready
     stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   });
 
+  // 清理必须在「等待就绪」之前注册。就绪超时会让 startServer 直接抛出，
+  // 若把 t.after 放在 await 之后，那条失败路径上根本不会注册清理：后端子进程
+  // 成为孤儿，而它握着 IPC 通道与 stdio 管道，测试运行器永远等不到自己退出。
+  // 结果就是「一条用例超时失败」被放大成「整轮静默挂死」——CI 上表现为跑到一半
+  // 再无输出，直到 job 撞上 timeout-minutes 被砍。
+  // 用一个标志位记录退出，而不是查 child.exitCode：被信号杀掉的进程 exitCode 恒为
+  // null（信号记在 signalCode 上），照着 exitCode 判断会去 await 一个已经发生过的
+  // 'exit' 事件，然后永远等下去。
+  let exited = child.exitCode !== null || child.signalCode !== null;
+  child.once('exit', () => { exited = true; });
+
+  t.after(async () => {
+    if (!exited) {
+      child.kill();
+      await new Promise(resolve => {
+        if (exited) return resolve();
+        child.once('exit', resolve);
+      });
+    }
+    await fs.promises.rm(dataDir, { recursive: true, force: true });
+  });
+
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk; });
 
   const ready = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`server ready timeout\n${stderr}`)), 10_000);
+    // 后端启动要开库、跑迁移、同步一百多个种子信源；CI 上还叠着 4 路测试并发，
+    // 10 秒在双核 runner 上会被正常启动摸到。放宽到 30 秒，只用于兜住真正的卡死。
+    const timeout = setTimeout(() => reject(new Error(`server ready timeout\n${stderr}`)), readyTimeoutMs);
     let stdout = '';
     child.stdout.on('data', chunk => {
       stdout += chunk;
@@ -59,12 +87,6 @@ async function startServer(t, { token = 'test-launch-token', nonce = 'test-ready
       clearTimeout(timeout);
       reject(new Error(`server exited before ready (${code})\n${stderr}`));
     });
-  });
-
-  t.after(async () => {
-    if (child.exitCode == null) child.kill();
-    if (child.exitCode == null) await new Promise(resolve => child.once('exit', resolve));
-    await fs.promises.rm(dataDir, { recursive: true, force: true });
   });
 
   assertReadyMessage(ready, nonce);
