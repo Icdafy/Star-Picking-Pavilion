@@ -43,6 +43,10 @@ function argumentValue(args, name) {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function hasStrictAuditFailure(summary) {
+  return Number(summary?.counts?.empty) > 0 || Number(summary?.counts?.failed) > 0;
+}
+
 async function runAudit(options = {}) {
   const priorDataDir = process.env.STAR_PICKING_PAVILION_DATA_DIR;
   const temporary = !priorDataDir;
@@ -74,7 +78,7 @@ if (require.main === module) {
   runAudit({ output: argumentValue(process.argv.slice(2), '--output') })
     .then(summary => {
       console.log(JSON.stringify(summary, null, 2));
-      if (process.argv.includes('--strict') && summary.counts.failed > 0) process.exitCode = 1;
+      if (process.argv.includes('--strict') && hasStrictAuditFailure(summary)) process.exitCode = 1;
     })
     .catch(error => {
       console.error(error);
@@ -82,4 +86,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { runAudit, summarizeSourceResults };
+module.exports = { hasStrictAuditFailure, runAudit, summarizeSourceResults };
