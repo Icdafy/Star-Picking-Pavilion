@@ -153,6 +153,8 @@ test('CI and tag release workflows enforce every gate before publishing', () => 
 
 test('package exposes reproducible release maintenance commands', () => {
   const pkg = require('../package.json');
+  assert.equal(pkg.scripts.test, 'node --test --test-concurrency=4 test/*.test.js');
+  assert.equal(pkg.scripts['audit:sources'], 'node scripts/audit-sources.js');
   assert.equal(pkg.scripts['verify:version'], 'node scripts/verify-version.js');
   assert.equal(pkg.scripts.notices, 'node scripts/generate-third-party-notices.js');
   assert.equal(pkg.devDependencies['@cyclonedx/cyclonedx-npm'], '^6.0.0');

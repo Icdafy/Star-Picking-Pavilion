@@ -13,6 +13,7 @@ process.env.STAR_PICKING_PAVILION_DATA_DIR = dataDir;
 
 const { db } = require('../server/db');
 const { applySourceMigrations } = require('../server/collectors');
+const seed = require('../config/sources.default.json');
 
 test.after(() => {
   try { require('../server/db').closeDatabase(); } catch {}
@@ -33,6 +34,19 @@ function insertSource(overrides = {}) {
 }
 
 const byId = id => db.prepare('SELECT * FROM sources WHERE id = ?').get(id);
+
+test('v6 将工信部空壳旧栏目迁移到可静态解析的新版新闻发布页', () => {
+  const oldUrl = 'https://www.miit.gov.cn/xwdt/gxdt/sjdt/index.html';
+  const newUrl = 'https://www.miit.gov.cn/xbymdz/xwfb/';
+  const source = seed.sources.find(item => item.name === '工信部·新闻动态');
+  const migration = seed._migrations.find(item => item.from === oldUrl);
+
+  assert.equal(seed._version, 6);
+  assert.equal(source.url, newUrl);
+  assert.equal(migration.to, newUrl);
+  assert.equal(migration.name, source.name);
+  assert.deepEqual(migration.selector, source.selector);
+});
 
 test('改地址保留原有行：id、采集统计与用户的启停状态都不丢', () => {
   const id = insertSource({ url: 'https://old.test/a', name: '老名字' });

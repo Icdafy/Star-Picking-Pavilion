@@ -1,9 +1,12 @@
 {
   "_说明": "信源种子库 —— 首次启动全量导入；之后按 _version 幂等增量补新源（url 唯一，不覆盖用户改动、不复活已删项）。分级学习 AIHOT：T1=官方一手，T1.5=官方社媒/次级渠道，T2=媒体/KOL/聚合检索。type: rss=标准RSS/Atom（支持 rsshub://路由，需在设置填 RSSHub 地址） | api=公开JSON（东方财富关键词 eastmoney://关键词，可带 ?pages=N&mode=relevance|recent|both&guard=off） | html=网页爬虫（配 selector） | bing=必应资讯RSS（大陆常空）。intl:true 标记国外情报源。enabled:false 默认停用，在『信源』页一键启用。",
   "_v7变更": "v0.0.7：① 东财适配器改为相关性优先（旧版 sort=time 实测相关率仅 0–25%，全在灌噪声），并加入关键词入库守卫，故大幅扩充关键词线；② 清退实测 404/不可达的官网深链，换成探测通过的地址；③ 补入央媒与科技媒体全量 feed，靠词库预筛过滤；④ 补入公众号（RSSHub / Wechat2RSS）接入位，默认停用。所有直连型信源均在 2026-07-25 实测可达后才写入。",
-  "_version": 5,
+  "_version": 6,
   "_迁移说明": "种子库的 INSERT OR IGNORE 只会补新源，改不动老库里已有的那一行——所以修地址、修选择器、清退死源必须走 _migrations，且在补新源之前执行（否则新地址会被插成第二条，老的那条继续每轮空转）。每一步都幂等：relocate 只在『老地址还在、新地址还没有』时改写，两边都在就停用老的；retire 只停用不删除，用户的历史文章与统计原样保留，随时可在信源页手工启用。",
   "_migrations": [
+    { "from": "https://www.miit.gov.cn/xwdt/gxdt/sjdt/index.html", "to": "https://www.miit.gov.cn/xbymdz/xwfb/", "name": "工信部·新闻动态",
+      "selector": { "list": "ul li a, .list li a", "datePattern": "\\d{4}-\\d{2}-\\d{2}" },
+      "note": "工信部新版新闻发布页（旧司局动态页已改为动态加载空壳，直连无法采集正文列表）" },
     { "from": "https://www.cnsa.gov.cn/n6758823/n6758838/index.html", "to": "https://www.cnsa.gov.cn/", "name": "国家航天局·官网",
       "selector": { "list": "ul li a, .list li a", "datePattern": "\\d{4}[-年]\\d{1,2}[-月]\\d{1,2}" },
       "note": "国家航天局发布（旧版用的 n6758823 深链已不可达，改抓首页要闻区）" },
@@ -42,9 +45,9 @@
     { "name": "国家发改委·新闻发布", "type": "html", "url": "https://www.ndrc.gov.cn/xwdt/xwfb/", "tier": "T1", "domain": "both",
       "selector": { "list": "ul li a, .list li a, .u-list li a", "datePattern": "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}" },
       "note": "低空经济与商业航天的顶层规划归口部门之一" },
-    { "name": "工信部·新闻动态", "type": "html", "url": "https://www.miit.gov.cn/xwdt/gxdt/sjdt/index.html", "tier": "T1", "domain": "both",
+    { "name": "工信部·新闻动态", "type": "html", "url": "https://www.miit.gov.cn/xbymdz/xwfb/", "tier": "T1", "domain": "both",
       "selector": { "list": "ul li a, .list li a", "datePattern": "\\d{4}-\\d{2}-\\d{2}" },
-      "note": "低空经济产业政策主管部门之一" },
+      "note": "工信部新版新闻发布页，覆盖低空经济产业政策主管部门动态" },
 
     { "name": "中国航天报", "type": "html", "url": "https://www.spacechina.com/n25/n2014789/n2014809/index.html", "tier": "T1.5", "domain": "aerospace",
       "selector": { "list": "ul li a, .list li a", "datePattern": "\\d{4}-\\d{2}-\\d{2}" },

@@ -501,7 +501,7 @@ test('常用网址沿用摘星阁主题并具备响应式和交互状态', () =>
     '.common-links-card',
     '.common-links-favorite.is-active',
     '.common-links-open',
-    '@media (max-width: 720px)'
+    '@container app (max-width: 45rem)'
   ]) assert.ok(css.includes(selector), `缺少 ${selector}`);
   assert.match(css, /\.common-links-card[\s\S]*var\(--glass-border\)/);
   assert.match(css, /\.common-links-favorite\.is-active[\s\S]*var\(--c-teal\)/);

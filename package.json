@@ -12,7 +12,7 @@
   },
   "main": "electron/main.js",
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test --test-concurrency=4 test/*.test.js",
     "test:e2e": "node --test test/e2e/*.test.js",
     "start": "electron .",
     "server": "node server/index.js",
@@ -22,6 +22,7 @@
     "verify:version": "node scripts/verify-version.js",
     "notices": "node scripts/generate-third-party-notices.js",
     "audit:runtime": "npm audit --omit=dev --audit-level=high",
+    "audit:sources": "node scripts/audit-sources.js",
     "dist": "electron-builder --win --publish never"
   },
   "dependencies": {
