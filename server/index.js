@@ -27,6 +27,7 @@ const {
 } = require('./input-validation');
 const packageJson = require('../package.json');
 const { resolveStaticFile } = require('./static-files');
+const { closeHttpServerGracefully } = require('./http-close');
 const { localDateString, startOfLocalDayIso } = require('./date-time');
 const { createSettingsUpdateCoordinator } = require('./settings-persistence');
 const {
@@ -551,11 +552,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 function closeHttpServer() {
-  if (!server.listening) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    server.close(error => error ? reject(error) : resolve());
-    server.closeIdleConnections?.();
-  });
+  return closeHttpServerGracefully(server);
 }
 
 function notifyStoppedAndExit(stopped) {
