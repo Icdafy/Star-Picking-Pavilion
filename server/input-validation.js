@@ -5,8 +5,10 @@ const { HttpError } = require('./http-security');
 const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api']);
 const SOURCE_TIERS = new Set(['T1', 'T1.5', 'T2']);
 const SOURCE_DOMAINS = new Set(['both', 'lowaltitude', 'aerospace']);
-const FEED_VIEWS = new Set(['featured', 'hot', 'all']);
+const FEED_VIEWS = new Set(['featured', 'hot', 'all', 'starred']);
 const FEED_DOMAINS = new Set(['lowaltitude', 'aerospace']);
+const EXPORT_KINDS = new Set(['daily', 'feed']);
+const EXPORT_FORMATS = new Set(['markdown', 'text']);
 
 function badRequest(message) {
   throw new HttpError(400, message);
@@ -114,6 +116,23 @@ function sanitizeDate(value) {
   return value;
 }
 
+// 导出请求：kind 决定取数路径，format 决定序列化方式，两者都必须是白名单值。
+// feed 类导出复用 parseFeedQuery，因此筛选条件的校验口径与信息流完全一致。
+function parseExportQuery(query, categories) {
+  const kind = query.get('kind') || 'daily';
+  if (!EXPORT_KINDS.has(kind)) badRequest('不支持的导出类型');
+  const format = query.get('format') || 'markdown';
+  if (!EXPORT_FORMATS.has(format)) badRequest('不支持的导出格式');
+  if (kind === 'daily') return { kind, format, date: sanitizeDate(query.get('date')) };
+  return { kind, format, feed: parseFeedQuery(query, categories) };
+}
+
+function sanitizeStarInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) badRequest('星标请求体必须是对象');
+  if (typeof input.starred !== 'boolean') badRequest('星标状态必须是布尔值');
+  return { starred: input.starred };
+}
+
 function sanitizeFeedback(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) badRequest('反馈请求体必须是对象');
   const kind = input.kind ?? 'feedback';
@@ -122,4 +141,11 @@ function sanitizeFeedback(input) {
   return { kind, content };
 }
 
-module.exports = { parseFeedQuery, sanitizeDate, sanitizeFeedback, sanitizeSourceInput };
+module.exports = {
+  parseFeedQuery,
+  parseExportQuery,
+  sanitizeDate,
+  sanitizeFeedback,
+  sanitizeSourceInput,
+  sanitizeStarInput
+};

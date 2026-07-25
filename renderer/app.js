@@ -126,6 +126,71 @@ function toast(msg, isError) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
+// ---------- 剪贴板与文件导出 ----------
+// 沙箱渲染进程里 navigator.clipboard 需要用户手势，且旧内核可能缺失；
+// 失败时回退到临时 textarea + execCommand，保证「复制」这个动作永远有结果。
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* 落到下面的回退路径 */ }
+  const scratch = document.createElement('textarea');
+  scratch.value = text;
+  scratch.setAttribute('readonly', '');
+  scratch.className = 'copy-scratch';
+  document.body.appendChild(scratch);
+  scratch.select();
+  let copied = false;
+  try { copied = document.execCommand('copy'); } catch { copied = false; }
+  scratch.remove();
+  return copied;
+}
+
+// 内容安全策略是 default-src 'self'，因此不能借助任何外部服务落盘；
+// blob: 由页面自己生成，配合 a[download] 完成一次纯本地的另存为。
+function downloadText(filename, text) {
+  // 带 BOM：Windows 记事本按 UTF-8 打开中文，不会显示成乱码
+  const blob = new Blob([`\ufeff${text}`], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function exportParams(kind, format) {
+  const params = new URLSearchParams({ kind, format });
+  if (kind === 'daily') {
+    if (state.dailyDate) params.set('date', state.dailyDate);
+    return params;
+  }
+  params.set('view', state.view);
+  if (state.domain) params.set('domain', state.domain);
+  if (state.category) params.set('category', state.category);
+  if (state.q) params.set('q', state.q);
+  return params;
+}
+
+async function runExport(kind, format, mode) {
+  try {
+    const result = await api('/api/export?' + exportParams(kind, format));
+    if (mode === 'copy') {
+      const copied = await copyText(result.content);
+      toast(copied ? `已复制 ${result.count} 条到剪贴板` : '复制失败，请手动选择文本', !copied);
+      return;
+    }
+    downloadText(result.filename, result.content);
+    toast(`已导出 ${result.count} 条到 ${result.filename}`);
+  } catch (error) {
+    toast('导出失败：' + error.message, true);
+  }
+}
+
 function persistUiPreferences(patch) {
   const sanitized = Bootstrap.sanitizeUiPreferencesPatch(patch, CommonLinks, {
     today: localDateString()
@@ -159,6 +224,8 @@ const dailyRequestGuard = Bootstrap.createLatestRequestGuard();
 const feedRequestGuard = Bootstrap.createLatestRequestGuard();
 const hotRailRequestGuard = Bootstrap.createLatestRequestGuard();
 
+// 共用同一个信息流视图集合：星标要和精选/热点/全部动态一样享有筛选、导出与实时轮询
+const FEED_VIEWS = ['featured', 'hot', 'all', 'starred'];
 const DOMAIN_NAME = { lowaltitude: '低空经济', aerospace: '商业航天' };
 const DIM_NAMES = {
   importance: '重要性', novelty: '新颖度', credibility: '可信度',
@@ -192,10 +259,14 @@ async function refreshStats() {
     setStat($('#statSources'), s.sources);
     setStat($('#statToday'), s.today);
     setStat($('#statFeatured'), s.featuredToday);
+    const starredCount = $('#tabStarredCount');
+    starredCount.hidden = !s.starred;
+    starredCount.textContent = s.starred > 99 ? '99+' : String(s.starred || '');
     const busy = s.pipeline?.running;
     $('#statStatus').innerHTML = `<span class="pulse-dot${busy ? ' busy' : ''}"></span>`;
     $('#statStatusLabel').textContent = busy ? '采集中' : (s.aiConfigured ? 'AI 在线' : '启发模式');
     const banner = $('#feedBanner');
+    // 星标是用户手动收的，与 AI 是否配置无关，这里不该弹降级提示
     if (!s.aiConfigured && (state.view === 'featured' || state.view === 'hot')) {
       banner.hidden = false;
       banner.innerHTML = '当前为<b>关键词启发式</b>降级模式 —— 在『设置』中填入 DeepSeek API Key 即可启用五维 AI 评分与智能精选。';
@@ -235,9 +306,20 @@ function cardInner(item) {
     <button class="dims-toggle" type="button" aria-expanded="false">五维研判
       <svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>` : '';
-  const foot = cluster || dimsToggle
-    ? `<div class="card-foot">${cluster}${dimsToggle}</div>${cluster ? '<div class="cluster-items" hidden></div>' : ''}`
-    : '';
+  // 留存与分发的入口固定在每张卡片上：星标留给自己，复制传给别人
+  const actions = `
+    <span class="card-foot-gap"></span>
+    <button class="card-act" data-act="copy" type="button" title="复制标题与链接">
+      <svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 4.5v-1a1.5 1.5 0 0 0-1.5-1.5H3a1.5 1.5 0 0 0-1.5 1.5V8A1.5 1.5 0 0 0 3 9.5h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      复制
+    </button>
+    <button class="card-act star-toggle${item.starred ? ' is-on' : ''}" data-act="star" type="button"
+      aria-pressed="${item.starred ? 'true' : 'false'}" title="${item.starred ? '取消星标' : '星标留存（不受保留天数清理）'}">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="${item.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span class="card-act-label">${item.starred ? '已星标' : '星标'}</span>
+    </button>`;
+  const foot = `<div class="card-foot">${cluster}${dimsToggle}${actions}</div>`
+    + (cluster ? '<div class="cluster-items" hidden></div>' : '');
   const reason = item.reason ? `
     <div class="card-reason">
       <span class="cr-label"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>情报研判</span>
@@ -284,13 +366,18 @@ document.addEventListener('error', event => {
   if (event.target?.matches?.('img.card-thumb')) event.target.remove();
 }, true);
 
-// 时间轴行（精选 / 全部动态）
-function renderTimeline(items, startIdx) {
+// 时间轴的时间基准：星标视图按收藏时间排序，分组标题就必须同样用收藏时间，
+// 否则日期分组会随发布时间来回跳，出现「今天 / 3月2日 / 今天」这样的乱序标题。
+const publishedTime = item => item.publishedAt || item.fetchedAt;
+const starredTime = item => item.starredAt || item.fetchedAt;
+
+// 时间轴行（精选 / 全部动态 / 星标）
+function renderTimeline(items, startIdx, timeOf = publishedTime) {
   // 按日期分组
   const groups = [];
   let cur = null;
   for (const item of items) {
-    const label = dateLabel(item.publishedAt || item.fetchedAt);
+    const label = dateLabel(timeOf(item));
     if (!cur || cur.label !== label) {
       cur = { label, items: [] };
       groups.push(cur);
@@ -303,7 +390,7 @@ function renderTimeline(items, startIdx) {
       ${g.items.map((item, i) => `
         <div class="tl-row">
           <div class="tl-left">
-            <span class="tl-time">${hhmm(item.publishedAt || item.fetchedAt)}</span>
+            <span class="tl-time">${hhmm(timeOf(item))}</span>
             <i class="tl-dot ${item.domain === 'lowaltitude' ? 'la' : item.domain === 'aerospace' ? 'ae' : ''}"></i>
           </div>
           <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}" style="animation-delay:${Math.min(startIdx + i, 10) * 35}ms">
@@ -368,7 +455,7 @@ async function loadFeed(reset = true) {
     const startIdx = state.page * 30;
     const html = state.view === 'hot'
       ? renderRanked(data.items, startIdx)
-      : renderTimeline(data.items, 0);
+      : renderTimeline(data.items, 0, state.view === 'starred' ? starredTime : publishedTime);
     if (reset) list.innerHTML = html;
     else list.insertAdjacentHTML('beforeend', html);
     state.listed = reset ? data.items.length : state.listed + data.items.length;
@@ -384,11 +471,15 @@ async function loadFeed(reset = true) {
       state.freshIds.clear();
     }
     if (reset && !data.items.length) {
+      const emptyCopy = state.q ? '没有检索到相关情报，换个关键词试试'
+        : state.view === 'starred' ? '还没有星标情报 —— 在任意卡片右下角点「星标」，收起来的情报不会被保留策略清理'
+          : '暂无内容 —— 点击右上角刷新按钮立即采集，或等待定时任务';
       list.innerHTML = `<div class="empty-state glass">
-        <div class="es-icon">风 平 浪 静</div>
-        <p>${state.q ? '没有检索到相关情报，换个关键词试试' : '暂无内容 —— 点击右上角刷新按钮立即采集，或等待定时任务'}</p>
+        <div class="es-icon">${state.view === 'starred' && !state.q ? '尚 未 摘 星' : '风 平 浪 静'}</div>
+        <p>${emptyCopy}</p>
       </div>`;
     }
+    syncFeedToolbar(data.items.length > 0 || state.listed > 0);
     $('#btnMore').hidden = !data.hasMore;
     $('#feedEnd').hidden = data.hasMore || !data.items.length;
   } catch (e) {
@@ -425,8 +516,56 @@ async function loadHotRail() {
   } catch { if (request.isCurrent()) box.innerHTML = ''; }
 }
 
-// 卡片交互：展开五维 / 事件簇
+// 导出按钮只在真的有内容可导时才可用，避免复制出一份空文档
+const VIEW_EXPORT_LABEL = {
+  featured: '精选', hot: '热点', all: '全部动态', starred: '星标'
+};
+function syncFeedToolbar(hasItems) {
+  $('#btnCopyFeed').disabled = !hasItems;
+  $('#btnExportFeed').disabled = !hasItems;
+  $('#feedToolbarNote').textContent = hasItems
+    ? `可把当前「${VIEW_EXPORT_LABEL[state.view] || '列表'}」列表整份带走（最多 200 条）`
+    : '';
+}
+
+async function toggleStar(card, button) {
+  const id = Number(card.dataset.id);
+  const starred = button.getAttribute('aria-pressed') !== 'true';
+  button.disabled = true;
+  try {
+    const result = await api(`/api/articles/${id}/star`, { body: { starred } });
+    // 在星标视图里取消星标 = 从收藏夹里移出，必须整表重载，否则卡片会留在原地
+    if (state.view === 'starred' && !result.starred) {
+      toast('已取消星标');
+      await loadFeed();
+      refreshStats();
+      return;
+    }
+    button.classList.toggle('is-on', result.starred);
+    button.setAttribute('aria-pressed', String(result.starred));
+    button.querySelector('.card-act-label').textContent = result.starred ? '已星标' : '星标';
+    button.title = result.starred ? '取消星标' : '星标留存（不受保留天数清理）';
+    button.querySelector('path')?.setAttribute('fill', result.starred ? 'currentColor' : 'none');
+    toast(result.starred ? '已星标，该情报不会被保留策略清理' : '已取消星标');
+    refreshStats();
+  } catch (error) {
+    toast('星标操作失败：' + error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+// 卡片交互：星标 / 复制 / 展开五维 / 事件簇
 $('#feedList').addEventListener('click', async e => {
+  const actionBtn = e.target.closest('.card-act');
+  if (actionBtn) {
+    const card = actionBtn.closest('.card');
+    if (actionBtn.dataset.act === 'star') return toggleStar(card, actionBtn);
+    const title = card.querySelector('.card-title');
+    const copied = await copyText(`${title.textContent.trim()}\n${title.href}`);
+    toast(copied ? '已复制标题与链接' : '复制失败，请手动选择文本', !copied);
+    return;
+  }
   const dimsBtn = e.target.closest('.dims-toggle');
   if (dimsBtn) {
     const card = dimsBtn.closest('.card');
@@ -525,6 +664,11 @@ function shiftDaily(days) {
   preferenceActions.remember('dailyDate', d);
   loadDaily(d);
 }
+$('#btnCopyFeed').addEventListener('click', () => runExport('feed', 'text', 'copy'));
+$('#btnExportFeed').addEventListener('click', () => runExport('feed', 'markdown', 'download'));
+$('#btnCopyDaily').addEventListener('click', () => runExport('daily', 'text', 'copy'));
+$('#btnExportDaily').addEventListener('click', () => runExport('daily', 'markdown', 'download'));
+
 $('#dailyPrev').addEventListener('click', () => shiftDaily(-1));
 $('#dailyNext').addEventListener('click', () => shiftDaily(1));
 $('#dailyRegen').addEventListener('click', async () => {
@@ -701,6 +845,7 @@ async function loadSettings() {
     ]);
   } catch {}
   loadMaintenance();
+  loadFeedback();
 }
 
 $('#btnSaveAi').addEventListener('click', async () => {
@@ -779,13 +924,45 @@ $('#btnPruneNow').addEventListener('click', async () => {
   }
 });
 
+// 情报备忘：写进本机库后要能回看和删除，否则提交等于写进黑洞
+async function loadFeedback() {
+  const list = $('#feedbackList');
+  try {
+    const notes = await api('/api/feedback');
+    list.innerHTML = notes.map(note => `
+      <li class="note-item" data-id="${note.id}">
+        <div class="note-body">
+          <p>${esc(note.content)}</p>
+          <span class="note-time">${esc(timeAgo(note.createdAt))}</span>
+        </div>
+        <button class="note-remove" data-act="remove-note" type="button"
+          aria-label="删除这条备忘">删除</button>
+      </li>`).join('');
+  } catch {
+    list.innerHTML = '';
+  }
+}
+
+$('#feedbackList').addEventListener('click', async event => {
+  const button = event.target.closest('button[data-act="remove-note"]');
+  if (!button) return;
+  const id = button.closest('.note-item').dataset.id;
+  try {
+    await api(`/api/feedback/${id}`, { method: 'DELETE' });
+    loadFeedback();
+  } catch (error) {
+    toast('备忘删除失败：' + error.message, true);
+  }
+});
+
 $('#btnFeedback').addEventListener('click', async () => {
   const t = $('#feedbackText').value.trim();
   if (!t) return toast('请先写点什么', true);
   try {
     await api('/api/feedback', { body: { kind: 'feedback', content: t } });
     $('#feedbackText').value = '';
-    toast('反馈已记录');
+    toast('已记入情报备忘');
+    loadFeedback();
   } catch (error) {
     toast('反馈保存失败：' + error.message, true);
   }
@@ -881,7 +1058,7 @@ function switchView(view, { persist = true } = {}) {
     t.setAttribute('aria-selected', on);
   });
   syncTabIndicator();
-  const isFeed = ['featured', 'hot', 'all'].includes(view);
+  const isFeed = FEED_VIEWS.includes(view);
   // 重放入场动画
   for (const sec of $$('.view')) {
     sec.style.animation = 'none';
@@ -973,7 +1150,7 @@ searchInput.addEventListener('input', e => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     state.q = e.target.value.trim();
-    if (!['featured', 'hot', 'all'].includes(state.view)) {
+    if (!FEED_VIEWS.includes(state.view)) {
       switchView('all', { persist: false });
     }
     else loadFeed();
@@ -1000,7 +1177,7 @@ $('#btnRefresh').addEventListener('click', async function () {
       if (s && !s.pipeline?.running && !s.pending) {
         clearInterval(poll);
         this.classList.remove('spinning');
-        if (['featured', 'hot', 'all'].includes(state.view)) { loadFeed(); loadHotRail(); }
+        if (FEED_VIEWS.includes(state.view)) { loadFeed(); loadHotRail(); }
         toast('采集分析完成');
       }
     }, 4000);
@@ -1028,7 +1205,7 @@ document.addEventListener('keydown', event => {
     return;
   }
   if (event.altKey && !event.ctrlKey && !event.metaKey) {
-    const tabIndex = '1234567'.indexOf(event.key);
+    const tabIndex = '12345678'.indexOf(event.key);
     if (tabIndex >= 0) {
       const tab = $$('.tab')[tabIndex];
       if (tab) { switchView(tab.dataset.view); event.preventDefault(); }
@@ -1037,6 +1214,13 @@ document.addEventListener('keydown', event => {
     const letter = String(event.key).toLowerCase();
     if (letter === 't') { toggleTheme(); event.preventDefault(); return; }
     if (letter === 'r') { $('#btnRefresh').click(); event.preventDefault(); return; }
+    // 复制当前视图：信息流复制列表，日报复制整份日报
+    if (letter === 'c') {
+      if (FEED_VIEWS.includes(state.view)) runExport('feed', 'text', 'copy');
+      else if (state.view === 'daily') runExport('daily', 'text', 'copy');
+      event.preventDefault();
+      return;
+    }
     return;
   }
   if (isTypingTarget(document.activeElement)) return;
@@ -1099,7 +1283,6 @@ $('#newFlash').addEventListener('click', () => {
   loadHotRail();
 });
 
-const FEED_VIEWS = ['featured', 'hot', 'all'];
 let pollTimer;
 async function pollRealtime() {
   clearTimeout(pollTimer);
@@ -1157,6 +1340,7 @@ async function start() {
   setDomain(state.domain, { persist: false, load: false });
   setRealtime(state.realtime, { persist: false });
   syncSearchBox();
+  syncFeedToolbar(false);
   syncNavHeight();
   syncScrollState();
   if (window.ResizeObserver) {

@@ -28,13 +28,23 @@ function resolveRetentionPlan({ retentionDays, irrelevantRetentionDays, nowMs = 
   };
 }
 
+// 星标是用户「我要留着」的显式意思表示，保留期对它不适用。
+// 少了这个条件，收藏的情报会在保留天数到期后被自动清理，星标就不可信了。
+const EXPIRED_ARTICLES_WHERE = `starred = 0
+  AND (fetched_at < ? OR (relevant = 0 AND fetched_at < ?))`;
+
 function selectExpiredIds(plan, limit) {
   return db.prepare(`
     SELECT id FROM articles
-    WHERE fetched_at < ?
-       OR (relevant = 0 AND fetched_at < ?)
+    WHERE ${EXPIRED_ARTICLES_WHERE}
     ORDER BY fetched_at
     LIMIT ?`).all(plan.articleCutoff, plan.irrelevantCutoff, limit).map(row => row.id);
+}
+
+// 设置页「待清理」的口径必须与真正会被删除的集合完全一致，否则星标会被算进去
+function countExpiring(plan) {
+  return db.prepare(`SELECT COUNT(*) c FROM articles WHERE ${EXPIRED_ARTICLES_WHERE}`)
+    .get(plan.articleCutoff, plan.irrelevantCutoff).c;
 }
 
 // 删除文章后，成员不足 2 条的簇失去意义；主条被删的簇要改推剩余最优条目
@@ -98,6 +108,7 @@ module.exports = {
   DAILY_REPORT_RETENTION_DAYS,
   MAX_DELETIONS_PER_RUN,
   resolveRetentionPlan,
+  countExpiring,
   pruneDatabase,
   getMaintenanceSnapshot
 };

@@ -544,6 +544,80 @@ test('设置页提供数据保留配置与本地库体积视图', () => {
   assert.ok(css.includes('.maintenance-stats'), '缺少 .maintenance-stats 样式');
 });
 
+test('星标作为一等信息流视图接入导航、筛选与实时轮询', () => {
+  assert.match(html, /data-view="starred"[^>]*aria-controls="viewFeed"/);
+  assert.match(html, /id="tabStarredCount"/);
+  assert.match(app, /const FEED_VIEWS = \['featured', 'hot', 'all', 'starred'\];/);
+  // isFeed 必须与轮询、导出共用同一个集合，否则星标视图会拿不到筛选条与增量刷新
+  assert.match(app, /const isFeed = FEED_VIEWS\.includes\(view\);/);
+  assert.doesNotMatch(app, /\['featured', 'hot', 'all'\]\.includes/);
+  assert.ok(css.includes('.tab-count'), '缺少 .tab-count 样式');
+});
+
+test('每张卡片都提供星标与复制入口，星标状态可被键盘感知', () => {
+  assert.match(app, /data-act="star"/);
+  assert.match(app, /data-act="copy"/);
+  assert.match(app, /aria-pressed="\$\{item\.starred \? 'true' : 'false'\}"/);
+  // 底栏此前只在存在事件簇或五维分时才渲染，那样大部分卡片就没有留存入口
+  assert.match(app, /const foot = `<div class="card-foot">\$\{cluster\}\$\{dimsToggle\}\$\{actions\}<\/div>`/);
+  assert.match(app, /\/api\/articles\/\$\{id\}\/star/);
+  assert.match(app, /星标操作失败：/);
+  for (const selector of ['.card-act', '.star-toggle.is-on', '.card-foot-gap']) {
+    assert.ok(css.includes(selector), `缺少 ${selector} 样式`);
+  }
+});
+
+test('星标视图的时间轴按收藏时间分组，不会按发布时间乱序', () => {
+  assert.match(app, /const starredTime = item => item\.starredAt \|\| item\.fetchedAt;/);
+  assert.match(app, /function renderTimeline\(items, startIdx, timeOf = publishedTime\)/);
+  assert.match(app, /const label = dateLabel\(timeOf\(item\)\);/);
+  assert.match(app, /renderTimeline\(data\.items, 0, state\.view === 'starred' \? starredTime : publishedTime\)/);
+});
+
+test('在星标视图取消星标后整表重载，卡片不会滞留在收藏夹里', () => {
+  const source = app.slice(app.indexOf('async function toggleStar'), app.indexOf('// 卡片交互'));
+  assert.match(source, /if \(state\.view === 'starred' && !result\.starred\)/);
+  assert.match(source, /await loadFeed\(\);/);
+});
+
+test('导出走服务端渲染，界面只负责复制或另存为', () => {
+  assert.match(app, /await api\('\/api\/export\?' \+ exportParams\(kind, format\)\)/);
+  assert.match(app, /navigator\.clipboard\?\.writeText/);
+  assert.match(app, /document\.execCommand\('copy'\)/);   // 沙箱内剪贴板不可用时的回退路径
+  assert.match(app, /anchor\.download = filename;/);
+  assert.match(app, /导出失败：/);
+  for (const id of ['btnCopyFeed', 'btnExportFeed', 'btnCopyDaily', 'btnExportDaily']) {
+    assert.ok(html.includes(`id="${id}"`), `缺少导出控件 ${id}`);
+  }
+  assert.ok(css.includes('.copy-scratch'), '缺少剪贴板回退容器样式');
+});
+
+test('情报备忘可回看与删除，不再是只写不读', () => {
+  assert.match(html, /id="feedbackList"[^>]*aria-live="polite"/);
+  assert.match(app, /async function loadFeedback\(\)/);
+  assert.match(app, /await api\('\/api\/feedback'\)/);
+  assert.match(app, /await api\(`\/api\/feedback\/\$\{id\}`, \{ method: 'DELETE' \}\)/);
+  assert.match(app, /备忘删除失败：/);
+  assert.ok(css.includes('.note-list'), '缺少 .note-list 样式');
+});
+
+test('快捷键随第八个视图扩展，并新增复制当前视图', () => {
+  assert.match(app, /const tabIndex = '12345678'\.indexOf\(event\.key\);/);
+  assert.match(app, /if \(letter === 'c'\)/);
+  assert.match(html, /切换第 1–8 个视图/);
+  assert.match(html, /<kbd>Alt<\/kbd><kbd>C<\/kbd>/);
+});
+
+test('界面偏好接受星标视图，重启后能回到收藏夹', () => {
+  const schema = require('../renderer/ui-preference-schema');
+  assert.equal(schema.isValidUiPreferenceValue('view', 'starred', CommonLinks), true);
+  assert.deepEqual(
+    schema.createUiPreferencePatch('view', 'starred', CommonLinks),
+    { view: 'starred' }
+  );
+  assert.deepEqual(schema.createUiPreferencePatch('view', 'nonsense', CommonLinks), {});
+});
+
 test('库体积展示对空库和各量级都给出可读结果', () => {
   const source = app.match(/function formatBytes\(bytes\)[\s\S]*?\n\}/)[0];
   const formatBytes = new Function(`${source}\nreturn formatBytes;`)();

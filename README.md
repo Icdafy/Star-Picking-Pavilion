@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.5.exe`，双击并按向导安装。v0.0.5 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.6.exe`，双击并按向导安装。v0.0.6 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.5.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.6.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -24,6 +24,8 @@ Get-Content .\SHA256SUMS.txt
 - 低空经济、商业航天领域和分类筛选
 - SQLite FTS5 全文检索与多源事件聚类
 - 每日情报简报和实时增量提示
+- 星标留存与「星标」视图，收藏的情报永久豁免数据保留清理
+- 日报与信息流可复制为纯文本、导出为 Markdown，单条可复制标题与链接
 - RSS、网页、公开 API 与 RSSHub 信源管理
 - 可选的 AI 五维评分、摘要与研判
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
@@ -34,6 +36,17 @@ Get-Content .\SHA256SUMS.txt
 - 失效信源自动退避重试，避免长期不可达的信源每轮空转
 
 信源被“移出监控”时只会停用，既有信源记录和历史文章不会被删除。
+
+## 留存与分发
+
+情报看完之后有两条出路：留给自己，或者传给别人。
+
+- **星标留存**：任意卡片右下角点「星标」即可收藏，「星标」视图按收藏时间倒序陈列，导航标签显示收藏总数。星标情报**永久豁免数据保留清理**，「待清理」计数也会排除它们；被判为无关、或身处事件簇中却不是主条的报道，只要收藏了就一定还在收藏夹里。
+- **整份导出**：日报可「复制日报」得到纯文本（直接贴进微信群或邮件），也可「导出 .md」存成 Markdown 文件。精选、热点、全部动态与星标四个信息流可按当前领域、分类与检索条件整份导出，单次最多 200 条，且始终从第一条开始，与当前翻到第几页无关。
+- **单条复制**：每张卡片的「复制」一次取走标题与链接。
+- **情报备忘**：「设置 → 情报备忘」的记录会列出最近 50 条，可随时回看与删除，保存在本机情报库中，不上传，也不受情报保留策略清理。
+
+导出内容只接受绝对 HTTP(S) 链接，标题中的 Markdown 语法字符会被转义；另存为完全在本地完成，不经过任何外部服务。
 
 ## 桌面后台运行
 
@@ -51,7 +64,7 @@ Get-Content .\SHA256SUMS.txt
 - 情报保留天数：默认 180 天，可设 7 到 3650 天
 - 无关内容保留天数：默认 21 天，用于被判为无关的噪声；该值不会超过情报保留天数
 
-清理每天在日报之后 20 分钟自动执行，也可以随时手动触发。到期条目连同 FTS5 全文索引行一起删除，成员不足的事件簇随之收敛，清理结束后截断 WAL 让磁盘占用真正回落。日报是自包含快照，保留期独立且更长。
+清理每天在日报之后 20 分钟自动执行，也可以随时手动触发。到期条目连同 FTS5 全文索引行一起删除，成员不足的事件簇随之收敛，清理结束后截断 WAL 让磁盘占用真正回落。日报是自包含快照，保留期独立且更长。**已加星标的情报和情报备忘不参与清理，无论保留天数设成多少都会保留。**
 
 连续采集失败的信源会按指数拉长重试间隔（从一个采集周期起，上限 6 小时），成功后立即复位。信源页会显示暂停状态与连续失败次数，可点「立即重试」清除退避；点击右上角「立即采集分析」时始终忽略退避，全量重试一遍。
 
@@ -110,7 +123,7 @@ npm run server              # 独立开发服务器，默认 http://127.0.0.1:76
 npm run pipeline            # 手动采集、分析、聚类
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.5 --artifacts
+npm run verify:version -- --tag v0.0.6 --artifacts
 npm run notices
 ```
 

@@ -11,7 +11,8 @@ const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require(
 const { persistApiKey } = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
 const { describeHealth } = require('./source-health');
-const { getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
+const { countExpiring, getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
+const exportMarkdown = require('./export/markdown');
 const {
   runPipeline, pruneOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
 } = require('./scheduler');
@@ -19,9 +20,13 @@ const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
 const { CATEGORIES } = require('./ai/pipeline');
-const { parseFeedQuery, sanitizeDate, sanitizeFeedback, sanitizeSourceInput } = require('./input-validation');
+const {
+  parseFeedQuery, parseExportQuery, sanitizeDate, sanitizeFeedback,
+  sanitizeSourceInput, sanitizeStarInput
+} = require('./input-validation');
+const packageJson = require('../package.json');
 const { resolveStaticFile } = require('./static-files');
-const { startOfLocalDayIso } = require('./date-time');
+const { localDateString, startOfLocalDayIso } = require('./date-time');
 const { createSettingsUpdateCoordinator } = require('./settings-persistence');
 const {
   API_TOKEN_HEADER,
@@ -91,6 +96,8 @@ function articleRow(r, scoring, nowMs) {
     tags: parseOptionalJson(r.tags_json, [], Array.isArray),
     source: r.source_name, tier: r.tier,
     clusterId: r.cluster_id, clusterSize: r.cluster_size || null,
+    starred: !!r.starred,
+    starredAt: safeDate(r.starred_at),
     analyzed: r.analyzed
   };
 }
@@ -109,17 +116,23 @@ const HEAT_EXPRESSION = `COALESCE(a.quality_score, 0) * pow(
 // 半衰期 36 小时下，超出此窗口的条目热度已衰减到千分之一以下，排进热榜没有意义
 const HOT_WINDOW_DAYS = 45;
 
-function queryFeed(q) {
+// 导出一次要覆盖整份收藏夹或整屏筛选结果，不能只给界面翻页用的 30 条
+const FEED_PAGE_SIZE = 30;
+const EXPORT_MAX_ITEMS = 200;
+
+function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
   const scoring = loadScoring();
   const nowMs = Date.now();
   const { view, domain, category, search, page } = parseFeedQuery(q, CATEGORIES);
-  const SIZE = 30;
+  const SIZE = size;
 
   const where = [];
   const params = [];
   if (view === 'featured') where.push('a.featured = 1');
   if (view === 'featured' || view === 'hot') where.push('a.relevant = 1');
   if (view === 'all') where.push("(a.relevant IS NULL OR a.relevant = 1)");
+  // 星标是用户的显式收藏，不受相关性判定影响：被 AI 判为无关但用户仍想留着的条目必须能看到
+  if (view === 'starred') where.push('a.starred = 1');
   if (domain) { where.push('a.domain = ?'); params.push(domain); }
   if (category) { where.push('a.category = ?'); params.push(category); }
 
@@ -143,19 +156,24 @@ function queryFeed(q) {
     idFilter = `AND a.id IN (${ids.join(',')})`;
   }
 
-  // 事件簇折叠：簇内只返回主条
+  // 事件簇折叠：簇内只返回主条。星标视图例外——用户收藏的是某一条具体报道，
+  // 若它恰好不是簇主条，折叠会让它从自己的收藏夹里消失。
+  const collapseClusters = view !== 'starred';
   const buildSql = (order, extraWhere) => `
     SELECT a.*, s.name AS source_name, s.tier, c.size AS cluster_size
     FROM articles a
     JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters c ON c.id = a.cluster_id
     WHERE ${where.join(' AND ') || '1=1'} ${idFilter} ${extraWhere}
-      AND (a.cluster_id IS NULL OR a.id = c.main_article_id)
+      ${collapseClusters ? 'AND (a.cluster_id IS NULL OR a.id = c.main_article_id)' : ''}
     ORDER BY ${order}
     LIMIT ${SIZE + 1} OFFSET ${page * SIZE}`;
 
   let rows;
-  if (view === 'hot') {
+  if (view === 'starred') {
+    // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
+    rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
+  } else if (view === 'hot') {
     const halfLife = Number(scoring.heatDecayHalfLifeHours) || 36;
     const windowStart = new Date(nowMs - HOT_WINDOW_DAYS * 86_400_000).toISOString();
     // 占位符按 SQL 文本位置绑定：先 WHERE 的过滤条件，再时间窗，最后 ORDER BY 里的半衰期
@@ -195,6 +213,7 @@ function countStats() {
     today: g('SELECT COUNT(*) c FROM articles WHERE fetched_at >= ?', todayStart).c,
     relevantToday: g('SELECT COUNT(*) c FROM articles WHERE relevant=1 AND fetched_at >= ?', todayStart).c,
     featuredToday: g('SELECT COUNT(*) c FROM articles WHERE featured=1 AND fetched_at >= ?', todayStart).c,
+    starred: g('SELECT COUNT(*) c FROM articles WHERE starred=1').c,
     pending: g('SELECT COUNT(*) c FROM articles WHERE analyzed=0').c
   };
 }
@@ -240,6 +259,19 @@ const server = http.createServer(async (req, res) => {
       const mCluster = p.match(/^\/api\/cluster\/(\d+)$/);
       if (mCluster) return json(res, 200, getCluster(Number(mCluster[1])));
 
+      // 星标：用户显式留存。starred_at 同时是收藏夹的排序键与保留清理的豁免标记
+      const mStar = p.match(/^\/api\/articles\/(\d+)\/star$/);
+      if (mStar && req.method === 'POST') {
+        const articleId = Number(mStar[1]);
+        const { starred } = sanitizeStarInput(await readJsonBody(req));
+        const changed = db.prepare('UPDATE articles SET starred=?, starred_at=? WHERE id=?')
+          .run(starred ? 1 : 0, starred ? now() : null, articleId).changes;
+        if (!changed) return json(res, 404, { error: '情报不存在' });
+        invalidateStatsCache();
+        const row = db.prepare('SELECT starred, starred_at FROM articles WHERE id=?').get(articleId);
+        return json(res, 200, { ok: true, starred: !!row.starred, starredAt: row.starred_at });
+      }
+
       if (p === '/api/daily' && req.method === 'GET') {
         const date = sanitizeDate(u.searchParams.get('date'));
         return json(res, 200, { report: getDaily(date), dates: listDailyDates() });
@@ -247,6 +279,45 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/daily/regenerate' && req.method === 'POST') {
         const body = await readJsonBody(req);
         return json(res, 200, generateDaily(sanitizeDate(body.date)));
+      }
+
+      // 导出：情报的最后一公里。渲染在服务端完成，界面只负责复制到剪贴板或存成文件，
+      // 这样两种格式的排版逻辑只有一份，且可以在 Node 里逐字符断言。
+      if (p === '/api/export' && req.method === 'GET') {
+        const request = parseExportQuery(u.searchParams, CATEGORIES);
+        const branding = {
+          format: request.format,
+          productName: packageJson.productName,
+          version: packageJson.version,
+          homepage: packageJson.homepage
+        };
+        if (request.kind === 'daily') {
+          const report = getDaily(request.date);
+          return json(res, 200, {
+            filename: exportMarkdown.exportFilename(
+              `${packageJson.productName}-情报日报`, report.date, request.format),
+            count: report.total,
+            format: request.format,
+            content: exportMarkdown.renderDaily(report, branding)
+          });
+        }
+        const { view, search } = request.feed;
+        const titles = { featured: '精选情报', hot: '热点情报', all: '全部动态', starred: '星标情报' };
+        // 导出始终从第一条开始，与用户当前翻到第几页无关
+        const exportQuery = new URLSearchParams(u.searchParams);
+        exportQuery.set('page', '0');
+        const items = queryFeed(exportQuery, { size: EXPORT_MAX_ITEMS }).items;
+        return json(res, 200, {
+          filename: exportMarkdown.exportFilename(
+            `${packageJson.productName}-${titles[view]}`, localDateString(), request.format),
+          count: items.length,
+          format: request.format,
+          content: exportMarkdown.renderArticles(items, {
+            ...branding,
+            title: titles[view],
+            subtitle: search ? `检索「${search}」` : ''
+          })
+        });
       }
 
       if (p === '/api/collect' && req.method === 'POST') {
@@ -266,9 +337,9 @@ const server = http.createServer(async (req, res) => {
           databaseBytes: databaseFileBytes(),
           articles: db.prepare('SELECT COUNT(*) c FROM articles').get().c,
           irrelevant: db.prepare('SELECT COUNT(*) c FROM articles WHERE relevant=0').get().c,
-          expiring: db.prepare(`SELECT COUNT(*) c FROM articles
-            WHERE fetched_at < ? OR (relevant = 0 AND fetched_at < ?)`)
-            .get(plan.articleCutoff, plan.irrelevantCutoff).c,
+          starred: db.prepare('SELECT COUNT(*) c FROM articles WHERE starred=1').get().c,
+          // 与 pruneDatabase 共用同一条 WHERE，「待清理」永远不会把星标算进去
+          expiring: countExpiring(plan),
           retentionDays: plan.retentionDays,
           irrelevantRetentionDays: plan.irrelevantRetentionDays,
           ...getMaintenanceSnapshot()
@@ -351,10 +422,23 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      // 反馈此前只写不读：提交完连自己都看不到，等于写进黑洞。
+      // 数据本来就在本机库里，列出来它才是一本可用的情报备忘。
+      if (p === '/api/feedback' && req.method === 'GET') {
+        return json(res, 200, db.prepare(
+          'SELECT id, kind, content, created_at FROM feedback ORDER BY id DESC LIMIT 50').all()
+          .map(row => ({ id: row.id, kind: row.kind, content: row.content, createdAt: row.created_at })));
+      }
       if (p === '/api/feedback' && req.method === 'POST') {
         const b = sanitizeFeedback(await readJsonBody(req));
-        db.prepare('INSERT INTO feedback (kind, content, created_at) VALUES (?, ?, ?)')
+        const r = db.prepare('INSERT INTO feedback (kind, content, created_at) VALUES (?, ?, ?)')
           .run(b.kind, b.content, now());
+        return json(res, 200, { ok: true, id: Number(r.lastInsertRowid) });
+      }
+      const mFeedback = p.match(/^\/api\/feedback\/(\d+)$/);
+      if (mFeedback && req.method === 'DELETE') {
+        const changed = db.prepare('DELETE FROM feedback WHERE id=?').run(Number(mFeedback[1])).changes;
+        if (!changed) return json(res, 404, { error: '反馈不存在' });
         return json(res, 200, { ok: true });
       }
 

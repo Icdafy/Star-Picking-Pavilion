@@ -898,12 +898,72 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 96px; }
 }
 .cluster-toggle { color: var(--second-ink); }
 .cluster-toggle:hover { background: var(--second-soft); border-color: var(--second-line); }
-.dims-toggle { color: var(--c-fg-faint); margin-left: auto; }
+/* 说明性开关靠左成组，留存/分发动作靠右成组，中间由 .card-foot-gap 撑开 */
+.dims-toggle { color: var(--c-fg-faint); }
 .dims-toggle:hover { color: var(--c-fg-dim); background: var(--hover-bg); border-color: var(--glass-border); }
 .cluster-toggle svg, .dims-toggle svg { width: 11px; height: 11px; transition: transform var(--dur) var(--ease); }
 .cluster-toggle.open svg { transform: rotate(90deg); }
 .card.expanded .dims-toggle svg { transform: rotate(180deg); }
 .card.expanded .dims-toggle { color: var(--accent-ink); }
+
+/* 卡片动作：星标留存与复制分发，固定在每张卡片右下角 */
+.card-foot-gap { flex: 1 1 auto; min-width: var(--sp-2); }
+.card-act {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-xs); cursor: pointer; line-height: 1.6;
+  background: none; border: 1px solid transparent; padding: 3px 9px;
+  border-radius: 99px; font-family: var(--font-ui); color: var(--c-fg-faint);
+  transition: all var(--dur) var(--ease);
+}
+.card-act svg { width: 12px; height: 12px; }
+.card-act:hover { color: var(--c-fg-dim); background: var(--hover-bg); border-color: var(--glass-border); }
+.card-act:disabled { opacity: .5; cursor: progress; }
+.card-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.star-toggle.is-on {
+  color: var(--flag-ink); border-color: var(--flag-line); background: var(--flag-soft);
+}
+.star-toggle.is-on:hover { color: var(--flag); border-color: var(--flag); }
+
+/* 导出工具条：把「当前这批情报」整份带走 */
+.feed-toolbar {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.feed-toolbar-note { font-size: var(--t-xs); color: var(--c-fg-faint); }
+.export-group { display: flex; gap: var(--sp-2); margin-left: auto; }
+.btn-compact { padding: 5px var(--sp-3); font-size: var(--t-xs); }
+.btn-ghost:disabled, .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+.daily-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+/* 剪贴板回退路径用的临时输入框：必须可选中，因此不能用 display:none */
+.copy-scratch { position: fixed; top: -1000px; left: -1000px; opacity: 0; }
+
+/* 导航标签上的星标计数 */
+.tab-count {
+  display: inline-block; margin-left: 5px; padding: 0 5px;
+  font-family: var(--font-mono); font-size: var(--t-2xs); font-weight: 400;
+  letter-spacing: 0; line-height: 1.7; border-radius: 99px;
+  color: var(--flag-ink); background: var(--flag-soft); border: 1px solid var(--flag-line);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 情报备忘列表 */
+.note-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.note-item {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: 9px var(--sp-3); border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border); background: var(--hover-bg);
+}
+.note-body { flex: 1; min-width: 0; }
+.note-body p { font-family: var(--font-body); font-size: var(--t-base); line-height: 1.75; word-break: break-word; }
+.note-time { display: block; margin-top: 3px; font-size: var(--t-2xs); color: var(--c-fg-faint); }
+.note-remove {
+  flex: none; font-family: var(--font-ui); font-size: var(--t-xs); cursor: pointer;
+  padding: 3px var(--sp-2); border-radius: 99px;
+  border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-faint);
+  transition: all var(--dur) var(--ease);
+}
+.note-remove:hover { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
+.note-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .cluster-items {
   margin-top: 9px; display: flex; flex-direction: column; gap: 7px;

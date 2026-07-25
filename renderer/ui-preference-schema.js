@@ -6,7 +6,9 @@
   else if (root) root.StarPickingPavilionUiPreferenceSchema = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createUiPreferenceSchema() {
   const THEMES = new Set(['light', 'dark']);
-  const VIEWS = new Set(['featured', 'hot', 'all', 'daily', 'links', 'sources', 'settings']);
+  const VIEWS = new Set([
+    'featured', 'hot', 'all', 'starred', 'daily', 'links', 'sources', 'settings'
+  ]);
   const DOMAINS = new Set(['', 'lowaltitude', 'aerospace']);
   const UI_PREFERENCE_FIELDS = Object.freeze([
     'theme',

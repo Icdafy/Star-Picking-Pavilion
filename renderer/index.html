@@ -83,6 +83,9 @@
     <button class="tab active" data-view="featured" aria-controls="viewFeed" role="tab" aria-selected="true">精选</button>
     <button class="tab" data-view="hot" aria-controls="viewFeed" role="tab" aria-selected="false">热点</button>
     <button class="tab" data-view="all" aria-controls="viewFeed" role="tab" aria-selected="false">全部动态</button>
+    <button class="tab" data-view="starred" aria-controls="viewFeed" role="tab" aria-selected="false">
+      星标<span class="tab-count" id="tabStarredCount" hidden></span>
+    </button>
     <button class="tab" data-view="daily" aria-controls="viewDaily" role="tab" aria-selected="false">情报日报</button>
     <button class="tab" data-view="links" aria-controls="viewLinks" role="tab" aria-selected="false">常用网址</button>
     <button class="tab" data-view="sources" aria-controls="viewSources" role="tab" aria-selected="false">信源</button>
@@ -103,6 +106,15 @@
   <section id="viewFeed" class="view" role="tabpanel">
     <div class="search-context" id="searchContext" hidden></div>
     <div class="feed-banner" id="feedBanner" hidden></div>
+    <div class="feed-toolbar">
+      <p class="feed-toolbar-note" id="feedToolbarNote"></p>
+      <div class="export-group" role="group" aria-label="导出当前列表">
+        <button class="btn-ghost btn-compact" id="btnCopyFeed" type="button"
+          title="把当前筛选下的情报复制成纯文本，直接贴进微信或邮件">复制文本</button>
+        <button class="btn-ghost btn-compact" id="btnExportFeed" type="button"
+          title="把当前筛选下的情报存成 Markdown 文件">导出 .md</button>
+      </div>
+    </div>
     <button class="new-flash" id="newFlash" hidden></button>
     <div class="feed-layout">
       <div>
@@ -131,7 +143,13 @@
         <p id="dailySub">每天 08:05 自动生成 · 覆盖前 24 小时精选</p>
       </div>
       <button class="btn-icon" id="dailyNext" aria-label="后一天"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4 L13.5 10 L7.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="btn-ghost" id="dailyRegen">重新生成</button>
+      <div class="daily-actions">
+        <button class="btn-primary btn-compact" id="btnCopyDaily" type="button"
+          title="把整份日报复制成纯文本，直接贴进微信群或邮件">复制日报</button>
+        <button class="btn-ghost btn-compact" id="btnExportDaily" type="button"
+          title="把整份日报存成 Markdown 文件">导出 .md</button>
+        <button class="btn-ghost btn-compact" id="dailyRegen">重新生成</button>
+      </div>
     </div>
     <div id="dailyBody"></div>
   </section>
@@ -199,11 +217,13 @@
         </label>
         <div class="btn-row"><button class="btn-primary" id="btnSaveCollect">保存</button></div>
         <p class="hint">日报每天 08:05 自动生成。信源等级 T1（官方一手）/T1.5（官方社媒）/T2（媒体聚合）影响计分权重。填入 RSSHub 地址后，可把公众号 / 媒体经 RSSHub 转成 RSS 接入（信源页提报 <code>rsshub://路由</code> 即可）。</p>
-        <h3 style="margin-top:24px">反馈</h3>
-        <label class="field"><span>问题或建议</span>
-          <textarea id="feedbackText" rows="3" placeholder="记录在本地 data 库中，便于后续整理"></textarea>
+        <h3 style="margin-top:24px">情报备忘 <span class="muted">仅存本机</span></h3>
+        <label class="field"><span>问题、建议或随手笔记</span>
+          <textarea id="feedbackText" rows="3" placeholder="记录在本地情报库中，随时可以回看和删除"></textarea>
         </label>
-        <div class="btn-row"><button class="btn-ghost" id="btnFeedback">提交反馈</button></div>
+        <div class="btn-row"><button class="btn-ghost" id="btnFeedback">记下</button></div>
+        <ul class="note-list" id="feedbackList" aria-live="polite"></ul>
+        <p class="hint">条目保存在本机 <code>star-picking-pavilion.db</code> 中，不会上传，也不会随情报保留策略被清理。</p>
       </div>
       <div class="glass card-pad">
         <h3>数据维护 <span class="muted">本地情报库</span></h3>
@@ -256,9 +276,10 @@
         <ul class="shortcut-list">
           <li><span>聚焦检索框</span><kbd>/</kbd><kbd>Ctrl</kbd><kbd>K</kbd></li>
           <li><span>清空检索并退出输入</span><kbd>Esc</kbd></li>
-          <li><span>切换第 1–7 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>7</kbd></li>
+          <li><span>切换第 1–8 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>8</kbd></li>
           <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
+          <li><span>复制当前列表为文本</span><kbd>Alt</kbd><kbd>C</kbd></li>
           <li><span>回到顶部</span><kbd>Home</kbd></li>
         </ul>
         <p class="hint">在输入框内录入文字时，除 <code>Esc</code> 外的快捷键不会被触发。</p>

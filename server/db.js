@@ -106,6 +106,11 @@ function migrate() {
   const addCol = (name, def) => { if (!cols.has(name)) db.exec(`ALTER TABLE articles ADD COLUMN ${name} ${def}`); };
   addCol('ai_reason', 'TEXT');   // 情报研判（推荐理由 / 编者按）
   addCol('image_url', 'TEXT');   // 文章缩略图
+  // 星标留存：用户显式收起来的情报。starred_at 既是「星标」视图的排序依据，
+  // 也让保留清理能识别并永久跳过这些条目（见 retention.selectExpiredIds）
+  addCol('starred', 'INTEGER NOT NULL DEFAULT 0');
+  addCol('starred_at', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_starred ON articles(starred, starred_at DESC)');
   // sources 表补 intl 列（标记国外情报源）
   const srcCols = new Set(db.prepare('PRAGMA table_info(sources)').all().map(c => c.name));
   if (!srcCols.has('intl')) db.exec('ALTER TABLE sources ADD COLUMN intl INTEGER NOT NULL DEFAULT 0');
