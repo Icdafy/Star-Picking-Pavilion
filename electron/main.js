@@ -181,8 +181,8 @@ async function createWindow(serverPort) {
   win = new BrowserWindow({
     width: 1440,
     height: 920,
-    minWidth: 1080,
-    minHeight: 680,
+    minWidth: 800,
+    minHeight: 600,
     backgroundColor: '#04060e',
     title: '摘星阁 · 低空经济与商业航天情报站',
     autoHideMenuBar: true,
