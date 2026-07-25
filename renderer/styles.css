@@ -201,6 +201,13 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* hidden 属性的 display:none 来自浏览器默认样式表，优先级最低——只要某个类规则
+   写了 display（本页有 .update-pill / .search-context / .tab-count / .lexicon-panel
+   四处），它就会被盖掉，于是「本该藏起来」的元素变成一个空盒子挂在界面上：
+   检索框左边一颗空胶囊、导航下一条空青条、星标标签后一个空角标。
+   在这里一次性兜住，比在每条规则后面各补一句 :not([hidden]) 可靠。 */
+[hidden] { display: none !important; }
+
 /* body 不能用 height:100%：sticky 只在包含块内生效，钉死高度会让导航条
    滚过一屏后就跟着内容滑走。用 min-height 既保证短页面铺满，又让包含块随内容增高。 */
 html { height: 100%; }
@@ -359,8 +366,12 @@ body {
 }
 
 /* ---------- 塔台状态栏 ---------- */
+/* 顶栏靠内容换行，而不是靠像素断点。放大缩放档位时窗口宽度没变、里面的东西
+   却大了一圈，写死 px 的断点这时候是不会触发的——于是「监控信源」这类标签会
+   被从中间断开成两行。让标签不许断词、顶栏允许换行，挤不下时整块下沉到次行，
+   任何档位下都成立。 */
 .tower {
-  display: flex; align-items: center; gap: var(--sp-7);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-7);
   padding: var(--sp-5) var(--sp-7) var(--sp-3);
   max-width: var(--shell); margin: 0 auto;
 }
@@ -385,6 +396,7 @@ body {
 }
 .brand-text p {
   font-size: var(--t-sm); color: var(--c-fg-faint); letter-spacing: .2em; margin-top: .125rem;
+  white-space: nowrap;
 }
 
 .tower-stats { display: flex; align-items: center; gap: var(--sp-5); margin-left: auto; }
@@ -395,7 +407,7 @@ body {
 }
 .stat-num.accent { color: var(--flag); }
 [data-theme="dark"] .stat-num.accent { text-shadow: 0 0 14px var(--flag-glow); }
-.stat-label { font-size: var(--t-xs); color: var(--c-fg-faint); letter-spacing: .14em; }
+.stat-label { font-size: var(--t-xs); color: var(--c-fg-faint); letter-spacing: .14em; white-space: nowrap; }
 .stat-divider { width: 1px; height: 1.625rem; background: linear-gradient(transparent, var(--rail-line), transparent); }
 
 .pulse-dot {
@@ -466,7 +478,6 @@ body {
   border-radius: var(--radius-lg); padding: var(--sp-4);
   box-shadow: var(--shadow-pop, 0 20px 50px rgba(0, 0, 0, .45));
 }
-.lexicon-panel[hidden] { display: none; }
 /* .glass 的底色只有 8.5% 不透明度——卡片压在页面底色上够用，但这是一块浮在
    滚动正文之上的浮层，透过去就没法读了。与提报信源的对话框同样处理：给足底色。 */
 [data-theme="dark"] .lexicon-panel { background: linear-gradient(165deg, rgba(20,28,58,.97), rgba(10,16,38,.98)); }
@@ -794,8 +805,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .update-pill.error { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
 
 /* 「N 条新情报」可点横幅 */
-.new-flash:not([hidden]) { display: block; }
 .new-flash {
+  display: block;
   width: 100%; margin-bottom: var(--sp-3); padding: .625rem var(--sp-5);
   border-radius: var(--radius-md); font-family: var(--font-ui); font-size: var(--t-base); font-weight: 700;
   cursor: pointer; text-align: center;

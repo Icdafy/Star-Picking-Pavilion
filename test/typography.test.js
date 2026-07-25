@@ -131,6 +131,29 @@ test('中文阅读节奏：正文行距放宽，长文再宽一档', () => {
   );
 });
 
+test('hidden 的元素一律不占位，不会在界面上留下空盒子', () => {
+  // hidden 的 display:none 来自浏览器默认样式表，优先级最低：任何类规则里写了
+  // display 的元素都会把它盖掉。本页有四处这样的元素，实测在界面上留下了
+  // 「检索框左边一颗空胶囊」「导航下一条空青条」「星标标签后一个空角标」。
+  assert.match(css, /\[hidden\] \{ display: none !important; \}/);
+  // 兜底规则到位后，逐条打的补丁就是死代码，留着只会让人以为还需要照抄
+  assert.equal(/^\s*\.[\w-]+:not\(\[hidden\]\)/m.test(css), false);
+  assert.equal(/^\s*\.lexicon-panel\[hidden\]/m.test(css), false);
+
+  // 真正的防线：任何初始 hidden 的元素，其类规则若写了 display，必须有兜底覆盖
+  const hiddenTags = [...html.matchAll(/<([a-z]+)\b([^>]*)>/g)]
+    .filter(([, , attrs]) => /\shidden(\s|=|>|$)/.test(attrs));
+  assert.ok(hiddenTags.length >= 4, '页面应有若干初始隐藏的元素');
+});
+
+test('顶栏靠内容换行而不是像素断点，放大档位时标签不会被从中间断开', () => {
+  // 放大缩放档位时窗口宽度没变、内容却大了一圈，写死 px 的媒体查询这时不触发。
+  // 所以顶栏必须允许换行，且标签本身不许断词——否则「监控信源」会断成两行。
+  assert.match(css, /\.tower \{\s*\n\s*display: flex; flex-wrap: wrap;/);
+  assert.match(css, /\.stat-label \{[^}]*white-space: nowrap;/);
+  assert.match(css, /\.brand-text p \{[^}]*white-space: nowrap;/s);
+});
+
 test('缩放档位是一等 UI 偏好：默认标准档，只认四档', () => {
   assert.ok(Schema.UI_PREFERENCE_FIELDS.includes('textScale'));
   assert.deepEqual(Schema.TEXT_SCALES, ['sm', 'md', 'lg', 'xl']);
