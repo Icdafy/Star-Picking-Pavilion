@@ -1,62 +1,88 @@
 'use strict';
-// 关键词库 —— 双重用途：① 无 API Key 时的启发式相关性判定与打分降级
-//                     ② 有 API Key 时作为预筛前的粗过滤，减少送往模型的无关条目，省钱
-// （学习 AIHOT 的「能用脚本就别用模型」原则）
+// 关键词判定 —— v0.0.7 起不再自己维护一份词表，全部派生自 config/lexicon.json。
+// 之前这里的 LOWALTITUDE / AEROSPACE 数组和词库是两套事实，加了新赛道要改两处，
+// 迟早漂移。现在词库是唯一入口，本模块只负责三件判定：
+//   ① 领域归属（matchDomain）
+//   ② 相关强度（keywordHits / relevanceOf）
+//   ③ 噪声形态（isNoise / noiseHits）——噪声不是「哪个领域」的问题，所以留在本地
+//
+// 双重用途照旧：无 API Key 时做启发式降级判定与打分；有 Key 时做预筛前的粗过滤省 token。
+const lexicon = require('./lexicon');
 
-const LOWALTITUDE = [
-  '低空经济', '低空空域', '低空飞行', '低空智联', '低空基建',
-  'eVTOL', '电动垂直起降', '飞行汽车', '空中出租', '空中交通',
-  '无人机', '无人驾驶航空', '通用航空', '通航', '直升机',
-  '亿航', '峰飞', '沃飞长空', '小鹏汇天', '时的科技', '御风未来', '览翌', '零重力飞机',
-  '大疆', '极飞', '纵横股份', '中无人机',
-  '适航', '适航证', '型号合格证', 'TC证', '空管', '空域改革',
-  '飞行营地', '低空旅游', '航空应急', '无人机配送', '无人机物流', '城市空中交通', 'UAM',
-  // —— 海外低空/eVTOL ——
-  'Joby', 'Archer', 'Lilium', 'Volocopter', 'Wisk', 'Vertical Aerospace', 'Beta Technologies',
-  'Eve Air', 'Supernal', 'eVTOL', 'air taxi', 'urban air mobility', 'advanced air mobility', 'eVTOL', 'drone delivery'
-];
-
-const AEROSPACE = [
-  '商业航天', '商业火箭', '运载火箭', '火箭发射', '发射场', '入轨', '首飞',
-  '可回收火箭', '回收复用', '垂直回收', '海上回收',
-  '卫星', '星座', '卫星互联网', '星网', '千帆', 'G60', '低轨卫星', '遥感卫星', '通信卫星',
-  '蓝箭', '朱雀', '星河动力', '谷神星', '智神星', '天兵科技', '天龙', '中科宇航', '力箭',
-  '星际荣耀', '双曲线', '东方空间', '引力一号', '深蓝航天', '星云', '捷龙', '快舟', '长征',
-  '航天科技集团', '航天科工', '国家航天局', '探月', '空间站', '神舟', '天舟', '嫦娥', '北斗',
-  '酒泉', '文昌', '太原', '西昌', '海南商发', '航天驭星', '微纳星空', '银河航天', '时空道宇',
-  // —— 海外商业航天 ——
-  'SpaceX', '星链', 'Starlink', 'Falcon', 'Starship', 'Blue Origin', 'New Glenn', 'New Shepard',
-  'Rocket Lab', 'Electron', 'Neutron', 'OneWeb', 'Kuiper', 'ULA', 'Vulcan', 'Ariane', 'Arianespace',
-  'NASA', 'ESA', 'Sierra Space', 'Firefly', 'Relativity', 'Astra', 'satellite', 'launch', 'orbit'
-];
-
-const NOISE = [
-  '股吧', '涨停', '快讯：', '盘中异动', '概念股拉升', '游资', '主力资金', '龙虎榜',
-  // 综合财经汇总/打包内容：主旨非本领域，仅顺带提及，过滤掉避免污染精选
+// 噪声形态：命中即扣分（config/scoring.json 的 noisePenalty），命中足够多则直接判无关。
+// 两类——
+//   A. 股评/炒作形态：主旨是股价而不是产业事件
+//   B. 综合汇总打包：即使其中一段提到航天/低空，整篇主旨都不是本领域
+const NOISE_PATTERNS = [
+  // A. 股评与炒作
+  '股吧', '涨停', '跌停', '盘中异动', '异动拉升', '概念股拉升', '概念股异动',
+  '游资', '主力资金', '龙虎榜', '北向资金', '融资余额', '主力净流入',
+  '尾盘拉升', '集合竞价', '抢筹', '牛股', '妖股', '掘金', '布局良机', '目标价',
+  '涨幅居前', '领涨', '封涨停', '连板', '题材股',
+  // B. 综合汇总与打包内容
   '四大证券报', '证券报精华', '财经晚报', '财经早报', '头版头条', '重要财经媒体',
   '新闻联播', '早参', '晚参', '盘前必读', '盘后', '复盘', '收评', '午评', '早评',
-  '重磅消息一览', '重要事件', '今日要闻', '每经', '一周要闻'
+  '重磅消息一览', '重要事件', '今日要闻', '每日经济新闻', '一周要闻', '每经',
+  '早间新闻', '隔夜外盘', '市场早报', '财经日历', '公告精选', '互动易',
+  '一图读懂今日', '今日热点汇总',
+  // C. 机关党务与礼仪性活动：官方信源（T1）的稳定产出，但对读者不是行业情报。
+  //    这类标题往往同时带着「民航局」「航天科技集团」等高权重词，不显式排除就会被
+  //    词库判成强相关，再乘上 T1 系数直接冲进精选——实测「党组理论学习中心组举行
+  //    集体学习」拿到过 77.6 分。只列党务与礼仪性活动，不列泛化的「会议」，
+  //    以免误伤「全国民航工作会议」这类真政策场合。
+  '党组理论学习', '理论学习中心组', '党课', '主题教育', '组织生活会', '党史学习',
+  '廉政', '巡视整改', '警示教育', '表彰大会', '慰问演出', '党支部', '党建工作',
+  '职工代表大会', '文艺汇演', '运动会'
 ];
 
-function matchDomain(text) {
-  const t = text || '';
-  const la = LOWALTITUDE.some(k => t.includes(k));
-  const ae = AEROSPACE.some(k => t.includes(k));
-  if (la && ae) return 'both';
-  if (la) return 'lowaltitude';
-  if (ae) return 'aerospace';
-  return null;
+// 兼容导出：老代码（和测试）按 LOWALTITUDE / AEROSPACE / NOISE 读词表，
+// 现在这三个都是词库的投影，仍然是普通字符串数组。
+function surfacesOf(domain) {
+  const terms = lexicon.loadLexicon().byDomain[domain] || [];
+  return [...new Set(terms.flatMap(term => term.surfaces))];
 }
 
+const LOWALTITUDE = surfacesOf('lowaltitude');
+const AEROSPACE = surfacesOf('aerospace');
+const NOISE = NOISE_PATTERNS;
+
+// 领域归属：'lowaltitude' | 'aerospace' | 'both' | null
+// 判定交给词库的加权逻辑，单个泛词（航空、卫星）不足以定性
+function matchDomain(text) {
+  const summary = lexicon.analyze(text);
+  if (!lexicon.isRelevantSummary(summary)) return null;
+  return summary.domain;
+}
+
+// 命中的词条数量（启发式打分用作强度信号）
 function keywordHits(text) {
-  const t = text || '';
-  let n = 0;
-  for (const k of [...LOWALTITUDE, ...AEROSPACE]) if (t.includes(k)) n++;
-  return n;
+  return lexicon.analyze(text).count;
+}
+
+// 完整的相关性画像：领域、命中词、权重和、噪声数——打分与预筛都从这里取数，
+// 一次分析复用，不必在多处重复扫描同一段文本
+function relevanceOf(text) {
+  const summary = lexicon.analyze(text);
+  const noise = noiseHits(text);
+  return {
+    ...summary,
+    noiseHits: noise,
+    relevant: lexicon.isRelevantSummary(summary) && noise < 2
+  };
+}
+
+function noiseHits(text) {
+  const haystack = String(text || '');
+  let hits = 0;
+  for (const pattern of NOISE_PATTERNS) if (haystack.includes(pattern)) hits++;
+  return hits;
 }
 
 function isNoise(text) {
-  return NOISE.some(k => (text || '').includes(k));
+  return noiseHits(text) > 0;
 }
 
-module.exports = { LOWALTITUDE, AEROSPACE, matchDomain, keywordHits, isNoise };
+module.exports = {
+  LOWALTITUDE, AEROSPACE, NOISE, NOISE_PATTERNS,
+  matchDomain, keywordHits, relevanceOf, noiseHits, isNoise
+};

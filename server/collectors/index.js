@@ -18,6 +18,52 @@ const ADAPTERS = {
   api: apiAdapter   // 公开 JSON API（东方财富关键词搜索等）
 };
 
+// 信源迁移 —— 改地址、修选择器、清退死源。
+// 必须在 INSERT OR IGNORE 补新源之前跑：种子库里写的已经是新地址，
+// 先补源的话新地址会被插成第二条，老的那条继续每轮空转，用户看到的是一堆重复与红叉。
+// 每一步都幂等，可以反复执行。
+function applySourceMigrations(migrations) {
+  if (!Array.isArray(migrations) || !migrations.length) return 0;
+  const findByUrl = db.prepare('SELECT * FROM sources WHERE url = ?');
+  let applied = 0;
+
+  for (const step of migrations) {
+    const current = findByUrl.get(step.from);
+    if (!current) continue;   // 用户已删或本来就没有，不复活
+
+    if (step.retire) {
+      if (!current.enabled) continue;
+      db.prepare('UPDATE sources SET enabled=0, note=?, consecutive_errors=0, next_fetch_at=NULL WHERE id=?')
+        .run(step.note || current.note, current.id);
+      applied++;
+      continue;
+    }
+
+    // 目标地址已经有独立的一行了（用户手工加过，或上一次迁移只跑了一半）：
+    // 不能撞 url 唯一约束，把老的那条停掉即可。
+    if (step.to && step.to !== step.from && findByUrl.get(step.to)) {
+      if (current.enabled) {
+        db.prepare('UPDATE sources SET enabled=0 WHERE id=?').run(current.id);
+        applied++;
+      }
+      continue;
+    }
+
+    db.prepare(`UPDATE sources SET url=?, name=?, tier=?, selector_json=?, note=?,
+        consecutive_errors=0, next_fetch_at=NULL, last_status=NULL WHERE id=?`)
+      .run(
+        step.to || current.url,
+        step.name || current.name,
+        step.tier || current.tier,
+        step.selector ? JSON.stringify(step.selector) : current.selector_json,
+        step.note || current.note,
+        current.id
+      );
+    applied++;
+  }
+  return applied;
+}
+
 // 首次启动导入种子信源；之后按 seed 文件 _version 幂等增量补充新源
 // （url 唯一，INSERT OR IGNORE 不覆盖用户改动；同一版本只补一次，不复活用户已删项）
 function seedSources() {
@@ -30,6 +76,9 @@ function seedSources() {
 
   // 全新库：全量导入；已有库：仅当 seed 版本更高时增量补新源
   if (count > 0 && applied >= seedVersion) return;
+
+  const migrated = count > 0 ? applySourceMigrations(seed._migrations) : 0;
+  if (migrated) console.log(`[collect] 信源迁移（v${seedVersion}）：修正 ${migrated} 个`);
 
   const stmt = db.prepare(`INSERT OR IGNORE INTO sources
     (name, type, url, tier, domain, enabled, selector_json, note, intl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -111,4 +160,4 @@ async function collectAll(onProgress, { force = false } = {}) {
   return { results, skipped };
 }
 
-module.exports = { collectAll, seedSources };
+module.exports = { collectAll, seedSources, applySourceMigrations };

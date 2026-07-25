@@ -383,7 +383,8 @@ body {
 .pulse-dot.busy { background: var(--flag); box-shadow: 0 0 8px var(--flag); animation-duration: .8s; }
 @keyframes pulse { 50% { opacity: .35; } }
 
-.tower-actions { display: flex; align-items: center; gap: var(--sp-2); }
+/* position: relative 是词库面板的定位基准 —— 面板要贴着检索框下方展开 */
+.tower-actions { position: relative; display: flex; align-items: center; gap: var(--sp-2); }
 
 .searchbox {
   display: flex; align-items: center; gap: var(--sp-2);
@@ -421,6 +422,91 @@ body {
 .search-clear:hover { background: var(--active-bg); color: var(--c-fg); }
 .searchbox.has-value .search-clear { display: grid; }
 .searchbox.has-value .search-hint { display: none; }
+
+/* ---------- 核心词库面板 ---------- */
+/* 词库入口贴在检索框右缘：它服务的正是「我该搜什么」这一步，离检索框越近越顺手 */
+.lexicon-toggle {
+  flex-shrink: 0; display: grid; place-items: center; width: 22px; height: 22px;
+  border: none; border-radius: var(--radius-xs); padding: 0; cursor: pointer;
+  background: none; color: var(--c-fg-faint);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.lexicon-toggle svg { width: 15px; height: 15px; }
+.lexicon-toggle:hover { color: var(--accent-ink); background: var(--hover-bg); }
+.lexicon-toggle.is-on { color: var(--accent-ink); background: var(--accent-soft); }
+
+.lexicon-panel {
+  position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 60;
+  width: min(560px, calc(100vw - 2 * var(--gutter)));
+  max-height: min(620px, calc(100vh - 120px));
+  display: flex; flex-direction: column;
+  border-radius: var(--radius-lg); padding: var(--sp-4);
+  box-shadow: var(--shadow-pop, 0 20px 50px rgba(0, 0, 0, .45));
+}
+.lexicon-panel[hidden] { display: none; }
+/* .glass 的底色只有 8.5% 不透明度——卡片压在页面底色上够用，但这是一块浮在
+   滚动正文之上的浮层，透过去就没法读了。与提报信源的对话框同样处理：给足底色。 */
+[data-theme="dark"] .lexicon-panel { background: linear-gradient(165deg, rgba(20,28,58,.97), rgba(10,16,38,.98)); }
+[data-theme="light"] .lexicon-panel { background: linear-gradient(168deg, rgba(255,255,255,.98), rgba(252,250,244,.97)); }
+.lexicon-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+.lexicon-head h3 {
+  font-family: var(--font-display); font-size: var(--t-lg);
+  color: var(--c-fg); margin: 0; letter-spacing: .02em;
+}
+.lexicon-sub {
+  margin: 3px 0 0; font-size: var(--t-xs); color: var(--c-fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.btn-icon-sm { width: 26px; height: 26px; flex-shrink: 0; }
+.btn-icon-sm svg { width: 9px; height: 9px; }
+
+.lexicon-filters { margin-top: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+.lexicon-filters input {
+  width: 100%; background: var(--input-bg); color: var(--c-fg);
+  border: 1px solid var(--glass-border); border-radius: 99px;
+  padding: 7px var(--sp-4); font-size: var(--t-sm); font-family: var(--font-ui); outline: none;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.lexicon-filters input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.lexicon-filters input::-webkit-search-cancel-button { display: none; }
+.lexicon-scopes { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.lexicon-body {
+  margin-top: var(--sp-3); overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+}
+.lexicon-empty {
+  margin: 0; padding: var(--sp-6) 0; text-align: center;
+  font-family: var(--font-body); font-size: var(--t-sm); color: var(--c-fg-faint);
+}
+.lexicon-group h4 {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 var(--sp-2);
+  font-size: var(--t-xs); font-weight: 600; color: var(--c-fg-dim);
+  letter-spacing: .06em;
+}
+.lex-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.lex-dot-la { background: var(--accent); }
+.lex-dot-ae { background: var(--second); }
+.lexicon-terms { display: flex; flex-wrap: wrap; gap: 5px; }
+.lex-term {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--glass-border); border-radius: 99px;
+  background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
+  padding: 4px 5px 4px 10px; font-size: var(--t-xs); font-family: var(--font-ui);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease);
+}
+.lex-term:hover { color: var(--c-fg); border-color: var(--accent-line); background: var(--hover-bg); }
+.lex-count {
+  min-width: 18px; padding: 0 5px; border-radius: 99px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-family: var(--font-mono); font-size: var(--t-2xs); line-height: 16px;
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+/* 库里一条都没有的词照样列出来——它标记的是「这个方向我还没捕到东西」，
+   本身就是情报，所以只压低对比度而不隐藏 */
+.lex-term.is-empty { opacity: .45; }
+.lex-term.is-empty .lex-count { background: var(--hover-bg); color: var(--c-fg-faint); }
 
 /* ---------- 按钮 ---------- */
 .btn-icon {
@@ -1300,6 +1386,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 96px; }
   .tab { font-size: var(--t-md); padding: 6px var(--sp-3); letter-spacing: 1px; }
   .searchbox { width: 100%; order: -1; }
   .tower-actions { flex-wrap: wrap; gap: 6px; }
+  /* 窄屏下 tower-actions 会换行，面板贴右缘会露出屏外，改为铺满可用宽度 */
+  .lexicon-panel { left: 0; right: 0; width: auto; }
 }
 @media (max-width: 720px) {
   :root { --gutter: 12px; }

@@ -54,6 +54,53 @@ test('the inverted index finds exactly the pairs a brute-force scan would find',
   }
 });
 
+// v0.0.7：overlap 系数的分母是较短者，短标题因此极易越过阈值——
+// 14 字的标题只有 13 个 bigram，撞上 6 个就是 0.46。并查集又是单链接聚类，
+// A~B、B~C、C~D 会把整条链并成一簇；实测 2000 条规模下出现过 149 条的巨簇。
+test('绝对交集下限切断短标题的串链，只保留真正共享足够多字的相似对', () => {
+  const docs = [
+    { id: 1, text: '我国成功发射千帆极轨卫星', domain: 'aerospace' },
+    { id: 2, text: '我国成功发射天链卫星', domain: 'aerospace' }
+  ].map(doc => ({ ...doc, grams: bigrams(doc.text) }));
+
+  const withoutFloor = new Set();
+  findSimilarPairs(docs, 0.42, (a, b) => withoutFloor.add(`${a.id}:${b.id}`), 0);
+  const withFloor = new Set();
+  findSimilarPairs(docs, 0.42, (a, b) => withFloor.add(`${a.id}:${b.id}`), 8);
+
+  // 「我国成功发射」+「卫星」共 7 个 bigram，比例够但绝对量不够：正是要挡的那种
+  assert.equal(withoutFloor.size, 1, '不设下限时这两条会被判为同一事件');
+  assert.equal(withFloor.size, 0, '设下限后不再合并');
+});
+
+test('簇容量上限阻止相似度误判吞掉半个库', () => {
+  const sourceId = db.prepare(`INSERT INTO sources (name, type, url, tier, domain)
+    VALUES ('容量测试', 'rss', ?, 'T2', 'aerospace')`)
+    .run(`https://example.com/cap-${Date.now()}`).lastInsertRowid;
+  const insert = db.prepare(`INSERT INTO articles
+    (source_id, title, url, fetched_at, relevant, analyzed, quality_score, domain)
+    VALUES (?, ?, ?, ?, 1, 1, 70, 'aerospace')`);
+  const stamp = Date.now();
+  // 40 条近乎一致的标题：不设上限会并成一个 40 条的巨簇
+  for (let i = 0; i < 40; i++) {
+    insert.run(sourceId,
+      `蓝箭航天朱雀三号运载火箭首次入轨发射任务取得圆满成功第${i}报`,
+      `https://example.com/cap-${stamp}-${i}`, now());
+  }
+
+  clusterRecent();
+  const maxSize = db.prepare('SELECT MAX(size) m FROM clusters').get().m;
+  const configured = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'config', 'scoring.json'), 'utf8')).clusterMaxSize;
+  assert.ok(maxSize <= configured, `最大簇 ${maxSize} 超过上限 ${configured}`);
+  // 上限不是「丢掉多余的」：剩下的条目应当另起新簇，而不是被扔在簇外
+  assert.ok(db.prepare('SELECT COUNT(*) c FROM clusters').get().c >= 2, '越界的成员应当另成簇');
+
+  db.prepare('DELETE FROM articles WHERE source_id = ?').run(sourceId);
+  db.prepare('DELETE FROM sources WHERE id = ?').run(sourceId);
+  clusterRecent();
+});
+
 test('an unchanged corpus is detected and reclustering performs no writes', () => {
   const sourceId = db.prepare(`INSERT INTO sources (name, type, url, tier, domain)
     VALUES ('幂等测试', 'rss', ?, 'T2', 'aerospace')`).run(`https://example.com/idempotent-${Date.now()}`).lastInsertRowid;

@@ -62,6 +62,33 @@
       <button class="search-clear" id="searchClear" type="button" aria-label="清除检索词">
         <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       </button>
+      <button class="lexicon-toggle" id="btnLexicon" type="button"
+              title="核心词库：低空经济与商业航天的重点词，带库内命中条数（Alt+K）"
+              aria-label="打开核心词库" aria-expanded="false" aria-controls="lexiconPanel">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.5 4.5h5a2 2 0 0 1 2 2v9a1.6 1.6 0 0 0-1.6-1.6H3.5Zm13 0h-5a2 2 0 0 0-2 2v9a1.6 1.6 0 0 1 1.6-1.6h5.4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <!-- 核心词库面板：按组罗列低空经济与商业航天的重点词，每个词带本地库命中条数，点击即检索 -->
+    <div class="lexicon-panel glass" id="lexiconPanel" role="dialog" aria-label="核心词库" hidden>
+      <div class="lexicon-head">
+        <div>
+          <h3>核心词库</h3>
+          <p class="lexicon-sub" id="lexiconSummary">载入中…</p>
+        </div>
+        <button class="btn-icon btn-icon-sm" id="lexiconClose" type="button" aria-label="关闭词库">
+          <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="lexicon-filters">
+        <input id="lexiconFilter" type="search" placeholder="在词库中过滤…" aria-label="在词库中过滤" autocomplete="off">
+        <div class="lexicon-scopes" role="group" aria-label="词库领域筛选">
+          <button class="chip active" data-lex-domain="">全部</button>
+          <button class="chip" data-lex-domain="lowaltitude">低空经济</button>
+          <button class="chip" data-lex-domain="aerospace">商业航天</button>
+          <button class="chip" data-lex-hits="1" aria-pressed="false">仅看有命中</button>
+        </div>
+      </div>
+      <div class="lexicon-body" id="lexiconBody" aria-live="polite"></div>
     </div>
     <button class="rt-toggle active" id="btnRealtime" title="实时更新：自动捕捉新情报并跟上评分" aria-pressed="true">
       <span class="rt-dot" aria-hidden="true"></span>实时

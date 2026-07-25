@@ -618,6 +618,35 @@ test('界面偏好接受星标视图，重启后能回到收藏夹', () => {
   assert.deepEqual(schema.createUiPreferencePatch('view', 'nonsense', CommonLinks), {});
 });
 
+test('核心词库面板挂在检索框旁，带库内命中数并且选词即检索', () => {
+  // 入口紧贴检索框：面板服务的正是「我该搜什么」这一步
+  assert.match(html, /id="btnLexicon"[^>]*aria-expanded="false"[^>]*aria-controls="lexiconPanel"/);
+  assert.match(html, /id="lexiconPanel"[^>]*role="dialog"[^>]*hidden/);
+  assert.match(html, /id="lexiconFilter"/);
+  assert.match(html, /id="lexiconBody"[^>]*aria-live="polite"/);
+  for (const scope of ['data-lex-domain=""', 'data-lex-domain="lowaltitude"', 'data-lex-domain="aerospace"']) {
+    assert.ok(html.includes(scope), `缺少领域筛选 ${scope}`);
+  }
+  assert.match(app, /await api\('\/api\/lexicon'\)/);
+  assert.match(app, /data-lex-term="\$\{esc\(item\.term\)\}"/);
+  assert.match(app, /class="lex-count">\$\{item\.count\}/);
+  // 面板上的条数按「全部动态」口径统计，选词后就必须落到同一个视图，
+  // 否则在「精选」里检索会看到远少于面板承诺的结果，那个数字立刻不可信
+  assert.match(app, /if \(state\.view === 'all'\) loadFeed\(\);\s*\n\s*else switchView\('all', \{ persist: false \}\);/);
+  for (const selector of ['.lexicon-panel', '.lexicon-terms', '.lex-term', '.lex-count', '.lex-term.is-empty']) {
+    assert.ok(css.includes(selector), `缺少 ${selector} 样式`);
+  }
+  // 面板是绝对定位的，必须有定位基准，否则会飘到页面左上角
+  assert.match(css, /\.tower-actions \{[^}]*position: relative/);
+});
+
+test('词库面板抢占 Esc 并有独立快捷键，且点击面板之外会收起', () => {
+  const source = app.slice(app.indexOf("if (event.key === 'Escape')"), app.indexOf('if (event.altKey'));
+  assert.match(source, /if \(!lexiconPanel\.hidden\) \{[\s\S]*setLexiconOpen\(false\)/);
+  assert.match(app, /if \(letter === 'k'\) \{ setLexiconOpen\(lexiconPanel\.hidden\)/);
+  assert.match(app, /if \(lexiconPanel\.contains\(event\.target\) \|\| lexiconToggle\.contains\(event\.target\)\) return;/);
+});
+
 test('库体积展示对空库和各量级都给出可读结果', () => {
   const source = app.match(/function formatBytes\(bytes\)[\s\S]*?\n\}/)[0];
   const formatBytes = new Function(`${source}\nreturn formatBytes;`)();

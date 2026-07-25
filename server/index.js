@@ -17,6 +17,7 @@ const {
   runPipeline, pruneOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
 } = require('./scheduler');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
+const lexicon = require('./ai/lexicon');
 const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
 const { CATEGORIES } = require('./ai/pipeline');
@@ -238,6 +239,85 @@ function invalidateStatsCache() {
   statsCache = null;
 }
 
+// ---------- 词库检索面板 ----------
+// 光有一份词表没用——用户要的是「这个词在我已经捕到的情报里有多少条」，
+// 0 条的词不值得点，40 条的词值得先看。所以这里把词库和本地库的命中数一起返回。
+//
+// 这个数字必须等于点下去真的能看到的卡片数，否则它就是在骗人：
+// 面板写 45、点进去只有 1 条，用户下一次就不会再信这个数了。
+// 因此计数完整复刻「全部动态」视图的口径——同一套检索路径（FTS5 trigram，
+// 短词降级 LIKE）、同一条相关性过滤、同一次事件簇折叠，只是不分页。
+// 前端选词后也固定切到「全部动态」，两边对齐。
+const LEXICON_COUNT_TTL_MS = 60_000;
+let lexiconCache = null;
+
+function matchingArticleIds(surface) {
+  if ([...surface].length >= 3) {
+    try {
+      return db.prepare('SELECT rowid AS id FROM articles_fts WHERE articles_fts MATCH ? LIMIT 500')
+        .all(`"${surface.replace(/"/g, '""')}"`).map(row => row.id);
+    } catch { /* 词里含 FTS 语法字符时降级 LIKE */ }
+  }
+  const pattern = `%${escapeLikePattern(surface)}%`;
+  return db.prepare(
+    `SELECT id FROM articles WHERE title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' LIMIT 500`)
+    .all(pattern, pattern).map(row => row.id);
+}
+
+function countVisible(ids) {
+  if (!ids.length) return 0;
+  // 与「全部动态」同口径：判为无关的不算，事件簇只算主条
+  return db.prepare(`
+    SELECT COUNT(*) c FROM articles a
+    LEFT JOIN clusters c ON c.id = a.cluster_id
+    WHERE a.id IN (${ids.join(',')})
+      AND (a.relevant IS NULL OR a.relevant = 1)
+      AND (a.cluster_id IS NULL OR a.id = c.main_article_id)`).get().c;
+}
+
+// 逐个匹配面单独计数，挑出结果最多的那一个作为这个词的检索式。
+//
+// 不能把各匹配面的命中并起来报数：检索接口一次只吃一个字符串，
+// 「亿航智能」并上别名「亿航」是 13 条，可点下去只搜规范词就只剩 9 条。
+// 反过来只数规范词又会漏掉那些通篇写「亿航」的报道。
+// 取命中最多的那个面，数字与点击结果就永远是同一个东西，而且是能拿到的最大召回。
+function resolveTermQuery(surfaces) {
+  let best = { query: surfaces[0], count: -1 };
+  for (const surface of surfaces) {
+    const count = countVisible(matchingArticleIds(surface));
+    if (count > best.count) best = { query: surface, count };
+  }
+  return { query: best.query, count: Math.max(0, best.count) };
+}
+
+function buildLexiconPanel() {
+  const { groups, version } = lexicon.loadLexicon();
+  let total = 0;
+  const payload = groups.map(group => ({
+    id: group.id,
+    label: group.label,
+    domain: group.domain,
+    terms: group.terms.map(term => {
+      const { query, count } = resolveTermQuery(term.surfaces);
+      total += count ? 1 : 0;
+      return { term: term.term, aliases: term.aliases, weight: term.weight, count, query };
+    })
+  }));
+  return {
+    version,
+    groups: payload,
+    termCount: payload.reduce((sum, group) => sum + group.terms.length, 0),
+    matchedTermCount: total
+  };
+}
+
+function getLexiconPanel(nowMs = Date.now()) {
+  if (!lexiconCache || nowMs - lexiconCache.at >= LEXICON_COUNT_TTL_MS) {
+    lexiconCache = { at: nowMs, value: buildLexiconPanel() };
+  }
+  return lexiconCache.value;
+}
+
 // ---------- 路由 ----------
 const server = http.createServer(async (req, res) => {
   try {
@@ -255,6 +335,8 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/feed' && req.method === 'GET') return json(res, 200, queryFeed(u.searchParams));
       if (p === '/api/stats' && req.method === 'GET') return json(res, 200, getStats());
       if (p === '/api/categories') return json(res, 200, CATEGORIES);
+      // 核心词库 + 每个词在本地情报库中的命中条数（检索面板用）
+      if (p === '/api/lexicon' && req.method === 'GET') return json(res, 200, getLexiconPanel());
 
       const mCluster = p.match(/^\/api\/cluster\/(\d+)$/);
       if (mCluster) return json(res, 200, getCluster(Number(mCluster[1])));

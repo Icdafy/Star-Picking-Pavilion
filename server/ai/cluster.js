@@ -25,7 +25,13 @@ function overlap(a, b) {
 }
 
 // 倒排索引求相似对：postings[bigram] → 已处理文档下标；对文档 i 累加得到与每个 j 的精确交集大小
-function findSimilarPairs(docs, threshold, onPair) {
+//
+// minShared 是防「串珠成链」的关键。overlap 系数的分母是较短者，短标题因此极易越过阈值：
+// 一条 14 字的标题只有 13 个 bigram，撞上 6 个就是 0.46，比 0.42 的阈值还高。
+// 而并查集是单链接聚类——A~B、B~C、C~D 会把整条链并成一个簇。
+// 实测 2000 条规模下出现过 149 条的巨簇，既毁了折叠展示，也让「多源印证」加成变成人人有份。
+// 再加一条绝对交集下限，短标题必须真的共享足够多的字，链就断在源头。
+function findSimilarPairs(docs, threshold, onPair, minShared = 0) {
   const postings = new Map();
   const shared = new Map();
   for (let i = 0; i < docs.length; i++) {
@@ -42,6 +48,7 @@ function findSimilarPairs(docs, threshold, onPair) {
       bucket.push(i);
     }
     for (const [j, count] of shared) {
+      if (count < minShared) continue;
       const other = docs[j];
       // 跨领域（低空 vs 航天）不并簇，避免文本相近导致误合
       if (doc.domain && other.domain && doc.domain !== other.domain) continue;
@@ -88,6 +95,8 @@ function clusterRecent() {
   const scoring = loadScoring();
   const windowH = scoring.clusterWindowHours || 72;
   const threshold = scoring.clusterSimilarityThreshold || 0.5;
+  const minShared = scoring.clusterMinSharedGrams ?? 8;
+  const maxSize = scoring.clusterMaxSize ?? 12;
 
   const rows = db.prepare(`
     SELECT a.id, a.title, a.ai_summary, a.domain, a.cluster_id, a.quality_score, s.tier
@@ -99,12 +108,20 @@ function clusterRecent() {
   // 标题 + AI 摘要一起算 bigram：东财式标题党标题差异大，但 AI 摘要对同一事件描述高度一致，靠摘要才能并簇
   for (const r of rows) r.grams = bigrams(r.title + ' ' + (r.ai_summary || ''));
 
-  // 并查集
+  // 并查集（带簇容量上限）。真实事件在 72 小时窗口里被十几家报道已是顶格，
+  // 再多就说明是相似度误判在串链；拒绝越界的合并，让链断在这里而不是吞掉半个库。
   const parent = new Map(rows.map(r => [r.id, r.id]));
+  const size = new Map(rows.map(r => [r.id, 1]));
   const find = id => { let p = parent.get(id); while (p !== parent.get(p)) p = parent.get(p); parent.set(id, p); return p; };
-  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); };
+  const union = (a, b) => {
+    const ra = find(a), rb = find(b);
+    if (ra === rb) return;
+    if (size.get(ra) + size.get(rb) > maxSize) return;
+    parent.set(ra, rb);
+    size.set(rb, size.get(ra) + size.get(rb));
+  };
 
-  findSimilarPairs(rows, threshold, (a, b) => union(a.id, b.id));
+  findSimilarPairs(rows, threshold, (a, b) => union(a.id, b.id), minShared);
 
   const groups = new Map();
   for (const r of rows) {

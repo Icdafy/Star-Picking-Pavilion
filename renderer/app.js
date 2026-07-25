@@ -1166,6 +1166,144 @@ $('#searchContext').addEventListener('click', event => {
   if (event.target.closest('button[data-act="clear-search"]')) clearSearch();
 });
 
+// ---------- 核心词库面板 ----------
+// 一份纯词表没有用处：用户真正要判断的是「这个词在我已经捕到的情报里有多少条」。
+// 所以面板把词库和本地库的命中数一起展示——0 条的词自然沉下去，有量的词一眼可见，
+// 点一下就把它填进检索框，省掉「想不起来该搜什么」这一步。
+const lexiconPanel = $('#lexiconPanel');
+const lexiconToggle = $('#btnLexicon');
+const lexiconFilter = $('#lexiconFilter');
+const lexiconState = { data: null, loading: false, domain: '', onlyHits: false, filter: '' };
+
+function lexiconVisibleGroups() {
+  const keyword = lexiconState.filter.trim().toLowerCase();
+  return (lexiconState.data?.groups || [])
+    .filter(group => !lexiconState.domain || group.domain === lexiconState.domain)
+    .map(group => ({
+      ...group,
+      terms: group.terms.filter(item => {
+        if (lexiconState.onlyHits && !item.count) return false;
+        if (!keyword) return true;
+        return [item.term, ...(item.aliases || [])]
+          .some(surface => String(surface).toLowerCase().includes(keyword));
+      })
+    }))
+    .filter(group => group.terms.length);
+}
+
+// 服务端会在规范词与别名里挑命中最多的那个当检索式。挑中的若不是规范词，
+// 得在悬浮提示里说清楚——否则用户点「亿航智能」、检索框里出现「亿航」会以为是 bug。
+function lexiconTermHint(item) {
+  const parts = [];
+  if (item.query && item.query !== item.term) parts.push(`按「${item.query}」检索，命中最多`);
+  if (item.aliases?.length) parts.push('含别名：' + item.aliases.join('、'));
+  return parts.join(' · ') || item.term;
+}
+
+function renderLexicon() {
+  const body = $('#lexiconBody');
+  const summary = $('#lexiconSummary');
+  if (lexiconState.loading) { body.innerHTML = '<p class="lexicon-empty">正在统计库内命中…</p>'; return; }
+  if (!lexiconState.data) { body.innerHTML = '<p class="lexicon-empty">词库载入失败，稍后重试</p>'; return; }
+
+  const groups = lexiconVisibleGroups();
+  const shown = groups.reduce((sum, group) => sum + group.terms.length, 0);
+  summary.textContent = `${lexiconState.data.termCount} 个核心词 · ${lexiconState.data.matchedTermCount} 个在库中有命中`
+    + (shown === lexiconState.data.termCount ? '' : ` · 当前显示 ${shown} 个`);
+
+  if (!groups.length) {
+    body.innerHTML = '<p class="lexicon-empty">没有符合条件的词</p>';
+    return;
+  }
+  body.innerHTML = groups.map(group => `
+    <section class="lexicon-group">
+      <h4><span class="lex-dot lex-dot-${group.domain === 'aerospace' ? 'ae' : 'la'}" aria-hidden="true"></span>${esc(group.label)}</h4>
+      <div class="lexicon-terms">
+        ${group.terms.map(item => `
+          <button type="button" class="lex-term${item.count ? '' : ' is-empty'}"
+                  data-lex-term="${esc(item.term)}"
+                  data-lex-query="${esc(item.query || item.term)}"
+                  title="${esc(lexiconTermHint(item))}">
+            ${esc(item.term)}<span class="lex-count">${item.count}</span>
+          </button>`).join('')}
+      </div>
+    </section>`).join('');
+}
+
+async function loadLexicon(force = false) {
+  if (lexiconState.data && !force) return;
+  lexiconState.loading = true;
+  renderLexicon();
+  try {
+    lexiconState.data = await api('/api/lexicon');
+  } catch {
+    lexiconState.data = null;
+  } finally {
+    lexiconState.loading = false;
+    renderLexicon();
+  }
+}
+
+function setLexiconOpen(open) {
+  lexiconPanel.hidden = !open;
+  lexiconToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  lexiconToggle.classList.toggle('is-on', open);
+  if (open) {
+    loadLexicon();
+    lexiconFilter.focus();
+  }
+}
+
+lexiconToggle.addEventListener('click', () => setLexiconOpen(lexiconPanel.hidden));
+$('#lexiconClose').addEventListener('click', () => {
+  setLexiconOpen(false);
+  lexiconToggle.focus();
+});
+
+lexiconFilter.addEventListener('input', event => {
+  lexiconState.filter = event.target.value;
+  renderLexicon();
+});
+
+$('.lexicon-scopes').addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  if (button.dataset.lexHits !== undefined) {
+    lexiconState.onlyHits = !lexiconState.onlyHits;
+    button.classList.toggle('active', lexiconState.onlyHits);
+    button.setAttribute('aria-pressed', lexiconState.onlyHits ? 'true' : 'false');
+  } else {
+    lexiconState.domain = button.dataset.lexDomain || '';
+    for (const scope of $$('.lexicon-scopes [data-lex-domain]')) {
+      scope.classList.toggle('active', scope === button);
+    }
+  }
+  renderLexicon();
+});
+
+// 选词即检索。固定落到「全部动态」，不管当前在哪个视图：
+// 面板上的条数是按全部动态的口径算的，若停在「精选」里检索，
+// 面板写 45、结果只有 1 条，这个数字立刻就不可信了。
+$('#lexiconBody').addEventListener('click', event => {
+  const button = event.target.closest('button[data-lex-term]');
+  if (!button) return;
+  const term = button.dataset.lexQuery || button.dataset.lexTerm;
+  clearTimeout(searchTimer);
+  searchInput.value = term;
+  state.q = term;
+  syncSearchBox();
+  setLexiconOpen(false);
+  if (state.view === 'all') loadFeed();
+  else switchView('all', { persist: false });
+});
+
+// 点面板之外或按 Esc 收起：面板浮在顶栏下方，不该赖着不走
+document.addEventListener('click', event => {
+  if (lexiconPanel.hidden) return;
+  if (lexiconPanel.contains(event.target) || lexiconToggle.contains(event.target)) return;
+  setLexiconOpen(false);
+});
+
 // 手动采集
 $('#btnRefresh').addEventListener('click', async function () {
   this.classList.add('spinning');
@@ -1197,6 +1335,13 @@ function isTypingTarget(element) {
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
+    // 词库面板优先于检索框：面板开着时 Esc 的意思是「收起它」，不是「清空我刚输的词」
+    if (!lexiconPanel.hidden) {
+      setLexiconOpen(false);
+      lexiconToggle.focus();
+      event.preventDefault();
+      return;
+    }
     if (document.activeElement === searchInput) {
       clearSearch();
       searchInput.blur();
@@ -1214,6 +1359,7 @@ document.addEventListener('keydown', event => {
     const letter = String(event.key).toLowerCase();
     if (letter === 't') { toggleTheme(); event.preventDefault(); return; }
     if (letter === 'r') { $('#btnRefresh').click(); event.preventDefault(); return; }
+    if (letter === 'k') { setLexiconOpen(lexiconPanel.hidden); event.preventDefault(); return; }
     // 复制当前视图：信息流复制列表，日报复制整份日报
     if (letter === 'c') {
       if (FEED_VIEWS.includes(state.view)) runExport('feed', 'text', 'copy');

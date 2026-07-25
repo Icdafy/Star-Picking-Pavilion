@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.6.exe`，双击并按向导安装。v0.0.6 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.7.exe`，双击并按向导安装。v0.0.7 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.6.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.7.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -22,6 +22,8 @@ Get-Content .\SHA256SUMS.txt
 
 - 精选、热点与全部动态信息流
 - 低空经济、商业航天领域和分类筛选
+- 113 个内置信源：官方一手、央媒与科技媒体、关键词检索线、公众号与外媒接入位
+- 207 个词条的核心词库，带库内命中条数，点词即检索
 - SQLite FTS5 全文检索与多源事件聚类
 - 每日情报简报和实时增量提示
 - 星标留存与「星标」视图，收藏的情报永久豁免数据保留清理
@@ -36,6 +38,42 @@ Get-Content .\SHA256SUMS.txt
 - 失效信源自动退避重试，避免长期不可达的信源每轮空转
 
 信源被“移出监控”时只会停用，既有信源记录和历史文章不会被删除。
+
+## 捕捉什么、怎么打分
+
+摘星阁只锁定两个领域：**低空经济**与**商业航天**。这两条线之外的内容，无论多热门，都会被判为无关。
+
+### 核心词库
+
+`config/lexicon.json` 定义了这两个领域的核心词：15 个分组、207 个词条、570 个匹配面，每条带权重（w=10 领域定义词，w=6~9 核心主题与具名主体，w=2~5 相关概念）与别名。它是一份事实、三处使用：
+
+1. **检索入口**：点顶栏检索框旁的词库图标（或按 <kbd>Alt</kbd>+<kbd>K</kbd>）打开面板，按组罗列全部核心词，**每个词实时显示它在你本地情报库里的命中条数**，点一下就检索。可按领域筛选、只看有命中的词，或直接输入过滤。命中数与「全部动态」完全同口径，面板写几条点下去就是几条。
+2. **打分**：命中词的权重和决定质量分的贴合度加成。
+3. **采集与预筛**：关键词型信源的入库守卫，以及未配置 API Key 时的启发式判定。
+
+想加新赛道或新公司，改这一个文件即可，采集、打分、检索三处同时生效。
+
+### 打分公式
+
+质量分由代码算出，模型只负责给五个维度打分（学习 AIHOT 的「能用脚本就别用模型」）：
+
+```
+质量分 = clamp(0,100,
+    Σ(维度权重 × 维度分) × 信源等级系数    // 模型给的五维分
+  + 词库贴合加成                            // 命中词的权重和，饱和曲线
+  + 多源印证加成                            // 事件簇里还有几家在报，饱和曲线
+  − 噪声形态惩罚 )                          // 股评软文、综合汇总、机关党务
+```
+
+后三项是模型看不到、代码却算得出的信号。三者都用饱和曲线，堆词、堆信源刷不满分。
+
+**精选门槛是自适应的**：取最近 14 天相关条目的分数分布，找目标精选率（默认 14%）对应的分位数来定门槛，各分类之间的相对高低不变。门槛有地板——整批都不合格时精选页就该是空的。全部参数在 `config/scoring.json`，改完秒级生效。
+
+### 信源
+
+信源分三级：T1 官方一手、T1.5 官方次级渠道、T2 媒体与聚合检索，等级直接进入打分系数。关键词检索线（`eastmoney://关键词`）默认相关性优先并叠加一路时效补充，可按 `?pages=2` 翻页；标题与摘要都不沾关键词、也不落在同领域词库内的条目在入库前就会被丢弃。
+
+微信公众号没有公开接口，需经 RSSHub 或 Wechat2RSS 中转：在「设置」填好 RSSHub 地址后启用种子库里的接入位，或直接用 Wechat2RSS 生成的完整地址新建一条 RSS 信源。公共 RSSHub 实例在 2026-07 实测普遍不可达，建议自建。
 
 ## 留存与分发
 
@@ -123,7 +161,7 @@ npm run server              # 独立开发服务器，默认 http://127.0.0.1:76
 npm run pipeline            # 手动采集、分析、聚类
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.6 --artifacts
+npm run verify:version -- --tag v0.0.7 --artifacts
 npm run notices
 ```
 

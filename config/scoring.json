@@ -1,5 +1,6 @@
 {
-  "_说明": "计分公式参数 —— 学习 AIHOT 的思路：模型只给五维分，最终质量分由这里的公式权重用代码算出来，随时可调，秒级生效",
+  "_说明": "计分公式参数 —— 学习 AIHOT 的思路：模型只给五维分，最终质量分由这里的公式权重用代码算出来，随时可调，秒级生效。v0.0.7 在维度分之外加了三个模型看不到、代码却算得出的信号：词库贴合度、多源印证、噪声形态。",
+  "_公式": "质量分 = clamp(0,100, Σ(维度权重 × 维度分) × 信源等级系数 + 词库加成 + 印证加成 − 噪声惩罚)",
   "dimensionWeights": {
     "importance": 0.32,
     "novelty": 0.18,
@@ -12,8 +13,23 @@
     "T1.5": 1.0,
     "T2": 0.85
   },
+  "lexiconBoost": {
+    "_说明": "命中 config/lexicon.json 核心词库的加成。按命中词的权重和给分（一个 w=10 的定义词胜过五个 w=2 的边缘词），收益递减：权重和达到 saturationWeight 时拿到 maxBonus 的一半。",
+    "maxBonus": 8,
+    "saturationWeight": 18
+  },
+  "corroborationBoost": {
+    "_说明": "多源印证加成。同一事件簇里除自己之外还有几个信源在报，越多越可能是真的行业大事。单条报道（簇大小 1）加 0 分。",
+    "maxBonus": 6,
+    "saturationSources": 2
+  },
+  "noisePenalty": {
+    "_说明": "噪声形态惩罚。股评软文、涨停快讯这类内容五维分常常不低，但对读者是纯干扰；命中 keywords.js 的 NOISE_PATTERNS 越多扣得越狠，扣到 maxPenalty 封顶。",
+    "perHit": 7,
+    "maxPenalty": 21
+  },
   "featuredThresholds": {
-    "_说明": "各分类精选门槛分（0-100）。学习 AIHOT「保护用户注意力」：精选率控制在 ~14%（相关项）。官方政策/发射门槛略低（一手信息值得看），二手观点门槛高。调高=更精，调低=更多",
+    "_说明": "各分类精选门槛分（0-100）。学习 AIHOT「保护用户注意力」：精选率控制在 ~14%（相关项）。官方政策/发射门槛略低（一手信息值得看），二手观点门槛高。调高=更精，调低=更多。实际生效值 = 这里的静态阈值 + adaptiveFeatured 算出的全局偏移。",
     "政策法规": 69,
     "发射与任务": 71,
     "企业动态": 70,
@@ -23,8 +39,18 @@
     "观点报告": 75,
     "default": 70
   },
+  "adaptiveFeatured": {
+    "_说明": "精选率自适应校准。固定阈值在信息丰枯不均时会让精选页忽而泛滥忽而空荡；这里改为把整体精选率钉在 targetRate 附近：取最近 sampleDays 天相关条目的质量分分布，找目标比例对应的分位数，与 default 阈值的差即为全局偏移（各分类的相对高低不变）。样本不足 minSamples 时不偏移，偏移量夹在 ±maxShift 以内——这道夹取同时是精选的「质量地板」：当一整段时间的分数全部低于 default−maxShift，精选页就该是空的，「top 14% 的垃圾」仍然是垃圾。偏移生效时不再叠加 heuristicThresholdDiscount——分位数已经量过真实分布，再打一次折等于把门槛砍两遍。enabled 置 false 即退回纯静态阈值。",
+    "enabled": true,
+    "targetRate": 0.14,
+    "sampleDays": 14,
+    "minSamples": 60,
+    "maxShift": 15
+  },
   "heatDecayHalfLifeHours": 36,
   "clusterSimilarityThreshold": 0.42,
+  "clusterMinSharedGrams": 8,
+  "clusterMaxSize": 12,
   "clusterWindowHours": 72,
   "heuristicThresholdDiscount": 0.85
 }

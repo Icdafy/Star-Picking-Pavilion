@@ -1,6 +1,8 @@
 'use strict';
 
 const { HttpError } = require('./http-security');
+// 与采集器共用同一个解析器：信源地址的写法只有一处定义，校验与采集不会各说各话
+const { parseEastmoneySpec } = require('./collectors/api');
 
 const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api']);
 const SOURCE_TIERS = new Set(['T1', 'T1.5', 'T2']);
@@ -38,11 +40,13 @@ function validateSourceUrl(type, value) {
   const url = boundedString(value, '信源地址', { min: 1, max: 2048 });
   if (type === 'api') {
     if (!url.startsWith('eastmoney://')) badRequest('API 信源当前仅支持 eastmoney://关键词');
-    let keyword;
-    try { keyword = decodeURIComponent(url.slice('eastmoney://'.length)); } catch {
-      badRequest('eastmoney 关键词编码无效');
+    // 形如 eastmoney://关键词?pages=2&mode=both&guard=off —— 关键词与可选参数分开校验，
+    // 否则 "?pages=2" 会被当成关键词的一部分混过长度检查
+    let spec;
+    try { spec = parseEastmoneySpec(url); } catch (error) {
+      badRequest(error instanceof HttpError ? error.message : 'eastmoney 信源格式无效');
     }
-    boundedString(keyword, 'eastmoney 关键词', { min: 1, max: 100 });
+    boundedString(spec.keyword, 'eastmoney 关键词', { min: 1, max: 100 });
     return url;
   }
   if (type === 'rss' && url.startsWith('rsshub://')) {

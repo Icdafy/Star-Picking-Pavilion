@@ -5,7 +5,7 @@
 //   · runPipeline：手动「立即采集分析」一次性全量（采集→抽干分析→聚类），供 /api/collect 与脚本用
 const cron = require('node-cron');
 const { collectAll } = require('./collectors');
-const { analyzePending } = require('./ai/pipeline');
+const { analyzePending, rescoreAfterClustering } = require('./ai/pipeline');
 const { clusterRecent } = require('./ai/cluster');
 const { generateDaily } = require('./ai/daily');
 const { pruneDatabase } = require('./retention');
@@ -87,8 +87,13 @@ async function analyzeOnce(trigger = 'loop', limit = 60) {
     const r = await analyzePending(null, limit);
     lastAnalyzeAt = new Date().toISOString();
     if (r.analyzed > 0) {
+      // 先聚类再重算：多源印证要等簇成型才知道，而精选阈值又依赖最新的分数分布，
+      // 顺序反过来的话「五家同时报道」这个最强信号永远进不了当轮的精选判定
       clusterRecent();
-      console.log(`[analyze] (${trigger}) 打分 ${r.analyzed} 条（${r.mode}），精选累计 ${r.featured ?? '-'}`);
+      const rescore = rescoreAfterClustering();
+      console.log(`[analyze] (${trigger}) 打分 ${r.analyzed} 条（${r.mode}），`
+        + `聚类后重算 ${rescore.changed}/${rescore.rescored} 条，`
+        + `精选阈值偏移 ${rescore.shift >= 0 ? '+' : ''}${rescore.shift}，精选累计 ${r.featured ?? '-'}`);
     }
     return r;
   } finally {
@@ -108,8 +113,9 @@ async function runPipeline(trigger = 'manual') {
     if (!r.analyzed) break;
   }
   clusterRecent();
-  console.log(`[pipeline] 手动全量完成：分析 ${total} 条`);
-  return { ...lastRun, analyzed: total };
+  const rescore = rescoreAfterClustering();
+  console.log(`[pipeline] 手动全量完成：分析 ${total} 条，聚类后重算 ${rescore.changed} 条`);
+  return { ...lastRun, analyzed: total, rescored: rescore.changed };
 }
 
 function startScheduler() {
