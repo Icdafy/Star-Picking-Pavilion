@@ -1,7 +1,8 @@
 'use strict';
 /* 摘星阁 · 前端逻辑（零依赖原生 JS）
-   v0.3：双主题切换 / 时间轴日期分组信息流 / 右侧热度栏
-        / 键盘快捷键 / 滑动导航指示 / 检索上下文 / 回到顶部 */
+   v0.4：卡片改为按领域着色（左缘色条由 data-domain 驱动），
+         元信息回归纯文字、评分胶囊收敛为配角；日报节改走样式表类，
+         缩略图解码让出主线程。交互与状态逻辑与 v0.3 一致。 */
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -321,7 +322,6 @@ function scorePill(item) {
 }
 
 function cardInner(item) {
-  const d = item.domain;
   const dims = item.scores ? Object.entries(DIM_NAMES).map(([k, name]) => `
     <div class="dim">
       <div class="dim-label"><span>${name}</span><b>${Math.round(item.scores[k] ?? 0)}</b></div>
@@ -357,7 +357,7 @@ function cardInner(item) {
       <span class="cr-text">${esc(item.reason)}</span>
     </div>` : '';
   const thumb = DomUtils.safeHttpUrl(item.image) !== '#'
-    ? `<img class="card-thumb" src="${safeUrl(item.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+    ? `<img class="card-thumb" src="${safeUrl(item.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
     : '';
 
   return `
@@ -365,7 +365,6 @@ function cardInner(item) {
       <div class="card-meta">
         <span class="meta-source">${esc(item.source)}</span>
         <span class="tier-chip tier-${esc(item.tier)}">${esc(item.tier)}</span>
-        ${d ? `<span class="domain-dot ${d === 'lowaltitude' ? 'la' : 'ae'}"><i></i>${DOMAIN_NAME[d] || ''}</span>` : ''}
         ${item.category ? `<span class="cat-tag">${esc(item.category)}</span>` : ''}
         <span>${timeAgo(item.publishedAt || item.fetchedAt)}</span>
       </div>
@@ -424,7 +423,7 @@ function renderTimeline(items, startIdx, timeOf = publishedTime) {
             <span class="tl-time">${hhmm(timeOf(item))}</span>
             <i class="tl-dot ${item.domain === 'lowaltitude' ? 'la' : item.domain === 'aerospace' ? 'ae' : ''}"></i>
           </div>
-          <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}" style="animation-delay:${Math.min(startIdx + i, 10) * 35}ms">
+          <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}"${item.domain ? ` data-domain="${esc(item.domain)}"` : ''} style="animation-delay:${Math.min(startIdx + i, 10) * 35}ms">
             ${cardInner(item)}
           </article>
         </div>`).join('')}
@@ -438,7 +437,7 @@ function renderRanked(items, startIdx) {
     return `
     <div class="rank-row">
       <div class="card-rank${rank <= 3 ? ' top' : ''}">${String(rank).padStart(2, '0')}</div>
-      <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}" style="animation-delay:${Math.min(i, 10) * 35}ms">
+      <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}"${item.domain ? ` data-domain="${esc(item.domain)}"` : ''} style="animation-delay:${Math.min(i, 10) * 35}ms">
         ${cardInner(item)}
       </article>
     </div>`;
@@ -668,7 +667,7 @@ async function loadDaily(date) {
       return;
     }
     body.innerHTML = r.sections.map(sec => `
-      <div class="daily-section glass" style="padding:18px 22px">
+      <div class="daily-section glass">
         <div class="daily-section-title">${esc(sec.category)}</div>
         ${sec.items.map(it => `
           <div class="daily-item">

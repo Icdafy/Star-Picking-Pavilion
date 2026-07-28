@@ -1,7 +1,17 @@
 /* ============================================================
-   摘星阁 · 双主题设计系统 v3（排版重制）
+   摘星阁 · 双主题设计系统 v4（观感精修）
    深空夜航（默认）—— OLED 墨蓝液态玻璃，夜航塔台气质
    宣纸白 —— 墨色纸面，报馆情报看板气质
+
+   v4 修的是「第一眼观感」，不换骨架：
+   - 图层：玻璃不再套玻璃。导航浮层加重、卡片落回素色，背景与前景分开；
+     极光/星点/颗粒降噪，只留「夜航」的氛围，不再抢内容的戏。
+   - 层级：卡片收敛成「来源 → 标题 → 摘要 → 研判 → 操作」一条视觉动线，
+     评分胶囊退到它该有的配角位；领域由整张卡片的左缘色条表达，
+     不再靠文字标签重复播报。
+   - 控件：导航、领域筛选、缩放档位统一为带底槽的分段控件；
+     卡片底部的「星标 / 复制」从幽灵小字改为常态可见的描边按钮——
+     开源给同事用，功能要让人找得到。
 
    字体：中文一律思源黑体（随包内置，见 fonts/source-han-sans-sc/），
          英文与数字一律 Times New Roman。二者靠一条字体栈同时生效——
@@ -122,17 +132,28 @@
   --danger-soft: rgba(248, 113, 113, .12);
   --danger-line: rgba(248, 113, 113, .4);
 
-  --glass-bg: linear-gradient(165deg, rgba(148,178,255,.085), rgba(96,118,180,.032) 38%, rgba(70,90,150,.06));
-  --glass-border: rgba(168,190,255,.15);
+  /* 浮层玻璃：导航、面板、热榜、对话框这些「浮在内容之上」的层。
+     v4 比 v3 更实——浮层的职责是把自己和下方滚动的内容分开，
+     太透会叠出重影，这正是旧版「别扭感」的来源之一。 */
+  --glass-bg: linear-gradient(165deg, rgba(148,178,255,.11), rgba(96,118,180,.05) 40%, rgba(70,90,150,.075));
+  --glass-border: rgba(168,190,255,.16);
   --glass-border-strong: rgba(168,190,255,.3);
   --glass-highlight: linear-gradient(90deg, transparent, rgba(210,225,255,.5), transparent);
   --glass-blur: blur(24px) saturate(155%);
   --glass-shadow: 0 18px 50px -18px rgba(0,0,0,.7), 0 4px 14px -8px rgba(0,0,0,.55), inset 0 1px 0 rgba(190,212,255,.06);
   --glass-shadow-lift: 0 26px 64px -20px rgba(0,0,0,.78), 0 8px 22px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(190,212,255,.09);
 
+  /* 卡片落回素色：信息流卡片是「内容」，不是浮层。半透明卡片叠在半透明
+     页底上会让文字显得脏；近实底色给出干净的阅读面，玻璃感交给浮层。 */
+  --card-bg: linear-gradient(172deg, #0d1429, #090f20);
+  --card-border: rgba(148,170,230,.13);
+  --card-shadow: 0 12px 32px -20px rgba(0,0,0,.6), 0 2px 8px -6px rgba(0,0,0,.5);
+  --card-shadow-lift: 0 18px 44px -20px rgba(0,0,0,.7), 0 4px 14px -8px rgba(0,0,0,.55);
+
+  /* 控件底槽：分段控件（导航 / 领域 / 缩放档位）与输入框共用的内凹底色 */
   --input-bg: rgba(8,13,30,.6);
-  --hover-bg: rgba(168,190,255,.06);
-  --active-bg: rgba(168,190,255,.1);
+  --hover-bg: rgba(168,190,255,.07);
+  --active-bg: rgba(168,190,255,.13);
   --rail-line: rgba(168,190,255,.16);
   --scrim: rgba(2,4,12,.62);
   --sticky-veil: linear-gradient(180deg, rgba(4,6,14,.94) 62%, rgba(4,6,14,0));
@@ -179,7 +200,7 @@
   --danger-soft: rgba(220, 38, 38, .09);
   --danger-line: rgba(220, 38, 38, .36);
 
-  --glass-bg: linear-gradient(168deg, rgba(255,255,255,.9), rgba(255,255,255,.7));
+  --glass-bg: linear-gradient(168deg, rgba(255,255,255,.92), rgba(255,255,255,.74));
   --glass-border: rgba(70,84,116,.14);
   --glass-border-strong: rgba(70,84,116,.28);
   --glass-highlight: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
@@ -187,9 +208,15 @@
   --glass-shadow: 0 10px 34px -16px rgba(46,58,89,.22), 0 2px 8px -4px rgba(46,58,89,.1);
   --glass-shadow-lift: 0 20px 48px -18px rgba(46,58,89,.3), 0 4px 14px -8px rgba(46,58,89,.14);
 
+  /* 宣纸主题卡片本来就是实底，这里只把描边与阴影统一到一个口径 */
+  --card-bg: linear-gradient(172deg, rgba(255,255,255,.92), rgba(253,251,246,.85));
+  --card-border: rgba(70,84,116,.13);
+  --card-shadow: 0 8px 26px -14px rgba(46,58,89,.16), 0 1px 6px -4px rgba(46,58,89,.08);
+  --card-shadow-lift: 0 16px 38px -16px rgba(46,58,89,.24), 0 3px 12px -6px rgba(46,58,89,.12);
+
   --input-bg: rgba(255,255,255,.78);
   --hover-bg: rgba(70,84,116,.05);
-  --active-bg: rgba(70,84,116,.09);
+  --active-bg: rgba(70,84,116,.1);
   --rail-line: rgba(70,84,116,.16);
   --scrim: rgba(40,46,66,.38);
   --sticky-veil: linear-gradient(180deg, rgba(246,244,238,.95) 62%, rgba(246,244,238,0));
@@ -273,7 +300,9 @@ body {
 }
 .searchbox:focus-within { outline: none; }
 
-/* ---------- 氛围层 ---------- */
+/* ---------- 氛围层 ----------
+   v4 整体降噪：极光变淡、颗粒变细。氛围层的职责是「有夜航的感觉」，
+   不是「一眼看到三团极光」。 */
 .atmosphere {
   position: fixed; inset: 0; z-index: -1;
   transition: opacity var(--dur-slow) var(--ease);
@@ -295,8 +324,8 @@ body {
   position: absolute; border-radius: 50%;
   filter: blur(90px); will-change: transform;
 }
-[data-theme="dark"] .aurora { opacity: .5; }
-[data-theme="light"] .aurora { opacity: .35; }
+[data-theme="dark"] .aurora { opacity: .32; }
+[data-theme="light"] .aurora { opacity: .26; }
 .aurora-a {
   width: 720px; height: 380px; top: -160px; right: -120px;
   background: radial-gradient(ellipse, rgba(60,110,200,.3), transparent 68%);
@@ -338,8 +367,8 @@ body {
   position: absolute; inset: 0; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-[data-theme="dark"] .grain { opacity: .35; }
-[data-theme="light"] .grain { opacity: .5; }
+[data-theme="dark"] .grain { opacity: .18; }
+[data-theme="light"] .grain { opacity: .3; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -353,7 +382,7 @@ body {
   }
 }
 
-/* ---------- 玻璃基元 ---------- */
+/* ---------- 玻璃基元（浮层专用） ---------- */
 .glass {
   position: relative;
   background: var(--glass-bg);
@@ -403,16 +432,23 @@ body {
   white-space: nowrap;
 }
 
-.tower-stats { display: flex; align-items: center; gap: var(--sp-5); margin-left: auto; }
+/* 数据条：三项数字是「塔台遥测」，给一条安静的数据带，
+   不再让它和检索框、按钮挤在同一视觉层里抢注意力 */
+.tower-stats {
+  display: flex; align-items: center; gap: var(--sp-5); margin-left: auto;
+  padding: .375rem var(--sp-4);
+  border: 1px solid var(--glass-border); border-radius: 99px;
+  background: var(--input-bg);
+}
 .stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .stat-num {
-  font-family: var(--font-mono); font-size: var(--t-xl); font-weight: 600;
-  font-variant-numeric: tabular-nums; line-height: 1.2; color: var(--c-fg);
+  font-family: var(--font-mono); font-size: var(--t-lg); font-weight: 700;
+  font-variant-numeric: tabular-nums; line-height: 1.25; color: var(--c-fg);
 }
 .stat-num.accent { color: var(--flag); }
 [data-theme="dark"] .stat-num.accent { text-shadow: 0 0 14px var(--flag-glow); }
-.stat-label { font-size: var(--t-xs); color: var(--c-fg-faint); letter-spacing: .14em; white-space: nowrap; }
-.stat-divider { width: 1px; height: 1.625rem; background: linear-gradient(transparent, var(--rail-line), transparent); }
+.stat-label { font-size: var(--t-2xs); color: var(--c-fg-faint); letter-spacing: .14em; white-space: nowrap; }
+.stat-divider { width: 1px; height: 1.375rem; background: linear-gradient(transparent, var(--rail-line), transparent); }
 
 .pulse-dot {
   display: inline-block; width: .5625rem; height: .5625rem; border-radius: 50%;
@@ -597,11 +633,13 @@ body {
 .btn-ghost.is-busy, .btn-primary.is-busy { opacity: .7; cursor: progress; }
 
 /* ---------- 导航 ---------- */
+/* v4：导航是全局唯一的玻璃浮层（内容卡片已落回素色），它需要在滚动时
+   清晰地「浮」在信息流之上，所以给它更实的底与更重的影。 */
 .nav {
   /* 用 min() 代替断点：窗口比 --shell 窄时自动让出边距，而 --shell 会随
      根字号变化，写死断点像素值反而对不上。 */
   max-width: min(var(--shell), calc(100% - 2 * var(--gutter)));
-  margin: var(--sp-1) auto var(--sp-5); padding: .625rem var(--sp-4);
+  margin: var(--sp-2) auto var(--sp-5); padding: .5rem var(--sp-3);
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
   position: sticky; top: var(--sticky-top); z-index: 50;
   transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
@@ -611,12 +649,19 @@ body.is-scrolled .nav {
   border-color: var(--glass-border-strong);
 }
 
-.nav-tabs { position: relative; display: flex; gap: var(--sp-1); flex-wrap: wrap; }
+/* 主导航：带底槽的分段控件。轨道给出「这是一组」的整体感，
+   指示块在轨道里滑动，比一排裸字更像一个成熟产品的导航。 */
+.nav-tabs {
+  position: relative; display: flex; gap: .125rem; flex-wrap: wrap;
+  padding: .1875rem; border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border); background: var(--input-bg);
+}
 .tab {
   position: relative; z-index: 1;
-  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 700; letter-spacing: .04em;
-  padding: .4375rem var(--sp-4); border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--font-display); font-size: var(--t-base); font-weight: 600; letter-spacing: .04em;
+  padding: .3125rem var(--sp-3); border-radius: var(--radius-sm); cursor: pointer;
   border: 1px solid transparent; background: none; color: var(--c-fg-dim);
+  white-space: nowrap;
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .tab:hover { color: var(--c-fg); background: var(--hover-bg); }
@@ -637,13 +682,24 @@ body.is-scrolled .nav {
   pointer-events: none;
 }
 
-.nav-filters { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; flex-wrap: wrap; }
+/* 筛选与视图分开一层：导航答「看哪一类」，筛选答「在哪条线里收窄」。
+   用一条细分隔把两者拆开，而不是混排在同一行里互相挤压。 */
+.nav-filters {
+  display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; flex-wrap: wrap;
+  padding-left: var(--sp-3); border-left: 1px solid var(--rail-line);
+}
 
-.domain-pills { display: flex; gap: .3125rem; }
+/* 领域胶囊：与导航同源的底槽分段控件，但形态沿用胶囊类名。
+   注意：app.js 按 .domain-pills .pill 批量改选中态，新按钮不得复用 .pill。 */
+.domain-pills {
+  display: flex; gap: .125rem; padding: .1875rem;
+  border: 1px solid var(--glass-border); border-radius: 99px;
+  background: var(--input-bg);
+}
 .pill {
-  font-size: var(--t-base); padding: .3125rem var(--sp-3); border-radius: 99px; cursor: pointer;
-  border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim);
-  font-family: var(--font-ui); line-height: 1.5;
+  font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--c-fg-dim);
+  font-family: var(--font-ui); line-height: 1.5; white-space: nowrap;
   transition: all var(--dur) var(--ease);
 }
 .pill:hover { color: var(--c-fg); background: var(--hover-bg); }
@@ -835,8 +891,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* 实时新到达卡片的高亮淡出 */
 .card-new { animation: card-flash 2.6s var(--ease) forwards; }
 @keyframes card-flash {
-  0% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring), var(--glass-shadow); }
-  100% { border-color: var(--glass-border); box-shadow: var(--glass-shadow); }
+  0% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring), var(--card-shadow); }
+  100% { border-color: var(--card-border); box-shadow: var(--card-shadow); }
 }
 
 /* —— 日期分组 + 时间轴 —— */
@@ -860,7 +916,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 .tl-row {
   display: grid; grid-template-columns: var(--tl-col) minmax(0, 1fr); gap: 0 var(--tl-gap);
-  position: relative; padding-bottom: var(--sp-3);
+  position: relative; padding-bottom: var(--sp-4);
 }
 /* 轴线与时间点共用 --tl-col 基准，两者中心严格对齐 */
 .tl-row::before {
@@ -885,28 +941,35 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* —— 卡片 —— */
 .feed-list { display: flex; flex-direction: column; }
 
+/* v4：卡片是「内容层」，落回近实底色、去掉逐卡的 backdrop-filter。
+   一是观感——半透明卡叠半透明底让文字发脏；二是性能——长列表每张卡
+   都做一次 24px 高斯模糊，滚动时合成层压力不小。 */
 .card {
   padding: var(--sp-4) var(--sp-5) var(--sp-3);
   border-radius: var(--radius-lg);
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
   position: relative;
   transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   animation: card-in .42s var(--ease-out) backwards;
-}
-.card::before {
-  content: ''; position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
-  background: var(--glass-highlight); pointer-events: none;
+  /* 首屏之外的卡片跳过布局与绘制，长列表滚动明显更省；
+     已渲染高度由 intrinsic-size 占位，滚动条不回跳 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 14rem;
 }
 .card:hover {
   transform: translateY(-2px);
   border-color: var(--glass-border-strong);
-  box-shadow: var(--glass-shadow-lift);
+  box-shadow: var(--card-shadow-lift);
 }
 @keyframes card-in { from { opacity: 0; transform: translateY(12px); } }
+
+/* 领域左缘色条：用颜色说出「这是哪条线」，不再靠元信息里的文字标签。
+   青色=低空经济，靛色=商业航天；与领域胶囊的选中态同色系。 */
+.card[data-domain="lowaltitude"] { border-left: 3px solid var(--accent-line); }
+.card[data-domain="aerospace"] { border-left: 3px solid var(--second-line); }
+.card.is-featured[data-domain] { border-left-color: var(--flag-line); }
 
 /* 头部一行：元信息自适应换行，评分胶囊常驻右侧且不再依赖固定留白 */
 .card-head {
@@ -916,29 +979,31 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .card-meta {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
   font-size: var(--t-xs); color: var(--c-fg-faint); min-width: 0; flex: 1;
+  padding-top: .125rem;
 }
-.meta-source { color: var(--c-fg-dim); font-weight: 700; }
+.meta-source {
+  color: var(--c-fg-dim); font-weight: 700;
+  font-size: var(--t-sm); letter-spacing: .02em;
+}
 .tier-chip {
-  font-family: var(--font-mono); font-size: var(--t-xs); padding: .0625rem .4375rem;
+  font-family: var(--font-mono); font-size: var(--t-2xs); padding: .0625rem .4375rem;
   border-radius: .3125rem; letter-spacing: .04em; white-space: nowrap;
 }
 .tier-T1 { color: var(--flag-ink); background: var(--flag-soft); border: 1px solid var(--flag-line); }
 .tier-T1\.5 { color: var(--second-ink); background: var(--second-soft); border: 1px solid var(--second-line); }
 .tier-T2 { color: var(--c-fg-faint); background: var(--hover-bg); border: 1px solid var(--glass-border); }
 
-.domain-dot { display: inline-flex; align-items: center; gap: .3125rem; white-space: nowrap; }
-.domain-dot i { width: .4375rem; height: .4375rem; border-radius: 50%; }
-.domain-dot.la i { background: var(--accent); }
-.domain-dot.ae i { background: var(--second); }
-
+/* 元信息里的分类标签退为纯文字：来源、等级、时间已经足够，
+   分类再贴一枚描边胶囊只会让首行变成「胶囊串」 */
 .cat-tag {
-  font-size: var(--t-xs); padding: .125rem .5625rem; border-radius: 99px; white-space: nowrap;
-  background: var(--hover-bg); border: 1px solid var(--glass-border);
-  color: var(--c-fg-dim);
+  font-size: var(--t-xs); color: var(--c-fg-faint); white-space: nowrap;
+  letter-spacing: .03em;
 }
+.cat-tag::before { content: '·'; margin-right: var(--sp-2); color: var(--rail-line); }
 
 .card-title {
   font-size: var(--t-lg); font-weight: 700; line-height: 1.5;
+  letter-spacing: .012em;
   color: var(--c-fg); text-decoration: none; cursor: pointer; display: block;
   text-wrap: pretty;
   transition: color var(--dur) var(--ease);
@@ -953,9 +1018,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 .card-tags { display: flex; gap: .375rem; margin-top: .5625rem; flex-wrap: wrap; }
 .card-tag {
-  font-size: var(--t-sm); color: var(--accent-ink); padding: .125rem .625rem;
+  font-size: var(--t-sm); color: var(--accent-ink); padding: .0625rem .5625rem;
   border-radius: 99px; background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
 }
 
 /* 卡片正文 + 缩略图并排 */
@@ -963,17 +1027,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .card-content .card-text { flex: 1; min-width: 0; }
 .card-thumb {
   flex-shrink: 0; width: 7.25rem; aspect-ratio: 4 / 3; object-fit: cover;
-  border-radius: var(--radius-sm); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm); border: 1px solid var(--card-border);
   background: var(--hover-bg); margin-top: .4375rem;
 }
 @container app (max-width: 35rem) { .card-thumb { width: 5.75rem; } }
 
-/* 情报研判（推荐理由 / 编者按） */
+/* 情报研判（推荐理由 / 编者按）：这张卡片上最重要的一句人话，
+   给它一个完整的色块而不是一根细线，读者一眼就能找到「为什么值得看」 */
 .card-reason {
-  margin-top: .6875rem; padding: .5625rem var(--sp-3);
-  border-left: 2px solid var(--flag);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: linear-gradient(100deg, var(--flag-soft), transparent 72%);
+  margin-top: .6875rem; padding: .625rem var(--sp-3);
+  border-left: 3px solid var(--flag);
+  border-radius: var(--radius-xs) var(--radius-sm) var(--radius-sm) var(--radius-xs);
+  background: linear-gradient(100deg, var(--flag-soft), transparent 85%);
   display: flex; gap: .5625rem; align-items: baseline;
 }
 .card-reason .cr-label {
@@ -985,10 +1050,10 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .card-reason .cr-text { font-size: var(--t-base); color: var(--c-fg-dim); }
 
 /* 事件簇展开项里的等级小标 */
-.ci-tier { font-family: var(--font-mono); font-size: var(--t-xs); padding: 0 .3125rem; border-radius: .25rem; }
+.ci-tier { font-family: var(--font-mono); font-size: var(--t-2xs); padding: 0 .3125rem; border-radius: .25rem; }
 
-/* 精选卡左缘辉光（区分精选与普通） */
-.card.is-featured { border-color: var(--pill-feat-border); }
+/* 精选卡：左缘旗标加粗并整体微染，区别于普通卡但不再叠加彩色描边 */
+.card.is-featured { border-left: 3px solid var(--flag-line); }
 .card.is-featured::after {
   content: ''; position: absolute; left: 0; top: 14%; bottom: 14%; width: 2.5px;
   border-radius: 2px; background: linear-gradient(var(--flag), transparent);
@@ -996,19 +1061,20 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 [data-theme="dark"] .card.is-featured::after { box-shadow: 0 0 10px var(--flag-glow); }
 
-/* 精选 / 质量胶囊 */
+/* 精选 / 质量胶囊：信息的配角，收小、降噪。
+   「精选」两个字本身就是观点，不再配火苗图标与它对喊。 */
 .score-pill {
   flex-shrink: 0;
-  display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap;
-  font-size: var(--t-sm); padding: .1875rem .6875rem; border-radius: 99px;
+  display: inline-flex; align-items: center; gap: .3125rem; white-space: nowrap;
+  font-size: var(--t-xs); padding: .125rem .5625rem; border-radius: 99px;
   border: 1px solid var(--glass-border); color: var(--c-fg-faint);
   background: var(--hover-bg); cursor: default;
 }
-.score-pill b { font-family: var(--font-mono); font-size: var(--t-base); font-variant-numeric: tabular-nums; font-weight: 700; }
+.score-pill b { font-family: var(--font-mono); font-size: var(--t-sm); font-variant-numeric: tabular-nums; font-weight: 700; }
 .score-pill.featured {
   background: var(--pill-feat-bg); border-color: var(--pill-feat-border); color: var(--pill-feat-fg);
 }
-.score-pill svg { width: .6875rem; height: .6875rem; }
+.score-pill svg { width: .625rem; height: .625rem; }
 
 /* 热点榜排名 */
 .card-rank {
@@ -1021,9 +1087,12 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .rank-row { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 0 .625rem; padding-bottom: var(--sp-3); }
 
 /* —— 卡片底部操作条 —— */
+/* v4 可发现性：星标/复制从幽灵小字改为常态可见的描边按钮，
+   并用一条细分隔与上方内容分开——操作区就该一眼可见。 */
 .card-foot {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
-  margin-top: .5625rem;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  margin-top: var(--sp-3); padding-top: var(--sp-2);
+  border-top: 1px solid var(--rail-line);
 }
 .cluster-toggle, .dims-toggle {
   display: inline-flex; align-items: center; gap: .375rem;
@@ -1046,13 +1115,14 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .card-foot-gap { flex: 1 1 auto; min-width: var(--sp-2); }
 .card-act {
   display: inline-flex; align-items: center; gap: .3125rem;
-  font-size: var(--t-sm); cursor: pointer; line-height: 1.6;
-  background: none; border: 1px solid transparent; padding: .1875rem .5625rem;
-  border-radius: 99px; font-family: var(--font-ui); color: var(--c-fg-faint);
+  font-size: var(--t-sm); cursor: pointer; line-height: 1.5;
+  border: 1px solid var(--glass-border); background: var(--input-bg);
+  padding: .25rem var(--sp-3); border-radius: 99px;
+  font-family: var(--font-ui); color: var(--c-fg-dim);
   transition: all var(--dur) var(--ease);
 }
 .card-act svg { width: .75rem; height: .75rem; }
-.card-act:hover { color: var(--c-fg-dim); background: var(--hover-bg); border-color: var(--glass-border); }
+.card-act:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
 .card-act:disabled { opacity: .5; cursor: progress; }
 .card-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .star-toggle.is-on {
@@ -1134,7 +1204,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 /* ---------- 右侧热度栏 ---------- */
 .hot-rail {
-  padding: var(--sp-5) var(--sp-5) var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
   position: sticky; top: var(--stack-top);
   max-height: calc(100vh - var(--stack-top) - var(--sp-6));
   overflow-y: auto; overscroll-behavior: contain;
@@ -1148,9 +1218,10 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .hot-item {
   display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: var(--sp-2);
   padding: var(--sp-2) .375rem; border-radius: var(--radius-sm); text-decoration: none;
-  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+  border-left: 2px solid transparent;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.hot-item:hover { background: var(--hover-bg); transform: translateX(2px); }
+.hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); }
 .hot-item .hi-rank {
   font-family: var(--font-mono); font-size: var(--t-base); font-weight: 700;
   color: var(--c-fg-faint); text-align: center; padding-top: 1px; font-variant-numeric: tabular-nums;
@@ -1187,7 +1258,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .daily-title h2 { font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 800; letter-spacing: .06em; }
 .daily-title p { font-size: var(--t-sm); color: var(--c-fg-faint); margin-top: .125rem; }
 
-.daily-section { margin-bottom: var(--sp-6); }
+.daily-section {
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-5) var(--sp-6);
+  /* 长列表性能优化同信息流卡片 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 20rem;
+}
 .daily-section-title {
   font-family: var(--font-display); font-size: var(--t-lg); font-weight: 800; letter-spacing: .06em;
   display: flex; align-items: center; gap: var(--sp-3); margin-bottom: .625rem; color: var(--c-fg);
@@ -1276,13 +1353,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .field-row { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 .field-row .field { flex: 1; min-width: 10.5rem; }
 
-/* 界面缩放档位：形态沿用领域胶囊，但**不能**复用 .pill 类名——
-   领域筛选在脚本里按 .pill 批量改选中态，共用类名会互相打架。 */
-.scale-options { display: flex; gap: .3125rem; flex-wrap: wrap; }
+/* 界面缩放档位：与导航、领域胶囊同源的底槽分段控件，但**不能**复用
+   .pill 类名——领域筛选在脚本里按 .pill 批量改选中态，共用类名会互相打架。 */
+.scale-options {
+  display: flex; gap: .125rem; flex-wrap: wrap;
+  padding: .1875rem; border-radius: 99px;
+  border: 1px solid var(--glass-border); background: var(--input-bg);
+  width: fit-content;
+}
 .scale-option {
-  font-size: var(--t-base); padding: .3125rem var(--sp-4); border-radius: 99px; cursor: pointer;
-  border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim);
-  font-family: var(--font-ui); line-height: 1.5;
+  font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--c-fg-dim);
+  font-family: var(--font-ui); line-height: 1.5; white-space: nowrap;
   transition: all var(--dur) var(--ease);
 }
 .scale-option:hover { color: var(--c-fg); background: var(--hover-bg); }
@@ -1462,8 +1544,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 @container app (max-width: 53.75rem) {
   .nav { gap: var(--sp-2); }
-  .nav-tabs { gap: .125rem; }
-  .tab { font-size: var(--t-md); padding: .375rem var(--sp-3); letter-spacing: .02em; }
+  .tab { padding: .3125rem var(--sp-2); letter-spacing: .02em; }
   .searchbox { flex-basis: 100%; max-width: none; order: -1; }
   .tower-actions { flex-basis: 100%; gap: .375rem; }
   /* 窄屏下 tower-actions 会换行，面板贴右缘会露出屏外，改为铺满可用宽度 */
@@ -1472,7 +1553,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 @container app (max-width: 45rem) {
   main { padding-inline: .75rem; }
   .nav { max-width: calc(100% - 1.5rem); }
-  .nav-filters { margin-left: 0; width: 100%; }
+  .nav-filters { margin-left: 0; width: 100%; padding-left: 0; border-left: 0; border-top: 1px solid var(--rail-line); padding-top: var(--sp-2); }
   .src-head { flex-direction: column; align-items: stretch; }
   .tl-row { grid-template-columns: 1fr; }
   .tl-left, .tl-row::before { display: none; }

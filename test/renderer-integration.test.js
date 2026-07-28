@@ -478,6 +478,27 @@ test('文章、图片、热点、事件簇和日报的远程地址全部通过�
   }
 });
 
+test('v4 卡片使用领域色条、异步缩略图与样式表托管的日报间距', () => {
+  assert.match(
+    app,
+    /<article class="card\$\{item\.featured \? ' is-featured' : ''\}" data-id="\$\{item\.id\}"\$\{item\.domain \? ` data-domain="\$\{esc\(item\.domain\)\}"` : ''\}/
+  );
+  assert.match(app, /class="card-thumb"[^>]*loading="lazy"[^>]*decoding="async"/);
+  assert.match(app, /<div class="daily-section glass">/);
+  assert.doesNotMatch(app, /class="daily-section glass"\s+style=/);
+});
+
+test('长信息流与日报跳过离屏渲染但保留固有占位', () => {
+  assert.match(
+    css,
+    /\.card\s*\{[^}]*content-visibility:\s*auto;[^}]*contain-intrinsic-size:\s*auto 14rem;/s
+  );
+  assert.match(
+    css,
+    /\.daily-section\s*\{[^}]*content-visibility:\s*auto;[^}]*contain-intrinsic-size:\s*auto 20rem;/s
+  );
+});
+
 test('信源移除操作明确说明为保留记录的软停用', () => {
   assert.match(app, /移出监控/);
   assert.match(app, /已采集文章和信源记录都会保留/);
