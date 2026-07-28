@@ -3,11 +3,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// v0.0.8 起随包内置思源黑体（约 4.6 MiB 的 woff2 分片），上限相应抬高。
-// 这两个数的作用不是压体积，而是拦住「数据库 / 日志 / 开发依赖被顺手打进包里」
-// 这类意外膨胀，所以留的余量刚好够一次正常的功能迭代，不该随手再往上调。
-const MAX_ASAR_BYTES = 18 * 1024 * 1024;
-const MAX_INSTALLER_BYTES = 120 * 1024 * 1024;
+// v0.0.11 的预算不得超过 v0.0.10 实测产物。思源黑体继续完整保留，
+// 通过排除生产依赖中的文档、示例和测试材料回收空间。
+const MAX_ASAR_BYTES = 12_476_662;
+const MAX_INSTALLER_BYTES = 99_328_923;
 const ALLOWED_ROOTS = new Set([
   'electron',
   'server',
@@ -17,6 +16,8 @@ const ALLOWED_ROOTS = new Set([
   'package.json'
 ]);
 const FORBIDDEN_APPLICATION_ARTIFACT = /(?:^|\/)(?:\.git|\.worktrees|\.playwright-cli|data|dist|docs?|tests?|logs?|screenshots?)(?:\/|$)|(?:^|\/)(?:settings\.json|[^/]+\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm))?|[^/]+\.log|[^/]+\.(?:tmp|temp|bak))(?:$|\/)/i;
+const FORBIDDEN_DEPENDENCY_ARTIFACT =
+  /(?:^|\/)(?:docs?|examples?|tests?|__tests__)(?:\/|$)|\.md$/i;
 const ALLOWED_RESOURCE_ENTRIES = new Set([
   'app.asar',
   'app-update.yml',
@@ -46,6 +47,9 @@ function assertAllowedEntries(entries) {
     const entry = normalizeEntry(rawEntry);
     const root = entry.slice(1).split('/')[0];
     if (!ALLOWED_ROOTS.has(root)) {
+      throw new Error(`Forbidden package entry: ${entry}`);
+    }
+    if (root === 'node_modules' && FORBIDDEN_DEPENDENCY_ARTIFACT.test(entry)) {
       throw new Error(`Forbidden package entry: ${entry}`);
     }
     if (root !== 'node_modules' && FORBIDDEN_APPLICATION_ARTIFACT.test(entry)) {

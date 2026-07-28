@@ -6,6 +6,8 @@ const path = require('node:path');
 
 const packageJson = require('../package.json');
 const {
+  MAX_ASAR_BYTES,
+  MAX_INSTALLER_BYTES,
   assertAllowedEntries,
   assertAllowedResourceEntries,
   assertRequiredLegalResources,
@@ -23,7 +25,9 @@ test('packaging config is a production allowlist with no broad glob or asar unpa
     'config/**/*',
     'package.json',
     '!**/*.map',
-    '!**/*.test.js'
+    '!**/*.test.js',
+    '!node_modules/**/{docs,doc,example,examples,test,tests,__tests__}/**/*',
+    '!node_modules/**/*.md'
   ]);
   assert.equal(Object.hasOwn(packageJson.build, 'asarUnpack'), false);
   assert.deepEqual(packageJson.build.electronLanguages, ['zh-CN', 'en-US']);
@@ -124,6 +128,31 @@ test('package verifier accepts only application roots, production dependencies a
       `expected ${forbidden} to be rejected`
     );
   }
+});
+
+test('v0.0.11 package budgets never exceed the v0.0.10 artifacts', () => {
+  assert.equal(MAX_ASAR_BYTES, 12_476_662);
+  assert.equal(MAX_INSTALLER_BYTES, 99_328_923);
+});
+
+test('package verifier rejects dependency docs, examples and tests', () => {
+  for (const forbidden of [
+    '/node_modules/undici/docs/docs/api/Client.md',
+    '/node_modules/cheerio/test/load.js',
+    '/node_modules/rss-parser/examples/sample.js'
+  ]) {
+    assert.throws(
+      () => assertAllowedEntries(['/electron/main.js', forbidden]),
+      error => error instanceof Error && error.message.includes(forbidden)
+    );
+  }
+});
+
+test('electron-builder excludes non-runtime dependency material', () => {
+  assert.ok(packageJson.build.files.includes(
+    '!node_modules/**/{docs,doc,example,examples,test,tests,__tests__}/**/*'
+  ));
+  assert.ok(packageJson.build.files.includes('!node_modules/**/*.md'));
 });
 
 test('package verifier rejects database, WAL, secret and temporary artifacts at any application path', () => {

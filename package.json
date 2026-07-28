@@ -59,7 +59,9 @@
       "config/**/*",
       "package.json",
       "!**/*.map",
-      "!**/*.test.js"
+      "!**/*.test.js",
+      "!node_modules/**/{docs,doc,example,examples,test,tests,__tests__}/**/*",
+      "!node_modules/**/*.md"
     ],
     "extraResources": [
       {
