@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.10.exe`，双击并按向导安装。v0.0.10 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.11.exe`，双击并按向导安装。v0.0.11 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.10.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.11.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -21,6 +21,8 @@ Get-Content .\SHA256SUMS.txt
 v0.0.9 将桌面窗口的最小可用尺寸调整为 800×600，并让顶栏、八个主导航、筛选器、热点、信源、设置、常用网址和日报按实际内容宽度完整自适应重排。小 / 标准 / 大 / 特大四档缩放都会提前触发对应的降栏布局，不使用横向导航滚动，也不会把热点隐藏掉。
 
 v0.0.10 只动发布前的信源自检门槛：`npm run audit:sources -- --strict` 此前只在「请求失败」时判不合格，抓到 0 条的信源会被放行；现在空结果与请求失败一并拦截。应用行为、数据库结构与界面均未改动，现有数据库、星标、日报、备忘与界面偏好全部保留。
+
+v0.0.11 在完整保留功能、用户数据与内置字体的前提下完成安全瘦身。信息卡改用领域左缘色条，元信息、评分胶囊、导航、筛选和操作按钮的视觉层级更清楚，远程缩略图改为异步解码；长信息流与日报使用离屏渲染，减少视口外内容的布局与绘制。正式安装包同时排除依赖文档、示例和测试材料，并把体积门禁收紧到不得超过 v0.0.10 实测产物。Electron/Chromium 仍是安装体积和启动内存的主要来源，本版本没有用关闭 GPU、合并进程或降低安全隔离来换取表面数字。
 
 ## 主要功能
 
@@ -168,7 +170,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.10 --artifacts
+npm run verify:version -- --tag v0.0.11 --artifacts
 npm run notices
 ```
 
