@@ -37,7 +37,7 @@
 - Modify: `server/db.js`
 - Test: `test/database-maintenance.test.js`
 
-- [ ] **Step 1: 写入失败的真实 SQLite 测试**
+- [x] **Step 1: 写入失败的真实 SQLite 测试**
 
 测试创建临时数据库、填充并删除大文本，验证指标和阈值：
 
@@ -67,13 +67,13 @@ test('manual compact preserves every live row and returns bytes to the filesyste
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认因模块缺失而失败**
+- [x] **Step 2: 运行测试并确认因模块缺失而失败**
 
 Run: `node --test test/database-maintenance.test.js`
 
 Expected: FAIL，错误包含 `Cannot find module '../server/database-maintenance'`。
 
-- [ ] **Step 3: 实现独立数据库维护模块**
+- [x] **Step 3: 实现独立数据库维护模块**
 
 模块导出固定常量与可注入依赖的函数：
 
@@ -109,13 +109,13 @@ function compactDatabase({ database, databasePath, mode = 'manual', availableByt
 
 `databaseStorageSnapshot` 必须用 `PRAGMA page_count`、`page_size`、`freelist_count` 和规范数据库主文件/WAL/SHM 的 `stat` 结果计算，不扫描其他目录。`server/db.js` 增加 `DATABASE_PATH` 导出并复用它打开数据库。
 
-- [ ] **Step 4: 运行数据库维护测试**
+- [x] **Step 4: 运行数据库维护测试**
 
 Run: `node --test test/database-maintenance.test.js`
 
 Expected: PASS，且临时数据库 `quick_check` 为 `ok`。
 
-- [ ] **Step 5: 提交 SQLite 维护核心**
+- [x] **Step 5: 提交 SQLite 维护核心**
 
 ```powershell
 git add server/database-maintenance.js server/db.js test/database-maintenance.test.js

@@ -10,7 +10,8 @@ const DATA_DIR = process.env.STAR_PICKING_PAVILION_DATA_DIR
   || path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new DatabaseSync(path.join(DATA_DIR, 'star-picking-pavilion.db'));
+const DATABASE_PATH = path.join(DATA_DIR, 'star-picking-pavilion.db');
+const db = new DatabaseSync(DATABASE_PATH);
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA journal_mode = WAL');
 
@@ -170,7 +171,7 @@ function checkpointWal() {
 function databaseFileBytes() {
   let total = 0;
   for (const suffix of ['', '-wal', '-shm']) {
-    try { total += fs.statSync(path.join(DATA_DIR, `star-picking-pavilion.db${suffix}`)).size; } catch {}
+    try { total += fs.statSync(`${DATABASE_PATH}${suffix}`).size; } catch {}
   }
   return total;
 }
@@ -184,5 +185,5 @@ function closeDatabase() {
 
 module.exports = {
   db, now, insertArticle, updateArticleFts, deleteArticles,
-  checkpointWal, databaseFileBytes, closeDatabase, DATA_DIR
+  checkpointWal, databaseFileBytes, closeDatabase, DATA_DIR, DATABASE_PATH
 };
