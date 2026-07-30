@@ -41,9 +41,9 @@ test('canonical brand config is the single explicit identity map', () => {
   });
 });
 
-test('package and installer metadata use the v0.0.12 canonical identity', () => {
+test('package and installer metadata use the v0.0.13 canonical identity', () => {
   assert.equal(pkg.name, 'star-picking-pavilion');
-  assert.equal(pkg.version, '0.0.12');
+  assert.equal(pkg.version, '0.0.13');
   assert.match(pkg.description, /摘星阁/);
   assert.match(pkg.description, /Star-Picking-Pavilion/);
   assert.equal(pkg.homepage, 'https://github.com/Icdafy/Star-Picking-Pavilion');
