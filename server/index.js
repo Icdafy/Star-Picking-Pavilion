@@ -13,6 +13,7 @@ const { seedSources } = require('./collectors');
 const { describeHealth } = require('./source-health');
 const { countExpiring, getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
 const exportMarkdown = require('./export/markdown');
+const { buildDailyBundle, serializeJsonl } = require('./archive/daily-bundle');
 const {
   runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
 } = require('./scheduler');
@@ -386,6 +387,31 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/daily' && req.method === 'GET') {
         const date = sanitizeDate(u.searchParams.get('date'));
         return json(res, 200, { report: getDaily(date), dates: listDailyDates() });
+      }
+      if (p === '/api/daily/archive' && req.method === 'GET') {
+        const date = sanitizeDate(u.searchParams.get('date')) || localDateString();
+        const bundle = buildDailyBundle({
+          database: db,
+          date,
+          scoring: loadScoring()
+        });
+        const branding = {
+          productName: packageJson.productName,
+          version: packageJson.version,
+          homepage: packageJson.homepage
+        };
+        return json(res, 200, {
+          date,
+          markdown: exportMarkdown.renderDailyArchive(bundle, branding),
+          jsonl: serializeJsonl(bundle.records),
+          manifest: {
+            schemaVersion: bundle.schemaVersion,
+            productVersion: packageJson.version,
+            generatedAt: bundle.generatedAt,
+            window: bundle.window,
+            summary: bundle.summary
+          }
+        });
       }
       if (p === '/api/daily/regenerate' && req.method === 'POST') {
         const body = await readJsonBody(req);

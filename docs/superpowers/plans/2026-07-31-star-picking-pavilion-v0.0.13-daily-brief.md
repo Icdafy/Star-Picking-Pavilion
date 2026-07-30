@@ -279,7 +279,7 @@ git commit -m "feat: boost heat for verified breakthroughs"
 - Modify: `server/index.js`
 - Modify: `test/export-markdown.test.js`
 
-- [ ] **Step 1: Write failing fixed-window and full-record tests**
+- [x] **Step 1: Write failing fixed-window and full-record tests**
 
 Use a temporary SQLite fixture with records at `07:59:59.999`, exactly `08:00:00.000`, within the window, and a late-fetched older publication. Assert:
 
@@ -293,7 +293,7 @@ assert.equal(bundle.records.filter(row => row.clusterId === 7).length, 2);
 
 In Asia/Shanghai, the UTC values above represent local 08:00. Also assert Markdown folds cluster summaries, JSONL retains both reports, empty windows are valid, and every accepted schema field exists.
 
-- [ ] **Step 2: Run bundle tests and verify failure**
+- [x] **Step 2: Run bundle tests and verify failure**
 
 Run:
 
@@ -303,7 +303,7 @@ node --test test/daily-bundle.test.js test/export-markdown.test.js
 
 Expected: fail because the bundle module and archive renderer are missing.
 
-- [ ] **Step 3: Implement the shared query and stable schema**
+- [x] **Step 3: Implement the shared query and stable schema**
 
 Export:
 
@@ -318,15 +318,15 @@ function serializeJsonl(records) {
 
 Query by `a.fetched_at > start AND a.fetched_at <= end`, join source and cluster metadata, order by `fetched_at, id`, parse JSON defensively, and calculate `heatAtCutoff` at the fixed window end.
 
-- [ ] **Step 4: Render the human brief**
+- [x] **Step 4: Render the human brief**
 
 Add `renderDailyArchive(bundle, options)` with overview, domain counts, hot ranking, breakthrough section, category sections, complete relevant index, and unreviewed/irrelevant counts. Use existing Markdown escaping and safe URL rules.
 
-- [ ] **Step 5: Upgrade the database daily report**
+- [x] **Step 5: Upgrade the database daily report**
 
 Make `generateDaily()` consume the same window/query semantics, set `windowVersion: 3`, and include new totals and breakthrough summaries. Keep `getDaily()` able to regenerate v2 cached rows.
 
-- [ ] **Step 6: Add an authenticated backend bundle endpoint**
+- [x] **Step 6: Add an authenticated backend bundle endpoint**
 
 Add:
 
@@ -351,7 +351,7 @@ Return:
 
 Use the existing strict date sanitizer, local token authentication, response security headers, and body size behavior.
 
-- [ ] **Step 7: Run bundle and export tests**
+- [x] **Step 7: Run bundle and export tests**
 
 Run:
 
@@ -361,7 +361,7 @@ node --test test/daily-bundle.test.js test/export-markdown.test.js test/date-tim
 
 Expected: all pass.
 
-- [ ] **Step 8: Commit the backend bundle**
+- [x] **Step 8: Commit the backend bundle**
 
 ```powershell
 git add server/archive/daily-bundle.js server/ai/daily.js server/export/markdown.js server/index.js test/daily-bundle.test.js test/export-markdown.test.js

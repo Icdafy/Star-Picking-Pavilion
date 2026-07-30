@@ -4,7 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  EXPORT_VERSION, FORMATS, normalizeFormat, escapeMarkdown, renderDaily, renderArticles, exportFilename
+  EXPORT_VERSION, FORMATS, normalizeFormat, escapeMarkdown,
+  renderDaily, renderDailyArchive, renderArticles, exportFilename
 } = require('../server/export/markdown');
 
 const BRAND = {
@@ -133,6 +134,51 @@ test('空日报和空列表给出明确说明而不是一份只有标题的空�
   const emptyFeed = renderArticles([], { ...BRAND, title: '星标情报' });
   assert.match(emptyFeed, /当前筛选条件下没有情报。/);
   assert.match(emptyFeed, /# 摘星阁 · 星标情报/);
+});
+
+test('研究简报同时呈现窗口统计、技术突破和完整行业索引', () => {
+  const item = {
+    title: '可重复使用火箭完成回收验证',
+    url: 'https://example.com/breakthrough',
+    sourceName: '官方源',
+    sourceTier: 'T1',
+    domain: 'aerospace',
+    category: '技术研发',
+    quality: 88,
+    breakthroughBonus: 8,
+    aiSummary: '完成关键回收试验。'
+  };
+  const output = renderDailyArchive({
+    date: '2026-07-31',
+    window: {
+      start: new Date(2026, 6, 30, 8).toISOString(),
+      end: new Date(2026, 6, 31, 8).toISOString()
+    },
+    generatedAt: new Date(2026, 6, 31, 8, 0, 5).toISOString(),
+    summary: {
+      total: 3,
+      relevant: 1,
+      featured: 1,
+      pending: 1,
+      irrelevant: 1,
+      breakthroughs: 1,
+      byDomain: { lowaltitude: 0, aerospace: 1 }
+    },
+    readable: {
+      hot: [item],
+      breakthroughs: [item],
+      sections: [{ category: '技术研发', items: [item] }],
+      relevantIndex: [item]
+    }
+  }, BRAND);
+
+  assert.match(output, /^# 摘星阁 · 每日新闻简报 2026-07-31/m);
+  assert.match(output, /采集 3 条 · 行业相关 1 条 · 精选 1 条/);
+  assert.match(output, /待分析 1 条 · 无关 1 条 · 技术突破 1 条/);
+  assert.match(output, /## 当日热点/);
+  assert.match(output, /## 可信技术突破/);
+  assert.match(output, /## 完整行业索引/);
+  assert.match(output, /技术突破 \+8/);
 });
 
 test('列表导出带上检索上下文与条数，便于收件人判断口径', () => {

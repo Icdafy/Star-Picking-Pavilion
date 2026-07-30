@@ -55,8 +55,8 @@ function formatStamp(value) {
 // 「来源（T1） · 低空经济 · 政策法规 · 质量分 82」
 function describeEntry(item) {
   const parts = [];
-  const source = flatten(item.source || item.source_name);
-  const tier = flatten(item.tier);
+  const source = flatten(item.source || item.source_name || item.sourceName);
+  const tier = flatten(item.tier || item.sourceTier);
   if (source) parts.push(tier ? `${source}（${tier}）` : source);
   const domain = DOMAIN_NAMES[item.domain];
   if (domain) parts.push(domain);
@@ -66,6 +66,10 @@ function describeEntry(item) {
   if (Number.isFinite(quality)) parts.push(`质量分 ${Math.round(quality)}`);
   const clusterSize = Number(item.clusterSize ?? item.cluster_size);
   if (Number.isFinite(clusterSize) && clusterSize > 1) parts.push(`${clusterSize} 个信源`);
+  const breakthroughBonus = Number(item.breakthroughBonus ?? item.breakthrough_bonus);
+  if (Number.isFinite(breakthroughBonus) && breakthroughBonus > 0) {
+    parts.push(`技术突破 +${Math.round(breakthroughBonus * 10) / 10}`);
+  }
   return parts;
 }
 
@@ -73,8 +77,10 @@ function entryLines(item, index, format) {
   const title = flatten(item.title) || '（无标题）';
   const url = safeUrl(item.url);
   const meta = describeEntry(item).join(' · ');
-  const summary = flatten(item.summary || item.ai_summary);
-  const reason = flatten(item.reason || item.ai_reason);
+  const summary = flatten(
+    item.summary || item.ai_summary || item.aiSummary || item.rawSummary
+  );
+  const reason = flatten(item.reason || item.ai_reason || item.aiReason);
   const lines = [];
 
   if (format === 'markdown') {
@@ -156,6 +162,50 @@ function renderDaily(report, options = {}) {
   }, format);
 }
 
+function renderDailyArchive(bundle, options = {}) {
+  const name = flatten(options.productName) || '摘星阁';
+  const summary = bundle?.summary || {};
+  const byDomain = summary.byDomain || {};
+  const readable = bundle?.readable || {};
+  const windowStart = formatStamp(bundle?.window?.start);
+  const windowEnd = formatStamp(bundle?.window?.end);
+  const summaryLines = [
+    `窗口 ${windowStart || '未知'} 至 ${windowEnd || '未知'}（按采集时间，前开后闭）`,
+    `采集 ${Number(summary.total) || 0} 条 · 行业相关 ${Number(summary.relevant) || 0} 条`
+      + ` · 精选 ${Number(summary.featured) || 0} 条`,
+    `待分析 ${Number(summary.pending) || 0} 条 · 无关 ${Number(summary.irrelevant) || 0} 条`
+      + ` · 技术突破 ${Number(summary.breakthroughs) || 0} 条`,
+    `低空经济 ${Number(byDomain.lowaltitude) || 0} 条 · 商业航天 ${Number(byDomain.aerospace) || 0} 条`
+  ];
+  const generatedAt = formatStamp(bundle?.generatedAt);
+  if (generatedAt) summaryLines.push(`生成于 ${generatedAt}`);
+
+  const sections = [];
+  if (Array.isArray(readable.hot) && readable.hot.length) {
+    sections.push({ title: '当日热点', items: readable.hot });
+  }
+  if (Array.isArray(readable.breakthroughs) && readable.breakthroughs.length) {
+    sections.push({ title: '可信技术突破', items: readable.breakthroughs });
+  }
+  for (const section of Array.isArray(readable.sections) ? readable.sections : []) {
+    sections.push({
+      title: flatten(section?.category),
+      items: Array.isArray(section?.items) ? section.items : []
+    });
+  }
+  if (Array.isArray(readable.relevantIndex) && readable.relevantIndex.length) {
+    sections.push({ title: '完整行业索引', items: readable.relevantIndex });
+  }
+
+  return serialize({
+    title: `${name} · 每日新闻简报 ${flatten(bundle?.date)}`,
+    summary: summaryLines,
+    sections,
+    emptyHint: '过去 24 小时未采集到新闻记录。',
+    footer: `${footerLine(options)} · 全量机器数据见 news.jsonl`
+  }, 'markdown');
+}
+
 function renderArticles(items, options = {}) {
   const format = normalizeFormat(options.format);
   const name = flatten(options.productName) || '摘星阁';
@@ -188,6 +238,7 @@ module.exports = {
   normalizeFormat,
   escapeMarkdown,
   renderDaily,
+  renderDailyArchive,
   renderArticles,
   exportFilename
 };

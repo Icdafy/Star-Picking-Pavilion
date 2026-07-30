@@ -139,5 +139,5 @@ test('corrupt optional JSON fields degrade safely instead of breaking the feed o
   const daily = await server.request({ pathname: '/api/daily?date=2026-07-20', headers: token });
   assert.equal(daily.status, 200);
   assert.equal(JSON.parse(daily.body).report.date, '2026-07-20');
-  assert.equal(JSON.parse(daily.body).report.windowVersion, 2);
+  assert.equal(JSON.parse(daily.body).report.windowVersion, 3);
 });
