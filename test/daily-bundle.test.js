@@ -155,6 +155,11 @@ test('08:00 window uses an open start, closed end and fetched time so late news 
   assert.equal(bundle.records[1].publishedAt, new Date(startMs - 7 * 86_400_000).toISOString());
   assert.equal(bundle.window.start, new Date(startMs).toISOString());
   assert.equal(bundle.window.end, new Date(endMs).toISOString());
+  assert.equal(bundle.window.timeZone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  assert.equal(
+    bundle.window.utcOffsetMinutes,
+    -new Date(bundle.window.end).getTimezoneOffset()
+  );
 });
 
 test('JSONL retains every report while readable sections fold event clusters', () => {

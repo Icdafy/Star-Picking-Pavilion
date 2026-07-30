@@ -28,6 +28,8 @@ function resolveDailyWindow(date) {
   return {
     start: start.toISOString(),
     end: end.toISOString(),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'local',
+    utcOffsetMinutes: -end.getTimezoneOffset(),
     basis: 'fetched_at',
     startInclusive: false,
     endInclusive: true
