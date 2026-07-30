@@ -45,6 +45,36 @@ test('Electron injects authentication only into the exact loopback API origin', 
   assert.match(source, /new URL\(url\)\.origin/);
 });
 
+test('daily archive integration keeps folder selection and authenticated export in the main process', () => {
+  assert.match(source, /registerDailyArchiveIpc/);
+  assert.match(source, /createDailyArchiveService/);
+  assert.match(
+    source,
+    /registerDailyArchiveIpc\(\{\s*ipcMain,\s*dialog,\s*getService:\s*\(\)\s*=>\s*dailyArchive,\s*getWindow:\s*\(\)\s*=>\s*win\s*\}\)/
+  );
+  assert.match(source, /\/api\/daily\/archive\?date=\$\{encodeURIComponent\(date\)\}/);
+  assert.match(source, /'x-star-picking-pavilion-token':\s*apiToken/);
+  assert.doesNotMatch(source, /webContents\.send\([^\n]*(?:apiToken|rootDirectory)/);
+
+  const readyIndex = source.indexOf('await startServer(');
+  const archiveIndex = source.indexOf('createDailyArchiveService(', readyIndex);
+  const startIndex = source.indexOf('await dailyArchive.start()', archiveIndex);
+  const windowIndex = source.indexOf('await createWindow(serverPort)', startIndex);
+  assert.ok(readyIndex >= 0);
+  assert.ok(archiveIndex > readyIndex);
+  assert.ok(startIndex > archiveIndex);
+  assert.ok(windowIndex > startIndex);
+});
+
+test('daily archive timers recover after sleep and stop before desktop shutdown', () => {
+  assert.match(source, /\bpowerMonitor\b/);
+  assert.match(source, /powerMonitor\.on\('resume', handleDailyArchiveResume\)/);
+  assert.match(source, /powerMonitor\.on\('unlock-screen', handleDailyArchiveResume\)/);
+  assert.match(source, /dailyArchive\?\.stop\(\)/);
+  assert.match(source, /powerMonitor\.removeListener\('resume', handleDailyArchiveResume\)/);
+  assert.match(source, /powerMonitor\.removeListener\('unlock-screen', handleDailyArchiveResume\)/);
+});
+
 test('Electron brokers encrypted credentials without exposing them to the renderer', () => {
   assert.match(source, /safeStorage/);
   assert.match(source, /createCredentialStore/);

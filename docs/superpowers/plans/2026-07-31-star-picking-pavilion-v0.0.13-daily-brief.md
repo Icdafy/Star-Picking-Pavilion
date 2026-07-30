@@ -481,7 +481,7 @@ git commit -m "feat: archive daily briefs atomically"
 - Modify: `test/preload.test.js`
 - Modify: `test/main-security.test.js`
 
-- [ ] **Step 1: Write failing IPC and preload tests**
+- [x] **Step 1: Write failing IPC and preload tests**
 
 Assert fixed channels:
 
@@ -495,7 +495,7 @@ daily-archive:retry
 
 Assert directory choice uses `dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory', 'promptToCreate'] })`, cancellation does not enable, `set-enabled` accepts only a boolean, and no IPC handler accepts a path argument.
 
-- [ ] **Step 2: Run IPC tests and verify failure**
+- [x] **Step 2: Run IPC tests and verify failure**
 
 Run:
 
@@ -505,15 +505,15 @@ node --test test/daily-archive-ipc.test.js test/preload.test.js test/main-securi
 
 Expected: fail on missing handlers and bridge methods.
 
-- [ ] **Step 3: Implement IPC handlers**
+- [x] **Step 3: Implement IPC handlers**
 
 Register handlers with injected `getService`, `dialog`, and `getWindow`. Choose directory in main, call `service.enable(selectedPath)`, return frozen-safe snapshots, and translate validation failures to stable Chinese messages.
 
-- [ ] **Step 4: Wire the archive service to Electron lifecycle**
+- [x] **Step 4: Wire the archive service to Electron lifecycle**
 
 After the authenticated backend is ready, create `requestBundle(date)` using the server controller’s exact origin and bearer token, start the service, register power-monitor resume/time-change handling, and stop timers before shutdown. Do not expose the token to renderer code beyond the existing page bootstrap mechanism.
 
-- [ ] **Step 5: Expose fixed preload methods**
+- [x] **Step 5: Expose fixed preload methods**
 
 Add:
 
@@ -525,7 +525,7 @@ saveCurrentDailyArchive: () => ipcRenderer.invoke('daily-archive:save-current').
 retryDailyArchives: () => ipcRenderer.invoke('daily-archive:retry').then(cloneAndFreeze)
 ```
 
-- [ ] **Step 6: Run IPC and security tests**
+- [x] **Step 6: Run IPC and security tests**
 
 Run:
 
@@ -535,7 +535,7 @@ node --test test/daily-archive-ipc.test.js test/preload.test.js test/main-securi
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit desktop integration**
+- [x] **Step 7: Commit desktop integration**
 
 ```powershell
 git add electron/daily-archive-ipc.js electron/main.js electron/preload.js test/daily-archive-ipc.test.js test/preload.test.js test/main-security.test.js

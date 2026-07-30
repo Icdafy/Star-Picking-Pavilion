@@ -31,6 +31,13 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
     launchAtLoginSupported: true,
     warnings: []
   };
+  const dailyArchiveSnapshot = {
+    schemaVersion: 1,
+    enabled: true,
+    rootDirectory: 'D:\\Research',
+    pendingDates: [],
+    lastResult: null
+  };
   const electron = {
     contextBridge: {
       exposeInMainWorld(name, value) { exposed.set(name, value); }
@@ -56,6 +63,25 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
             ...desktopSnapshot,
             closeToTray: args[0]?.closeToTray === true
           });
+        }
+        if (channel === 'daily-archive:get') return Promise.resolve(dailyArchiveSnapshot);
+        if (channel === 'daily-archive:choose-directory') {
+          return Promise.resolve({ canceled: false, settings: dailyArchiveSnapshot });
+        }
+        if (channel === 'daily-archive:set-enabled') {
+          return Promise.resolve({
+            ...dailyArchiveSnapshot,
+            enabled: args[0]?.enabled === true
+          });
+        }
+        if (channel === 'daily-archive:save-current') {
+          return Promise.resolve({
+            result: { status: 'saved', date: '2026-07-31' },
+            settings: dailyArchiveSnapshot
+          });
+        }
+        if (channel === 'daily-archive:retry') {
+          return Promise.resolve({ results: [], settings: dailyArchiveSnapshot });
         }
         return Promise.resolve('invoked');
       }
@@ -113,6 +139,34 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
     JSON.parse(JSON.stringify(ipcCalls.at(-1))),
     ['invoke', 'storage:delete-legacy', { id: 'legacy-123456789abc' }]
   );
+
+  const archiveSettings = await api.getDailyArchiveSettings();
+  assert.deepEqual(JSON.parse(JSON.stringify(archiveSettings)), dailyArchiveSnapshot);
+  assert.equal(Object.isFrozen(archiveSettings), true);
+  assert.equal(Object.isFrozen(archiveSettings.pendingDates), true);
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'daily-archive:get']);
+
+  const chosen = await api.chooseDailyArchiveDirectory();
+  assert.equal(chosen.canceled, false);
+  assert.equal(Object.isFrozen(chosen), true);
+  assert.equal(Object.isFrozen(chosen.settings), true);
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'daily-archive:choose-directory']);
+
+  const disabledArchive = await api.setDailyArchiveEnabled(false);
+  assert.equal(disabledArchive.enabled, false);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(ipcCalls.at(-1))),
+    ['invoke', 'daily-archive:set-enabled', { enabled: false }]
+  );
+
+  const manualSave = await api.saveCurrentDailyArchive();
+  assert.equal(manualSave.result.status, 'saved');
+  assert.equal(Object.isFrozen(manualSave.result), true);
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'daily-archive:save-current']);
+
+  const retriedArchives = await api.retryDailyArchives();
+  assert.equal(Object.isFrozen(retriedArchives.results), true);
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'daily-archive:retry']);
 
   let payload;
   api.onUpdateStatus(value => { payload = value; });

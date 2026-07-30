@@ -11,7 +11,8 @@ const {
   ipcMain,
   dialog,
   session,
-  safeStorage
+  safeStorage,
+  powerMonitor
 } = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -30,6 +31,8 @@ const {
   createStorageMaintenanceController
 } = require('./storage-maintenance');
 const { registerStorageMaintenanceIpc } = require('./storage-maintenance-ipc');
+const { createDailyArchiveService } = require('./daily-archive');
+const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -45,6 +48,8 @@ let desktopShutdownPromise = null;
 let uiPreferencesStore = null;
 let backgroundMode = null;
 let storageMaintenance = null;
+let dailyArchive = null;
+let dailyArchivePowerListenersRegistered = false;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
   ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
   : null;
@@ -206,6 +211,42 @@ function installApiAuthentication(serverPort, apiToken) {
   });
 }
 
+function createDailyArchiveBundleRequester(serverPort, apiToken, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== 'function') throw new TypeError('fetch is unavailable');
+  return async date => {
+    const url = `http://127.0.0.1:${serverPort}/api/daily/archive?date=${encodeURIComponent(date)}`;
+    const response = await fetchImpl(url, {
+      headers: {
+        'x-star-picking-pavilion-token': apiToken
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`新闻简报服务返回 HTTP ${response.status}`);
+    }
+    return response.json();
+  };
+}
+
+function handleDailyArchiveResume() {
+  dailyArchive?.handleResume().catch(error => {
+    console.warn('[每日简报] 恢复定时任务失败:', error.message);
+  });
+}
+
+function registerDailyArchivePowerEvents() {
+  if (dailyArchivePowerListenersRegistered) return;
+  dailyArchivePowerListenersRegistered = true;
+  powerMonitor.on('resume', handleDailyArchiveResume);
+  powerMonitor.on('unlock-screen', handleDailyArchiveResume);
+}
+
+function unregisterDailyArchivePowerEvents() {
+  if (!dailyArchivePowerListenersRegistered) return;
+  dailyArchivePowerListenersRegistered = false;
+  powerMonitor.removeListener('resume', handleDailyArchiveResume);
+  powerMonitor.removeListener('unlock-screen', handleDailyArchiveResume);
+}
+
 function installPermissionPolicy() {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
@@ -330,6 +371,12 @@ registerStorageMaintenanceIpc({
   ipcMain,
   getController: () => storageMaintenance
 });
+registerDailyArchiveIpc({
+  ipcMain,
+  dialog,
+  getService: () => dailyArchive,
+  getWindow: () => win
+});
 
 async function chooseLegacyDatabase() {
   const result = await dialog.showMessageBox({
@@ -386,6 +433,12 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   const initialApiKey = await credentialStore.get();
   const { port: serverPort, apiToken } = await startServer({ initialApiKey, credentialStore });
   installApiAuthentication(serverPort, apiToken);
+  dailyArchive = createDailyArchiveService({
+    userDataPath: dataDir,
+    requestBundle: createDailyArchiveBundleRequester(serverPort, apiToken)
+  });
+  registerDailyArchivePowerEvents();
+  await dailyArchive.start();
   await createWindow(serverPort);
 }).catch(async error => {
   if (!(error instanceof MigrationCancelledError)) {
@@ -409,6 +462,8 @@ function shutdownDesktop() {
   if (desktopShutdownPromise) return desktopShutdownPromise;
   desktopShutdownPromise = (async () => {
     backendReady = false;
+    dailyArchive?.stop();
+    unregisterDailyArchivePowerEvents();
     if (autoUpdateTimer) clearInterval(autoUpdateTimer);
     autoUpdateTimer = null;
     if (serverController) await serverController.shutdown();

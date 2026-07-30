@@ -37,6 +37,21 @@ const desktopApi = Object.freeze({
   deleteLegacyData: id => ipcRenderer
     .invoke('storage:delete-legacy', { id })
     .then(cloneAndFreeze),
+  getDailyArchiveSettings: () => ipcRenderer
+    .invoke('daily-archive:get')
+    .then(cloneAndFreeze),
+  chooseDailyArchiveDirectory: () => ipcRenderer
+    .invoke('daily-archive:choose-directory')
+    .then(cloneAndFreeze),
+  setDailyArchiveEnabled: enabled => ipcRenderer
+    .invoke('daily-archive:set-enabled', { enabled })
+    .then(cloneAndFreeze),
+  saveCurrentDailyArchive: () => ipcRenderer
+    .invoke('daily-archive:save-current')
+    .then(cloneAndFreeze),
+  retryDailyArchives: () => ipcRenderer
+    .invoke('daily-archive:retry')
+    .then(cloneAndFreeze),
   // 主进程推送更新状态：available / downloading / downloaded / error
   onUpdateStatus: cb => ipcRenderer.on('update:status', (_e, payload) => cb(payload)),
   // 渲染层请求「重启并安装更新」
