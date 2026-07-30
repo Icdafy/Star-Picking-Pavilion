@@ -253,6 +253,57 @@
         <ul class="note-list" id="feedbackList" aria-live="polite"></ul>
         <p class="hint">条目保存在本机 <code>star-picking-pavilion.db</code> 中，不会上传，也不会随情报保留策略被清理。</p>
       </div>
+      <div class="glass card-pad daily-archive-card">
+        <div class="daily-archive-heading">
+          <div>
+            <span class="daily-archive-kicker">DAILY RESEARCH VAULT</span>
+            <h3>每日新闻资料库 <span class="muted">自动归档 · 可回溯分析</span></h3>
+            <p>每天 08:00 汇总此前 24 小时的全部采集内容，同时保存可读简报、完整 JSONL 数据和校验清单。</p>
+          </div>
+          <span class="daily-archive-cutoff">08:00 截止</span>
+        </div>
+        <div class="daily-archive-master">
+          <label class="desktop-switch daily-archive-switch">
+            <span class="switch-copy">
+              <strong>每天自动保存新闻简报</strong>
+              <small>首次开启会弹出系统文件夹选择窗口；关闭后保留已有归档。</small>
+            </span>
+            <input id="dailyArchiveEnabled" type="checkbox" role="switch">
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <div class="daily-archive-next">
+            <span>下一次归档</span>
+            <strong id="dailyArchiveNextRun">未启用</strong>
+          </div>
+        </div>
+        <div class="daily-archive-path-row">
+          <div class="daily-archive-path-copy">
+            <span>保存位置</span>
+            <output id="dailyArchivePath" class="daily-archive-path" dir="auto">尚未选择保存位置</output>
+          </div>
+          <button class="btn-ghost" id="btnChooseDailyArchive" type="button">选择或更改位置</button>
+        </div>
+        <div class="daily-archive-status-grid" aria-label="每日归档状态">
+          <div>
+            <span>最近成功</span>
+            <strong id="dailyArchiveLastSuccess">尚无归档</strong>
+          </div>
+          <div>
+            <span>补存队列</span>
+            <strong id="dailyArchivePending">无待补存</strong>
+          </div>
+        </div>
+        <div class="daily-archive-actions">
+          <button class="btn-primary" id="btnSaveDailyArchive" type="button" disabled>立即保存最近一期</button>
+          <button class="btn-ghost" id="btnRetryDailyArchive" type="button" disabled>重试待补存日期</button>
+          <p id="dailyArchiveStatus"
+             class="test-result daily-archive-live"
+             role="status"
+             aria-live="polite"
+             aria-busy="false">自动归档已关闭。</p>
+        </div>
+        <p class="hint">归档目录按年、月、日整理。为确保 08:00 准时保存，请让摘星阁保持运行；可在“桌面运行”中开启后台运行和登录启动。</p>
+      </div>
       <div class="glass card-pad storage-governance-card">
         <div class="storage-heading">
           <div>
@@ -445,6 +496,7 @@
 <script src="settings-form-controller.js"></script>
 <script src="desktop-settings-controller.js"></script>
 <script src="storage-maintenance-controller.js"></script>
+<script src="daily-archive-controller.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

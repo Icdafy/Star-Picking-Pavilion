@@ -63,3 +63,12 @@ test('表单、长文本和浮层不会撑破可用空间', () => {
   assert.match(css, /\.glass-dialog\s*\{[^}]*max-height:\s*min\(92vh,\s*45rem\);[^}]*overflow:\s*auto;/s);
   assert.match(css, /\.hint,[\s\S]*?overflow-wrap:\s*anywhere;/);
 });
+
+test('daily archive status and long native paths adapt without horizontal overflow', () => {
+  assert.match(css, /\.daily-archive-path[^}]*overflow-wrap:\s*anywhere;/s);
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-archive-status-grid\s*\{[^}]*grid-template-columns:\s*1fr;/s
+  );
+  assert.match(css, /\.daily-archive-actions\s*\{[^}]*flex-wrap:\s*wrap;/s);
+});

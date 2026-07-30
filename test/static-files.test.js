@@ -11,6 +11,10 @@ const root = path.resolve(__dirname, '..', 'renderer');
 test('static path resolution stays inside the renderer directory', () => {
   assert.equal(resolveStaticFile(root, '/'), path.join(root, 'index.html'));
   assert.equal(resolveStaticFile(root, '/styles.css'), path.join(root, 'styles.css'));
+  assert.equal(
+    resolveStaticFile(root, '/daily-archive-controller.js'),
+    path.join(root, 'daily-archive-controller.js')
+  );
   assert.equal(resolveStaticFile(root, '/../package.json'), null);
   assert.equal(resolveStaticFile(root, '/%2e%2e%2fpackage.json'), null);
   assert.equal(resolveStaticFile(root, '/..%5cpackage.json'), null);

@@ -14,6 +14,9 @@ const settingsFormController = fs.readFileSync(
   path.join(root, 'renderer', 'settings-form-controller.js'),
   'utf8'
 );
+const dailyArchiveController = fs.existsSync(path.join(root, 'renderer', 'daily-archive-controller.js'))
+  ? fs.readFileSync(path.join(root, 'renderer', 'daily-archive-controller.js'), 'utf8')
+  : '';
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 
 function createStorage(entries = {}) {
@@ -585,6 +588,53 @@ test('v0.0.12 数据维护面板分离数据库、缓存、迁移残留和旧库
   assert.match(app, /Desktop\.deleteLegacyData/);
   assert.ok(css.includes('.storage-breakdown'), '缺少存储明细网格');
   assert.ok(css.includes('.maintenance-action-grid'), '缺少维护操作网格');
+});
+
+test('v0.0.13 settings expose the complete daily research archive workflow', () => {
+  assert.match(html, /daily-archive-controller\.js/);
+  for (const id of [
+    'dailyArchiveEnabled',
+    'dailyArchivePath',
+    'btnChooseDailyArchive',
+    'btnSaveDailyArchive',
+    'btnRetryDailyArchive',
+    'dailyArchiveNextRun',
+    'dailyArchiveLastSuccess',
+    'dailyArchivePending',
+    'dailyArchiveStatus'
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `缺少每日归档控件 ${id}`);
+  }
+  assert.match(html, /id="dailyArchiveEnabled"[^>]*role="switch"/);
+  assert.match(html, /id="dailyArchivePath"[^>]*dir="auto"/);
+  assert.match(html, /id="dailyArchiveStatus"[^>]*aria-live="polite"/);
+  assert.match(app, /DailyArchiveController\.createDailyArchiveController/);
+  for (const method of [
+    'getDailyArchiveSettings',
+    'chooseDailyArchiveDirectory',
+    'setDailyArchiveEnabled',
+    'saveCurrentDailyArchive',
+    'retryDailyArchives'
+  ]) {
+    assert.match(app, new RegExp(`Desktop\\?\\.${method}|Desktop\\.${method}`));
+  }
+  assert.match(app, /dailyArchive\?\.load\(\)/);
+  assert.match(app, /每日新闻简报自动归档仅在安装版中可用/);
+  assert.match(dailyArchiveController, /createDailyArchiveController/);
+  assert.match(dailyArchiveController, /aria-busy/);
+  assert.match(dailyArchiveController, /pendingDates/);
+});
+
+test('technical breakthrough heat boosts are visible and explained with sanitized signals', () => {
+  assert.match(app, /breakthroughBonus/);
+  assert.match(app, /breakthroughScore/);
+  assert.match(app, /breakthroughSignals/);
+  assert.match(app, /class="breakthrough-pill"/);
+  assert.match(app, /技术突破 <b>\+\$\{breakthrough\.bonus/);
+  assert.match(app, /class="breakthrough-explanation"/);
+  assert.match(app, /esc\(breakthrough\.explanation\)/);
+  assert.ok(css.includes('.breakthrough-pill'), '缺少技术突破徽标样式');
+  assert.ok(css.includes('.breakthrough-explanation'), '缺少技术突破说明样式');
 });
 
 test('星标作为一等信息流视图接入导航、筛选与实时轮询', () => {

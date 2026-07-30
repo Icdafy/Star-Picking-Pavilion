@@ -12,6 +12,7 @@ const CommonLinks = window.CommonLinks;
 const SettingsFormController = window.SettingsFormController;
 const DesktopSettingsController = window.DesktopSettingsController;
 const StorageMaintenanceController = window.StorageMaintenanceController;
+const DailyArchiveController = window.DailyArchiveController;
 const Bootstrap = window.StarPickingPavilionBootstrap;
 const Desktop = window.starPickingPavilion || window.windcatcher;
 const storage = Bootstrap.getSafeStorage(window);
@@ -322,20 +323,74 @@ function scorePill(item) {
   return `<span class="score-pill">待评</span>`;
 }
 
+function breakthroughPresentation(item) {
+  const rawBonus = Number(item.breakthroughBonus);
+  if (!Number.isFinite(rawBonus) || rawBonus <= 0) return null;
+  const bonusValue = Math.min(100, Math.max(0, rawBonus));
+  const bonus = Number.isInteger(bonusValue)
+    ? String(bonusValue)
+    : bonusValue.toFixed(1).replace(/\.0$/, '');
+  const score = Math.round(
+    Math.min(1, Math.max(0, Number(item.breakthroughScore) || 0)) * 100
+  );
+  const signals = item.breakthroughSignals && typeof item.breakthroughSignals === 'object'
+    ? item.breakthroughSignals
+    : {};
+  const safeTerms = value => Array.isArray(value)
+    ? value
+        .filter(term => typeof term === 'string' && term.trim())
+        .map(term => term.trim().slice(0, 40))
+        .slice(0, 4)
+    : [];
+  const objects = safeTerms(signals.objects);
+  const actions = safeTerms(signals.actions);
+  const evidenceNames = {
+    'tier-t1': '官方一手信源',
+    'tier-t1.5-model': '官方信源与模型可信度',
+    'corroborated-model': '多信源交叉验证',
+    'corroborated-no-model': '多信源一致报道'
+  };
+  const evidence = evidenceNames[signals.credibilityEvidence] || '可信信源验证';
+  const details = [
+    objects.length ? `技术对象：${objects.join('、')}` : '',
+    actions.length ? `完成证据：${actions.join('、')}` : '',
+    `可信依据：${evidence}`,
+    `突破置信度：${score}%`
+  ].filter(Boolean);
+  return {
+    bonus,
+    score,
+    explanation: `该条情报通过技术突破门槛，热度加成 ${bonus} 分。${details.join('；')}。`
+  };
+}
+
 function cardInner(item) {
   const dims = item.scores ? Object.entries(DIM_NAMES).map(([k, name]) => `
     <div class="dim">
       <div class="dim-label"><span>${name}</span><b>${Math.round(item.scores[k] ?? 0)}</b></div>
       <div class="dim-bar"><i style="width:${Math.min(100, item.scores[k] ?? 0)}%"></i></div>
     </div>`).join('') : '';
+  const breakthrough = breakthroughPresentation(item);
+  const breakthroughBadge = breakthrough ? `
+    <span class="breakthrough-pill" role="note"
+      aria-label="技术突破热度加成 ${breakthrough.bonus} 分，置信度 ${breakthrough.score}%"
+      title="已通过技术对象、完成动作与可信度门槛">
+      技术突破 <b>+${breakthrough.bonus}</b>
+    </span>` : '';
+  const breakthroughDetail = breakthrough ? `
+    <div class="breakthrough-explanation" role="note">
+      <strong>技术突破加分依据</strong>
+      <p>${esc(breakthrough.explanation)}</p>
+    </div>` : '';
+  const analysisDetails = `${dims}${breakthroughDetail}`;
   const cluster = item.clusterSize > 1 ? `
     <button class="cluster-toggle" data-cluster="${item.clusterId}" data-self="${item.id}" type="button" aria-expanded="false">
       <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       ${item.clusterSize} 个信源 · 关联报道
     </button>` : '';
   // 五维分解此前只能靠"盲点"卡片才展开，现在给出显式的可聚焦入口
-  const dimsToggle = dims ? `
-    <button class="dims-toggle" type="button" aria-expanded="false">五维研判
+  const dimsToggle = analysisDetails ? `
+    <button class="dims-toggle" type="button" aria-expanded="false">${dims ? '五维研判' : '研判详情'}
       <svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>` : '';
   // 留存与分发的入口固定在每张卡片上：星标留给自己，复制传给别人
@@ -369,7 +424,7 @@ function cardInner(item) {
         ${item.category ? `<span class="cat-tag">${esc(item.category)}</span>` : ''}
         <span>${timeAgo(item.publishedAt || item.fetchedAt)}</span>
       </div>
-      ${scorePill(item)}
+      <div class="card-score-group">${breakthroughBadge}${scorePill(item)}</div>
     </div>
     <a class="card-title" href="${safeUrl(item.url)}" target="_blank" rel="noopener">${esc(item.title)}</a>
     <div class="card-content${thumb ? ' has-thumb' : ''}">
@@ -381,7 +436,7 @@ function cardInner(item) {
     </div>
     ${reason}
     ${foot}
-    ${dims ? `<div class="dims">${dims}</div>` : ''}`;
+    ${analysisDetails ? `<div class="dims">${analysisDetails}</div>` : ''}`;
 }
 
 function localDateString(date = new Date()) {
@@ -839,11 +894,63 @@ if (!desktopSettings) {
   $('#desktopSettingsResult').className = 'test-result desktop-settings-result warning';
 }
 
+const dailyArchiveAvailable = Boolean(
+  DailyArchiveController
+  && Desktop?.getDailyArchiveSettings
+  && Desktop?.chooseDailyArchiveDirectory
+  && Desktop?.setDailyArchiveEnabled
+  && Desktop?.saveCurrentDailyArchive
+  && Desktop?.retryDailyArchives
+);
+const dailyArchive = dailyArchiveAvailable
+  ? DailyArchiveController.createDailyArchiveController({
+      elements: {
+        enabled: $('#dailyArchiveEnabled'),
+        rootDirectory: $('#dailyArchivePath'),
+        chooseButton: $('#btnChooseDailyArchive'),
+        saveButton: $('#btnSaveDailyArchive'),
+        retryButton: $('#btnRetryDailyArchive'),
+        nextRun: $('#dailyArchiveNextRun'),
+        lastSuccess: $('#dailyArchiveLastSuccess'),
+        pending: $('#dailyArchivePending'),
+        status: $('#dailyArchiveStatus')
+      },
+      bridge: {
+        getDailyArchiveSettings: () => Desktop.getDailyArchiveSettings(),
+        chooseDailyArchiveDirectory: () => Desktop.chooseDailyArchiveDirectory(),
+        setDailyArchiveEnabled: enabled => Desktop.setDailyArchiveEnabled(enabled),
+        saveCurrentDailyArchive: () => Desktop.saveCurrentDailyArchive(),
+        retryDailyArchives: () => Desktop.retryDailyArchives()
+      }
+    })
+  : null;
+
+if (!dailyArchive) {
+  $('#dailyArchiveEnabled').disabled = true;
+  $('#btnChooseDailyArchive').disabled = true;
+  $('#btnSaveDailyArchive').disabled = true;
+  $('#btnRetryDailyArchive').disabled = true;
+  $('#dailyArchiveStatus').textContent = '每日新闻简报自动归档仅在安装版中可用；当前仍可在“情报日报”中手动导出 Markdown。';
+  $('#dailyArchiveStatus').className = 'test-result daily-archive-live warning';
+}
+
 $('#setCloseToTray').addEventListener('change', event => {
   desktopSettings?.update('closeToTray', event.currentTarget.checked).catch(() => {});
 });
 $('#setLaunchAtLogin').addEventListener('change', event => {
   desktopSettings?.update('launchAtLogin', event.currentTarget.checked).catch(() => {});
+});
+$('#dailyArchiveEnabled').addEventListener('change', event => {
+  dailyArchive?.toggle(event.currentTarget.checked).catch(() => {});
+});
+$('#btnChooseDailyArchive').addEventListener('click', () => {
+  dailyArchive?.chooseDirectory().catch(() => {});
+});
+$('#btnSaveDailyArchive').addEventListener('click', () => {
+  dailyArchive?.saveCurrent().catch(() => {});
+});
+$('#btnRetryDailyArchive').addEventListener('click', () => {
+  dailyArchive?.retry().catch(() => {});
 });
 
 function formatBytes(bytes) {
@@ -905,7 +1012,8 @@ async function loadSettings() {
   try {
     await Promise.all([
       settingsForm.load(),
-      desktopSettings?.load()
+      desktopSettings?.load(),
+      dailyArchive?.load()
     ]);
   } catch {}
   loadMaintenance();

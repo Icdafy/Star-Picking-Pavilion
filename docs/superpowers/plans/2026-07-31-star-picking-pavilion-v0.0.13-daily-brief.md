@@ -555,7 +555,7 @@ git commit -m "feat: add native daily archive controls"
 - Modify: `test/responsive-layout.test.js`
 - Modify: `test/static-files.test.js`
 
-- [ ] **Step 1: Write failing controller and integration tests**
+- [x] **Step 1: Write failing controller and integration tests**
 
 Assert:
 
@@ -566,7 +566,7 @@ Assert:
 - card data with `breakthroughBonus > 0` renders a “技术突破 +N” badge and accessible explanation;
 - required IDs and script tags exist.
 
-- [ ] **Step 2: Run UI tests and verify red state**
+- [x] **Step 2: Run UI tests and verify red state**
 
 Run:
 
@@ -576,7 +576,7 @@ node --test test/daily-archive-controller.test.js test/renderer-integration.test
 
 Expected: fail because the controller and markup are missing.
 
-- [ ] **Step 3: Implement the controller state machine**
+- [x] **Step 3: Implement the controller state machine**
 
 Export `createDailyArchiveController({ elements, bridge, formatDateTime })` with:
 
@@ -590,23 +590,23 @@ retry()
 
 Queue mutations, restore confirmed state after errors, set `aria-busy`, and keep status messages in one `aria-live` region.
 
-- [ ] **Step 4: Add the settings card**
+- [x] **Step 4: Add the settings card**
 
 Add the switch, selected path, change-directory button, immediate-save button, retry button, next run, last success, and status. Mark path output with `dir="auto"` and allow wrapping without a horizontal table.
 
-- [ ] **Step 5: Wire renderer startup**
+- [x] **Step 5: Wire renderer startup**
 
 Create the controller only when every preload method exists. Load it with other settings. Browser-only mode disables the switch and keeps existing daily Markdown download.
 
-- [ ] **Step 6: Render breakthrough badges**
+- [x] **Step 6: Render breakthrough badges**
 
 Use persisted `breakthroughBonus`, `breakthroughScore`, and sanitized signals from `articleRow()`. Put the short badge beside heat/quality metadata and the human explanation inside the existing expanded dimensions panel.
 
-- [ ] **Step 7: Style for all supported sizes**
+- [x] **Step 7: Style for all supported sizes**
 
 Use existing glass-card, switch, button, spacing, and theme variables. At narrow widths stack status rows and allow long paths to wrap with `overflow-wrap:anywhere`. Do not introduce a new color system.
 
-- [ ] **Step 8: Run UI tests**
+- [x] **Step 8: Run UI tests**
 
 Run:
 
@@ -616,7 +616,7 @@ node --test test/daily-archive-controller.test.js test/renderer-integration.test
 
 Expected: all pass.
 
-- [ ] **Step 9: Commit the UI**
+- [x] **Step 9: Commit the UI**
 
 ```powershell
 git add renderer/daily-archive-controller.js renderer/index.html renderer/app.js renderer/styles.css test/daily-archive-controller.test.js test/renderer-integration.test.js test/responsive-layout.test.js test/static-files.test.js
