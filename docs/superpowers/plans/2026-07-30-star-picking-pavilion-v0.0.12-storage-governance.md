@@ -298,7 +298,7 @@ git commit -m "feat: govern desktop caches and legacy data"
 - Test: `test/preload.test.js`
 - Test: `test/main-security.test.js`
 
-- [ ] **Step 1: 写入失败的固定 IPC 测试**
+- [x] **Step 1: 写入失败的固定 IPC 测试**
 
 ```js
 test('storage IPC never forwards renderer paths', async () => {
@@ -317,13 +317,13 @@ test('preload exposes frozen no-path storage methods', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认 IPC 尚不存在**
+- [x] **Step 2: 运行测试并确认 IPC 尚不存在**
 
 Run: `node --test test/storage-maintenance-ipc.test.js test/preload.test.js test/main-security.test.js`
 
 Expected: FAIL，缺少存储 IPC 或 preload 方法。
 
-- [ ] **Step 3: 实现 IPC 与主进程初始化**
+- [x] **Step 3: 实现 IPC 与主进程初始化**
 
 `storage-maintenance-ipc.js` 注册：
 
@@ -342,13 +342,13 @@ app.commandLine.appendSwitch('disk-cache-size', String(CACHE_SOFT_LIMIT_BYTES));
 
 在数据迁移完成、窗口创建之前初始化控制器；旧库删除确认使用 Electron 原生 `dialog.showMessageBox`，正文列出控制器重新验证后的精确文件和不可恢复提示。
 
-- [ ] **Step 4: 运行 Electron 桥测试**
+- [x] **Step 4: 运行 Electron 桥测试**
 
 Run: `node --test test/storage-maintenance-ipc.test.js test/preload.test.js test/main-security.test.js`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交桌面桥**
+- [x] **Step 5: 提交桌面桥**
 
 ```powershell
 git add electron/storage-maintenance-ipc.js electron/preload.js electron/main.js test/storage-maintenance-ipc.test.js test/preload.test.js test/main-security.test.js

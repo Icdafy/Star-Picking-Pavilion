@@ -129,6 +129,29 @@ test('main process assembles background mode after preferences and before the wi
   assert.ok(createWindow > initializeBackground);
 });
 
+test('main process caps cache and initializes storage governance before the window', () => {
+  assert.match(source, /registerStorageMaintenanceIpc/);
+  assert.match(source, /createStorageMaintenanceController/);
+  assert.match(source, /CACHE_SOFT_LIMIT_BYTES/);
+  assert.match(
+    source,
+    /app\.commandLine\.appendSwitch\('disk-cache-size', String\(CACHE_SOFT_LIMIT_BYTES\)\)/
+  );
+  assert.match(source, /storageMaintenance\.prepareBeforeReady\(\)/);
+  assert.match(source, /storageMaintenance\.initializeAfterMigration\(\)/);
+  assert.match(source, /candidate\.files\.join\('\\n'\)/);
+
+  const readyIndex = source.indexOf('app.whenReady().then');
+  const prepareIndex = source.indexOf('await storageMaintenance.prepareBeforeReady()', readyIndex);
+  const migrationIndex = source.indexOf('await migrateUserData(', prepareIndex);
+  const residueIndex = source.indexOf('await storageMaintenance.initializeAfterMigration()', migrationIndex);
+  const windowIndex = source.indexOf('await createWindow(serverPort)', residueIndex);
+  assert.ok(prepareIndex > readyIndex);
+  assert.ok(migrationIndex > prepareIndex);
+  assert.ok(residueIndex > migrationIndex);
+  assert.ok(windowIndex > residueIndex);
+});
+
 test('HTTP request-target parsing is covered by the server error boundary', () => {
   const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 'utf8');
   const handler = serverSource.indexOf('http.createServer');

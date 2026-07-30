@@ -70,6 +70,16 @@ function fileSetBytes(databasePath) {
   }, 0);
 }
 
+function databaseFiles(databasePath) {
+  const files = [];
+  for (const suffix of ['', '-wal', '-shm']) {
+    const file = `${databasePath}${suffix}`;
+    const stat = safeLstat(file);
+    if (stat?.isFile() && !stat.isSymbolicLink()) files.push(file);
+  }
+  return files;
+}
+
 function defaultState() {
   return {
     version: 1,
@@ -249,6 +259,7 @@ function createStorageMaintenanceController({
       candidates.push({
         id: candidateId(databasePath),
         path: databasePath,
+        files: databaseFiles(databasePath),
         bytes: fileSetBytes(databasePath),
         migratedAt: Number.isFinite(migratedAt) ? new Date(migratedAt).toISOString() : null,
         eligible,
@@ -339,8 +350,9 @@ function createStorageMaintenanceController({
     if (!candidate?.eligible) throw new Error('旧版数据库状态已变化，无法清理');
     let deletedFiles = 0;
     let deletedBytes = 0;
-    for (const suffix of ['-wal', '-shm', '']) {
-      const target = `${candidate.path}${suffix}`;
+    const orderedFiles = candidate.files.slice().sort((left, right) =>
+      (left === candidate.path ? 1 : 0) - (right === candidate.path ? 1 : 0));
+    for (const target of orderedFiles) {
       const stat = safeLstat(target);
       if (!stat) continue;
       if (!stat.isFile() || stat.isSymbolicLink()) {

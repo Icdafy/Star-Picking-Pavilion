@@ -186,6 +186,10 @@ test('legacy deletion needs a migrated source, thirty-day grace and explicit con
   const before = await cancelled.getSnapshot();
   assert.equal(before.legacy.candidates.length, 1);
   assert.equal(before.legacy.candidates[0].eligible, true);
+  assert.deepEqual(
+    before.legacy.candidates[0].files.slice().sort(),
+    ['', '-shm', '-wal'].map(suffix => `${legacy}${suffix}`).filter(file => fs.existsSync(file)).sort()
+  );
   const actualLegacyBytes = ['', '-wal', '-shm'].reduce(
     (total, suffix) => total + (fs.existsSync(`${legacy}${suffix}`) ? fs.statSync(`${legacy}${suffix}`).size : 0),
     0

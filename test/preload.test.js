@@ -103,6 +103,17 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
     { closeToTray: true }
   ]);
 
+  const storageSnapshot = await api.getStorageSnapshot();
+  assert.equal(storageSnapshot, 'invoked');
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'storage:get']);
+  await api.clearManagedCache();
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'storage:clear-cache']);
+  await api.deleteLegacyData('legacy-123456789abc');
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(ipcCalls.at(-1))),
+    ['invoke', 'storage:delete-legacy', { id: 'legacy-123456789abc' }]
+  );
+
   let payload;
   api.onUpdateStatus(value => { payload = value; });
   updateListener({}, { status: 'downloaded' });

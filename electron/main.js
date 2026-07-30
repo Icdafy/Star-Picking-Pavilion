@@ -25,6 +25,11 @@ const {
 const { createBackgroundModeController } = require('./background-mode');
 const { registerDesktopSettingsIpc } = require('./desktop-settings-ipc');
 const { focusExistingWindow, createServerProcessController } = require('./server-process');
+const {
+  CACHE_SOFT_LIMIT_BYTES,
+  createStorageMaintenanceController
+} = require('./storage-maintenance');
+const { registerStorageMaintenanceIpc } = require('./storage-maintenance-ipc');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -39,6 +44,7 @@ let quitAfterShutdown = false;
 let desktopShutdownPromise = null;
 let uiPreferencesStore = null;
 let backgroundMode = null;
+let storageMaintenance = null;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
   ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
   : null;
@@ -56,6 +62,34 @@ function getDataDir() {
   if (testDataDir) return testDataDir;
   return app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..', 'data');
 }
+
+app.commandLine.appendSwitch('disk-cache-size', String(CACHE_SOFT_LIMIT_BYTES));
+
+async function confirmLegacyDeletion(candidate) {
+  const result = await dialog.showMessageBox({
+    type: 'warning',
+    title: '清理旧版数据库',
+    message: '确认永久删除这份已迁移的旧版数据库？',
+    detail: `即将删除：\n${candidate.files.join('\n')}\n\n此操作不可恢复，请先确认已有备份。`,
+    buttons: ['取消', '删除旧版数据'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true
+  });
+  return result.response === 1;
+}
+
+storageMaintenance = createStorageMaintenanceController({
+  userDataDir: getDataDir(),
+  appDataDir: app.getPath('appData'),
+  repoDataDir: path.join(__dirname, '..', 'data'),
+  isPackaged: testDataDir ? false : app.isPackaged,
+  session: {
+    clearCache: () => session.defaultSession.clearCache(),
+    clearCodeCaches: options => session.defaultSession.clearCodeCaches?.(options) || Promise.resolve()
+  },
+  confirm: confirmLegacyDeletion
+});
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
@@ -279,6 +313,10 @@ registerDesktopSettingsIpc({
   ipcMain,
   getController: () => backgroundMode
 });
+registerStorageMaintenanceIpc({
+  ipcMain,
+  getController: () => storageMaintenance
+});
 
 async function chooseLegacyDatabase() {
   const result = await dialog.showMessageBox({
@@ -295,6 +333,7 @@ async function chooseLegacyDatabase() {
 }
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
+  await storageMaintenance.prepareBeforeReady();
   installPermissionPolicy();
   setupAutoUpdate();
   await migrateUserData({
@@ -303,6 +342,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     repoDataDir: getDataDir(),
     chooseSource: chooseLegacyDatabase
   });
+  await storageMaintenance.initializeAfterMigration();
   const dataDir = getDataDir();
   uiPreferencesStore = await loadUiPreferencesStore({ directory: dataDir });
   backgroundMode = createBackgroundModeController({
