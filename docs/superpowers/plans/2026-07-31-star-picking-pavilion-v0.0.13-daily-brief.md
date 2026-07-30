@@ -66,7 +66,7 @@
 - Create: `server/ai/breakthrough.js`
 - Create: `test/breakthrough.test.js`
 
-- [ ] **Step 1: Write failing positive and negative classifier tests**
+- [x] **Step 1: Write failing positive and negative classifier tests**
 
 Create table-driven tests that call:
 
@@ -90,7 +90,7 @@ assert.ok(result.signals.actions.includes('回收'));
 
 Cover both industries and reject planned, rumored, noisy, wrong-category, low-credibility T2 single-source, and object-only examples.
 
-- [ ] **Step 2: Run classifier tests and verify the missing-module failure**
+- [x] **Step 2: Run classifier tests and verify the missing-module failure**
 
 Run:
 
@@ -100,7 +100,7 @@ node --test test/breakthrough.test.js
 
 Expected: fail because `server/ai/breakthrough.js` does not exist.
 
-- [ ] **Step 3: Add the versioned configuration**
+- [x] **Step 3: Add the versioned configuration**
 
 Define:
 
@@ -125,7 +125,7 @@ Define:
 
 Expand aliases enough to cover the accepted design cases without generic words such as “航空” or “卫星” acting alone.
 
-- [ ] **Step 4: Implement a pure, explainable classifier**
+- [x] **Step 4: Implement a pure, explainable classifier**
 
 Export:
 
@@ -148,7 +148,7 @@ function analyzeBreakthrough(article, config) {
 
 Require domain, eligible category, one object, one completion action, zero noise, and the configured credibility gate. Calculate strength from normalized novelty, importance, credibility, object specificity, completion evidence, tier, and corroboration. Clamp to `[0, 1]`.
 
-- [ ] **Step 5: Run classifier tests**
+- [x] **Step 5: Run classifier tests**
 
 Run:
 
@@ -158,7 +158,7 @@ node --test test/breakthrough.test.js
 
 Expected: all cases pass.
 
-- [ ] **Step 6: Commit the classifier**
+- [x] **Step 6: Commit the classifier**
 
 ```powershell
 git add config/breakthroughs.json server/ai/breakthrough.js test/breakthrough.test.js
