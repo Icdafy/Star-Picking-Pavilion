@@ -137,12 +137,12 @@ test('main process caps cache and initializes storage governance before the wind
     source,
     /app\.commandLine\.appendSwitch\('disk-cache-size', String\(CACHE_SOFT_LIMIT_BYTES\)\)/
   );
-  assert.match(source, /storageMaintenance\.prepareBeforeReady\(\)/);
+  assert.match(source, /runBestEffortMaintenance\([\s\S]{0,160}?storageMaintenance\.prepareBeforeReady\(\)/);
   assert.match(source, /storageMaintenance\.initializeAfterMigration\(\)/);
   assert.match(source, /candidate\.files\.join\('\\n'\)/);
 
   const readyIndex = source.indexOf('app.whenReady().then');
-  const prepareIndex = source.indexOf('await storageMaintenance.prepareBeforeReady()', readyIndex);
+  const prepareIndex = source.indexOf("await runBestEffortMaintenance(", readyIndex);
   const migrationIndex = source.indexOf('await migrateUserData(', prepareIndex);
   const residueIndex = source.indexOf('await storageMaintenance.initializeAfterMigration()', migrationIndex);
   const windowIndex = source.indexOf('await createWindow(serverPort)', residueIndex);
@@ -150,6 +150,11 @@ test('main process caps cache and initializes storage governance before the wind
   assert.ok(migrationIndex > prepareIndex);
   assert.ok(residueIndex > migrationIndex);
   assert.ok(windowIndex > residueIndex);
+});
+
+test('optional startup cache maintenance cannot prevent the application from launching', () => {
+  assert.match(source, /async function runBestEffortMaintenance/);
+  assert.match(source, /catch \(error\) \{[\s\S]{0,220}?return \{ skipped: true, failures:/);
 });
 
 test('HTTP request-target parsing is covered by the server error boundary', () => {

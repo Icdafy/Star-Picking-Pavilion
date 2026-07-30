@@ -8,6 +8,35 @@ const AUTO_COMPACT_MIN_RATIO = 0.25;
 const AUTO_COMPACT_INTERVAL_MS = 30 * 86_400_000;
 const COMPACT_FREE_SPACE_RESERVE_BYTES = 64 * 1024 * 1024;
 
+class DatabaseIntegrityError extends Error {
+  constructor(detail = 'unknown') {
+    super(`数据库完整性检查失败：${detail}`);
+    this.name = 'DatabaseIntegrityError';
+    this.code = 'database-integrity';
+  }
+}
+
+function describeDatabaseMaintenanceError(error) {
+  if (error instanceof DatabaseIntegrityError || error?.code === 'database-integrity') {
+    return {
+      statusCode: 409,
+      body: {
+        ok: false,
+        code: 'database-integrity',
+        error: '数据库完整性检查未通过，已停止压缩。请先备份数据并查看运行日志。'
+      }
+    };
+  }
+  return {
+    statusCode: 500,
+    body: {
+      ok: false,
+      code: 'database-maintenance-failed',
+      error: '数据库压缩未完成，请稍后重试；若持续失败，请先备份数据并查看运行日志。'
+    }
+  };
+}
+
 function pragmaNumber(database, name) {
   const row = database.prepare(`PRAGMA ${name}`).get();
   const value = Number(row?.[name]);
@@ -56,8 +85,17 @@ function writeMeta(database, key, value) {
 function assertHealthy(database) {
   const result = database.prepare('PRAGMA quick_check').get();
   if (result?.quick_check !== 'ok') {
-    throw new Error(`数据库完整性检查失败: ${result?.quick_check || 'unknown'}`);
+    throw new DatabaseIntegrityError(result?.quick_check || 'unknown');
   }
+}
+
+function checkpointWal(database) {
+  const row = database.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get() || {};
+  return {
+    busy: Number(row.busy) || 0,
+    log: Number(row.log) || 0,
+    checkpointed: Number(row.checkpointed) || 0
+  };
 }
 
 function shouldAutoCompact({
@@ -97,11 +135,21 @@ function compactDatabase({
   }
 
   assertHealthy(database);
-  database.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  const checkpoint = checkpointWal(database);
+  const afterCheckpoint = databaseStorageSnapshot({ database, databasePath, statSync });
+  if (checkpoint.busy !== 0) {
+    return {
+      skipped: true,
+      reason: 'checkpoint-busy',
+      checkpoint,
+      before,
+      after: afterCheckpoint
+    };
+  }
   const freeBytes = availableBytes == null
     ? availableBytesForPath(databasePath, statfsSync)
     : Number(availableBytes);
-  const requiredBytes = before.mainFileBytes * 2 + COMPACT_FREE_SPACE_RESERVE_BYTES;
+  const requiredBytes = afterCheckpoint.mainFileBytes * 2 + COMPACT_FREE_SPACE_RESERVE_BYTES;
   if (!Number.isFinite(freeBytes) || freeBytes < requiredBytes) {
     return {
       skipped: true,
@@ -109,7 +157,7 @@ function compactDatabase({
       requiredBytes,
       availableBytes: Number.isFinite(freeBytes) ? freeBytes : 0,
       before,
-      after: before
+      after: afterCheckpoint
     };
   }
 
@@ -141,10 +189,13 @@ module.exports = {
   AUTO_COMPACT_MIN_BYTES,
   AUTO_COMPACT_MIN_RATIO,
   COMPACT_FREE_SPACE_RESERVE_BYTES,
+  DatabaseIntegrityError,
   assertHealthy,
   availableBytesForPath,
+  checkpointWal,
   compactDatabase,
   databaseStorageSnapshot,
+  describeDatabaseMaintenanceError,
   optimizeDatabase,
   readMeta,
   shouldAutoCompact,

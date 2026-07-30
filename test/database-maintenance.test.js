@@ -12,8 +12,11 @@ const {
   AUTO_COMPACT_MIN_BYTES,
   AUTO_COMPACT_MIN_RATIO,
   COMPACT_FREE_SPACE_RESERVE_BYTES,
+  DatabaseIntegrityError,
+  assertHealthy,
   compactDatabase,
   databaseStorageSnapshot,
+  describeDatabaseMaintenanceError,
   optimizeDatabase,
   shouldAutoCompact
 } = require('../server/database-maintenance');
@@ -82,6 +85,32 @@ test('automatic compaction requires size, ratio and thirty-day interval together
   assert.equal(shouldAutoCompact({ ...eligible, lastCompactionAt: null }), true);
 });
 
+test('integrity failures carry a stable maintenance error code', () => {
+  assert.throws(
+    () => assertHealthy({
+      prepare: () => ({ get: () => ({ quick_check: 'database disk image is malformed' }) })
+    }),
+    error => {
+      assert.equal(error instanceof DatabaseIntegrityError, true);
+      assert.equal(error.code, 'database-integrity');
+      assert.match(error.message, /完整性检查失败/);
+      return true;
+    }
+  );
+  assert.deepEqual(describeDatabaseMaintenanceError(new DatabaseIntegrityError('malformed')), {
+    statusCode: 409,
+    body: {
+      ok: false,
+      code: 'database-integrity',
+      error: '数据库完整性检查未通过，已停止压缩。请先备份数据并查看运行日志。'
+    }
+  });
+  assert.equal(
+    describeDatabaseMaintenanceError(new Error('disk I/O')).body.code,
+    'database-maintenance-failed'
+  );
+});
+
 test('manual compaction preserves live rows, verifies integrity and shrinks allocated pages', t => {
   const fixture = createFixture();
   t.after(() => {
@@ -132,6 +161,33 @@ test('compaction skips safely when the volume lacks the required temporary space
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'space');
   assert.equal(fixture.database.prepare('SELECT COUNT(*) c FROM keepers').get().c, 1);
+});
+
+test('compaction stops when an active reader prevents a complete WAL checkpoint', t => {
+  const fixture = createFixture();
+  const reader = new DatabaseSync(fixture.databasePath, { readOnly: true });
+  t.after(() => {
+    try { reader.exec('ROLLBACK'); } catch {}
+    reader.close();
+    fixture.database.close();
+    fs.rmSync(fixture.directory, { recursive: true, force: true });
+  });
+  reader.exec('BEGIN');
+  reader.prepare('SELECT COUNT(*) c FROM keepers').get();
+  fixture.database.prepare('INSERT INTO keepers (content) VALUES (?)').run('new WAL row');
+
+  const result = compactDatabase({
+    database: fixture.database,
+    databasePath: fixture.databasePath,
+    mode: 'manual',
+    availableBytes: Number.MAX_SAFE_INTEGER
+  });
+
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'checkpoint-busy');
+  assert.equal(result.checkpoint.busy, 1);
+  assert.equal(typeof result.after.walBytes, 'number');
+  assert.equal(fixture.database.prepare('SELECT COUNT(*) c FROM keepers').get().c, 2);
 });
 
 test('optimize records its own successful maintenance timestamp', t => {

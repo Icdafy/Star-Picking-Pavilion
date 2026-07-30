@@ -130,6 +130,33 @@ test('unavailable desktop storage is never rendered as zero and total becomes a 
   assert.equal(view.pruneButton.disabled, false);
 });
 
+test('cache accounting failures render known bytes as a lower bound instead of an exact zero', async () => {
+  const view = elements();
+  const controller = createStorageMaintenanceController({
+    elements: view,
+    requestDatabase: async () => databaseSnapshot(),
+    pruneDatabase: async () => ({}),
+    compactDatabase: async () => ({}),
+    getDesktopStorage: async () => desktopSnapshot({
+      cache: {
+        bytes: 1024,
+        entries: [{ name: 'Cache', bytes: 1024 }],
+        failures: [{ name: 'Code Cache', reason: 'EACCES' }],
+        softLimitBytes: 256 * 1024 * 1024,
+        pendingRestart: false
+      }
+    }),
+    clearDesktopCache: async () => ({}),
+    deleteLegacyData: async () => ({}),
+    formatBytes
+  });
+
+  await controller.load();
+
+  assert.equal(view.cache.textContent, '≥ 1 KB');
+  assert.equal(view.total.textContent, '≥ 17 KB');
+});
+
 test('legacy cleanup stays disabled until an eligible regenerated candidate exists', async () => {
   const view = elements();
   let desktop = desktopSnapshot({
@@ -196,4 +223,50 @@ test('each maintenance action owns its busy and error state independently', asyn
   assert.equal(view.cacheStatus.textContent, '✗ cache failed');
   assert.match(view.cacheStatus.className, /fail/);
   assert.equal(view.compactStatus.textContent, '✓ 已释放 4 KB');
+});
+
+test('busy checkpoints and partial cleanup results are reported without false success', async () => {
+  const view = elements();
+  let compactResult = { skipped: true, reason: 'busy' };
+  const controller = createStorageMaintenanceController({
+    elements: view,
+    requestDatabase: async () => databaseSnapshot(),
+    pruneDatabase: async () => ({}),
+    compactDatabase: async () => compactResult,
+    getDesktopStorage: async () => desktopSnapshot(),
+    clearDesktopCache: async () => ({
+      pendingRestart: true,
+      releasedBytes: 1024,
+      failedBytes: 2048,
+      pendingBytes: 2048,
+      failures: [{ name: 'Cache', reason: 'EBUSY' }]
+    }),
+    deleteLegacyData: async () => ({
+      deleted: true,
+      deletedBytes: 1024,
+      failedBytes: 2048,
+      failedFiles: [{ name: 'windcatcher.db-wal', reason: 'EBUSY' }]
+    }),
+    formatBytes
+  });
+  await controller.load();
+
+  await controller.compact();
+  assert.equal(view.compactStatus.textContent, '暂未压缩：采集或清理正在进行');
+  assert.doesNotMatch(view.compactStatus.className, /ok|fail/);
+
+  compactResult = { skipped: true, reason: 'checkpoint-busy' };
+  await controller.compact();
+  assert.equal(view.compactStatus.textContent, '暂未压缩：数据库正在读取中，请稍后重试');
+  assert.doesNotMatch(view.compactStatus.className, /ok|fail/);
+
+  await controller.clearCache();
+  assert.match(view.cacheStatus.textContent, /已释放 1 KB/);
+  assert.match(view.cacheStatus.textContent, /2 KB 暂未清理/);
+  assert.match(view.cacheStatus.className, /fail/);
+
+  await controller.deleteLegacy();
+  assert.match(view.legacyStatus.textContent, /已释放 1 KB/);
+  assert.match(view.legacyStatus.textContent, /2 KB 暂未删除/);
+  assert.match(view.legacyStatus.className, /fail/);
 });

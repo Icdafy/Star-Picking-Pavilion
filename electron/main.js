@@ -79,6 +79,19 @@ async function confirmLegacyDeletion(candidate) {
   return result.response === 1;
 }
 
+async function runBestEffortMaintenance(label, operation) {
+  try {
+    const result = await operation();
+    if (result?.failures?.length) {
+      console.warn(`[storage] ${label} completed with ${result.failures.length} failure(s)`);
+    }
+    return result;
+  } catch (error) {
+    console.warn(`[storage] ${label} skipped:`, error);
+    return { skipped: true, failures: [{ reason: String(error?.code || error?.message || error) }] };
+  }
+}
+
 storageMaintenance = createStorageMaintenanceController({
   userDataDir: getDataDir(),
   appDataDir: app.getPath('appData'),
@@ -333,7 +346,10 @@ async function chooseLegacyDatabase() {
 }
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
-  await storageMaintenance.prepareBeforeReady();
+  await runBestEffortMaintenance(
+    'startup cache cleanup',
+    () => storageMaintenance.prepareBeforeReady()
+  );
   installPermissionPolicy();
   setupAutoUpdate();
   await migrateUserData({
@@ -342,7 +358,13 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     repoDataDir: getDataDir(),
     chooseSource: chooseLegacyDatabase
   });
-  await storageMaintenance.initializeAfterMigration();
+  const migrationMaintenance = await storageMaintenance.initializeAfterMigration();
+  if (migrationMaintenance.removedMigrationResidue?.failures?.length) {
+    console.warn(
+      `[storage] migration residue cleanup completed with `
+      + `${migrationMaintenance.removedMigrationResidue.failures.length} failure(s)`
+    );
+  }
   const dataDir = getDataDir();
   uiPreferencesStore = await loadUiPreferencesStore({ directory: dataDir });
   backgroundMode = createBackgroundModeController({

@@ -539,6 +539,12 @@ git commit -m "test: verify v0.0.12 release candidate"
 
 若没有文件变化，不创建空提交。
 
+- [x] **Step 7: 处理独立安全审查**
+
+复现并修复 Windows 目录联接越界、确认期间同路径数据库替换、WAL/SHM 集合变化、可选维护阻断启动、WAL checkpoint 忙碌、缓存失败重试与旧库删除失败回滚问题；为每条修复增加定向回归测试。
+
+Expected: 开发数据物理边界不可绕过，删除对象必须与确认时身份一致；可选清理失败不阻止启动，失败结果和剩余占用如实显示。
+
 ### Task 8: 推送 main、标签与核验 GitHub Release
 
 **Files:**

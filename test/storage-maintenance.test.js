@@ -130,6 +130,41 @@ test('manual cache cleanup clears the live session and queues startup-only cache
   assert.equal(fs.existsSync(path.join(box.userDataDir, 'DawnWebGPUCache')), false);
 });
 
+test('manual cache cleanup settles live operations independently and returns measured partial results', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  writeSizedFile(path.join(box.userDataDir, 'Cache', 'http.bin'), 20);
+  writeSizedFile(path.join(box.userDataDir, 'Code Cache', 'code.bin'), 30);
+  const calls = [];
+  const controller = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    session: {
+      async clearCache() {
+        calls.push('cache');
+        const error = new Error('live cache locked');
+        error.code = 'EBUSY';
+        throw error;
+      },
+      async clearCodeCaches() {
+        calls.push('code');
+        fs.rmSync(path.join(box.userDataDir, 'Code Cache'), { recursive: true, force: true });
+      }
+    }
+  });
+
+  const result = await controller.clearCache();
+
+  assert.deepEqual(calls.sort(), ['cache', 'code']);
+  assert.equal(result.clearedSession, false);
+  assert.equal(result.releasedBytes, 30);
+  assert.equal(result.pendingBytes, 20);
+  assert.equal(result.pendingRestart, true);
+  assert.deepEqual(result.failures, [{ name: 'session-cache', reason: 'EBUSY' }]);
+  const state = JSON.parse(fs.readFileSync(path.join(box.userDataDir, 'storage-maintenance.json'), 'utf8'));
+  assert.equal(state.pendingStartupCacheClear, true);
+});
+
 test('post-migration cleanup removes only exact stale migration temporary files', async t => {
   const box = sandbox();
   t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
@@ -153,7 +188,7 @@ test('post-migration cleanup removes only exact stale migration temporary files'
   });
   const result = await controller.initializeAfterMigration();
 
-  assert.deepEqual(result.removedMigrationResidue, { files: 1, bytes: 12 });
+  assert.deepEqual(result.removedMigrationResidue, { files: 1, bytes: 12, failures: [] });
   assert.equal(fs.existsSync(old), false);
   assert.equal(fs.existsSync(fresh), true);
   assert.equal(fs.existsSync(unknown), true);
@@ -186,6 +221,7 @@ test('legacy deletion needs a migrated source, thirty-day grace and explicit con
   const before = await cancelled.getSnapshot();
   assert.equal(before.legacy.candidates.length, 1);
   assert.equal(before.legacy.candidates[0].eligible, true);
+  assert.equal(Object.hasOwn(before.legacy.candidates[0], 'identities'), false);
   assert.deepEqual(
     before.legacy.candidates[0].files.slice().sort(),
     ['', '-shm', '-wal'].map(suffix => `${legacy}${suffix}`).filter(file => fs.existsSync(file)).sort()
@@ -255,4 +291,277 @@ test('legacy candidates inside development data or still in grace are never elig
   assert.equal(grace.legacy.candidates.length, 1);
   assert.equal(grace.legacy.candidates[0].eligible, false);
   assert.equal(grace.legacy.candidates[0].reason, 'grace-period');
+});
+
+test('a user-data junction into development data never produces a removable legacy candidate', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  fs.rmSync(box.userDataDir, { recursive: true, force: true });
+  const canonical = path.join(box.repoDataDir, 'star-picking-pavilion.db');
+  const physicalLegacy = path.join(box.repoDataDir, 'windcatcher.db');
+  createDatabase(canonical, 'canonical');
+  createDatabase(physicalLegacy, 'development');
+  writeSizedFile(path.join(box.repoDataDir, 'Cache', 'keep.bin'), 20);
+  const physicalResidue = path.join(
+    box.repoDataDir,
+    'star-picking-pavilion.db.backup-123-abcdef123456.tmp-wal'
+  );
+  writeSizedFile(physicalResidue, 15);
+  try {
+    fs.symlinkSync(
+      box.repoDataDir,
+      box.userDataDir,
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
+  } catch (error) {
+    if (['EPERM', 'EACCES'].includes(error.code)) {
+      t.skip(`junction creation unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+  const nowMs = Date.parse('2026-07-30T00:00:00.000Z');
+  const staleDate = new Date(nowMs - MIGRATION_TEMP_MAX_AGE_MS - 1);
+  fs.utimesSync(physicalResidue, staleDate, staleDate);
+  const visibleLegacy = path.join(box.userDataDir, 'windcatcher.db');
+  fs.writeFileSync(path.join(box.userDataDir, 'migration-v0.0.1.json'), JSON.stringify({
+    source: visibleLegacy,
+    destination: path.join(box.userDataDir, 'star-picking-pavilion.db'),
+    timestamp: new Date(nowMs - 31 * 86_400_000).toISOString(),
+    status: 'migrated'
+  }));
+
+  const controller = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    cacheLimitBytes: 1,
+    now: () => new Date(nowMs),
+    confirm: async () => true
+  });
+  const snapshot = await controller.getSnapshot();
+
+  assert.equal(snapshot.legacy.candidates.length, 0);
+  await assert.rejects(controller.deleteLegacy('legacy-000000000000'));
+  const cache = await controller.prepareBeforeReady();
+  assert.equal(cache.cleared, false);
+  assert.equal(cache.failures[0].reason, 'reparse-point');
+  const residue = await controller.initializeAfterMigration();
+  assert.equal(residue.removedMigrationResidue.files, 0);
+  assert.equal(residue.removedMigrationResidue.failures[0].reason, 'reparse-point');
+  assert.equal(fs.existsSync(physicalLegacy), true);
+  assert.equal(fs.existsSync(path.join(box.repoDataDir, 'Cache', 'keep.bin')), true);
+  assert.equal(fs.existsSync(physicalResidue), true);
+});
+
+test('legacy deletion aborts when the database or exact sidecar set changes during confirmation', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  const canonical = path.join(box.userDataDir, 'star-picking-pavilion.db');
+  const legacy = path.join(box.userDataDir, 'windcatcher.db');
+  createDatabase(canonical, 'canonical');
+  createDatabase(legacy, 'original');
+  const nowMs = Date.parse('2026-07-30T00:00:00.000Z');
+  fs.writeFileSync(path.join(box.userDataDir, 'migration-v0.0.1.json'), JSON.stringify({
+    source: legacy,
+    destination: canonical,
+    timestamp: new Date(nowMs - 31 * 86_400_000).toISOString(),
+    status: 'migrated'
+  }));
+
+  const replacementController = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    now: () => new Date(nowMs),
+    confirm: async () => {
+      fs.rmSync(legacy);
+      createDatabase(legacy, 'replacement');
+      return true;
+    }
+  });
+  const replacementId = (await replacementController.getSnapshot()).legacy.candidates[0].id;
+  await assert.rejects(
+    replacementController.deleteLegacy(replacementId),
+    /状态已变化/
+  );
+  const replacement = new DatabaseSync(legacy, { readOnly: true });
+  assert.equal(replacement.prepare('SELECT value FROM entries').get().value, 'replacement');
+  replacement.close();
+
+  const wal = `${legacy}-wal`;
+  writeSizedFile(wal, 17);
+  const oldWalDate = new Date(nowMs - 1_000);
+  fs.utimesSync(wal, oldWalDate, oldWalDate);
+  const sidecarController = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    now: () => new Date(nowMs),
+    confirm: async () => {
+      fs.writeFileSync(wal, Buffer.alloc(17, 2));
+      const changedWalDate = new Date(nowMs);
+      fs.utimesSync(wal, changedWalDate, changedWalDate);
+      return true;
+    }
+  });
+  const sidecarId = (await sidecarController.getSnapshot()).legacy.candidates[0].id;
+  await assert.rejects(sidecarController.deleteLegacy(sidecarId), /状态已变化|不可清理/);
+  assert.equal(fs.existsSync(legacy), true);
+});
+
+test('legacy deletion stages the confirmed set and rolls every file back when the main delete fails', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  const canonical = path.join(box.userDataDir, 'star-picking-pavilion.db');
+  const legacy = path.join(box.userDataDir, 'windcatcher.db');
+  createDatabase(canonical, 'canonical');
+  createDatabase(legacy, 'legacy');
+  writeSizedFile(`${legacy}-wal`, 7);
+  writeSizedFile(`${legacy}-shm`, 8);
+  const nowMs = Date.parse('2026-07-30T00:00:00.000Z');
+  fs.writeFileSync(path.join(box.userDataDir, 'migration-v0.0.1.json'), JSON.stringify({
+    source: legacy,
+    destination: canonical,
+    timestamp: new Date(nowMs - 31 * 86_400_000).toISOString(),
+    status: 'migrated'
+  }));
+  const controller = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    now: () => new Date(nowMs),
+    confirm: async () => true
+  });
+  const candidate = (await controller.getSnapshot()).legacy.candidates[0];
+  const originalRm = fs.promises.rm;
+  fs.promises.rm = async (target, options) => {
+    if (String(target).includes('windcatcher.db.delete-')) {
+      const error = new Error('locked');
+      error.code = 'EBUSY';
+      throw error;
+    }
+    return originalRm.call(fs.promises, target, options);
+  };
+  let result;
+  try {
+    result = await controller.deleteLegacy(candidate.id);
+  } finally {
+    fs.promises.rm = originalRm;
+  }
+
+  assert.equal(result.deleted, false);
+  assert.equal(result.deletedFiles, 0);
+  assert.equal(result.deletedBytes, 0);
+  assert.equal(result.failedFiles[0].reason, 'EBUSY');
+  for (const file of candidate.files) assert.equal(fs.existsSync(file), true);
+  assert.equal(
+    fs.readdirSync(box.userDataDir).some(name => name.includes('.delete-')),
+    false
+  );
+});
+
+test('cache traversal and deletion failures are reported without throwing or suppressing retry', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  const cacheFile = path.join(box.userDataDir, 'Cache', 'locked.bin');
+  writeSizedFile(cacheFile, 20);
+  const controller = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    cacheLimitBytes: 10,
+    session: {
+      async clearCache() {},
+      async clearCodeCaches() {}
+    }
+  });
+  await controller.clearCache();
+
+  const originalRm = fs.promises.rm;
+  fs.promises.rm = async (target, options) => {
+    if (path.resolve(target) === path.resolve(path.dirname(cacheFile))) {
+      const error = new Error('locked');
+      error.code = 'EBUSY';
+      throw error;
+    }
+    return originalRm.call(fs.promises, target, options);
+  };
+  let result;
+  try {
+    result = await controller.prepareBeforeReady();
+  } finally {
+    fs.promises.rm = originalRm;
+  }
+
+  assert.equal(result.cleared, false);
+  assert.equal(result.reason, 'pending');
+  assert.equal(result.releasedBytes, 0);
+  assert.equal(result.failedBytes, 20);
+  assert.equal(result.pendingBytes, 20);
+  assert.equal(result.failures[0].reason, 'EBUSY');
+  const state = JSON.parse(fs.readFileSync(path.join(box.userDataDir, 'storage-maintenance.json'), 'utf8'));
+  assert.equal(state.pendingStartupCacheClear, true);
+  assert.equal(state.lastAutoCacheClearAt, null);
+});
+
+test('cache state persistence failure is returned as a best-effort startup result', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  writeSizedFile(path.join(box.userDataDir, 'Cache', 'large.bin'), 20);
+  const controller = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    cacheLimitBytes: 10
+  });
+  const statePath = path.join(box.userDataDir, 'storage-maintenance.json');
+  const originalRename = fs.promises.rename;
+  fs.promises.rename = async (source, destination) => {
+    if (path.resolve(destination) === path.resolve(statePath)) {
+      const error = new Error('read only');
+      error.code = 'EACCES';
+      throw error;
+    }
+    return originalRename.call(fs.promises, source, destination);
+  };
+  let result;
+  try {
+    result = await controller.prepareBeforeReady();
+  } finally {
+    fs.promises.rename = originalRename;
+  }
+
+  assert.equal(result.cleared, false);
+  assert.equal(result.reason, 'automatic');
+  assert.equal(result.releasedBytes, 20);
+  assert.equal(result.failures.at(-1).name, 'storage-maintenance.json');
+  assert.equal(result.failures.at(-1).reason, 'EACCES');
+  assert.equal(fs.existsSync(path.join(box.userDataDir, 'Cache')), false);
+});
+
+test('an unreadable cache directory degrades to an accounting failure instead of blocking startup', async t => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  const cacheDir = path.join(box.userDataDir, 'Cache');
+  writeSizedFile(path.join(cacheDir, 'entry.bin'), 20);
+  const controller = createStorageMaintenanceController({
+    ...box,
+    isPackaged: true,
+    cacheLimitBytes: 10
+  });
+  const originalReaddir = fs.readdirSync;
+  fs.readdirSync = (target, options) => {
+    if (path.resolve(target) === path.resolve(cacheDir)) {
+      const error = new Error('denied');
+      error.code = 'EACCES';
+      throw error;
+    }
+    return originalReaddir.call(fs, target, options);
+  };
+  let result;
+  try {
+    result = await controller.prepareBeforeReady();
+  } finally {
+    fs.readdirSync = originalReaddir;
+  }
+
+  assert.equal(result.cleared, false);
+  assert.equal(result.reason, 'below-limit');
+  assert.equal(result.failures[0].reason, 'EACCES');
+  assert.equal(fs.existsSync(path.join(cacheDir, 'entry.bin')), true);
 });

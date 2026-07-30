@@ -16,7 +16,10 @@ const exportMarkdown = require('./export/markdown');
 const {
   runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
 } = require('./scheduler');
-const { databaseStorageSnapshot } = require('./database-maintenance');
+const {
+  databaseStorageSnapshot,
+  describeDatabaseMaintenanceError
+} = require('./database-maintenance');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const lexicon = require('./ai/lexicon');
 const { heatScore } = require('./ai/scoring');
@@ -438,11 +441,14 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, ...result, databaseBytes: databaseFileBytes() });
       }
       if (p === '/api/maintenance/compact' && req.method === 'POST') {
-        const result = compactOnce('manual', { mode: 'manual' });
-        if (result.skipped && result.reason === 'busy') {
-          return json(res, 409, { ok: false, ...result });
+        try {
+          const result = compactOnce('manual', { mode: 'manual' });
+          return json(res, 200, { ok: !result.skipped, ...result });
+        } catch (error) {
+          console.error('[maintenance:compact]', error);
+          const failure = describeDatabaseMaintenanceError(error);
+          return json(res, failure.statusCode, failure.body);
         }
-        return json(res, 200, { ok: !result.skipped, ...result });
       }
 
       if (p === '/api/sources' && req.method === 'GET') {

@@ -45,6 +45,7 @@
     const state = {
       databaseAvailable: false,
       desktopAvailable: false,
+      desktopExact: false,
       database: null,
       desktop: null,
       eligibleLegacy: null,
@@ -102,8 +103,12 @@
     function renderDesktop(snapshot) {
       state.desktop = snapshot;
       state.desktopAvailable = true;
+      state.desktopExact = !snapshot?.cache?.failures?.length;
       state.eligibleLegacy = snapshot?.legacy?.candidates?.find(candidate => candidate.eligible) || null;
-      elements.cache.textContent = formatBytes(asBytes(snapshot?.cache?.bytes));
+      const cacheBytes = asBytes(snapshot?.cache?.bytes);
+      elements.cache.textContent = state.desktopExact
+        ? formatBytes(cacheBytes)
+        : (cacheBytes > 0 ? `≥ ${formatBytes(cacheBytes)}` : UNAVAILABLE);
       elements.migrationResidue.textContent = formatBytes(asBytes(snapshot?.migrationResidue?.bytes));
       elements.legacy.textContent = formatBytes(asBytes(snapshot?.legacy?.bytes));
     }
@@ -111,6 +116,7 @@
     function renderDesktopUnavailable() {
       state.desktop = null;
       state.desktopAvailable = false;
+      state.desktopExact = false;
       state.eligibleLegacy = null;
       for (const field of ['cache', 'migrationResidue', 'legacy']) {
         elements[field].textContent = UNAVAILABLE;
@@ -127,7 +133,7 @@
           + asBytes(state.desktop?.legacy?.bytes)
         : 0;
       const total = formatBytes(databaseBytes + desktopBytes);
-      elements.total.textContent = state.databaseAvailable && state.desktopAvailable
+      elements.total.textContent = state.databaseAvailable && state.desktopAvailable && state.desktopExact
         ? total
         : `≥ ${total}`;
     }
@@ -156,7 +162,9 @@
       renderButtons();
       try {
         const result = await operation();
-        setStatus(kind, successMessage(result), 'ok', false);
+        const feedback = successMessage(result);
+        if (typeof feedback === 'string') setStatus(kind, feedback, 'ok', false);
+        else setStatus(kind, feedback.message, feedback.tone || '', false);
         await load();
         return result;
       } catch (error) {
@@ -180,25 +188,58 @@
     function compact() {
       return run('compact', operations.compactDatabase, result => {
         if (!result?.skipped) return `✓ 已释放 ${formatBytes(asBytes(result?.reclaimedBytes))}`;
-        if (result.reason === 'space') return '暂未压缩：磁盘可用空间不足';
-        if (result.reason === 'busy') return '暂未压缩：采集或清理正在进行';
-        return '暂未压缩：当前无需深度整理';
+        if (result.reason === 'space') {
+          return { message: '暂未压缩：磁盘可用空间不足', tone: '' };
+        }
+        if (result.reason === 'busy') {
+          return { message: '暂未压缩：采集或清理正在进行', tone: '' };
+        }
+        if (result.reason === 'checkpoint-busy') {
+          return { message: '暂未压缩：数据库正在读取中，请稍后重试', tone: '' };
+        }
+        return { message: '暂未压缩：当前无需深度整理', tone: '' };
       });
     }
 
     function clearCache() {
-      return run('cache', operations.clearDesktopCache, result => (
-        result?.pendingRestart
-          ? '✓ 已清理可释放缓存，其余将在重启后完成'
-          : `✓ 已清理 ${formatBytes(asBytes(result?.deletedBytes))}`
-      ));
+      return run('cache', operations.clearDesktopCache, result => {
+        const released = asBytes(result?.releasedBytes);
+        const pending = asBytes(result?.pendingBytes);
+        const failed = asBytes(result?.failedBytes);
+        if (failed > 0 || result?.failures?.length > 0) {
+          return {
+            message: `已释放 ${formatBytes(released)}，`
+              + (failed > 0
+                ? `${formatBytes(failed)} 暂未清理，将在重启后重试`
+                : '部分缓存未能处理，请稍后重试'),
+            tone: 'fail'
+          };
+        }
+        if (result?.pendingRestart) {
+          return `✓ 已清理运行中缓存，约 ${formatBytes(pending)} 将在重启后清理`;
+        }
+        return `✓ 已清理 ${formatBytes(released)}`;
+      });
     }
 
     function deleteLegacy() {
       const candidate = state.eligibleLegacy;
       if (!candidate) return Promise.reject(new Error('没有可清理的旧版数据'));
       return run('legacy', () => operations.deleteLegacyData(candidate.id), result => {
-        if (result?.cancelled || result?.deleted === false) return '已取消';
+        if (result?.cancelled) return '已取消';
+        if (asBytes(result?.failedBytes) > 0) {
+          return {
+            message: `已释放 ${formatBytes(asBytes(result?.deletedBytes))}，`
+              + `${formatBytes(asBytes(result?.failedBytes))} 暂未删除`,
+            tone: 'fail'
+          };
+        }
+        if (result?.deleted === false) {
+          return {
+            message: '未删除：文件正在使用，请关闭相关程序后重试',
+            tone: 'fail'
+          };
+        }
         return `✓ 已清理 ${formatBytes(asBytes(result?.deletedBytes))}`;
       });
     }
