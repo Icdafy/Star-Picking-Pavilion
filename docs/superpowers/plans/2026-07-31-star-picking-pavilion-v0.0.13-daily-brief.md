@@ -631,11 +631,11 @@ git commit -m "feat: add daily archive settings experience"
 - Modify: `test/scheduler.test.js`
 - Modify: `test/e2e/electron.test.js`
 
-- [ ] **Step 1: Write failing scheduler and E2E expectations**
+- [x] **Step 1: Write failing scheduler and E2E expectations**
 
 Assert daily report cron is exactly `0 8 * * *`, stop destroys it, and an archive-enabled E2E fixture can select a temporary directory through a stubbed native dialog, save current, and observe all three files with a valid manifest.
 
-- [ ] **Step 2: Run focused scheduler and E2E tests**
+- [x] **Step 2: Run focused scheduler and E2E tests**
 
 Run:
 
@@ -646,15 +646,15 @@ npm run test:e2e
 
 Expected: scheduler assertion fails before implementation; add E2E support without weakening existing real Electron checks.
 
-- [ ] **Step 3: Move database daily generation to 08:00**
+- [x] **Step 3: Move database daily generation to 08:00**
 
 Change the cron minute from `5` to `0`, update status logging, preserve retention at 08:25, and ensure the independent Electron archive query can safely run concurrently as a read.
 
-- [ ] **Step 4: Complete the real Electron archive flow**
+- [x] **Step 4: Complete the real Electron archive flow**
 
 Use an isolated temporary user-data directory and archive root. Verify switch state, save button, generated files, manifest hashes, restart persistence, and no console/page errors.
 
-- [ ] **Step 5: Run scheduler and E2E tests**
+- [x] **Step 5: Run scheduler and E2E tests**
 
 Run:
 
@@ -665,7 +665,7 @@ npm run test:e2e
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit scheduling and E2E coverage**
+- [x] **Step 6: Commit scheduling and E2E coverage**
 
 ```powershell
 git add server/scheduler.js test/scheduler.test.js test/e2e/electron.test.js

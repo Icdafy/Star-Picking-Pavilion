@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -10,6 +11,7 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const { DatabaseSync } = require('node:sqlite');
 const { _electron: electron } = require('playwright');
+const { mostRecentDueDate } = require('../../electron/daily-archive');
 
 const projectRoot = path.join(__dirname, '..', '..');
 const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
@@ -213,6 +215,35 @@ async function waitForJson(file, predicate, timeoutMs = 5_000) {
   );
 }
 
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+async function assertDailyArchiveBundle(rootDirectory, date) {
+  const [year, month] = date.split('-');
+  const directory = path.join(rootDirectory, '摘星阁新闻简报', year, month, date);
+  const markdownFile = path.join(directory, '新闻简报.md');
+  const jsonlFile = path.join(directory, 'news.jsonl');
+  const manifestFile = path.join(directory, 'manifest.json');
+  const manifest = await waitForJson(
+    manifestFile,
+    value => value?.archiveSchemaVersion === 1 && value?.date === date,
+    10_000
+  );
+  const [markdown, jsonl] = await Promise.all([
+    fs.promises.readFile(markdownFile),
+    fs.promises.readFile(jsonlFile)
+  ]);
+
+  assert.ok(markdown.length > 0);
+  assert.equal(manifest.files['新闻简报.md'].bytes, markdown.length);
+  assert.equal(manifest.files['新闻简报.md'].sha256, sha256(markdown));
+  assert.equal(manifest.files['news.jsonl'].bytes, jsonl.length);
+  assert.equal(manifest.files['news.jsonl'].sha256, sha256(jsonl));
+  assert.equal(manifest.window.basis, 'fetched_at');
+  return { directory, manifest };
+}
+
 function isNonEmptyBase64(value) {
   if (typeof value !== 'string' || value.length === 0) return false;
   const decoded = Buffer.from(value, 'base64');
@@ -359,6 +390,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
   assert.match(mainSource, /STAR_PICKING_PAVILION_TEST_DATA_DIR/);
 
   const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-electron-e2e-'));
+  const archiveRoot = path.join(dataDir, 'archive-root');
+  const archiveDate = mostRecentDueDate(new Date());
   const mockCalls = [];
   let firstApp;
   let secondApp;
@@ -384,6 +417,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
     path.join(__dirname, 'fixtures', 'empty-settings.json'),
     path.join(dataDir, 'settings.json')
   );
+  await fs.promises.mkdir(archiveRoot);
 
   mockServer = http.createServer(async (request, response) => {
     let body;
@@ -605,6 +639,54 @@ test('real Electron desktop flow is secure, persistent across restart and single
     authorized: true
   });
 
+  const archivePageErrors = [];
+  const archiveConsoleErrors = [];
+  const captureArchivePageError = error => archivePageErrors.push(error.message);
+  const captureArchiveConsole = message => {
+    if (message.type() === 'error') archiveConsoleErrors.push(message.text());
+  };
+  firstPage.on('pageerror', captureArchivePageError);
+  firstPage.on('console', captureArchiveConsole);
+  await firstApp.evaluate(({ dialog }, selectedDirectory) => {
+    dialog.showOpenDialog = async (_owner, options) => {
+      globalThis.__sppArchiveDialogOptions = options;
+      return { canceled: false, filePaths: [selectedDirectory] };
+    };
+  }, archiveRoot);
+
+  await firstPage.locator('#dailyArchiveEnabled').click({ force: true });
+  await firstPage.waitForFunction(expectedPath => {
+    const pathOutput = document.querySelector('#dailyArchivePath');
+    const toggle = document.querySelector('#dailyArchiveEnabled');
+    return toggle?.checked === true && pathOutput?.textContent === expectedPath;
+  }, archiveRoot);
+  const archiveDialogOptions = await firstApp.evaluate(() => (
+    globalThis.__sppArchiveDialogOptions
+  ));
+  assert.deepEqual(archiveDialogOptions.properties, [
+    'openDirectory',
+    'createDirectory',
+    'promptToCreate'
+  ]);
+
+  assert.equal(await firstPage.locator('#btnSaveDailyArchive').isEnabled(), true);
+  await firstPage.locator('#btnSaveDailyArchive').click();
+  await firstPage.waitForFunction(expectedDate => {
+    const status = document.querySelector('#dailyArchiveStatus');
+    return status?.textContent.includes(expectedDate)
+      && (status.textContent.includes('已保存') || status.textContent.includes('已校验'));
+  }, archiveDate, { timeout: 10_000 });
+  await assertDailyArchiveBundle(archiveRoot, archiveDate);
+  const archiveState = await waitForJson(
+    path.join(dataDir, 'daily-archive.json'),
+    value => value?.enabled === true && value?.lastSuccessfulDate === archiveDate
+  );
+  assert.equal(archiveState.rootDirectory, await fs.promises.realpath(archiveRoot));
+  assert.equal(archivePageErrors.length, 0, archivePageErrors.join('\n'));
+  assert.equal(archiveConsoleErrors.length, 0, archiveConsoleErrors.join('\n'));
+  firstPage.off('pageerror', captureArchivePageError);
+  firstPage.off('console', captureArchiveConsole);
+
   await waitForJson(path.join(dataDir, 'ui-preferences.json'), preferences => (
     preferences.theme === 'light'
       && preferences.view === 'settings'
@@ -690,6 +772,12 @@ test('real Electron desktop flow is secure, persistent across restart and single
   secondApp = await electron.launch({ args: ['.', '--hidden'], cwd: projectRoot, env });
   const secondProcess = secondApp.process();
   const secondPage = await secondApp.firstWindow();
+  const restartPageErrors = [];
+  const restartConsoleErrors = [];
+  secondPage.on('pageerror', error => restartPageErrors.push(error.message));
+  secondPage.on('console', message => {
+    if (message.type() === 'error') restartConsoleErrors.push(message.text());
+  });
   await secondPage.waitForSelector('.tab[data-view="links"][aria-selected="true"]');
   await waitForWindowVisibility(secondApp, false);
 
@@ -774,6 +862,17 @@ test('real Electron desktop flow is secure, persistent across restart and single
     prefilter: PREFILTER_MODEL,
     scoring: SCORING_MODEL
   });
+  await secondPage.waitForFunction(expected => {
+    const toggle = document.querySelector('#dailyArchiveEnabled');
+    const pathOutput = document.querySelector('#dailyArchivePath');
+    const lastSuccess = document.querySelector('#dailyArchiveLastSuccess');
+    return toggle?.checked === true
+      && pathOutput?.textContent === expected.rootDirectory
+      && lastSuccess?.textContent === expected.date;
+  }, {
+    rootDirectory: await fs.promises.realpath(archiveRoot),
+    date: archiveDate
+  });
   const maskedSettings = await secondPage.evaluate(async () => (
     fetch('/api/settings').then(response => response.json())
   ));
@@ -791,6 +890,8 @@ test('real Electron desktop flow is secure, persistent across restart and single
     authorized: true
   });
   assert.equal(mockCalls.length, 2);
+  assert.equal(restartPageErrors.length, 0, restartPageErrors.join('\n'));
+  assert.equal(restartConsoleErrors.length, 0, restartConsoleErrors.join('\n'));
 
   secondCloseMs = await closeElectronGracefully(secondApp, secondProcess, 'second Electron app');
   secondApp = null;

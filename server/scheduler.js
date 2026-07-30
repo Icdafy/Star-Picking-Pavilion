@@ -166,11 +166,11 @@ function startScheduler() {
   // 分析循环（秒级，setInterval 自调度；锁防重入）
   analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeSec * 1000);
   // 日报（每天定点纯代码生成）
-  cronTasks.add(cron.schedule(`5 ${settings.dailyReportHour ?? 8} * * *`, () => {
+  cronTasks.add(cron.schedule(`0 ${settings.dailyReportHour ?? 8} * * *`, () => {
     try { generateDaily(); console.log('[daily] 日报已生成'); }
     catch (e) { console.error('[daily]', e); }
   }));
-  // 保留清理（日报之后 20 分钟，避开采集与日报的忙时）
+  // 保留清理（日报之后 25 分钟，避开采集与日报的忙时）
   cronTasks.add(cron.schedule(`25 ${settings.dailyReportHour ?? 8} * * *`, () => {
     try {
       const result = pruneOnce('cron');
@@ -186,7 +186,7 @@ function startScheduler() {
       if (!result.skipped) compactOnce('startup', { mode: 'auto' });
     } catch (e) { console.error('[retention]', e); }
   }, 90_000);
-  console.log(`[scheduler] 已启动：每 ${interval} 分钟采集，每 ${analyzeSec} 秒分析一批，每天 ${settings.dailyReportHour ?? 8}:05 出日报、${settings.dailyReportHour ?? 8}:25 清理过期数据`);
+  console.log(`[scheduler] 已启动：每 ${interval} 分钟采集，每 ${analyzeSec} 秒分析一批，每天 ${settings.dailyReportHour ?? 8}:00 出日报、${settings.dailyReportHour ?? 8}:25 清理过期数据`);
 }
 
 function stopScheduler() {
