@@ -291,6 +291,20 @@ function createDailyArchiveService({
     return writeStateSnapshot(cloneState(state));
   }
 
+  async function persistStateChange(nextState, { resetLastResult = false } = {}) {
+    const previousState = state;
+    const previousLastResult = lastResult;
+    state = nextState;
+    if (resetLastResult) lastResult = null;
+    try {
+      await persist();
+    } catch (error) {
+      state = previousState;
+      lastResult = previousLastResult;
+      throw error;
+    }
+  }
+
   async function validateRoot(rootDirectory) {
     if (typeof rootDirectory !== 'string' || !path.isAbsolute(rootDirectory)) {
       throw new DailyArchiveError('directory-invalid', '归档目录必须是绝对路径。');
@@ -651,7 +665,7 @@ function createDailyArchiveService({
     await load();
     const physicalRoot = await validateRoot(rootDirectory);
     const sameRoot = state.enabled && state.rootDirectory === physicalRoot;
-    state = {
+    const nextState = {
       ...state,
       enabled: true,
       rootDirectory: physicalRoot,
@@ -661,18 +675,19 @@ function createDailyArchiveService({
       lastErrorCode: null,
       lastErrorAt: null
     };
-    lastResult = null;
-    await persist();
+    await persistStateChange(nextState, { resetLastResult: true });
     if (started) scheduleNext();
     return getSnapshot();
   }
 
   async function disable() {
     await load();
-    state.enabled = false;
-    state.lastErrorCode = null;
-    state.lastErrorAt = null;
-    await persist();
+    await persistStateChange({
+      ...state,
+      enabled: false,
+      lastErrorCode: null,
+      lastErrorAt: null
+    });
     clearSchedule();
     return getSnapshot();
   }

@@ -183,6 +183,42 @@ test('enable validates the root and persists versioned state with an atomic sibl
   );
 });
 
+test('failed enable or disable persistence restores the last confirmed switch state', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  let failNextStateRename = true;
+  const fileSystem = Object.create(fs.promises);
+  fileSystem.rename = async (source, destination) => {
+    if (failNextStateRename && destination === stateFile(userDataPath)) {
+      failNextStateRename = false;
+      throw Object.assign(new Error('state rename failed'), { code: 'EACCES' });
+    }
+    return fs.promises.rename(source, destination);
+  };
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => sampleBundle(date),
+    now: () => new Date(2026, 6, 31, 7, 30, 0),
+    fileSystem
+  });
+
+  await assert.rejects(service.enable(rootDirectory), /state rename failed/);
+  assert.equal(service.getSnapshot().enabled, false);
+  assert.equal(service.getSnapshot().rootDirectory, '');
+
+  await service.enable(rootDirectory);
+  assert.equal(service.getSnapshot().enabled, true);
+  failNextStateRename = true;
+
+  await assert.rejects(service.disable(), /state rename failed/);
+  assert.equal(service.getSnapshot().enabled, true);
+  assert.equal(service.getSnapshot().rootDirectory, await fs.promises.realpath(rootDirectory));
+  assert.equal(
+    JSON.parse(await fs.promises.readFile(stateFile(userDataPath), 'utf8')).enabled,
+    true
+  );
+});
+
 test('saveCurrent writes a complete date directory and a verifiable manifest', async t => {
   const userDataPath = await makeDirectory(t);
   const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
