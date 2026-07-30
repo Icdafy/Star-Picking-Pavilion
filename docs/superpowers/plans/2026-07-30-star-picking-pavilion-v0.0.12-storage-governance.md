@@ -132,7 +132,7 @@ git commit -m "feat: add safe database compaction"
 - Test: `test/scheduler.test.js`
 - Test: `test/feed-query.test.js`
 
-- [ ] **Step 1: 写入失败的优化、互斥和 API 测试**
+- [x] **Step 1: 写入失败的优化、互斥和 API 测试**
 
 ```js
 test('prune records optimize separately after committed deletions', () => {
@@ -155,13 +155,13 @@ test('maintenance API exposes database storage detail and accepts compact withou
 });
 ```
 
-- [ ] **Step 2: 运行三组测试并确认新断言失败**
+- [x] **Step 2: 运行三组测试并确认新断言失败**
 
 Run: `node --test test/retention.test.js test/scheduler.test.js test/feed-query.test.js`
 
 Expected: FAIL，缺少 `optimized`、`compactOnce` 或 `/api/maintenance/compact`。
 
-- [ ] **Step 3: 接入优化、压缩和互斥**
+- [x] **Step 3: 接入优化、压缩和互斥**
 
 `pruneDatabase` 在事务提交后调用：
 
@@ -194,13 +194,13 @@ try {
 
 新增 `POST /api/maintenance/compact`，忽略任何未知请求字段，并只返回字节数、状态、原因和耗时。
 
-- [ ] **Step 4: 运行后端维护回归**
+- [x] **Step 4: 运行后端维护回归**
 
 Run: `node --test test/database-maintenance.test.js test/retention.test.js test/scheduler.test.js test/feed-query.test.js`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交后端集成**
+- [x] **Step 5: 提交后端集成**
 
 ```powershell
 git add server/retention.js server/scheduler.js server/index.js test/retention.test.js test/scheduler.test.js test/feed-query.test.js

@@ -109,6 +109,12 @@ test('the maintenance endpoint reports library size and prunes on demand', async
   assert.equal(before.retentionDays, 180);
   assert.equal(before.lastPruneAt, null);
   assert.ok(before.databaseBytes > 0);
+  assert.equal(before.database.fileBytes, before.databaseBytes);
+  assert.ok(before.database.allocatedBytes > 0);
+  assert.equal(typeof before.database.reclaimableBytes, 'number');
+  assert.equal(typeof before.database.reclaimableRatio, 'number');
+  assert.equal(before.lastOptimizeAt, null);
+  assert.equal(before.lastCompactionAt, null);
 
   const pruned = JSON.parse((await server.request({
     pathname: '/api/maintenance/prune', method: 'POST', headers
@@ -120,10 +126,38 @@ test('the maintenance endpoint reports library size and prunes on demand', async
   assert.equal(after.articles, 1);
   assert.equal(after.expiring, 0);
   assert.ok(after.lastPruneAt);
+  assert.ok(after.lastOptimizeAt);
 
   // 清理必须同时清掉 FTS 影子行，否则检索还能命中已删条目
   const remaining = await feed(server, `view=all&page=0&q=${encodeURIComponent('应当被清理')}`);
   assert.equal(remaining.items.length, 0);
+});
+
+test('manual database compaction accepts no path and returns only storage metrics', async t => {
+  const server = await startServer(t);
+  seed(server, [{ title: '压缩后仍然保留的情报', quality: 70 }]);
+  const headers = {
+    [API_TOKEN_HEADER]: server.token,
+    'Content-Type': 'application/json'
+  };
+
+  const response = await server.request({
+    pathname: '/api/maintenance/compact',
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ databasePath: 'C:\\不应被采用\\arbitrary.db' })
+  });
+  assert.equal(response.status, 200);
+  const result = JSON.parse(response.body);
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, false);
+  assert.equal(Object.hasOwn(result, 'databasePath'), false);
+  assert.equal(Object.hasOwn(result.before, 'databasePath'), false);
+  assert.equal(typeof result.before.fileBytes, 'number');
+  assert.equal(typeof result.after.fileBytes, 'number');
+
+  const feedAfter = await feed(server, 'view=all&page=0');
+  assert.equal(feedAfter.items.some(item => item.title === '压缩后仍然保留的情报'), true);
 });
 
 test('retention days are validated and persisted through the settings endpoint', async t => {

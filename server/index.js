@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createCredentialIpcTracer } = require('../electron/credential-ipc-trace');
 const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
-const { db, now, closeDatabase, databaseFileBytes } = require('./db');
+const { db, now, closeDatabase, databaseFileBytes, DATABASE_PATH } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
 const { persistApiKey } = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
@@ -14,8 +14,9 @@ const { describeHealth } = require('./source-health');
 const { countExpiring, getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
 const exportMarkdown = require('./export/markdown');
 const {
-  runPipeline, pruneOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
+  runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
 } = require('./scheduler');
+const { databaseStorageSnapshot } = require('./database-maintenance');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const lexicon = require('./ai/lexicon');
 const { heatScore } = require('./ai/scoring');
@@ -416,8 +417,10 @@ const server = http.createServer(async (req, res) => {
           retentionDays: settings.collect.retentionDays,
           irrelevantRetentionDays: settings.collect.irrelevantRetentionDays
         });
+        const database = databaseStorageSnapshot({ database: db, databasePath: DATABASE_PATH });
         return json(res, 200, {
-          databaseBytes: databaseFileBytes(),
+          databaseBytes: database.fileBytes,
+          database,
           articles: db.prepare('SELECT COUNT(*) c FROM articles').get().c,
           irrelevant: db.prepare('SELECT COUNT(*) c FROM articles WHERE relevant=0').get().c,
           starred: db.prepare('SELECT COUNT(*) c FROM articles WHERE starred=1').get().c,
@@ -425,13 +428,21 @@ const server = http.createServer(async (req, res) => {
           expiring: countExpiring(plan),
           retentionDays: plan.retentionDays,
           irrelevantRetentionDays: plan.irrelevantRetentionDays,
-          ...getMaintenanceSnapshot()
+          ...getMaintenanceSnapshot(),
+          scheduler: getStatus()
         });
       }
       if (p === '/api/maintenance/prune' && req.method === 'POST') {
         const result = pruneOnce('manual');
         invalidateStatsCache();
         return json(res, 200, { ok: true, ...result, databaseBytes: databaseFileBytes() });
+      }
+      if (p === '/api/maintenance/compact' && req.method === 'POST') {
+        const result = compactOnce('manual', { mode: 'manual' });
+        if (result.skipped && result.reason === 'busy') {
+          return json(res, 409, { ok: false, ...result });
+        }
+        return json(res, 200, { ok: !result.skipped, ...result });
       }
 
       if (p === '/api/sources' && req.method === 'GET') {

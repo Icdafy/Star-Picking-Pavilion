@@ -25,3 +25,12 @@ test('scheduler and pipeline compare ISO timestamps through SQLite time function
   assert.match(pipeline, /julianday\(fetched_at\)/);
   assert.match(cluster, /julianday\(a\.fetched_at\)/);
 });
+
+test('database compaction is mutually exclusive and evaluated only after retention cleanup', () => {
+  assert.match(source, /let compactRunning = false/);
+  assert.match(source, /if \(compactRunning\) return \{ skipped: true, reason: 'maintenance' \}/);
+  assert.match(source, /function compactOnce\(trigger = 'manual'/);
+  assert.match(source, /collectRunning \|\| analyzeRunning \|\| pruneRunning \|\| compactRunning/);
+  assert.match(source, /pruneOnce\('cron'\)[\s\S]*compactOnce\('cron', \{ mode: 'auto' \}\)/);
+  assert.match(source, /pruneOnce\('startup'\)[\s\S]*compactOnce\('startup', \{ mode: 'auto' \}\)/);
+});

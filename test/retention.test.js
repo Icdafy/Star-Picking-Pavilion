@@ -166,6 +166,11 @@ test('a prune with nothing to delete is harmless and still records the run', () 
   assert.equal(result.removedArticles, 0);
   assert.equal(result.removedClusters, 0);
   assert.equal(result.hasMore, false);
+  assert.equal(result.optimized, true);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM articles WHERE id = ?').get(kept).c, 1);
-  assert.equal(getMaintenanceSnapshot().lastPruneAt, new Date(NOW_MS).toISOString());
+  assert.deepEqual(getMaintenanceSnapshot(), {
+    lastPruneAt: new Date(NOW_MS).toISOString(),
+    lastOptimizeAt: new Date(NOW_MS).toISOString(),
+    lastCompactionAt: null
+  });
 });

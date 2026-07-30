@@ -3,6 +3,7 @@
 // 分两档保留：判为无关的噪声很快清掉，相关情报按用户设置的天数保留；
 // 事件簇随之收敛，日报是自包含快照因此单独按更长周期保留。
 const { db, now, deleteArticles, checkpointWal } = require('./db');
+const { optimizeDatabase, readMeta } = require('./database-maintenance');
 
 const DAILY_REPORT_RETENTION_DAYS = 730;
 // 单轮上限：首次在大库上清理时避免一次性锁库过久，剩余部分下一轮继续
@@ -96,12 +97,19 @@ function pruneDatabase({ settings, nowMs = Date.now(), maxDeletions = MAX_DELETI
   }
 
   if (removedArticles > 0 || removedReports > 0) checkpointWal();
-  return { ...plan, removedArticles, removedClusters, removedReports, hasMore };
+  let optimized = false;
+  try {
+    optimized = optimizeDatabase({ database: db, nowMs }).optimized;
+  } catch {}
+  return { ...plan, removedArticles, removedClusters, removedReports, hasMore, optimized };
 }
 
 function getMaintenanceSnapshot() {
-  const row = db.prepare("SELECT value FROM meta WHERE key = 'lastPruneAt'").get();
-  return { lastPruneAt: row?.value || null };
+  return {
+    lastPruneAt: readMeta(db, 'lastPruneAt'),
+    lastOptimizeAt: readMeta(db, 'lastOptimizeAt'),
+    lastCompactionAt: readMeta(db, 'lastCompactionAt')
+  };
 }
 
 module.exports = {

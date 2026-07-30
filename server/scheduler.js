@@ -11,13 +11,17 @@ const { generateDaily } = require('./ai/daily');
 const { pruneDatabase } = require('./retention');
 const { loadSettings } = require('./config');
 const { collectionIntervalMs } = require('./schedule-policy');
+const { db, DATABASE_PATH } = require('./db');
+const { compactDatabase } = require('./database-maintenance');
 
 let collectRunning = false;
 let analyzeRunning = false;
 let pruneRunning = false;
+let compactRunning = false;
 let lastRun = null;        // 最近一次采集摘要
 let lastAnalyzeAt = null;  // 最近一次分析循环时间
 let lastPrune = null;      // 最近一次数据保留清理摘要
+let lastCompact = null;    // 最近一次数据库深度压缩摘要
 let schedulerStarted = false;
 let collectTimer = null;
 let analyzeTimer = null;
@@ -28,7 +32,8 @@ const cronTasks = new Set();
 // ---------- 数据保留清理 ----------
 // 单轮有删除上限，剩余部分继续清，避免首次在大库上一次性长时间持锁
 function pruneOnce(trigger = 'cron') {
-  if (pruneRunning) return { skipped: true };
+  if (compactRunning) return { skipped: true, reason: 'maintenance' };
+  if (pruneRunning) return { skipped: true, reason: '清理进行中' };
   pruneRunning = true;
   try {
     const settings = loadSettings();
@@ -55,9 +60,37 @@ function pruneOnce(trigger = 'cron') {
   }
 }
 
+// ---------- 数据库深度压缩 ----------
+function compactOnce(trigger = 'manual', { mode = trigger === 'manual' ? 'manual' : 'auto' } = {}) {
+  if (collectRunning || analyzeRunning || pruneRunning || compactRunning) {
+    return { skipped: true, reason: 'busy' };
+  }
+  compactRunning = true;
+  try {
+    const result = compactDatabase({
+      database: db,
+      databasePath: DATABASE_PATH,
+      mode
+    });
+    lastCompact = {
+      at: new Date().toISOString(),
+      trigger,
+      mode,
+      ...result
+    };
+    if (!result.skipped) {
+      console.log(`[maintenance] 数据库压缩完成：释放 ${result.reclaimedBytes} 字节`);
+    }
+    return lastCompact;
+  } finally {
+    compactRunning = false;
+  }
+}
+
 // ---------- 采集一次 ----------
 // force：手动触发时忽略失败退避，把暂停中的信源也重试一遍
 async function collectOnce(trigger = 'cron', { force = false } = {}) {
+  if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (collectRunning) return { skipped: true, reason: '采集进行中' };
   collectRunning = true;
   const started = Date.now();
@@ -81,6 +114,7 @@ async function collectOnce(trigger = 'cron', { force = false } = {}) {
 
 // ---------- 分析一批（实时循环调用）----------
 async function analyzeOnce(trigger = 'loop', limit = 60) {
+  if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (analyzeRunning) return { skipped: true };
   analyzeRunning = true;
   try {
@@ -103,6 +137,7 @@ async function analyzeOnce(trigger = 'loop', limit = 60) {
 
 // ---------- 手动全量：采集 → 抽干分析 → 聚类（立即采集分析按钮）----------
 async function runPipeline(trigger = 'manual') {
+  if (compactRunning) return { skipped: true, reason: 'maintenance' };
   await collectOnce(trigger, { force: trigger === 'manual' });
   let total = 0;
   // 抽干：反复分析直到没有 analyzed=0（每批 200）
@@ -137,13 +172,19 @@ function startScheduler() {
   }));
   // 保留清理（日报之后 20 分钟，避开采集与日报的忙时）
   cronTasks.add(cron.schedule(`25 ${settings.dailyReportHour ?? 8} * * *`, () => {
-    try { pruneOnce('cron'); } catch (e) { console.error('[retention]', e); }
+    try {
+      const result = pruneOnce('cron');
+      if (!result.skipped) compactOnce('cron', { mode: 'auto' });
+    } catch (e) { console.error('[retention]', e); }
   }));
   // 启动后先跑一轮全量
   startupTimer = setTimeout(() => runPipeline('startup').catch(e => console.error('[pipeline]', e)), 2500);
   // 启动清理放在首轮采集分析之后，避免和冷启动争 IO
   pruneTimer = setTimeout(() => {
-    try { pruneOnce('startup'); } catch (e) { console.error('[retention]', e); }
+    try {
+      const result = pruneOnce('startup');
+      if (!result.skipped) compactOnce('startup', { mode: 'auto' });
+    } catch (e) { console.error('[retention]', e); }
   }, 90_000);
   console.log(`[scheduler] 已启动：每 ${interval} 分钟采集，每 ${analyzeSec} 秒分析一批，每天 ${settings.dailyReportHour ?? 8}:05 出日报、${settings.dailyReportHour ?? 8}:25 清理过期数据`);
 }
@@ -168,21 +209,24 @@ function stopScheduler() {
 }
 
 async function waitForSchedulerIdle() {
-  while (collectRunning || analyzeRunning || pruneRunning) {
+  while (collectRunning || analyzeRunning || pruneRunning || compactRunning) {
     await new Promise(resolve => setTimeout(resolve, 25));
   }
 }
 
 module.exports = {
-  startScheduler, stopScheduler, waitForSchedulerIdle, runPipeline, collectOnce, analyzeOnce, pruneOnce,
+  startScheduler, stopScheduler, waitForSchedulerIdle,
+  runPipeline, collectOnce, analyzeOnce, pruneOnce, compactOnce,
   getStatus: () => ({
-    running: collectRunning || analyzeRunning,
+    running: collectRunning || analyzeRunning || pruneRunning || compactRunning,
     schedulerStarted,
     collectRunning,
     analyzeRunning,
     pruneRunning,
+    compactRunning,
     lastRun,
     lastAnalyzeAt,
-    lastPrune
+    lastPrune,
+    lastCompact
   })
 };
