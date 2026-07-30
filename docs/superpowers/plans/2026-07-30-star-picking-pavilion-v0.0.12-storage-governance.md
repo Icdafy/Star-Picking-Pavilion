@@ -366,7 +366,7 @@ git commit -m "feat: expose safe storage maintenance controls"
 - Test: `test/renderer-integration.test.js`
 - Test: `test/responsive-layout.test.js`
 
-- [ ] **Step 1: 写入失败的控制器与静态集成测试**
+- [x] **Step 1: 写入失败的控制器与静态集成测试**
 
 ```js
 test('combines database and desktop snapshots without treating unavailable values as zero', async () => {
@@ -384,13 +384,13 @@ test('legacy action stays disabled without an eligible candidate', async () => {
 
 静态回归断言必须找到 `msDatabase`、`msReclaimable`、`msCache`、`msMigrationResidue`、`msLegacy`、`msTotal`、`btnCompactNow`、`btnClearCache`、`btnDeleteLegacy` 和独立状态区域。
 
-- [ ] **Step 2: 运行界面测试并确认失败**
+- [x] **Step 2: 运行界面测试并确认失败**
 
 Run: `node --test test/storage-maintenance-controller.test.js test/renderer-integration.test.js test/responsive-layout.test.js`
 
 Expected: FAIL，缺少控制器、DOM ID 或响应式样式。
 
-- [ ] **Step 3: 实现无框架存储控制器和界面**
+- [x] **Step 3: 实现无框架存储控制器和界面**
 
 控制器接收：
 
@@ -410,13 +410,13 @@ createStorageMaintenanceController({
 
 HTML 使用卡片内可换行的统计网格；CSS 在 720px 和 480px 下分别收敛为两列和单列，不引入横向滚动。
 
-- [ ] **Step 4: 运行界面与响应式测试**
+- [x] **Step 4: 运行界面与响应式测试**
 
 Run: `node --test test/storage-maintenance-controller.test.js test/renderer-integration.test.js test/responsive-layout.test.js`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交用户界面**
+- [x] **Step 5: 提交用户界面**
 
 ```powershell
 git add renderer/storage-maintenance-controller.js renderer/index.html renderer/app.js renderer/styles.css test/storage-maintenance-controller.test.js test/renderer-integration.test.js test/responsive-layout.test.js

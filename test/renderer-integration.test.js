@@ -559,15 +559,32 @@ test('设置页提供数据保留配置与本地库体积视图', () => {
   assert.match(html, /id="setIrrelevantRetentionDays"[^>]*type="number"[^>]*min="1"[^>]*max="3650"/);
   assert.match(html, /id="btnSaveRetention"/);
   assert.match(html, /id="btnPruneNow"/);
-  for (const id of ['msArticles', 'msSize', 'msExpiring']) {
+  for (const id of ['msArticles', 'msTotal', 'msExpiring']) {
     assert.ok(html.includes(`id="${id}"`), `缺少统计位 ${id}`);
   }
-  assert.match(app, /await api\('\/api\/maintenance'\)/);
+  assert.match(app, /requestDatabase: \(\) => api\('\/api\/maintenance'\)/);
   assert.match(app, /'\/api\/maintenance\/prune'/);
   assert.match(app, /await settingsForm\.saveRetention\(\)/);
   assert.match(settingsFormController, /RETENTION_FIELD_NAMES/);
   assert.match(settingsFormController, /retentionDays: Number\(elements\.retentionDays\.value\)/);
   assert.ok(css.includes('.maintenance-stats'), '缺少 .maintenance-stats 样式');
+});
+
+test('v0.0.12 数据维护面板分离数据库、缓存、迁移残留和旧库操作', () => {
+  assert.match(html, /storage-maintenance-controller\.js/);
+  for (const id of [
+    'msDatabase', 'msReclaimable', 'msCache', 'msMigrationResidue',
+    'msLegacy', 'msTotal', 'btnCompactNow', 'btnClearCache',
+    'btnDeleteLegacy', 'compactResult', 'cacheResult', 'legacyResult'
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `缺少存储治理控件 ${id}`);
+  }
+  assert.match(app, /StorageMaintenanceController\.createStorageMaintenanceController/);
+  assert.match(app, /Desktop\.getStorageSnapshot/);
+  assert.match(app, /Desktop\.clearManagedCache/);
+  assert.match(app, /Desktop\.deleteLegacyData/);
+  assert.ok(css.includes('.storage-breakdown'), '缺少存储明细网格');
+  assert.ok(css.includes('.maintenance-action-grid'), '缺少维护操作网格');
 });
 
 test('星标作为一等信息流视图接入导航、筛选与实时轮询', () => {

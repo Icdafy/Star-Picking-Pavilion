@@ -30,6 +30,8 @@ test('核心网格可在自身最小宽度不足时自动降为单栏', () => {
     );
   }
   assert.match(css, /\.settings-grid[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
+  assert.match(css, /\.storage-breakdown[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
+  assert.match(css, /\.maintenance-action-grid[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
 });
 
 test('热点区在窄容器中降栏但不被隐藏', () => {

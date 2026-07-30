@@ -11,6 +11,7 @@ const DomUtils = window.DomUtils;
 const CommonLinks = window.CommonLinks;
 const SettingsFormController = window.SettingsFormController;
 const DesktopSettingsController = window.DesktopSettingsController;
+const StorageMaintenanceController = window.StorageMaintenanceController;
 const Bootstrap = window.StarPickingPavilionBootstrap;
 const Desktop = window.starPickingPavilion || window.windcatcher;
 const storage = Bootstrap.getSafeStorage(window);
@@ -853,18 +854,51 @@ function formatBytes(bytes) {
   return `${(value / 1073741824).toFixed(2)} GB`;
 }
 
+const desktopStorageAvailable = Boolean(
+  Desktop?.getStorageSnapshot
+  && Desktop?.clearManagedCache
+  && Desktop?.deleteLegacyData
+);
+const desktopStorageUnavailable = async () => {
+  throw new Error('桌面存储治理仅在安装版中可用');
+};
+const storageMaintenance = StorageMaintenanceController.createStorageMaintenanceController({
+  elements: {
+    articles: $('#msArticles'),
+    expiring: $('#msExpiring'),
+    database: $('#msDatabase'),
+    reclaimable: $('#msReclaimable'),
+    cache: $('#msCache'),
+    migrationResidue: $('#msMigrationResidue'),
+    legacy: $('#msLegacy'),
+    total: $('#msTotal'),
+    hint: $('#lastPruneHint'),
+    pruneButton: $('#btnPruneNow'),
+    compactButton: $('#btnCompactNow'),
+    cacheButton: $('#btnClearCache'),
+    legacyButton: $('#btnDeleteLegacy'),
+    pruneStatus: $('#pruneResult'),
+    compactStatus: $('#compactResult'),
+    cacheStatus: $('#cacheResult'),
+    legacyStatus: $('#legacyResult')
+  },
+  requestDatabase: () => api('/api/maintenance'),
+  pruneDatabase: () => api('/api/maintenance/prune', { body: {} }),
+  compactDatabase: () => api('/api/maintenance/compact', { body: {} }),
+  getDesktopStorage: desktopStorageAvailable
+    ? () => Desktop.getStorageSnapshot()
+    : desktopStorageUnavailable,
+  clearDesktopCache: desktopStorageAvailable
+    ? () => Desktop.clearManagedCache()
+    : desktopStorageUnavailable,
+  deleteLegacyData: desktopStorageAvailable
+    ? candidateId => Desktop.deleteLegacyData(candidateId)
+    : desktopStorageUnavailable,
+  formatBytes
+});
+
 async function loadMaintenance() {
-  try {
-    const m = await api('/api/maintenance');
-    $('#msArticles').textContent = m.articles.toLocaleString('zh-CN');
-    $('#msSize').textContent = formatBytes(m.databaseBytes);
-    $('#msExpiring').textContent = m.expiring.toLocaleString('zh-CN');
-    if (m.lastPruneAt) {
-      $('#lastPruneHint').innerHTML =
-        `上次清理：${esc(timeAgo(m.lastPruneAt))} · 情报保留 ${m.retentionDays} 天、无关内容保留 ${m.irrelevantRetentionDays} 天。`
-        + '过期情报连同全文检索索引会自动清除，WAL 随之截断。';
-    }
-  } catch {}
+  return storageMaintenance.load().catch(() => null);
 }
 
 async function loadSettings() {
@@ -934,24 +968,22 @@ $('#btnSaveRetention').addEventListener('click', async () => {
 });
 
 $('#btnPruneNow').addEventListener('click', async () => {
-  const el = $('#pruneResult');
-  el.textContent = '清理中…';
-  el.className = 'test-result';
-  $('#btnPruneNow').disabled = true;
   try {
-    const r = await api('/api/maintenance/prune', { body: {} });
-    el.textContent = r.skipped
-      ? '清理已在进行中，请稍候'
-      : r.removedArticles ? `✓ 已清理 ${r.removedArticles} 条` : '✓ 没有需要清理的内容';
-    el.classList.add(r.skipped ? 'fail' : 'ok');
-    loadMaintenance();
+    await storageMaintenance.prune();
     refreshStats();
-  } catch (error) {
-    el.textContent = '✗ ' + error.message;
-    el.classList.add('fail');
-  } finally {
-    $('#btnPruneNow').disabled = false;
-  }
+  } catch {}
+});
+
+$('#btnCompactNow').addEventListener('click', () => {
+  storageMaintenance.compact().catch(() => {});
+});
+
+$('#btnClearCache').addEventListener('click', () => {
+  storageMaintenance.clearCache().catch(() => {});
+});
+
+$('#btnDeleteLegacy').addEventListener('click', () => {
+  storageMaintenance.deleteLegacy().catch(() => {});
 });
 
 // 情报备忘：写进本机库后要能回看和删除，否则提交等于写进黑洞

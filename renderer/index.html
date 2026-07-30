@@ -253,12 +253,50 @@
         <ul class="note-list" id="feedbackList" aria-live="polite"></ul>
         <p class="hint">条目保存在本机 <code>star-picking-pavilion.db</code> 中，不会上传，也不会随情报保留策略被清理。</p>
       </div>
-      <div class="glass card-pad">
-        <h3>数据维护 <span class="muted">本地情报库</span></h3>
-        <div class="maintenance-stats" id="maintenanceStats" aria-live="polite">
-          <div class="ms-item"><span class="ms-num" id="msArticles">–</span><span class="ms-label">库内情报</span></div>
-          <div class="ms-item"><span class="ms-num" id="msSize">–</span><span class="ms-label">占用空间</span></div>
-          <div class="ms-item"><span class="ms-num accent" id="msExpiring">–</span><span class="ms-label">待清理</span></div>
+      <div class="glass card-pad storage-governance-card">
+        <div class="storage-heading">
+          <div>
+            <span class="storage-kicker">STORAGE RADAR</span>
+            <h3>存储治理 <span class="muted">自动守护 · 手动可控</span></h3>
+          </div>
+          <span class="storage-policy-badge">本机专属</span>
+        </div>
+        <div class="maintenance-stats storage-overview" id="maintenanceStats" aria-live="polite">
+          <div class="storage-total">
+            <span class="storage-total-label">当前受管总计</span>
+            <span class="storage-total-number" id="msTotal">–</span>
+            <span class="storage-total-note">情报库、桌面缓存与可确认的旧版数据</span>
+          </div>
+          <div class="ms-item">
+            <span class="ms-num" id="msArticles">–</span>
+            <span class="ms-label">库内情报</span>
+          </div>
+          <div class="ms-item">
+            <span class="ms-num accent" id="msExpiring">–</span>
+            <span class="ms-label">已到清理期</span>
+          </div>
+        </div>
+        <div class="storage-breakdown" aria-label="存储占用明细">
+          <div class="storage-detail">
+            <span class="storage-detail-icon database" aria-hidden="true"></span>
+            <span class="storage-detail-copy"><span>情报数据库</span><strong id="msDatabase">–</strong></span>
+          </div>
+          <div class="storage-detail">
+            <span class="storage-detail-icon reclaimable" aria-hidden="true"></span>
+            <span class="storage-detail-copy"><span>可回收空页</span><strong id="msReclaimable">–</strong></span>
+          </div>
+          <div class="storage-detail">
+            <span class="storage-detail-icon cache" aria-hidden="true"></span>
+            <span class="storage-detail-copy"><span>桌面缓存</span><strong id="msCache">–</strong></span>
+          </div>
+          <div class="storage-detail">
+            <span class="storage-detail-icon residue" aria-hidden="true"></span>
+            <span class="storage-detail-copy"><span>迁移残留</span><strong id="msMigrationResidue">–</strong></span>
+          </div>
+          <div class="storage-detail">
+            <span class="storage-detail-icon legacy" aria-hidden="true"></span>
+            <span class="storage-detail-copy"><span>旧版数据</span><strong id="msLegacy">–</strong></span>
+          </div>
         </div>
         <div class="field-row">
           <label class="field"><span>情报保留天数</span>
@@ -271,9 +309,38 @@
         <div class="btn-row">
           <button class="btn-primary" id="btnSaveRetention">保存</button>
           <button class="btn-ghost" id="btnPruneNow">立即清理</button>
-          <span id="pruneResult" class="test-result" role="status"></span>
+          <span id="pruneResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
         </div>
-        <p class="hint" id="lastPruneHint">桌面端长期驻留运行，过期情报连同全文检索索引会在每天 <b id="pruneHour">08</b>:25 自动清理，WAL 随之截断。判为无关的噪声用更短的保留期，避免撑大本地库。</p>
+        <p class="hint storage-policy-hint" id="lastPruneHint">正在读取本机存储状态…</p>
+        <div class="maintenance-action-grid">
+          <section class="maintenance-action-card">
+            <span class="maintenance-action-index">01</span>
+            <div>
+              <h4>整理情报库</h4>
+              <p>回收数据库内部空页；压缩前后都会校验完整性。</p>
+            </div>
+            <button class="btn-ghost" id="btnCompactNow" type="button">安全压缩</button>
+            <span id="compactResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+          </section>
+          <section class="maintenance-action-card">
+            <span class="maintenance-action-index">02</span>
+            <div>
+              <h4>清理桌面缓存</h4>
+              <p>仅处理可再生成的网页与图形缓存，不触碰情报、星标和设置。</p>
+            </div>
+            <button class="btn-ghost" id="btnClearCache" type="button">清理缓存</button>
+            <span id="cacheResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+          </section>
+          <section class="maintenance-action-card">
+            <span class="maintenance-action-index">03</span>
+            <div>
+              <h4>旧版数据确认</h4>
+              <p>只在迁移满 30 天且新库健康时开放，并再次弹窗列出删除范围。</p>
+            </div>
+            <button class="btn-ghost" id="btnDeleteLegacy" type="button" disabled>审阅并清理</button>
+            <span id="legacyResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+          </section>
+        </div>
       </div>
       <div class="glass card-pad">
         <h3>桌面运行 <span class="muted">Windows</span></h3>
@@ -377,6 +444,7 @@
 <script src="common-links.js"></script>
 <script src="settings-form-controller.js"></script>
 <script src="desktop-settings-controller.js"></script>
+<script src="storage-maintenance-controller.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
