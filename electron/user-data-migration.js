@@ -138,6 +138,8 @@ async function migrateUserData(options) {
 module.exports = {
   CANONICAL_DATABASE,
   LEGACY_DATABASE,
+  MANIFEST,
   MigrationCancelledError,
-  migrateUserData
+  migrateUserData,
+  quickCheck
 };

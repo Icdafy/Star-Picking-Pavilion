@@ -215,7 +215,7 @@ git commit -m "feat: coordinate automatic storage maintenance"
 - Modify: `electron/user-data-migration.js`
 - Test: `test/user-data-migration.test.js`
 
-- [ ] **Step 1: 写入失败的桌面文件系统安全测试**
+- [x] **Step 1: 写入失败的桌面文件系统安全测试**
 
 覆盖 256 MiB/7 天缓存阈值、精确临时文件模式、30 天旧库宽限和未知文件保护：
 
@@ -240,13 +240,13 @@ test('development data and symlinked cache entries are never removable', async (
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认模块缺失**
+- [x] **Step 2: 运行测试并确认模块缺失**
 
 Run: `node --test test/storage-maintenance.test.js test/user-data-migration.test.js`
 
 Expected: FAIL，错误包含 `Cannot find module '../electron/storage-maintenance'`。
 
-- [ ] **Step 3: 实现桌面存储控制器**
+- [x] **Step 3: 实现桌面存储控制器**
 
 模块固定：
 
@@ -275,13 +275,13 @@ const MIGRATION_TEMP_MAX_AGE_MS = 7 * 86_400_000;
 
 迁移模块导出其规范常量和 `quickCheck`，让存储治理复用同一判断，不复制数据库身份规则。
 
-- [ ] **Step 4: 运行桌面存储测试**
+- [x] **Step 4: 运行桌面存储测试**
 
 Run: `node --test test/storage-maintenance.test.js test/user-data-migration.test.js`
 
 Expected: PASS，取消确认、未满宽限和开发目录文件均保持不变。
 
-- [ ] **Step 5: 提交桌面存储核心**
+- [x] **Step 5: 提交桌面存储核心**
 
 ```powershell
 git add electron/storage-maintenance.js electron/user-data-migration.js test/storage-maintenance.test.js test/user-data-migration.test.js
