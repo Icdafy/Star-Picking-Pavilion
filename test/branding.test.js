@@ -73,8 +73,8 @@ test('release documentation points only to the canonical repository and installe
 
   assert.match(readme, /https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion\/releases/);
   assert.match(releasing, /Icdafy\/Star-Picking-Pavilion/);
-  assert.match(readme, /Star-Picking-Pavilion-Setup-0\.0\.12\.exe/);
-  assert.match(releasing, /Star-Picking-Pavilion-Setup-0\.0\.12\.exe/);
+  assert.match(readme, /Star-Picking-Pavilion-Setup-0\.0\.13\.exe/);
+  assert.match(releasing, /Star-Picking-Pavilion-Setup-0\.0\.13\.exe/);
   assert.doesNotMatch(readme, /Icdafy\/Windcather|Windcatcher-Setup-/i);
   assert.doesNotMatch(releasing, /Icdafy\/Windcather|Windcatcher-Setup-/i);
 });

@@ -10,6 +10,9 @@
     "type": "git",
     "url": "https://github.com/Icdafy/Star-Picking-Pavilion.git"
   },
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "main": "electron/main.js",
   "scripts": {
     "test": "node --test --test-concurrency=4 test/*.test.js",
@@ -31,7 +34,8 @@
     "iconv-lite": "^0.7.3",
     "node-cron": "^4.6.0",
     "rss-parser": "^3.13.0",
-    "semver": "~7.7.4"
+    "semver": "~7.7.4",
+    "undici": "^8.9.0"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "^6.0.0",
@@ -41,7 +45,7 @@
   },
   "overrides": {
     "js-yaml": "^4.3.0",
-    "undici": "^7.28.0"
+    "undici": "^8.9.0"
   },
   "build": {
     "appId": "com.icdafy.star-picking-pavilion",

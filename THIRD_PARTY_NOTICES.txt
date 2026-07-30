@@ -160,7 +160,7 @@ tiny-typed-emitter@2.1.0
 License: MIT
 Source: https://github.com/binier/tiny-typed-emitter.git
 
-undici@7.28.0
+undici@8.9.0
 License: MIT
 Source: git+https://github.com/nodejs/undici.git
 

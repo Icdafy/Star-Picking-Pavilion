@@ -198,7 +198,7 @@ API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用�
 
 ## 从源码开发
 
-需要 Node.js 22+ 与 npm 10+。
+需要 Node.js 22.19+ 与 npm 10+。
 
 ```powershell
 npm ci

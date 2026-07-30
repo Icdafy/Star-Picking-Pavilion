@@ -3,6 +3,7 @@
 // （硅基流动、火山方舟、本地 Ollama 等都遵循同一协议）
 const { validateAiBaseUrl } = require('../http-security');
 const { readBoundedBody } = require('../collectors/fetch-util');
+const { fetch: undiciFetch } = require('undici');
 
 const MAX_AI_RESPONSE_BYTES = 2 * 1024 * 1024;
 
@@ -11,7 +12,7 @@ async function chat(messages, {
   model,
   temperature = 0.2,
   maxTokens = 4000,
-  fetchImpl = fetch,
+  fetchImpl = undiciFetch,
   maxResponseBytes = MAX_AI_RESPONSE_BYTES
 }) {
   const { apiKey, baseUrl, requestTimeoutMs } = settings.ai;

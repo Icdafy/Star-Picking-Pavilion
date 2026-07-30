@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 
 const { fetchText } = require('../server/collectors/fetch-util');
 
@@ -54,4 +55,29 @@ test('collector fetch decodes bounded responses and rejects non-web URLs', async
     fetchText('file:///private', settings, { fetchImpl: async () => response() }),
     /HTTP|HTTPS/
   );
+});
+
+test('collector uses the pinned Undici client instead of the crash-prone runtime global fetch', async t => {
+  const server = http.createServer((_request, response) => {
+    response.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    response.setHeader('Connection', 'close');
+    response.end('独立网络客户端');
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error('runtime global fetch must not be used');
+  };
+  try {
+    const { port } = server.address();
+    const text = await fetchText(`http://127.0.0.1:${port}/feed`, settings);
+    assert.equal(text, '独立网络客户端');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

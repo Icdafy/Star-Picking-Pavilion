@@ -1,6 +1,7 @@
 'use strict';
 // 抓取工具：带 UA / 超时 / 编码识别（GBK 政府网站友好）
 const iconv = require('iconv-lite');
+const { fetch: undiciFetch } = require('undici');
 
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 
@@ -35,7 +36,9 @@ async function readBoundedBody(response, maxResponseBytes) {
 
 async function fetchText(url, settings, options = {}) {
   const target = requireWebUrl(url);
-  const fetchImpl = options.fetchImpl || fetch;
+  // Electron/Node 随运行时附带的 Undici 版本可能含 paused-parser 崩溃；
+  // 采集链固定使用项目锁定、带上游修复的客户端，测试仍可显式注入。
+  const fetchImpl = options.fetchImpl || undiciFetch;
   const maxResponseBytes = options.maxResponseBytes || MAX_RESPONSE_BYTES;
   if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0) {
     throw new Error('采集响应大小上限无效');
