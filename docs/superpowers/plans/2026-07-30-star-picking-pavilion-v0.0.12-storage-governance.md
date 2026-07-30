@@ -485,19 +485,19 @@ git commit -m "chore: prepare v0.0.12 release"
 - Verify: `dist/Star-Picking-Pavilion-Setup-0.0.12.exe.blockmap`
 - Verify: `dist/latest.yml`
 
-- [ ] **Step 1: 运行完整单元和集成测试**
+- [x] **Step 1: 运行完整单元和集成测试**
 
 Run: `npm test`
 
 Expected: 全部 PASS，无跳过的存储安全测试。
 
-- [ ] **Step 2: 运行真实 Electron E2E**
+- [x] **Step 2: 运行真实 Electron E2E**
 
 Run: `npm run test:e2e`
 
 Expected: 全部 PASS，桌面进程正常退出且无残留。
 
-- [ ] **Step 3: 运行信源、依赖和声明门禁**
+- [x] **Step 3: 运行信源、依赖和声明门禁**
 
 Run: `npm run audit:sources -- --strict`
 
@@ -509,7 +509,7 @@ Run: `git diff --exit-code -- THIRD_PARTY_NOTICES.txt`
 
 Expected: 信源无空结果/失败，生产依赖无 high 级漏洞，第三方声明无未提交差异。
 
-- [ ] **Step 4: 构建并审计安装包**
+- [x] **Step 4: 构建并审计安装包**
 
 先确认 `dist` 解析后的绝对路径为 `F:\摘星阁\dist`，再用 PowerShell `Remove-Item -LiteralPath` 清理旧构建文件。
 
@@ -523,13 +523,13 @@ Run: `Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.0.12.exe`
 
 Expected: 构建和两项验证 PASS，签名状态为 `NotSigned`，包内不存在用户数据库、维护状态、日志或测试夹具。
 
-- [ ] **Step 5: 执行安装与存储治理烟测**
+- [x] **Step 5: 执行安装与存储治理烟测**
 
 在临时测试数据目录启动解包版，验证空库启动、维护分项、手动普通清理、无可回收空间时深度压缩跳过、缓存清理、无旧库时按钮禁用、单实例和正常退出。再用安装包完成当前用户安装、启动和卸载；卸载后用户数据目录继续保留。
 
 Expected: 所有操作给出确定状态，数据库 `quick_check` 为 `ok`，进程完全退出。
 
-- [ ] **Step 6: 提交验证中产生的必要修正**
+- [x] **Step 6: 提交验证中产生的必要修正**
 
 ```powershell
 git add -A
