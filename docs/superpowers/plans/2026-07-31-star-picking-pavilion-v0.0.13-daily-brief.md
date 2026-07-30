@@ -375,7 +375,7 @@ git commit -m "feat: generate daily research bundles"
 - Create: `electron/daily-archive.js`
 - Create: `test/daily-archive.test.js`
 
-- [ ] **Step 1: Write failing state and filesystem tests**
+- [x] **Step 1: Write failing state and filesystem tests**
 
 Inject filesystem, clock, timer, hashing, and bundle request dependencies. Cover:
 
@@ -391,7 +391,7 @@ const service = createDailyArchiveService({
 
 Assert default disabled state, atomic settings save, current due date before/after 08:00, multi-day catch-up, same-date single flight, valid existing manifest skip, incomplete target conflict directory, missing drive retry, temporary directory cleanup rules, and no advancement after failure.
 
-- [ ] **Step 2: Run archive service tests and verify missing-module failure**
+- [x] **Step 2: Run archive service tests and verify missing-module failure**
 
 Run:
 
@@ -401,7 +401,7 @@ node --test test/daily-archive.test.js
 
 Expected: fail because `electron/daily-archive.js` is missing.
 
-- [ ] **Step 3: Implement validated versioned state**
+- [x] **Step 3: Implement validated versioned state**
 
 Persist `daily-archive.json` with:
 
@@ -420,7 +420,7 @@ Persist `daily-archive.json` with:
 
 Use a temporary sibling and rename. Invalid or corrupt state returns disabled defaults.
 
-- [ ] **Step 4: Implement exact date and catch-up helpers**
+- [x] **Step 4: Implement exact date and catch-up helpers**
 
 Export pure helpers for:
 
@@ -432,11 +432,11 @@ enumerateDueDates(state, now)
 
 Use local calendar construction for 08:00, not a fixed 24-hour interval.
 
-- [ ] **Step 5: Implement root validation and atomic date directory writes**
+- [x] **Step 5: Implement root validation and atomic date directory writes**
 
 Validate absolute directories with a create/write/remove probe. Build fixed child segments only. Write Markdown and JSONL, calculate SHA-256, write manifest last, then rename the temporary directory. Never accept paths from renderer input and never recursively overwrite an existing date directory.
 
-- [ ] **Step 6: Implement scheduler lifecycle**
+- [x] **Step 6: Implement scheduler lifecycle**
 
 Provide:
 
@@ -453,7 +453,7 @@ handleResume()
 
 Schedule one timer to the next local 08:00, reschedule after firing, and serialize catch-up dates.
 
-- [ ] **Step 7: Run archive service tests**
+- [x] **Step 7: Run archive service tests**
 
 Run:
 
@@ -463,7 +463,7 @@ node --test test/daily-archive.test.js
 
 Expected: all pass.
 
-- [ ] **Step 8: Commit the desktop service**
+- [x] **Step 8: Commit the desktop service**
 
 ```powershell
 git add electron/daily-archive.js test/daily-archive.test.js
