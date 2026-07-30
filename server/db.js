@@ -111,6 +111,12 @@ function migrate() {
   // 也让保留清理能识别并永久跳过这些条目（见 retention.selectExpiredIds）
   addCol('starred', 'INTEGER NOT NULL DEFAULT 0');
   addCol('starred_at', 'TEXT');
+  // v0.0.13 技术突破热度证据。质量分本身保持原语义，突破只影响热点公式；
+  // 持久化以后，SQL 排序、卡片解释和每日研究样本读取同一份判定。
+  addCol('breakthrough_score', 'REAL NOT NULL DEFAULT 0');
+  addCol('breakthrough_bonus', 'REAL NOT NULL DEFAULT 0');
+  addCol('breakthrough_signals_json', 'TEXT');
+  addCol('scoring_version', 'INTEGER NOT NULL DEFAULT 1');
   db.exec('CREATE INDEX IF NOT EXISTS idx_articles_starred ON articles(starred, starred_at DESC)');
   // sources 表补 intl 列（标记国外情报源）
   const srcCols = new Set(db.prepare('PRAGMA table_info(sources)').all().map(c => c.name));

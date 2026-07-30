@@ -6,13 +6,14 @@
 //   精选与否 = 代码按分类阈值 + 自适应偏移判断
 // 无 API Key 时整条管线降级为词库启发式，应用照常可用
 const { db, now, updateArticleFts } = require('../db');
-const { loadSettings, loadScoring } = require('../config');
+const { loadSettings, loadScoring, loadBreakthroughs } = require('../config');
 const { chat, extractJson } = require('./deepseek');
 const kw = require('./keywords');
 const lexicon = require('./lexicon');
 const calibration = require('./calibration');
 const { computeQuality, isFeatured } = require('./scoring');
 const { normalizeModelResult } = require('./model-result');
+const { analyzeBreakthrough } = require('./breakthrough');
 
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 
@@ -120,6 +121,7 @@ function heuristicAnalyze(a) {
 async function analyzePending(onProgress, limit = 200) {
   const settings = loadSettings();
   const scoring = loadScoring();
+  const breakthroughs = loadBreakthroughs();
   const hasKey = !!settings.ai.apiKey;
 
   const pending = db.prepare(`
@@ -156,7 +158,7 @@ async function analyzePending(onProgress, limit = 200) {
     for (const a of candidates) {
       const h = heuristicAnalyze(a);
       if (!h.relevant) { markIrrelevant(a.id); analyzed++; continue; }
-      persistResult(a, h.domain, h.result, scoring, 3);
+      persistResult(a, h.domain, h.result, scoring, breakthroughs, 3);
       if (db.prepare('SELECT featured FROM articles WHERE id=?').get(a.id).featured) featuredCount++;
       analyzed++;
       onProgress && onProgress({ done: analyzed, total: pending.length });
@@ -200,11 +202,11 @@ async function analyzePending(onProgress, limit = 200) {
       const a = relevantArts[idx++];
       try {
         const result = a._heuristic || await scoreArticle(a, settings);
-        persistResult(a, a._domain, result, scoring, a._heuristic ? 3 : 1);
+        persistResult(a, a._domain, result, scoring, breakthroughs, a._heuristic ? 3 : 1);
       } catch (e) {
         console.error(`[ai] 评分失败 #${a.id}:`, e.message);
         const h = heuristicAnalyze(a);
-        if (h.relevant) persistResult(a, h.domain, h.result, scoring, 3);
+        if (h.relevant) persistResult(a, h.domain, h.result, scoring, breakthroughs, 3);
         else db.prepare('UPDATE articles SET analyzed=2 WHERE id=?').run(a.id);
       }
       analyzed++;
@@ -234,21 +236,53 @@ function scoringContext(article, { clusterSize = 1 } = {}) {
   };
 }
 
-function persistResult(a, domain, result, scoring, analyzedFlag) {
+function breakthroughFor(article, {
+  domain,
+  result,
+  context,
+  clusterSize,
+  breakthroughs
+}) {
+  return analyzeBreakthrough({
+    domain,
+    category: result.category,
+    title: article.title,
+    summary: `${result.summary || ''} ${article.summary_raw || ''}`.trim(),
+    tags: result.tags,
+    tier: article.tier,
+    clusterSize,
+    noiseHits: context.noiseHits,
+    scores: result.scores
+  }, breakthroughs);
+}
+
+function persistResult(a, domain, result, scoring, breakthroughs, analyzedFlag) {
   result = normalizeModelResult(result, CATEGORIES);
   const context = scoringContext({ ...a, ai_summary: result.summary }, { clusterSize: 1 });
+  const resolvedDomain = domain || context.lexicon.domain || a.domain || 'lowaltitude';
   const quality = computeQuality(result.scores, context, scoring);
+  const breakthrough = breakthroughFor(a, {
+    domain: resolvedDomain,
+    result,
+    context,
+    clusterSize: 1,
+    breakthroughs
+  });
   const featured = isFeatured(quality, result.category, scoring, {
     heuristic: analyzedFlag === 3,
     shift: calibration.currentShift(scoring).shift
   }) ? 1 : 0;
   db.prepare(`UPDATE articles SET
       relevant=1, analyzed=?, domain=?, category=?, scores_json=?,
-      quality_score=?, featured=?, ai_summary=?, ai_reason=?, tags_json=?
+      quality_score=?, featured=?, ai_summary=?, ai_reason=?, tags_json=?,
+      breakthrough_score=?, breakthrough_bonus=?, breakthrough_signals_json=?,
+      scoring_version=?
     WHERE id=?`).run(
-    analyzedFlag, domain || context.lexicon.domain || a.domain || 'lowaltitude', result.category,
+    analyzedFlag, resolvedDomain, result.category,
     JSON.stringify(result.scores), quality, featured,
-    result.summary || null, result.reason || null, JSON.stringify(result.tags || []), a.id);
+    result.summary || null, result.reason || null, JSON.stringify(result.tags || []),
+    breakthrough.score, breakthrough.bonus, JSON.stringify(breakthrough.signals),
+    breakthrough.version, a.id);
   updateArticleFts(a.id, a.title, (result.summary || '') + ' ' + (a.summary_raw || ''));
 }
 
@@ -257,11 +291,14 @@ function persistResult(a, domain, result, scoring, analyzedFlag) {
 // 「五家同时报道」这个最强的信号就永远进不了质量分。这里只做纯代码重算，不再调模型。
 function rescoreAfterClustering() {
   const scoring = loadScoring();
+  const breakthroughs = loadBreakthroughs();
   calibration.invalidate();
   const shift = calibration.currentShift(scoring).shift;
   const rows = db.prepare(`
-    SELECT a.id, a.title, a.summary_raw, a.ai_summary, a.category, a.scores_json,
-           a.quality_score, a.featured, a.analyzed, s.tier,
+    SELECT a.id, a.title, a.summary_raw, a.ai_summary, a.domain, a.category,
+           a.scores_json, a.tags_json, a.quality_score, a.featured, a.analyzed,
+           a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json,
+           a.scoring_version, s.tier,
            COALESCE(c.size, 1) AS cluster_size
     FROM articles a
     JOIN sources s ON s.id = a.source_id
@@ -270,20 +307,60 @@ function rescoreAfterClustering() {
       AND julianday(a.fetched_at) > julianday('now', ?)`)
     .all(`-${scoring.clusterWindowHours || 72} hours`);
 
-  const update = db.prepare('UPDATE articles SET quality_score=?, featured=? WHERE id=?');
+  const update = db.prepare(`UPDATE articles SET
+    quality_score=?, featured=?, breakthrough_score=?, breakthrough_bonus=?,
+    breakthrough_signals_json=?, scoring_version=? WHERE id=?`);
   let changed = 0;
   for (const row of rows) {
     let scores;
     try { scores = JSON.parse(row.scores_json); } catch { continue; }
-    const quality = computeQuality(scores, scoringContext(row, { clusterSize: row.cluster_size }), scoring);
+    const context = scoringContext(row, { clusterSize: row.cluster_size });
+    const quality = computeQuality(scores, context, scoring);
+    let tags = [];
+    try {
+      const parsed = JSON.parse(row.tags_json || '[]');
+      if (Array.isArray(parsed)) tags = parsed;
+    } catch {}
+    const breakthrough = breakthroughFor(row, {
+      domain: row.domain,
+      result: {
+        category: row.category,
+        summary: row.ai_summary,
+        tags,
+        scores
+      },
+      context,
+      clusterSize: row.cluster_size,
+      breakthroughs
+    });
     const featured = isFeatured(quality, row.category, scoring, {
       heuristic: row.analyzed === 3, shift
     }) ? 1 : 0;
-    if (quality === row.quality_score && featured === row.featured) continue;
-    update.run(quality, featured, row.id);
+    const signalsJson = JSON.stringify(breakthrough.signals);
+    if (quality === row.quality_score
+      && featured === row.featured
+      && breakthrough.score === row.breakthrough_score
+      && breakthrough.bonus === row.breakthrough_bonus
+      && signalsJson === row.breakthrough_signals_json
+      && breakthrough.version === row.scoring_version) continue;
+    update.run(
+      quality,
+      featured,
+      breakthrough.score,
+      breakthrough.bonus,
+      signalsJson,
+      breakthrough.version,
+      row.id
+    );
     changed++;
   }
   return { rescored: rows.length, changed, shift };
 }
 
-module.exports = { analyzePending, rescoreAfterClustering, scoringContext, CATEGORIES };
+module.exports = {
+  analyzePending,
+  rescoreAfterClustering,
+  scoringContext,
+  breakthroughFor,
+  CATEGORIES
+};

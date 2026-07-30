@@ -20,15 +20,21 @@ function seed(server, articles) {
       .run(`https://example.com/feed-${Math.random()}`).lastInsertRowid;
     const insert = database.prepare(`INSERT INTO articles
       (source_id, title, url, summary_raw, ai_summary, fetched_at, published_at,
-       relevant, analyzed, quality_score, featured, domain)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, 'aerospace')`);
+       relevant, analyzed, quality_score, featured, domain,
+       breakthrough_score, breakthrough_bonus, breakthrough_signals_json, scoring_version)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, 'aerospace', ?, ?, ?, 1)`);
     const ftsInsert = database.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)');
     for (const article of articles) {
       const stamp = new Date(Date.now() - (article.ageHours || 0) * 3600_000).toISOString();
       const id = insert.run(
         sourceId, article.title, `https://example.com/${Math.random()}`,
         article.title, article.summary || '', stamp, stamp,
-        article.quality ?? 60, article.featured ? 1 : 0
+        article.quality ?? 60, article.featured ? 1 : 0,
+        article.breakthroughScore || 0,
+        article.breakthroughBonus || 0,
+        article.breakthroughSignals
+          ? JSON.stringify(article.breakthroughSignals)
+          : null
       ).lastInsertRowid;
       ftsInsert.run(id, article.title, article.summary || '');
     }
@@ -64,6 +70,39 @@ test('the hot view ranks by decayed heat, not by raw quality score', async t => 
   // 时间线视图不受热度影响，仍然按时间倒序
   const all = await feed(server, 'view=all&page=0');
   assert.deepEqual(all.items.map(item => item.title), ['刚刚发生的中分新闻', '一周前的高分旧闻']);
+});
+
+test('the hot view and displayed heat share the breakthrough-adjusted formula', async t => {
+  const server = await startServer(t);
+  seed(server, [
+    {
+      title: '普通技术进展',
+      quality: 75,
+      ageHours: 18
+    },
+    {
+      title: '可信技术突破',
+      quality: 75,
+      ageHours: 18,
+      breakthroughScore: 0.8,
+      breakthroughBonus: 8,
+      breakthroughSignals: {
+        objects: ['可重复使用火箭'],
+        actions: ['回收'],
+        credibilityEvidence: 'tier-t1',
+        uncertainty: [],
+        rejectedReason: null
+      }
+    }
+  ]);
+
+  const hot = await feed(server, 'view=hot&page=0');
+  assert.deepEqual(hot.items.map(item => item.title), ['可信技术突破', '普通技术进展']);
+  const breakthrough = hot.items[0];
+  assert.equal(breakthrough.breakthroughScore, 0.8);
+  assert.equal(breakthrough.breakthroughBonus, 8);
+  assert.deepEqual(breakthrough.breakthroughSignals.objects, ['可重复使用火箭']);
+  assert.ok(breakthrough.heat > hot.items[1].heat);
 });
 
 test('articles far outside the heat window still appear when nothing newer exists', async t => {

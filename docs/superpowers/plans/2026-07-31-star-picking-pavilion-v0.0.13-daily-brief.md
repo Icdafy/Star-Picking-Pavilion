@@ -177,7 +177,7 @@ git commit -m "feat: classify credible technology breakthroughs"
 - Modify: `test/scoring-v7.test.js`
 - Create: `test/breakthrough-pipeline.test.js`
 
-- [ ] **Step 1: Write failing database, pipeline, and heat tests**
+- [x] **Step 1: Write failing database, pipeline, and heat tests**
 
 Assert migrations add:
 
@@ -206,7 +206,7 @@ min(100, quality + bonus) *
 
 Add fixture rows proving SQL hot ordering matches `heatScore()` ordering and that pipeline rescore updates multi-source evidence.
 
-- [ ] **Step 2: Run focused tests to confirm red state**
+- [x] **Step 2: Run focused tests to confirm red state**
 
 Run:
 
@@ -216,7 +216,7 @@ node --test test/scoring-v7.test.js test/breakthrough-pipeline.test.js
 
 Expected: fail on missing fields and old heat signature.
 
-- [ ] **Step 3: Add idempotent database columns**
+- [x] **Step 3: Add idempotent database columns**
 
 Extend `migrate()`:
 
@@ -227,15 +227,15 @@ addCol('breakthrough_signals_json', 'TEXT');
 addCol('scoring_version', 'INTEGER NOT NULL DEFAULT 1');
 ```
 
-- [ ] **Step 4: Load breakthrough configuration from one path**
+- [x] **Step 4: Load breakthrough configuration from one path**
 
 Add `BREAKTHROUGH_PATH`, `loadBreakthroughs()`, validation, and export in `server/config.js`. Fail startup for malformed bundled configuration rather than silently accepting an unsafe rule set.
 
-- [ ] **Step 5: Persist evidence during scoring and cluster rescore**
+- [x] **Step 5: Persist evidence during scoring and cluster rescore**
 
 Build classifier input from title, raw/AI summary, domain, category, tier, cluster size, model scores, and noise count. Extend update statements to persist score, bonus, signals JSON, and version. Ensure `rescoreAfterClustering()` selects enough fields and recalculates after cluster size changes.
 
-- [ ] **Step 6: Update JavaScript and SQL heat formulas**
+- [x] **Step 6: Update JavaScript and SQL heat formulas**
 
 Keep old callers valid:
 
@@ -251,7 +251,7 @@ function heatScore(quality, publishedAt, scoring, nowMs = Date.now(), breakthrou
 
 Mirror the same expression in `HEAT_EXPRESSION`, parameter order, fallback query, and `articleRow()`.
 
-- [ ] **Step 7: Run focused tests**
+- [x] **Step 7: Run focused tests**
 
 Run:
 
@@ -261,7 +261,7 @@ node --test test/scoring-v7.test.js test/breakthrough-pipeline.test.js test/feed
 
 Expected: all pass.
 
-- [ ] **Step 8: Commit persistence and heat changes**
+- [x] **Step 8: Commit persistence and heat changes**
 
 ```powershell
 git add server/db.js server/config.js server/ai/pipeline.js server/ai/scoring.js server/index.js test/scoring-v7.test.js test/breakthrough-pipeline.test.js test/feed-query.test.js

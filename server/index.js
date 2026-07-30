@@ -88,6 +88,9 @@ function articleRow(r, scoring, nowMs) {
   const safeDate = value => value && Number.isFinite(new Date(value).getTime()) ? value : null;
   const publishedAt = safeDate(r.published_at);
   const fetchedAt = safeDate(r.fetched_at);
+  const breakthroughScore = Math.max(0, Math.min(1,
+    Number(r.breakthrough_score) || 0));
+  const breakthroughBonus = Math.max(0, Number(r.breakthrough_bonus) || 0);
   return {
     id: r.id, title: r.title, url: r.url,
     summary: r.ai_summary || (r.summary_raw || '').slice(0, 120),
@@ -96,12 +99,26 @@ function articleRow(r, scoring, nowMs) {
     publishedAt, fetchedAt,
     domain: r.domain, category: r.category,
     quality,
-    heat: quality != null ? Math.round(heatScore(quality, publishedAt || fetchedAt, scoring, nowMs) * 10) / 10 : null,
+    heat: quality != null ? Math.round(heatScore(
+      quality,
+      publishedAt || fetchedAt,
+      scoring,
+      nowMs,
+      { score: breakthroughScore, bonus: breakthroughBonus }
+    ) * 10) / 10 : null,
     featured: !!r.featured,
     scores: parseOptionalJson(r.scores_json, null, value => value && typeof value === 'object' && !Array.isArray(value)),
     tags: parseOptionalJson(r.tags_json, [], Array.isArray),
     source: r.source_name, tier: r.tier,
     clusterId: r.cluster_id, clusterSize: r.cluster_size || null,
+    breakthroughScore,
+    breakthroughBonus,
+    breakthroughSignals: parseOptionalJson(
+      r.breakthrough_signals_json,
+      null,
+      value => value && typeof value === 'object' && !Array.isArray(value)
+    ),
+    scoringVersion: Number(r.scoring_version) || 1,
     starred: !!r.starred,
     starredAt: safeDate(r.starred_at),
     analyzed: r.analyzed
@@ -115,9 +132,13 @@ function escapeLikePattern(value) {
 
 // 热度 = 质量分 × 指数时间衰减。与 scoring.heatScore 同式，放进 SQL 才能只取需要的一页，
 // 否则每次请求都要把上千行读进内存再在 JS 里排序（实时轮询每 18 秒会请求两次）。
-const HEAT_EXPRESSION = `COALESCE(a.quality_score, 0) * pow(
+const HEAT_EXPRESSION = `min(
+  100.0,
+  max(0.0, COALESCE(a.quality_score, 0) + COALESCE(a.breakthrough_bonus, 0))
+) * pow(
   0.5,
-  max(0.0, (julianday('now') - julianday(COALESCE(a.published_at, a.fetched_at))) * 24.0) / ?
+  max(0.0, (julianday('now') - julianday(COALESCE(a.published_at, a.fetched_at))) * 24.0)
+    / (? + ? * min(1.0, max(0.0, COALESCE(a.breakthrough_score, 0))))
 )`;
 // 半衰期 36 小时下，超出此窗口的条目热度已衰减到千分之一以下，排进热榜没有意义
 const HOT_WINDOW_DAYS = 45;
@@ -181,15 +202,18 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
     rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
   } else if (view === 'hot') {
     const halfLife = Number(scoring.heatDecayHalfLifeHours) || 36;
+    const breakthroughExtension = Math.max(0,
+      Number(scoring.breakthroughBoost?.maxHalfLifeExtensionHours) || 0);
     const windowStart = new Date(nowMs - HOT_WINDOW_DAYS * 86_400_000).toISOString();
     // 占位符按 SQL 文本位置绑定：先 WHERE 的过滤条件，再时间窗，最后 ORDER BY 里的半衰期
     rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`,
       'AND COALESCE(a.published_at, a.fetched_at) >= ?'))
-      .all(...params, windowStart, halfLife);
+      .all(...params, windowStart, halfLife, breakthroughExtension);
     // 窗口内已经取空时退回不限时间的热度榜：既覆盖长期未采集的库，也让「加载更多」能翻到更早的内容。
     // 热度排序是全局的，因此续翻的偏移量与窗口版一致，不会重复或跳条。
     if (!rows.length) {
-      rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`, '')).all(...params, halfLife);
+      rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`, ''))
+        .all(...params, halfLife, breakthroughExtension);
     }
   } else {
     rows = db.prepare(buildSql('COALESCE(a.published_at, a.fetched_at) DESC', '')).all(...params);

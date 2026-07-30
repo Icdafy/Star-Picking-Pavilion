@@ -77,6 +77,44 @@ test('质量分始终夹在 0 到 100 之间', () => {
     { tier: 'T1', lexicon: { weightSum: 999 }, clusterSize: 99 }, config), 100);
 });
 
+test('技术突破强度为零时热度与旧公式逐值一致', () => {
+  const now = Date.parse('2026-07-31T08:00:00.000Z');
+  const publishedAt = '2026-07-30T20:00:00.000Z';
+  const expected = 80 * Math.pow(0.5, 12 / config.heatDecayHalfLifeHours);
+
+  assert.equal(scoring.heatScore(80, publishedAt, config, now), expected);
+  assert.equal(
+    scoring.heatScore(80, publishedAt, config, now, { score: 0, bonus: 0 }),
+    expected
+  );
+});
+
+test('可信技术突破提升初始热度并延长半衰期但不越过 100', () => {
+  const runtimeConfig = {
+    ...config,
+    breakthroughBoost: {
+      maxHalfLifeExtensionHours: 18
+    }
+  };
+  const now = Date.parse('2026-07-31T08:00:00.000Z');
+  const publishedAt = '2026-07-30T20:00:00.000Z';
+  const score = 0.75;
+  const bonus = 8;
+  const effectiveQuality = Math.min(100, 96 + bonus);
+  const effectiveHalfLife = config.heatDecayHalfLifeHours + 18 * score;
+  const expected = effectiveQuality * Math.pow(0.5, 12 / effectiveHalfLife);
+
+  assert.equal(
+    scoring.heatScore(96, publishedAt, runtimeConfig, now, { score, bonus }),
+    expected
+  );
+  assert.ok(scoring.heatScore(96, publishedAt, runtimeConfig, now, { score, bonus }) <= 100);
+  assert.ok(
+    scoring.heatScore(96, publishedAt, runtimeConfig, now, { score, bonus })
+      > scoring.heatScore(96, publishedAt, runtimeConfig, now)
+  );
+});
+
 test('自适应偏移与启发式折扣互斥，不会把门槛砍两遍', () => {
   const staticThreshold = config.featuredThresholds.default;
   const discount = config.heuristicThresholdDiscount;

@@ -97,11 +97,20 @@ function isFeatured(quality, category, scoring, options = false) {
   return quality >= resolveThreshold(category, scoring, resolved);
 }
 
-function heatScore(quality, publishedAt, scoring, nowMs = Date.now()) {
+function heatScore(quality, publishedAt, scoring, nowMs = Date.now(), breakthrough = {}) {
   const t = publishedAt ? new Date(publishedAt).getTime() : nowMs;
   const hours = Math.max(0, (nowMs - t) / 3600e3);
-  const halfLife = scoring.heatDecayHalfLifeHours || 36;
-  return quality * Math.pow(0.5, hours / halfLife);
+  const baseHalfLife = Math.max(1, boundedNumber(scoring.heatDecayHalfLifeHours, 36));
+  const score = Math.max(0, Math.min(1, boundedNumber(breakthrough.score, 0)));
+  const bonus = Math.max(0, boundedNumber(breakthrough.bonus, 0));
+  const extension = Math.max(0, boundedNumber(
+    scoring.breakthroughBoost?.maxHalfLifeExtensionHours,
+    0
+  ));
+  const effectiveQuality = Math.min(100,
+    Math.max(0, boundedNumber(quality, 0) + bonus));
+  const effectiveHalfLife = baseHalfLife + extension * score;
+  return effectiveQuality * Math.pow(0.5, hours / effectiveHalfLife);
 }
 
 module.exports = {

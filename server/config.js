@@ -8,6 +8,7 @@ const { getApiKey, setApiKey } = require('./runtime-credentials');
 
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
+const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
 const DEFAULT_SETTINGS = {
   // —— AI 分析层（DeepSeek，OpenAI 兼容协议；留好接口，可换任意兼容服务）——
@@ -223,8 +224,62 @@ function deepMerge(base, over) {
   return base;
 }
 
-function loadScoring() {
-  return JSON.parse(fs.readFileSync(SCORING_PATH, 'utf8'));
+function nonEmptyStringArray(value, field) {
+  if (!Array.isArray(value) || !value.length
+    || value.some(item => typeof item !== 'string' || !item.trim())) {
+    throw new Error(`技术突破配置无效: ${field}`);
+  }
+  return [...new Set(value.map(item => item.trim()))];
 }
 
-module.exports = { applySettingsPatch, loadSettings, saveSettings, loadScoring, SETTINGS_PATH };
+function loadBreakthroughs() {
+  const raw = JSON.parse(fs.readFileSync(BREAKTHROUGHS_PATH, 'utf8'));
+  if (!Number.isInteger(raw.version) || raw.version < 1) {
+    throw new Error('技术突破配置无效: version');
+  }
+  for (const field of ['maxBonus', 'maxHalfLifeExtensionHours']) {
+    if (!Number.isFinite(Number(raw[field])) || Number(raw[field]) < 0) {
+      throw new Error(`技术突破配置无效: ${field}`);
+    }
+  }
+  const minimumScores = raw.minimumScores || {};
+  for (const field of ['tier15Credibility', 'corroboratedCredibility']) {
+    if (!Number.isFinite(Number(minimumScores[field]))
+      || Number(minimumScores[field]) < 0
+      || Number(minimumScores[field]) > 100) {
+      throw new Error(`技术突破配置无效: minimumScores.${field}`);
+    }
+  }
+  const objects = raw.objects || {};
+  return {
+    ...raw,
+    eligibleCategories: nonEmptyStringArray(raw.eligibleCategories, 'eligibleCategories'),
+    completionActions: nonEmptyStringArray(raw.completionActions, 'completionActions'),
+    uncertaintyMarkers: nonEmptyStringArray(raw.uncertaintyMarkers, 'uncertaintyMarkers'),
+    objects: {
+      lowaltitude: nonEmptyStringArray(objects.lowaltitude, 'objects.lowaltitude'),
+      aerospace: nonEmptyStringArray(objects.aerospace, 'objects.aerospace')
+    }
+  };
+}
+
+function loadScoring() {
+  const scoring = JSON.parse(fs.readFileSync(SCORING_PATH, 'utf8'));
+  const breakthroughs = loadBreakthroughs();
+  scoring.breakthroughBoost = {
+    maxBonus: breakthroughs.maxBonus,
+    maxHalfLifeExtensionHours: breakthroughs.maxHalfLifeExtensionHours,
+    version: breakthroughs.version
+  };
+  return scoring;
+}
+
+module.exports = {
+  applySettingsPatch,
+  loadSettings,
+  saveSettings,
+  loadScoring,
+  loadBreakthroughs,
+  SETTINGS_PATH,
+  BREAKTHROUGHS_PATH
+};
