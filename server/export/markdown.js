@@ -7,6 +7,7 @@
 //   text     —— 纯文本，链接单独成行，适合贴进微信群与邮件
 
 const DOMAIN_NAMES = { lowaltitude: '低空经济', aerospace: '商业航天' };
+const EXPORT_VERSION = '0.0.12';
 const FORMATS = new Set(['markdown', 'text']);
 // 只转义行内有语义的字符：标题里出现 [] 或 * 时不转义会把链接和强调撑破，
 // 而 # - . 之类只在行首有语义，本模块每一行都自带前缀（`# `/`> `/`N. `/`   - `），
@@ -122,9 +123,9 @@ function serialize(document, format) {
   return `${blocks.join('\n\n')}\n`;
 }
 
-function footerLine({ productName, version, homepage } = {}) {
+function footerLine({ productName, homepage } = {}) {
   const name = flatten(productName) || '摘星阁';
-  const parts = [version ? `由 ${name} v${flatten(version)} 生成` : `由 ${name} 生成`];
+  const parts = [`由 ${name} v${EXPORT_VERSION} 生成`];
   const link = safeUrl(homepage);
   if (link) parts.push(link);
   return parts.join(' · ');
@@ -182,6 +183,7 @@ function exportFilename(label, stamp, format) {
 }
 
 module.exports = {
+  EXPORT_VERSION,
   FORMATS,
   normalizeFormat,
   escapeMarkdown,

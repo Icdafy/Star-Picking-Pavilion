@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// v0.0.11 的预算不得超过 v0.0.10 实测产物。思源黑体继续完整保留，
+// v0.0.12 的预算不得超过 v0.0.11 实测产物。思源黑体继续完整保留，
 // 通过排除生产依赖中的文档、示例和测试材料回收空间。
 const MAX_ASAR_BYTES = 12_476_662;
 const MAX_INSTALLER_BYTES = 99_328_923;
@@ -15,7 +15,7 @@ const ALLOWED_ROOTS = new Set([
   'node_modules',
   'package.json'
 ]);
-const FORBIDDEN_APPLICATION_ARTIFACT = /(?:^|\/)(?:\.git|\.worktrees|\.playwright-cli|data|dist|docs?|tests?|logs?|screenshots?)(?:\/|$)|(?:^|\/)(?:settings\.json|[^/]+\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm))?|[^/]+\.log|[^/]+\.(?:tmp|temp|bak))(?:$|\/)/i;
+const FORBIDDEN_APPLICATION_ARTIFACT = /(?:^|\/)(?:\.git|\.worktrees|\.playwright-cli|data|dist|docs?|tests?|logs?|screenshots?)(?:\/|$)|(?:^|\/)(?:settings\.json|storage-maintenance\.json|[^/]+\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm))?|[^/]+\.log|[^/]+\.(?:tmp|temp|bak))(?:$|\/)/i;
 const FORBIDDEN_DEPENDENCY_ARTIFACT =
   /(?:^|\/)(?:docs?|examples?|tests?|__tests__)(?:\/|$)|\.md$/i;
 const ALLOWED_RESOURCE_ENTRIES = new Set([

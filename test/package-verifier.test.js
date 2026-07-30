@@ -130,7 +130,7 @@ test('package verifier accepts only application roots, production dependencies a
   }
 });
 
-test('v0.0.11 package budgets never exceed the v0.0.10 artifacts', () => {
+test('v0.0.12 package budgets never exceed the v0.0.11 artifacts', () => {
   assert.equal(MAX_ASAR_BYTES, 12_476_662);
   assert.equal(MAX_INSTALLER_BYTES, 99_328_923);
 });
@@ -159,6 +159,7 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
   for (const forbidden of [
     '/renderer/cache.sqlite',
     '/config/settings.json',
+    '/electron/storage-maintenance.json',
     '/server/runtime.db-wal',
     '/electron/debug.log',
     '/renderer/screenshot.png.tmp'
@@ -168,6 +169,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical package version', () => {
-  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.11.exe');
+  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.12.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.version)), '.exe');
 });

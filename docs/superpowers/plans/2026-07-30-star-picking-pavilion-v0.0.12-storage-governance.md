@@ -438,7 +438,7 @@ git commit -m "feat: add storage governance dashboard"
 - Modify: `test/release-readiness.test.js`
 - Modify: `test/package-verifier.test.js`
 
-- [ ] **Step 1: 更新版本测试期望并确认失败**
+- [x] **Step 1: 更新版本测试期望并确认失败**
 
 把所有当前产品身份断言更新为 `0.0.12`，并增加 README/Release Notes 对数据库深度压缩、缓存治理、旧库确认保护和阈值的覆盖。
 
@@ -446,13 +446,13 @@ Run: `node --test test/branding.test.js test/export-markdown.test.js test/releas
 
 Expected: FAIL，当前文件仍声明 `0.0.11`。
 
-- [ ] **Step 2: 更新 npm 版本**
+- [x] **Step 2: 更新 npm 版本**
 
 Run: `npm version 0.0.12 --no-git-tag-version`
 
 Expected: `package.json` 与 `package-lock.json` 均为 `0.0.12`，没有创建 tag。
 
-- [ ] **Step 3: 更新全部用户和发布资料**
+- [x] **Step 3: 更新全部用户和发布资料**
 
 README 首屏、版本说明、功能列表、数据保留、本地文件、备份与隐私章节统一到 v0.0.12。CHANGELOG 顶部新增完整的 `0.0.12` 变更；RELEASE_NOTES 改为可直接用于 GitHub Release 的 v0.0.12 正文；RELEASING 中所有命令、资产名和 tag 改为 v0.0.12。导出页脚改为：
 
@@ -462,7 +462,7 @@ const EXPORT_VERSION = '0.0.12';
 
 包审计基线使用 v0.0.11 实际产物尺寸；正式代码、设计和计划允许进入 ASAR，数据库、维护状态、日志和测试夹具继续被排除。
 
-- [ ] **Step 4: 运行版本和发布资料测试**
+- [x] **Step 4: 运行版本和发布资料测试**
 
 Run: `npm run verify:version -- --tag v0.0.12`
 
@@ -470,7 +470,7 @@ Run: `node --test test/branding.test.js test/export-markdown.test.js test/releas
 
 Expected: 全部 PASS。
 
-- [ ] **Step 5: 提交版本资料**
+- [x] **Step 5: 提交版本资料**
 
 ```powershell
 git add package.json package-lock.json README.md CHANGELOG.md RELEASE_NOTES.md RELEASING.md server/export/markdown.js test/branding.test.js test/export-markdown.test.js test/release-readiness.test.js test/package-verifier.test.js

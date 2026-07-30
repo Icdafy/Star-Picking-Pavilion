@@ -9,11 +9,11 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('package and lockfile versions stay synchronized at v0.0.11', () => {
+test('package and lockfile versions stay synchronized at v0.0.12', () => {
   const packageJson = JSON.parse(read('package.json'));
   const packageLock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(packageJson.version, '0.0.11');
+  assert.equal(packageJson.version, '0.0.12');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
 });
@@ -31,7 +31,8 @@ test('public release documentation and compliance artifacts are complete', () =>
   ]) assert.equal(fs.existsSync(path.join(root, file)), true, `missing ${file}`);
 
   assert.match(read('LICENSE'), /MIT License[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
-  assert.equal(require('../package.json').version, '0.0.11');
+  assert.equal(require('../package.json').version, '0.0.12');
+  assert.match(read('CHANGELOG.md'), /\[0\.0\.12\].*2026-07-30/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.11\].*2026-07-28/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.10\].*2026-07-25/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.9\].*2026-07-25/);
@@ -44,13 +45,13 @@ test('public release documentation and compliance artifacts are complete', () =>
   assert.match(read('CHANGELOG.md'), /\[0\.0\.2\].*2026-07-23/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.1\].*2026-07-21/);
   assert.match(read('SECURITY.md'), /Security Advisories/);
-  // 按文档出现顺序断言 v0.0.11 的主线：领域色条 → 离屏渲染 → 功能保留 → 未签名提示
+  // 按文档出现顺序断言 v0.0.12 的主线：分项可见 → 自动阈值 → 旧库保护 → 未签名提示
   assert.match(
     read('RELEASE_NOTES.md'),
-    /v0\.0\.11[\s\S]*领域色条[\s\S]*离屏渲染[\s\S]*不删除功能[\s\S]*未签名/
+    /v0\.0\.12[\s\S]*存储治理[\s\S]*64 MiB[\s\S]*30 天[\s\S]*旧版数据[\s\S]*未签名/
   );
   assert.match(read('THIRD_PARTY_NOTICES.txt'), /cheerio@1\.2\.0/);
-  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.0\.11/);
+  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.0\.12/);
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
@@ -66,7 +67,7 @@ test('README documents installation, privacy, recovery and security truthfully',
   const readme = read('README.md');
   for (const required of [
     /Windows 10\/11.*x64/,
-    /Star-Picking-Pavilion-Setup-0\.0\.11\.exe/,
+    /Star-Picking-Pavilion-Setup-0\.0\.12\.exe/,
     /SmartScreen/,
     /Get-FileHash/,
     /云幄\s*·\s*常用网址/,
@@ -78,6 +79,13 @@ test('README documents installation, privacy, recovery and security truthfully',
     /safeStorage/,
     /MIT/
   ]) assert.match(readme, required);
+  for (const storageRule of [
+    /数据库深度压缩/,
+    /64 MiB.*25%.*30 天/s,
+    /缓存.*256 MiB/s,
+    /旧版.*30 天.*确认/s,
+    /storage-maintenance\.json/
+  ]) assert.match(readme, storageRule);
   assert.match(readme, /API Key 不写入 `settings\.json`/);
   assert.doesNotMatch(readme, /settings\.json`\s*\|\s*DeepSeek Key/i);
   assert.doesNotMatch(readme, /HTTP\s*:7644/);
@@ -88,18 +96,18 @@ test('version verifier matches package, tag, installer and latest metadata', asy
   const { verifyVersion } = require('../scripts/verify-version');
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-version-'));
   t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.0.11\n');
-  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.0.11.exe'), 'fixture');
+  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.0.12\n');
+  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.0.12.exe'), 'fixture');
 
   assert.deepEqual(verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.0.11',
+    tag: 'v0.0.12',
     distDir: directory,
     requireArtifacts: true
   }), {
-    version: '0.0.11',
-    tag: 'v0.0.11',
-    installer: 'Star-Picking-Pavilion-Setup-0.0.11.exe'
+    version: '0.0.12',
+    tag: 'v0.0.12',
+    installer: 'Star-Picking-Pavilion-Setup-0.0.12.exe'
   });
   assert.throws(() => verifyVersion({
     packageJson: require('../package.json'),
