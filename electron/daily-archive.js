@@ -275,7 +275,7 @@ function createDailyArchiveService({
           await fileSystem.writeFile(
             temporary,
             `${JSON.stringify(snapshot, null, 2)}\n`,
-            { encoding: 'utf8', mode: 0o600, flag: 'wx' }
+            { encoding: 'utf8', mode: 0o600, flag: 'wx', flush: true }
           );
           await fileSystem.rename(temporary, statePath);
         } catch (error) {
@@ -481,17 +481,17 @@ function createDailyArchiveService({
     await fileSystem.writeFile(
       path.join(directory, MARKDOWN_FILE_NAME),
       markdown,
-      { flag: 'wx', mode: 0o600 }
+      { flag: 'wx', mode: 0o600, flush: true }
     );
     await fileSystem.writeFile(
       path.join(directory, JSONL_FILE_NAME),
       jsonl,
-      { flag: 'wx', mode: 0o600 }
+      { flag: 'wx', mode: 0o600, flush: true }
     );
     await fileSystem.writeFile(
       path.join(directory, MANIFEST_FILE_NAME),
       `${JSON.stringify(manifest, null, 2)}\n`,
-      { encoding: 'utf8', flag: 'wx', mode: 0o600 }
+      { encoding: 'utf8', flag: 'wx', mode: 0o600, flush: true }
     );
   }
 

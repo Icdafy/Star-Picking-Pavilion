@@ -218,6 +218,31 @@ test('saveCurrent writes a complete date directory and a verifiable manifest', a
   );
 });
 
+test('archive files are flushed before the date directory is atomically committed', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  const writes = [];
+  const fileSystem = Object.create(fs.promises);
+  fileSystem.writeFile = async (candidate, contents, options) => {
+    writes.push({ name: path.basename(candidate), options });
+    return fs.promises.writeFile(candidate, contents, options);
+  };
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => sampleBundle(date),
+    now: () => new Date(2026, 6, 31, 10, 0, 0),
+    fileSystem
+  });
+
+  await service.enable(rootDirectory);
+  await service.saveCurrent();
+
+  for (const name of ['新闻简报.md', 'news.jsonl', 'manifest.json']) {
+    const write = writes.find(entry => entry.name === name);
+    assert.equal(write?.options?.flush, true, name);
+  }
+});
+
 test('a valid existing archive is verified and skipped without requesting the bundle again', async t => {
   const userDataPath = await makeDirectory(t);
   const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
