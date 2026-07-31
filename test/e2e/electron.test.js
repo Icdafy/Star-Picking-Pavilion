@@ -16,8 +16,8 @@ const { mostRecentDueDate } = require('../../electron/daily-archive');
 const projectRoot = path.join(__dirname, '..', '..');
 const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
 const DUMMY_API_KEY = 'sk-e2e-dummy-secret';
-const PREFILTER_MODEL = 'deepseek-v4-flash';
-const SCORING_MODEL = 'deepseek-v4-pro';
+// v0.0.14 起只有一个模型：预筛与研判共用 deepseek-v4-flash（DeepSeek-V4-Flash-0731）
+const ANALYSIS_MODEL = 'deepseek-v4-flash';
 const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
 const MAX_GRACEFUL_CLOSE_MS = 4_000;
 const EXPECTED_UI_PREFERENCE_KEYS = [
@@ -270,8 +270,7 @@ async function collectStalledSaveDiagnostics({
     settingsExists: false,
     settingsParseable: false,
     settingsBaseUrlMatches: false,
-    settingsPrefilterModelMatches: false,
-    settingsScoringModelMatches: false,
+    settingsModelMatches: false,
     electronChildAlive: electronProcess.exitCode === null
       && electronProcess.signalCode === null,
     credentialIpcStdoutCaptured: credentialIpcOutput.stdoutCaptured,
@@ -303,8 +302,7 @@ async function collectStalledSaveDiagnostics({
       const settings = JSON.parse(await fs.promises.readFile(settingsFile, 'utf8'));
       diagnostics.settingsParseable = true;
       diagnostics.settingsBaseUrlMatches = settings?.ai?.baseUrl === expectedBaseUrl;
-      diagnostics.settingsPrefilterModelMatches = settings?.ai?.prefilterModel === PREFILTER_MODEL;
-      diagnostics.settingsScoringModelMatches = settings?.ai?.scoringModel === SCORING_MODEL;
+      diagnostics.settingsModelMatches = settings?.ai?.model === ANALYSIS_MODEL;
     } catch {}
   }
 
@@ -332,8 +330,10 @@ async function assertPersistedFiles(dataDir, expected) {
 
   const settings = JSON.parse(settingsRaw);
   assert.equal(settings.ai.baseUrl, expected.baseUrl);
-  assert.equal(settings.ai.prefilterModel, PREFILTER_MODEL);
-  assert.equal(settings.ai.scoringModel, SCORING_MODEL);
+  assert.equal(settings.ai.model, ANALYSIS_MODEL);
+  // 两段式模型字段必须彻底消失，否则升级后仍然可能被读回去打到 pro
+  assert.equal(Object.hasOwn(settings.ai, 'prefilterModel'), false);
+  assert.equal(Object.hasOwn(settings.ai, 'scoringModel'), false);
   assert.equal(Object.hasOwn(settings.ai, 'apiKey'), false);
 
   const credentials = JSON.parse(credentialsRaw);
@@ -554,8 +554,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   try {
     await firstPage.locator('#setBaseUrl').fill(mockBaseUrl);
     await firstPage.locator('#setApiKey').fill(DUMMY_API_KEY);
-    await firstPage.locator('#setPrefilterModel').fill(PREFILTER_MODEL);
-    await firstPage.locator('#setScoringModel').fill(SCORING_MODEL);
+    await firstPage.locator('#setModel').fill(ANALYSIS_MODEL);
     await firstPage.locator('#setInterval').fill('45');
     await firstPage.locator('#setRsshub').fill(`${mockBaseUrl}/rsshub`);
 
@@ -569,8 +568,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
 
     assert.equal(await firstPage.locator('#setApiKey').inputValue(), DUMMY_API_KEY);
     assert.equal(await firstPage.locator('#setBaseUrl').inputValue(), mockBaseUrl);
-    assert.equal(await firstPage.locator('#setPrefilterModel').inputValue(), PREFILTER_MODEL);
-    assert.equal(await firstPage.locator('#setScoringModel').inputValue(), SCORING_MODEL);
+    assert.equal(await firstPage.locator('#setModel').inputValue(), ANALYSIS_MODEL);
     assert.equal(await firstPage.locator('#setInterval').inputValue(), '45');
     assert.equal(await firstPage.locator('#setRsshub').inputValue(), `${mockBaseUrl}/rsshub`);
   } finally {
@@ -635,7 +633,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   }, undefined, { timeout: 5_000 });
   assert.deepEqual(mockCalls[0], {
     path: '/chat/completions',
-    model: PREFILTER_MODEL,
+    model: ANALYSIS_MODEL,
     authorized: true
   });
 
@@ -851,16 +849,13 @@ test('real Electron desktop flow is secure, persistent across restart and single
   await secondPage.waitForFunction(expected => {
     const key = document.querySelector('#setApiKey');
     const baseUrl = document.querySelector('#setBaseUrl');
-    const prefilter = document.querySelector('#setPrefilterModel');
-    const scoring = document.querySelector('#setScoringModel');
+    const model = document.querySelector('#setModel');
     return key?.dataset.hasStoredKey === 'true'
       && baseUrl?.value === expected.baseUrl
-      && prefilter?.value === expected.prefilter
-      && scoring?.value === expected.scoring;
+      && model?.value === expected.model;
   }, {
     baseUrl: mockBaseUrl,
-    prefilter: PREFILTER_MODEL,
-    scoring: SCORING_MODEL
+    model: ANALYSIS_MODEL
   });
   await secondPage.waitForFunction(expected => {
     const toggle = document.querySelector('#dailyArchiveEnabled');
@@ -886,7 +881,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   }, undefined, { timeout: 5_000 });
   assert.deepEqual(mockCalls[1], {
     path: '/chat/completions',
-    model: PREFILTER_MODEL,
+    model: ANALYSIS_MODEL,
     authorized: true
   });
   assert.equal(mockCalls.length, 2);

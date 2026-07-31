@@ -5,11 +5,11 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.SettingsFormController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createSettingsFormModule() {
+  const DEFAULT_MODEL = 'deepseek-v4-flash';
   const FIELD_NAMES = Object.freeze([
     'apiKey',
     'baseUrl',
-    'prefilterModel',
-    'scoringModel',
+    'model',
     'intervalMinutes',
     'rsshubBase',
     'retentionDays',
@@ -18,8 +18,7 @@
   const AI_FIELD_NAMES = Object.freeze([
     'apiKey',
     'baseUrl',
-    'prefilterModel',
-    'scoringModel'
+    'model'
   ]);
   const COLLECT_FIELD_NAMES = Object.freeze(['intervalMinutes', 'rsshubBase']);
   const RETENTION_FIELD_NAMES = Object.freeze(['retentionDays', 'irrelevantRetentionDays']);
@@ -86,11 +85,8 @@
       if (canApplyLoad('baseUrl', prior)) {
         elements.baseUrl.value = settings.ai.baseUrl;
       }
-      if (canApplyLoad('prefilterModel', prior)) {
-        elements.prefilterModel.value = settings.ai.prefilterModel;
-      }
-      if (canApplyLoad('scoringModel', prior)) {
-        elements.scoringModel.value = settings.ai.scoringModel;
+      if (canApplyLoad('model', prior)) {
+        elements.model.value = settings.ai.model;
       }
       if (canApplyLoad('intervalMinutes', prior)) {
         elements.intervalMinutes.value = settings.collect.intervalMinutes;
@@ -111,8 +107,7 @@
       const apiKey = elements.apiKey.value.trim();
       const aiPatch = {
         baseUrl: elements.baseUrl.value || 'https://api.deepseek.com',
-        prefilterModel: elements.prefilterModel.value || 'deepseek-v4-flash',
-        scoringModel: elements.scoringModel.value || 'deepseek-v4-pro'
+        model: elements.model.value || DEFAULT_MODEL
       };
       if (apiKey) aiPatch.apiKey = apiKey;
       const result = await request('/api/settings', { body: { ai: aiPatch } });

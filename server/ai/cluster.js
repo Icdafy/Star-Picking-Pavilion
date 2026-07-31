@@ -1,13 +1,33 @@
 'use strict';
-// 事件聚类 —— 同一事件多家报道折叠成一个事件簇
-// 用字符 bigram overlap 相似度（纯代码，零成本），官方源优先当主条
-// （AIHOT 用 embedding，这里先用代码方案，后续可在此模块换成 embedding 接口）
+// 管线第 7、8 段：事件聚类 与 语义合并 —— 同一事件多家报道折叠成一个事件簇。
+//
+// 两条通道并进同一个并查集：
+//   ⑦ 字面通道：字符 bigram overlap 相似度（纯代码，零成本）
+//   ⑧ 语义通道：ai/merge —— 主事件键相同，或锚点实体重叠且动作类一致
+// 字面通道漏掉的是「同一件事被两家用完全不同的说法写出来」，那正是语义通道补的；
+// 语义通道单独用又会把「同一批公司的不同事件」并到一起，所以两条都要，
+// 且都受同一套约束（跨领域禁并、簇容量上限）管着。
+// （AIHOT 用 embedding，这里用结构化事件键代替，零调用成本且可解释。）
 //
 // 性能：分析循环每 75 秒调一次，逐对比较是 O(n²)×集合大小，72 小时窗口下会长时间阻塞事件循环。
 // 改为倒排索引计数：交集大小由倒排表累加得到，与逐对比较**结果完全一致**，只是不再枚举无交集的对。
 // 另外只在分组真正变化时才写库，避免每轮重写全部 cluster_id 把 WAL 撑大。
 const { db, now } = require('../db');
 const { loadScoring } = require('../config');
+const { semanticPairs } = require('./merge');
+const { anchorKeys } = require('./entities');
+
+// 库里的 JSON 列可能是 NULL（升级前的老数据）或被截断，解析失败一律当空数组，
+// 让聚类退回纯字面通道，而不是让整轮分析炸掉。
+function parseJsonArray(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function bigrams(s) {
   const t = String(s || '').replace(/[\s\p{P}]+/gu, '').toLowerCase();
@@ -99,14 +119,20 @@ function clusterRecent() {
   const maxSize = scoring.clusterMaxSize ?? 12;
 
   const rows = db.prepare(`
-    SELECT a.id, a.title, a.ai_summary, a.domain, a.cluster_id, a.quality_score, s.tier
+    SELECT a.id, a.title, a.ai_summary, a.domain, a.cluster_id, a.quality_score,
+           a.entities_json, a.events_json, a.event_key, s.tier
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.relevant = 1 AND julianday(a.fetched_at) > julianday('now', ?)
     ORDER BY a.id`).all(`-${windowH} hours`);
   if (!rows.length) return { clusters: 0 };
 
   // 标题 + AI 摘要一起算 bigram：东财式标题党标题差异大，但 AI 摘要对同一事件描述高度一致，靠摘要才能并簇
-  for (const r of rows) r.grams = bigrams(r.title + ' ' + (r.ai_summary || ''));
+  for (const r of rows) {
+    r.grams = bigrams(r.title + ' ' + (r.ai_summary || ''));
+    r.anchorKeys = anchorKeys(parseJsonArray(r.entities_json));
+    r.primaryEventKey = r.event_key || null;
+    r.actionClass = parseJsonArray(r.events_json)[0]?.actionClass || null;
+  }
 
   // 并查集（带簇容量上限）。真实事件在 72 小时窗口里被十几家报道已是顶格，
   // 再多就说明是相似度误判在串链；拒绝越界的合并，让链断在这里而不是吞掉半个库。
@@ -121,7 +147,20 @@ function clusterRecent() {
     size.set(rb, size.get(ra) + size.get(rb));
   };
 
+  // ⑦ 字面通道
   findSimilarPairs(rows, threshold, (a, b) => union(a.id, b.id), minShared);
+  // ⑧ 语义通道。跑在字面通道之后、分组之前，因此并进来的关系同样受 maxSize 约束：
+  // 语义判断出错时最多把一个簇撑到上限，不会像早期版本那样吞掉半个库。
+  let semanticMerges = 0;
+  semanticPairs(rows, (a, b) => {
+    if (find(a.id) === find(b.id)) return;
+    union(a.id, b.id);
+    // union 会因为超出簇容量上限而拒绝，所以要回头确认它真的合并了
+    if (find(a.id) === find(b.id)) semanticMerges++;
+  }, {
+    minSharedAnchors: scoring.mergeMinSharedAnchors ?? 2,
+    maxAnchorPostings: scoring.mergeMaxAnchorPostings ?? 60
+  });
 
   const groups = new Map();
   for (const r of rows) {
@@ -134,7 +173,7 @@ function clusterRecent() {
   // 分组与库中现状一致时直接返回：分析循环每 75 秒跑一次，绝大多数轮次没有新的并簇，
   // 若照旧重写全部 cluster_id，WAL 会被无意义的写入撑大。
   if (matchesStoredClusters(partition, rows)) {
-    return { clusters: partition.length, unchanged: true };
+    return { clusters: partition.length, semanticMerges, unchanged: true };
   }
 
   let clusterCount = 0;
@@ -173,7 +212,7 @@ function clusterRecent() {
     db.exec(`DELETE FROM clusters
       WHERE id NOT IN (SELECT DISTINCT cluster_id FROM articles WHERE cluster_id IS NOT NULL)`);
     db.exec('COMMIT');
-    return { clusters: clusterCount };
+    return { clusters: clusterCount, semanticMerges };
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;

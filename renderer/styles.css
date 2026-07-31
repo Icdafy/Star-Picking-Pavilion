@@ -1022,6 +1022,33 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   border-radius: 99px; background: var(--accent-soft);
 }
 
+/* 实体标签：标签(tags)是模型给的主题词，实体是抠出来的具名对象，
+   两者形态必须能一眼分开——标签是实心药丸，实体是描边按钮，且实体可点击检索 */
+.card-entities { display: flex; gap: .375rem; margin-top: .4375rem; flex-wrap: wrap; }
+.card-entity {
+  font-size: var(--t-sm); color: var(--c-fg-dim); padding: .0625rem .5rem;
+  border-radius: var(--radius-xs); background: transparent;
+  border: 1px solid var(--card-border); cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.card-entity:hover { color: var(--second-ink); border-color: var(--second-line); }
+.card-entity:focus-visible { outline: 2px solid var(--second); outline-offset: 2px; }
+
+/* 原子事件：只在一条情报确实拆出多件事时出现，说明「这条不止讲了一件事」 */
+.card-events {
+  margin-top: .5625rem; padding: .5rem var(--sp-3);
+  border-radius: var(--radius-sm); background: var(--hover-bg);
+  display: flex; gap: .5625rem; align-items: baseline;
+}
+.card-events .ce-label {
+  flex-shrink: 0; font-family: var(--font-display); font-size: var(--t-sm);
+  font-weight: 700; color: var(--second-ink); letter-spacing: .07em;
+}
+.card-events .ce-list { margin: 0; padding-left: 1.125rem; font-size: var(--t-base); color: var(--c-fg-dim); }
+.card-events .ce-list li + li { margin-top: .1875rem; }
+.card-events .ce-list b { color: var(--c-fg); font-weight: 600; }
+.card-events .ce-list span { margin-left: .375rem; color: var(--second-ink); }
+
 /* 卡片正文 + 缩略图并排 */
 .card-content { display: flex; gap: var(--sp-3); align-items: flex-start; }
 .card-content .card-text { flex: 1; min-width: 0; }

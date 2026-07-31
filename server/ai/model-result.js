@@ -30,7 +30,11 @@ function normalizeModelResult(value, categories) {
     category,
     summary: boundedText(value.summary, 80),
     reason: boundedText(value.reason, 60),
-    tags
+    tags,
+    // 实体与原子事件按原样带出，交给 entities/events 两个模块各自归一。
+    // 这里只负责保证「一定是数组」，让下游不用重复做类型防御。
+    entities: Array.isArray(value.entities) ? value.entities.slice(0, 16) : [],
+    events: Array.isArray(value.events) ? value.events.slice(0, 8) : []
   };
 }
 

@@ -42,8 +42,7 @@ function createElements() {
   return {
     apiKey: new FakeInput(),
     baseUrl: new FakeInput(),
-    prefilterModel: new FakeInput(),
-    scoringModel: new FakeInput(),
+    model: new FakeInput(),
     intervalMinutes: new FakeInput(),
     rsshubBase: new FakeInput(),
     retentionDays: new FakeInput(),
@@ -56,8 +55,7 @@ const loadedSettings = Object.freeze({
   ai: {
     _hasKey: false,
     baseUrl: 'https://loaded.example/v1',
-    prefilterModel: 'loaded-prefilter',
-    scoringModel: 'loaded-scoring'
+    model: 'loaded-model',
   },
   collect: {
     intervalMinutes: 10,
@@ -70,8 +68,7 @@ function settingsWithPrefix(prefix, hasKey = false) {
     ai: {
       _hasKey: hasKey,
       baseUrl: `https://${prefix}.example/v1`,
-      prefilterModel: `${prefix}-prefilter`,
-      scoringModel: `${prefix}-scoring`
+      model: `${prefix}-model`,
     },
     collect: {
       intervalMinutes: prefix === 'newer' ? 90 : 30,
@@ -98,8 +95,7 @@ test('late settings load preserves every user edit and AI save still supplies th
   const loading = controller.load();
   elements.apiKey.fill('sk-user-edit');
   elements.baseUrl.fill('https://user.example/v1');
-  elements.prefilterModel.fill('user-prefilter');
-  elements.scoringModel.fill('user-scoring');
+  elements.model.fill('user-model');
   elements.intervalMinutes.fill('45');
   elements.rsshubBase.fill('https://user-rsshub.example');
 
@@ -108,8 +104,7 @@ test('late settings load preserves every user edit and AI save still supplies th
 
   assert.equal(elements.apiKey.value, 'sk-user-edit');
   assert.equal(elements.baseUrl.value, 'https://user.example/v1');
-  assert.equal(elements.prefilterModel.value, 'user-prefilter');
-  assert.equal(elements.scoringModel.value, 'user-scoring');
+  assert.equal(elements.model.value, 'user-model');
   assert.equal(elements.intervalMinutes.value, '45');
   assert.equal(elements.rsshubBase.value, 'https://user-rsshub.example');
 
@@ -121,8 +116,7 @@ test('late settings load preserves every user edit and AI save still supplies th
         ai: {
           apiKey: 'sk-user-edit',
           baseUrl: 'https://user.example/v1',
-          prefilterModel: 'user-prefilter',
-          scoringModel: 'user-scoring'
+          model: 'user-model',
         }
       }
     }
@@ -150,8 +144,7 @@ test('successful save and explicit clear reset credential state while a later cl
       ai: {
         _hasKey: true,
         baseUrl: 'https://reloaded.example/v1',
-        prefilterModel: 'reloaded-prefilter',
-        scoringModel: 'reloaded-scoring'
+        model: 'reloaded-model',
       },
       collect: {
         intervalMinutes: 60,
@@ -173,8 +166,7 @@ test('successful save and explicit clear reset credential state while a later cl
 
   elements.apiKey.fill('sk-saved');
   elements.baseUrl.fill('https://saved.example/v1');
-  elements.prefilterModel.fill('saved-prefilter');
-  elements.scoringModel.fill('saved-scoring');
+  elements.model.fill('saved-model');
   await controller.saveAi();
 
   assert.equal(elements.apiKey.value, '');
@@ -191,8 +183,7 @@ test('successful save and explicit clear reset credential state while a later cl
   assert.equal(elements.apiKey.value, '');
   assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
   assert.equal(elements.baseUrl.value, 'https://reloaded.example/v1');
-  assert.equal(elements.prefilterModel.value, 'reloaded-prefilter');
-  assert.equal(elements.scoringModel.value, 'reloaded-scoring');
+  assert.equal(elements.model.value, 'reloaded-model');
   assert.equal(elements.intervalMinutes.value, '60');
   assert.equal(elements.rsshubBase.value, 'https://reloaded-rsshub.example');
 });
@@ -269,8 +260,7 @@ test('failed save leaves all unsaved fields dirty across a later settings load',
 
   elements.apiKey.fill('sk-unsaved');
   elements.baseUrl.fill('https://unsaved.example/v1');
-  elements.prefilterModel.fill('unsaved-prefilter');
-  elements.scoringModel.fill('unsaved-scoring');
+  elements.model.fill('unsaved-model');
   elements.intervalMinutes.fill('75');
   elements.rsshubBase.fill('https://unsaved-rsshub.example');
 
@@ -279,8 +269,7 @@ test('failed save leaves all unsaved fields dirty across a later settings load',
 
   assert.equal(elements.apiKey.value, 'sk-unsaved');
   assert.equal(elements.baseUrl.value, 'https://unsaved.example/v1');
-  assert.equal(elements.prefilterModel.value, 'unsaved-prefilter');
-  assert.equal(elements.scoringModel.value, 'unsaved-scoring');
+  assert.equal(elements.model.value, 'unsaved-model');
   assert.equal(elements.intervalMinutes.value, '75');
   assert.equal(elements.rsshubBase.value, 'https://unsaved-rsshub.example');
 });
@@ -304,8 +293,7 @@ test('an older settings load resolving last cannot roll back a newer load', asyn
 
   assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
   assert.equal(elements.baseUrl.value, 'https://newer.example/v1');
-  assert.equal(elements.prefilterModel.value, 'newer-prefilter');
-  assert.equal(elements.scoringModel.value, 'newer-scoring');
+  assert.equal(elements.model.value, 'newer-model');
   assert.equal(elements.intervalMinutes.value, '90');
   assert.equal(elements.rsshubBase.value, 'https://newer-rsshub.example');
 });
@@ -325,8 +313,7 @@ test('successful AI and collect saves mark unchanged submitted fields clean for 
 
   elements.apiKey.fill('sk-synchronized');
   elements.baseUrl.fill('https://saved.example/v1');
-  elements.prefilterModel.fill('saved-prefilter');
-  elements.scoringModel.fill('saved-scoring');
+  elements.model.fill('saved-model');
   elements.intervalMinutes.fill('55');
   elements.rsshubBase.fill('https://saved-rsshub.example');
   await controller.saveAi();
@@ -336,8 +323,7 @@ test('successful AI and collect saves mark unchanged submitted fields clean for 
   assert.equal(elements.apiKey.value, '');
   assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
   assert.equal(elements.baseUrl.value, 'https://reloaded.example/v1');
-  assert.equal(elements.prefilterModel.value, 'reloaded-prefilter');
-  assert.equal(elements.scoringModel.value, 'reloaded-scoring');
+  assert.equal(elements.model.value, 'reloaded-model');
   assert.equal(elements.intervalMinutes.value, '30');
   assert.equal(elements.rsshubBase.value, 'https://reloaded-rsshub.example');
   assert.equal(calls.length, 3);

@@ -117,7 +117,20 @@ function migrate() {
   addCol('breakthrough_bonus', 'REAL NOT NULL DEFAULT 0');
   addCol('breakthrough_signals_json', 'TEXT');
   addCol('scoring_version', 'INTEGER NOT NULL DEFAULT 1');
+  // v0.0.14 结构化管线的落库字段。canonical_url 是去掉跟踪参数后的去重键
+  // （url 仍是跳转用的原始地址）；entities/events 是标注、实体提取与原子事件分离的产物；
+  // event_key 是主事件键，聚类的精确通道直接按它对齐。
+  // clean_version 记录这行是用哪一版清洗规则洗的，抬版本号即可让历史数据被顺带重洗。
+  addCol('canonical_url', 'TEXT');
+  addCol('entities_json', 'TEXT');
+  addCol('topics_json', 'TEXT');
+  addCol('events_json', 'TEXT');
+  addCol('event_key', 'TEXT');
+  addCol('clean_version', 'INTEGER NOT NULL DEFAULT 0');
   db.exec('CREATE INDEX IF NOT EXISTS idx_articles_starred ON articles(starred, starred_at DESC)');
+  // 入库去重每条都要查一次 canonical_url；主事件键则是聚类精确通道的分桶依据
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_canonical ON articles(canonical_url)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_event_key ON articles(event_key)');
   // sources 表补 intl 列（标记国外情报源）
   const srcCols = new Set(db.prepare('PRAGMA table_info(sources)').all().map(c => c.name));
   if (!srcCols.has('intl')) db.exec('ALTER TABLE sources ADD COLUMN intl INTEGER NOT NULL DEFAULT 0');
@@ -133,11 +146,19 @@ migrate();
 function now() { return new Date().toISOString(); }
 
 function insertArticle(a) {
+  // url 上的唯一约束只能挡住「一字不差」的重复。真实世界里同一篇文章会带着不同的
+  // utm/spm/share 参数从多个入口进来，规范化后的 canonical_url 才是可靠的去重键。
+  const canonicalUrl = a.canonicalUrl || null;
+  if (canonicalUrl) {
+    const existing = db.prepare('SELECT id FROM articles WHERE canonical_url = ? LIMIT 1').get(canonicalUrl);
+    if (existing) return false;
+  }
   const stmt = db.prepare(`INSERT OR IGNORE INTO articles
-    (source_id, title, url, summary_raw, published_at, fetched_at, domain, image_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-  const r = stmt.run(a.sourceId, a.title, a.url, a.summaryRaw || null,
-    a.publishedAt || null, now(), a.domain || null, a.image || null);
+    (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
+    a.publishedAt || null, now(), a.domain || null, a.image || null,
+    Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0);
   if (r.changes > 0) {
     db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
       .run(r.lastInsertRowid, a.title, a.summaryRaw || '');

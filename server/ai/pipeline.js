@@ -1,7 +1,17 @@
 'use strict';
-// AI 分析管线 —— 复刻 AIHOT 的两段式架构：
-//   阶段1 预筛（便宜模型，批量）：只判断「是否相关 + 属于哪个领域」，无关的直接落库不再花钱
-//   阶段2 评分（强模型，单条）：只打五个维度分 + 分类 + 一句话摘要 + 标签，不打总分
+// AI 分析管线 —— 复刻 AIHOT 的八段式架构。每天上万条进来，只有两段花钱：
+//   ① 结构化   collectors + ai/normalize：原始条目压成统一形状
+//   ② 数据清洗 ai/normalize：HTML 实体、站点后缀、正文尾巴、跟踪参数（纯代码）
+//   ③ 预筛     词库粗过滤 → 便宜的批量模型调用，只判「是否相关 + 哪个领域」【花钱】
+//   ④ 标注     ai/entities：词库分组即主题
+//   ⑤ 实体提取 ai/entities：词库通道 + 模型通道双路合并、别名归一
+//   ⑥ 原子事件分离 ai/events：一条里的多件事拆成 主体·动作·客体，各自成键
+//   ⑦ 聚类     ai/cluster：bigram 字面通道
+//   ⑧ 语义合并 ai/merge：主事件键 + 锚点实体重叠，补上字面通道并不到的
+// ④⑤⑥ 与打分共用同一次模型调用（同一个 JSON 里多几个字段），请求数不增加——
+// 这是卡兹克「能用脚本就别用模型」的直接推论：模型只负责它独有的语义判断，
+// 归一、去重、计分、分桶、合并全部由代码完成。
+//
 //   最终质量分 = 代码公式（维度权重 × 信源等级系数 + 词库贴合 + 多源印证 − 噪声）
 //   精选与否 = 代码按分类阈值 + 自适应偏移判断
 // 无 API Key 时整条管线降级为词库启发式，应用照常可用
@@ -14,6 +24,9 @@ const calibration = require('./calibration');
 const { computeQuality, isFeatured } = require('./scoring');
 const { normalizeModelResult } = require('./model-result');
 const { analyzeBreakthrough } = require('./breakthrough');
+const normalize = require('./normalize');
+const entities = require('./entities');
+const events = require('./events');
 
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 
@@ -36,7 +49,7 @@ async function prefilterBatch(articles, settings) {
   const out = await chat([
     { role: 'system', content: PREFILTER_SYSTEM },
     { role: 'user', content: lines.join('\n') }
-  ], { settings, model: settings.ai.prefilterModel, maxTokens: 2000 });
+  ], { settings, model: settings.ai.model, maxTokens: 2000 });
   const j = extractJson(out);
   if (!j || !Array.isArray(j.results)) throw new Error('预筛响应解析失败');
   const map = new Map();
@@ -65,8 +78,12 @@ const SCORING_SYSTEM = `你是「摘星阁」情报站的资深分析师，领�
  "category": "${CATEGORIES.join('|')}" 之一,
  "summary": "≤80字的一句话核心摘要，信息密度优先，不要套话",
  "reason": "≤60字情报研判：点明这条为什么值得看 / 接下来要盯什么 / 利好或冲击了谁。要有判断、像行业老兵的批注，禁止复述标题与空话套话",
- "tags": ["2到4个简短标签，如 eVTOL、适航取证、可回收火箭、卫星互联网"]
+ "tags": ["2到4个简短标签，如 eVTOL、适航取证、可回收火箭、卫星互联网"],
+ "entities": [{"n":"具名对象原文","t":"org|product|facility|place|person|policy"}],
+ "events": [{"a":"主体","v":"动作","o":"客体（可空）","w":"时间（可空）"}]
 }
+entities：最多 6 个**具名**对象——公司/机构(org)、型号或产品或星座(product)、发射场或基地或起降场(facility)、地域(place)、人物(person)、政策文件或许可(policy)。写全称，不要写「该公司」「某型号」这类指代，也不要把「低空经济」「商业航天」这种行业名当实体。
+events：原子事件，最多 3 条。**一条资讯里如果讲了多件事，必须拆开**（例：「A 公司完成 B 轮融资，其 X 型号同期首飞」→ 两条）。最重要的那件排第一。主体 a 必填且写全称；动作 v 用简短动词短语（发射入轨、完成首飞、获颁适航证、完成 B 轮融资、签署采购协议…）。没有第二件事就只给一条。
 评分要克制：平庸的日常资讯应在 40-60 区间，只有真正的行业大事才配 80+。营销软文、概念炒作、蹭热点的公司表态给低分。`;
 
 async function scoreArticle(article, settings) {
@@ -77,9 +94,9 @@ async function scoreArticle(article, settings) {
   const out = await chat([
     { role: 'system', content: SCORING_SYSTEM },
     { role: 'user', content: user }
-  ], { settings, model: settings.ai.scoringModel, maxTokens: 600 });
+  ], { settings, model: settings.ai.model, maxTokens: 900 });
   const j = extractJson(out);
-  if (!j || !j.scores) throw new Error('评分响应解析失败');
+  if (!j || !j.scores) throw new Error('研判响应解析失败');
   return j;
 }
 
@@ -117,6 +134,30 @@ function heuristicAnalyze(a) {
   };
 }
 
+// ---------- 阶段 1、2：结构化与清洗（补洗历史数据） ----------
+// 新采集的条目在入库前就洗过了。这里处理两种情况：升级前留在库里的旧数据，
+// 以及清洗规则改版（抬 CLEAN_VERSION）之后需要重洗的数据。
+// 纯代码、幂等，跟着分析循环顺带做，不需要为它单独跑一次全量。
+function refreshCleaning(rows) {
+  const update = db.prepare(`UPDATE articles
+    SET title = ?, summary_raw = ?, canonical_url = ?, clean_version = ? WHERE id = ?`);
+  let cleaned = 0;
+  for (const row of rows) {
+    if (row.clean_version >= normalize.CLEAN_VERSION) continue;
+    const title = normalize.cleanTitle(row.title, { sourceName: row.source_name }) || row.title;
+    const summary = normalize.cleanSummary(row.summary_raw);
+    const canonicalUrl = row.canonical_url || normalize.canonicalizeUrl(row.url) || null;
+    update.run(title, summary || null, canonicalUrl, normalize.CLEAN_VERSION, row.id);
+    row.title = title;
+    row.summary_raw = summary;
+    row.canonical_url = canonicalUrl;
+    row.clean_version = normalize.CLEAN_VERSION;
+    updateArticleFts(row.id, title, summary || '');
+    cleaned++;
+  }
+  return cleaned;
+}
+
 // ---------- 主流程 ----------
 async function analyzePending(onProgress, limit = 200) {
   const settings = loadSettings();
@@ -125,12 +166,15 @@ async function analyzePending(onProgress, limit = 200) {
   const hasKey = !!settings.ai.apiKey;
 
   const pending = db.prepare(`
-    SELECT a.id, a.title, a.summary_raw, a.published_at, a.domain,
+    SELECT a.id, a.title, a.url, a.summary_raw, a.published_at, a.domain,
+           a.canonical_url, a.clean_version,
            s.name AS source_name, s.tier, s.intl
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.analyzed = 0
     ORDER BY a.id DESC LIMIT ?`).all(limit);
   if (!pending.length) return { analyzed: 0, featured: 0 };
+
+  const cleaned = refreshCleaning(pending);
 
   let analyzed = 0, featuredCount = 0;
 
@@ -163,7 +207,7 @@ async function analyzePending(onProgress, limit = 200) {
       analyzed++;
       onProgress && onProgress({ done: analyzed, total: pending.length });
     }
-    return { analyzed, featured: featuredCount, mode: 'heuristic' };
+    return { analyzed, featured: featuredCount, cleaned, mode: 'heuristic' };
   }
 
   // —— 完整模式 ——
@@ -217,7 +261,7 @@ async function analyzePending(onProgress, limit = 200) {
 
   featuredCount = db.prepare(
     `SELECT COUNT(*) c FROM articles WHERE featured=1 AND julianday(fetched_at) > julianday('now','-1 day')`).get().c;
-  return { analyzed, featured: featuredCount, mode: 'full' };
+  return { analyzed, featured: featuredCount, cleaned, mode: 'full' };
 }
 
 function markIrrelevant(id) {
@@ -256,10 +300,30 @@ function breakthroughFor(article, {
   }, breakthroughs);
 }
 
+// 阶段 4、5、6：标注 / 实体提取 / 原子事件分离。
+// 全部基于「模型这一次已经返回的字段」+ 词库，不再额外发请求。
+// 模型没给 events（降级模式，或它自己偷懒）时用代码从标题动作反推一个主事件，
+// 保证聚类的精确通道对每条相关情报都有输入。
+function structureResult(article, result, fullText) {
+  const annotated = entities.analyzeEntities(fullText, result.entities);
+  let atomicEvents = events.normalizeEvents(result.events, { fallbackText: fullText });
+  if (!atomicEvents.length) atomicEvents = events.deriveEvents(fullText, annotated.entities);
+  return {
+    entities: annotated.entities,
+    topics: annotated.topics,
+    events: atomicEvents,
+    eventKey: events.primaryEventKey(atomicEvents)
+  };
+}
+
 function persistResult(a, domain, result, scoring, breakthroughs, analyzedFlag) {
   result = normalizeModelResult(result, CATEGORIES);
   const context = scoringContext({ ...a, ai_summary: result.summary }, { clusterSize: 1 });
   const resolvedDomain = domain || context.lexicon.domain || a.domain || 'lowaltitude';
+  const structured = structureResult(
+    a, result,
+    `${a.title || ''} ${result.summary || ''} ${a.summary_raw || ''}`
+  );
   const quality = computeQuality(result.scores, context, scoring);
   const breakthrough = breakthroughFor(a, {
     domain: resolvedDomain,
@@ -276,14 +340,20 @@ function persistResult(a, domain, result, scoring, breakthroughs, analyzedFlag) 
       relevant=1, analyzed=?, domain=?, category=?, scores_json=?,
       quality_score=?, featured=?, ai_summary=?, ai_reason=?, tags_json=?,
       breakthrough_score=?, breakthrough_bonus=?, breakthrough_signals_json=?,
-      scoring_version=?
+      scoring_version=?, entities_json=?, topics_json=?, events_json=?, event_key=?
     WHERE id=?`).run(
     analyzedFlag, resolvedDomain, result.category,
     JSON.stringify(result.scores), quality, featured,
     result.summary || null, result.reason || null, JSON.stringify(result.tags || []),
     breakthrough.score, breakthrough.bonus, JSON.stringify(breakthrough.signals),
-    breakthrough.version, a.id);
-  updateArticleFts(a.id, a.title, (result.summary || '') + ' ' + (a.summary_raw || ''));
+    breakthrough.version,
+    JSON.stringify(structured.entities), JSON.stringify(structured.topics),
+    JSON.stringify(structured.events), structured.eventKey,
+    a.id);
+  // 实体名一并进 FTS：检索「蓝箭航天」时，标题里只写了「蓝箭」的那条也应该出来
+  const entityText = structured.entities.map(entity => entity.name).join(' ');
+  updateArticleFts(a.id, a.title,
+    `${result.summary || ''} ${a.summary_raw || ''} ${entityText}`.trim());
 }
 
 // ---------- 聚类之后的重算 ----------

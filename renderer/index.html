@@ -219,21 +219,16 @@
         <label class="field"><span>接口地址</span>
           <input id="setBaseUrl" type="text" placeholder="https://api.deepseek.com">
         </label>
-        <div class="field-row">
-          <label class="field"><span>预筛模型（便宜）</span>
-            <input id="setPrefilterModel" type="text" placeholder="deepseek-v4-flash">
-          </label>
-          <label class="field"><span>评分模型（强）</span>
-            <input id="setScoringModel" type="text" placeholder="deepseek-v4-pro">
-          </label>
-        </div>
+        <label class="field"><span>分析模型</span>
+          <input id="setModel" type="text" placeholder="deepseek-v4-flash">
+        </label>
         <div class="btn-row">
           <button class="btn-primary" id="btnSaveAi">保存</button>
           <button class="btn-ghost" id="btnTestAi">测试连接</button>
           <button class="btn-ghost" id="btnClearAiKey" disabled>清除已保存密钥</button>
           <span id="aiTestResult" class="test-result" role="status"></span>
         </div>
-        <p class="hint">两段式管线：便宜模型批量预筛相关性 → 强模型只打五维分 → 最终质量分由本地公式计算（config/scoring.json 可调权重与阈值）。V4 系列已自动关闭思考模式以省钱提速。</p>
+        <p class="hint">全站只调用 <code>deepseek-v4-flash</code>（当前指向 DeepSeek-V4-Flash-0731）：批量预筛相关性 → 同一次调用产出五维分、摘要、研判、实体与原子事件 → 结构化、清洗、聚类、语义合并与最终质量分全部由本地代码完成（config/scoring.json 可调权重与阈值）。已自动关闭思考模式以省钱提速；deepseek-v4-pro 已从本应用移除。</p>
       </div>
       <div class="glass card-pad">
         <h3>采集调度</h3>

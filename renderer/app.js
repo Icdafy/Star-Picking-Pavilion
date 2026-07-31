@@ -364,6 +364,46 @@ function breakthroughPresentation(item) {
   };
 }
 
+// 实体类型 → 中文短标签。只用于 title 提示，不占卡片版面。
+const ENTITY_TYPE_NAMES = {
+  org: '机构', product: '型号', facility: '场站', place: '地域', person: '人物', policy: '政策'
+};
+// 动作类 → 中文。原子事件里模型写的动作原文各式各样，
+// 归类之后才好在卡片上给出一致的措辞。
+const EVENT_CLASS_NAMES = {
+  launch: '发射入轨', recovery: '回收复用', 'flight-test': '试飞验证',
+  certification: '适航取证', funding: '融资', listing: '上市',
+  order: '订单中标', delivery: '交付量产', partnership: '合作签约',
+  policy: '政策发布', facility: '场站基建', research: '研制试验',
+  personnel: '人事组织', incident: '异常与延期'
+};
+
+function entityChipsHtml(item) {
+  const list = Array.isArray(item.entities) ? item.entities.filter(e => e?.name).slice(0, 6) : [];
+  if (!list.length) return '';
+  return `<div class="card-entities" role="group" aria-label="相关实体">${list.map(entity => {
+    const type = ENTITY_TYPE_NAMES[entity.type] || '实体';
+    return `<button class="card-entity" type="button" data-entity="${esc(entity.name)}"
+      title="按${type}检索「${esc(entity.name)}」">${esc(entity.name)}</button>`;
+  }).join('')}</div>`;
+}
+
+// 原子事件只在真的拆出多件事时才展示。单事件的卡片摘要已经说清楚了，
+// 再列一遍只是噪声；而「这条其实讲了两件事」本身就是读者需要知道的信息。
+function atomicEventsHtml(item) {
+  const list = Array.isArray(item.events) ? item.events.filter(e => e?.actor) : [];
+  if (list.length < 2) return '';
+  const rows = list.map(event => {
+    const action = EVENT_CLASS_NAMES[event.actionClass] || event.action || '相关动作';
+    const object = event.object ? ` · ${esc(event.object)}` : '';
+    return `<li><b>${esc(event.actor)}</b><span>${esc(action)}</span>${object}</li>`;
+  }).join('');
+  return `<div class="card-events" role="note">
+      <span class="ce-label">原子事件 ${list.length}</span>
+      <ol class="ce-list">${rows}</ol>
+    </div>`;
+}
+
 function cardInner(item) {
   const dims = item.scores ? Object.entries(DIM_NAMES).map(([k, name]) => `
     <div class="dim">
@@ -431,9 +471,11 @@ function cardInner(item) {
       <div class="card-text">
         ${item.summary ? `<p class="card-summary">${esc(item.summary)}</p>` : ''}
         ${item.tags?.length ? `<div class="card-tags">${item.tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+        ${entityChipsHtml(item)}
       </div>
       ${thumb}
     </div>
+    ${atomicEventsHtml(item)}
     ${reason}
     ${foot}
     ${analysisDetails ? `<div class="dims">${analysisDetails}</div>` : ''}`;
@@ -652,6 +694,13 @@ $('#feedList').addEventListener('click', async e => {
     toast(copied ? '已复制标题与链接' : '复制失败，请手动选择文本', !copied);
     return;
   }
+  // 实体标签即检索入口：看到「蓝箭航天」就想知道它最近还有什么动静，
+  // 这一步不该再让人回到搜索框里手打一遍
+  const entityBtn = e.target.closest('.card-entity');
+  if (entityBtn) {
+    runTermSearch(entityBtn.dataset.entity);
+    return;
+  }
   const dimsBtn = e.target.closest('.dims-toggle');
   if (dimsBtn) {
     const card = dimsBtn.closest('.card');
@@ -862,8 +911,7 @@ const settingsForm = SettingsFormController.createSettingsFormController({
   elements: {
     apiKey: $('#setApiKey'),
     baseUrl: $('#setBaseUrl'),
-    prefilterModel: $('#setPrefilterModel'),
-    scoringModel: $('#setScoringModel'),
+    model: $('#setModel'),
     intervalMinutes: $('#setInterval'),
     rsshubBase: $('#setRsshub'),
     retentionDays: $('#setRetentionDays'),
@@ -1456,17 +1504,24 @@ $('.lexicon-scopes').addEventListener('click', event => {
 // 选词即检索。固定落到「全部动态」，不管当前在哪个视图：
 // 面板上的条数是按全部动态的口径算的，若停在「精选」里检索，
 // 面板写 45、结果只有 1 条，这个数字立刻就不可信了。
+// 「点一个词就检索它」的唯一实现：词库面板与卡片上的实体标签共用。
+// 两处若各写一份，防抖计时器和视图切换的处理迟早会漂开。
+function runTermSearch(term) {
+  const query = String(term || '').trim();
+  if (!query) return;
+  clearTimeout(searchTimer);
+  searchInput.value = query;
+  state.q = query;
+  syncSearchBox();
+  if (state.view === 'all') loadFeed();
+  else switchView('all', { persist: false });
+}
+
 $('#lexiconBody').addEventListener('click', event => {
   const button = event.target.closest('button[data-lex-term]');
   if (!button) return;
-  const term = button.dataset.lexQuery || button.dataset.lexTerm;
-  clearTimeout(searchTimer);
-  searchInput.value = term;
-  state.q = term;
-  syncSearchBox();
   setLexiconOpen(false);
-  if (state.view === 'all') loadFeed();
-  else switchView('all', { persist: false });
+  runTermSearch(button.dataset.lexQuery || button.dataset.lexTerm);
 });
 
 // 点面板之外或按 Esc 收起：面板浮在顶栏下方，不该赖着不走

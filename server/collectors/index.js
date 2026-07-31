@@ -7,6 +7,7 @@ const { db, now, insertArticle } = require('../db');
 const { loadSettings } = require('../config');
 const { collectionIntervalMs } = require('../schedule-policy');
 const { isDue, nextFetchAtIso } = require('../source-health');
+const { structureItem } = require('../ai/normalize');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
@@ -104,16 +105,14 @@ async function collectSource(source, settings) {
   for (const it of items) {
     if (!it.title || !it.url) continue;
     if (it.publishedAt && new Date(it.publishedAt).getTime() < cutoff) continue;
-    const ok = insertArticle({
-      sourceId: source.id,
-      title: it.title.trim().slice(0, 300),
-      url: it.url,
-      summaryRaw: (it.summary || '').trim().slice(0, 2000),
-      publishedAt: it.publishedAt || null,
-      image: it.image || null,
+    // 结构化 + 清洗放在入库之前：脏标题一旦落库，后面的预筛、聚类和去重
+    // 全都要带着它算，而清洗本身是纯代码，越早做越省事。
+    const structured = structureItem(it, {
+      sourceName: source.name,
       domain: source.domain === 'both' ? null : source.domain
     });
-    if (ok) added++;
+    if (!structured) continue;
+    if (insertArticle({ sourceId: source.id, ...structured })) added++;
   }
   return { fetched: items.length, added };
 }

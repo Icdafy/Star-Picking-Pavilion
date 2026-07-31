@@ -120,6 +120,12 @@ function articleRow(r, scoring, nowMs) {
       value => value && typeof value === 'object' && !Array.isArray(value)
     ),
     scoringVersion: Number(r.scoring_version) || 1,
+    // 结构化管线的产物：实体（标注/实体提取）与原子事件（事件分离）。
+    // 老数据这几列是 NULL，解析后是空数组，前端按「没有就不渲染」处理。
+    entities: parseOptionalJson(r.entities_json, [], Array.isArray),
+    topics: parseOptionalJson(r.topics_json, [], Array.isArray),
+    events: parseOptionalJson(r.events_json, [], Array.isArray),
+    eventKey: r.event_key || null,
     starred: !!r.starred,
     starredAt: safeDate(r.starred_at),
     analyzed: r.analyzed

@@ -33,7 +33,7 @@ async function chat(messages, {
       max_tokens: maxTokens,
       response_format: { type: 'json_object' },
       // DeepSeek V4 系列默认开启思考模式，会把 token 花在 reasoning_content 上；
-      // 本系统的任务（预筛/五维打分）不需要长思考，显式关闭以省钱提速
+      // 本系统的任务（预筛/结构化研判）不需要长思考，显式关闭以省钱提速
       thinking: { type: 'disabled' }
     };
     let res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
@@ -85,7 +85,7 @@ function extractJson(text) {
 async function testConnection(settings) {
   const out = await chat(
     [{ role: 'user', content: '请只回复 JSON：{"ok":true}' }],
-    { settings, model: settings.ai.prefilterModel, maxTokens: 100 }
+    { settings, model: settings.ai.model, maxTokens: 100 }
   );
   const j = extractJson(out);
   if (!j || j.ok !== true) throw new Error('响应异常: ' + String(out).slice(0, 100));

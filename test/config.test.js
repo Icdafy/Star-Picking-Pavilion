@@ -94,7 +94,18 @@ test('editable settings reject invalid numeric, URL, and model values', () => {
   assert.throws(() => applySettingsPatch(current, { collect: { intervalMinutes: 0 } }), /采集间隔/);
   assert.throws(() => applySettingsPatch(current, { collect: { intervalMinutes: 'ten' } }), /采集间隔/);
   assert.throws(() => applySettingsPatch(current, { collect: { rsshubBase: 'file:///secret' } }), /RSSHub/);
-  assert.throws(() => applySettingsPatch(current, { ai: { scoringModel: '' } }), /模型/);
+  assert.throws(() => applySettingsPatch(current, { ai: { model: '' } }), /模型/);
+  // 两段式模型是 v0.0.14 之前的形态，字段本身已经不再受理
+  assert.throws(() => applySettingsPatch(current, { ai: { scoringModel: 'x' } }), /设置字段/);
+  // v4-pro 已从本应用移除：设置层直接挡住，避免有人把它填回去
+  assert.throws(
+    () => applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }),
+    /已从本应用移除/
+  );
+  assert.equal(
+    applySettingsPatch(current, { ai: { model: ' deepseek-v4-flash ' } }).settings.ai.model,
+    'deepseek-v4-flash'
+  );
 
   const valid = applySettingsPatch(current, {
     collect: { intervalMinutes: 30, rsshubBase: 'https://rsshub.example/' }
@@ -108,7 +119,7 @@ test('loading a malformed legacy settings file normalizes scheduler and request 
     "__proto__": { "polluted": true },
     "unknown": "discard me",
     "dailyReportHour": 99,
-    "ai": { "requestTimeoutMs": -1, "maxBatchPrefilter": 500, "prefilterModel": "" },
+    "ai": { "requestTimeoutMs": -1, "maxBatchPrefilter": 500, "prefilterModel": "", "scoringModel": "deepseek-v4-pro" },
     "collect": {
       "intervalMinutes": 9999,
       "analyzeIntervalSeconds": 0,
@@ -123,7 +134,11 @@ test('loading a malformed legacy settings file normalizes scheduler and request 
   assert.equal(loaded.dailyReportHour, 8);
   assert.equal(loaded.ai.requestTimeoutMs, 60000);
   assert.equal(loaded.ai.maxBatchPrefilter, 20);
-  assert.equal(loaded.ai.prefilterModel, 'deepseek-v4-flash');
+  // 旧库的两段式模型字段被收敛：prefilterModel 是空串、scoringModel 是已退役的 v4-pro，
+  // 两个都不可用，于是回落到默认模型而不是把 pro 带进新版本
+  assert.equal(loaded.ai.model, 'deepseek-v4-flash');
+  assert.equal(Object.hasOwn(loaded.ai, 'prefilterModel'), false);
+  assert.equal(Object.hasOwn(loaded.ai, 'scoringModel'), false);
   assert.equal(loaded.collect.intervalMinutes, 10);
   assert.equal(loaded.collect.analyzeIntervalSeconds, 75);
   assert.equal(loaded.collect.keepDays, 30);

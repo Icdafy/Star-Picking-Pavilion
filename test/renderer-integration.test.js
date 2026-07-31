@@ -637,6 +637,32 @@ test('technical breakthrough heat boosts are visible and explained with sanitize
   assert.ok(css.includes('.breakthrough-explanation'), '缺少技术突破说明样式');
 });
 
+test('v0.0.14 卡片呈现实体标签与原子事件，实体点击即检索', () => {
+  assert.match(app, /class="card-entities"/);
+  assert.match(app, /class="card-entity"[^]*?data-entity="\$\{esc\(entity\.name\)\}"/);
+  assert.match(app, /class="card-events"/);
+  assert.match(app, /原子事件 \$\{list\.length\}/);
+  // 原子事件只在真的拆出多件事时展示，单事件卡片不加这一块噪声
+  assert.match(app, /if \(list\.length < 2\) return '';/);
+  // 词库面板与实体标签共用同一条检索路径，两处不会各写一份
+  assert.match(app, /function runTermSearch\(term\)/);
+  assert.match(app, /const entityBtn = e\.target\.closest\('\.card-entity'\);/);
+  assert.match(app, /runTermSearch\(entityBtn\.dataset\.entity\)/);
+  assert.ok(css.includes('.card-entity'), '缺少实体标签样式');
+  assert.ok(css.includes('.card-events'), '缺少原子事件样式');
+});
+
+test('v0.0.14 设置页只暴露单一分析模型字段', () => {
+  assert.match(html, /id="setModel"[^>]*placeholder="deepseek-v4-flash"/);
+  assert.doesNotMatch(html, /setPrefilterModel|setScoringModel/);
+  // v4-pro 只能作为「已移除」的说明出现，不能再是任何输入框的候选值
+  assert.doesNotMatch(html, /(?:placeholder|value)="[^"]*deepseek-v4-pro/);
+  assert.match(html, /deepseek-v4-pro 已从本应用移除/);
+  assert.match(html, /DeepSeek-V4-Flash-0731/);
+  assert.match(app, /model: \$\('#setModel'\)/);
+  assert.doesNotMatch(app, /prefilterModel|scoringModel/);
+});
+
 test('星标作为一等信息流视图接入导航、筛选与实时轮询', () => {
   assert.match(html, /data-view="starred"[^>]*aria-controls="viewFeed"/);
   assert.match(html, /id="tabStarredCount"/);
