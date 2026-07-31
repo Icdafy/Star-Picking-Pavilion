@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { performance } = require('node:perf_hooks');
 
 const ARCHIVE_DIRECTORY_NAME = '摘星阁新闻简报';
 const MARKDOWN_FILE_NAME = '新闻简报.md';
@@ -17,6 +18,7 @@ const DEFAULT_DAILY_ARCHIVE_STATE = Object.freeze({
   rootDirectory: '',
   enabledAt: null,
   lastSuccessfulDate: null,
+  lastIntegrityCheckDate: null,
   lastAttemptAt: null,
   lastErrorCode: null,
   lastErrorAt: null
@@ -167,6 +169,12 @@ function normalizeStoredState(raw) {
   if (raw.lastSuccessfulDate !== null && !parseLocalDate(raw.lastSuccessfulDate)) {
     return cloneState();
   }
+  const lastIntegrityCheckDate = raw.lastIntegrityCheckDate == null
+    ? null
+    : raw.lastIntegrityCheckDate;
+  if (lastIntegrityCheckDate !== null && !parseLocalDate(lastIntegrityCheckDate)) {
+    return cloneState();
+  }
   if (raw.lastAttemptAt !== null && !isIsoTimestamp(raw.lastAttemptAt)) return cloneState();
   if (raw.lastErrorCode !== null && typeof raw.lastErrorCode !== 'string') return cloneState();
   if (raw.lastErrorAt !== null && !isIsoTimestamp(raw.lastErrorAt)) return cloneState();
@@ -178,6 +186,7 @@ function normalizeStoredState(raw) {
     rootDirectory: raw.rootDirectory,
     enabledAt: raw.enabledAt,
     lastSuccessfulDate: raw.lastSuccessfulDate,
+    lastIntegrityCheckDate,
     lastAttemptAt: raw.lastAttemptAt,
     lastErrorCode: raw.lastErrorCode,
     lastErrorAt: raw.lastErrorAt
@@ -209,6 +218,7 @@ function createDailyArchiveService({
   setTimer = setTimeout,
   clearTimer = clearTimeout,
   getTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'local',
+  monotonicNow = () => performance.now(),
   fileSystem = fs.promises,
   randomBytes = crypto.randomBytes
 } = {}) {
@@ -220,6 +230,7 @@ function createDailyArchiveService({
   if (typeof setTimer !== 'function') throw new TypeError('setTimer must be a function');
   if (typeof clearTimer !== 'function') throw new TypeError('clearTimer must be a function');
   if (typeof getTimeZone !== 'function') throw new TypeError('getTimeZone must be a function');
+  if (typeof monotonicNow !== 'function') throw new TypeError('monotonicNow must be a function');
   if (!fileSystem || typeof fileSystem !== 'object') {
     throw new TypeError('fileSystem must provide promise-based filesystem methods');
   }
@@ -231,9 +242,11 @@ function createDailyArchiveService({
   let started = false;
   let timer = null;
   let scheduledAt = null;
-  let scheduledDelayMs = null;
+  let scheduledWallClockMs = null;
+  let scheduledMonotonicMs = null;
   let scheduledTimeZone = null;
   let scheduledOffsetMinutes = null;
+  let scheduleRefreshInFlight = null;
   let runningDate = null;
   let lastResult = null;
   let writeQueue = Promise.resolve();
@@ -244,6 +257,12 @@ function createDailyArchiveService({
     const value = now();
     assertValidDate(value, 'now');
     return new Date(value.getTime());
+  }
+
+  function monotonicClock() {
+    const value = Number(monotonicNow());
+    if (!Number.isFinite(value)) throw new TypeError('monotonicNow must return a finite number');
+    return value;
   }
 
   function randomToken() {
@@ -535,7 +554,12 @@ function createDailyArchiveService({
   }
 
   async function markSuccess(date, result) {
-    if (shouldAdvanceSuccess(date)) state.lastSuccessfulDate = date;
+    if (
+      (!state.lastSuccessfulDate || date > state.lastSuccessfulDate)
+      && shouldAdvanceSuccess(date)
+    ) {
+      state.lastSuccessfulDate = date;
+    }
     state.lastErrorCode = null;
     state.lastErrorAt = null;
     lastResult = result;
@@ -627,7 +651,8 @@ function createDailyArchiveService({
     if (timer !== null) clearTimer(timer);
     timer = null;
     scheduledAt = null;
-    scheduledDelayMs = null;
+    scheduledWallClockMs = null;
+    scheduledMonotonicMs = null;
     scheduledTimeZone = null;
     scheduledOffsetMinutes = null;
   }
@@ -639,7 +664,8 @@ function createDailyArchiveService({
     const target = nextRunAt(current);
     const delay = Math.max(0, target.getTime() - current.getTime());
     scheduledAt = target.toISOString();
-    scheduledDelayMs = delay;
+    scheduledWallClockMs = current.getTime();
+    scheduledMonotonicMs = monotonicClock();
     scheduledTimeZone = String(getTimeZone() || 'local');
     scheduledOffsetMinutes = current.getTimezoneOffset();
     timer = setTimer(async () => {
@@ -655,20 +681,44 @@ function createDailyArchiveService({
     }, delay);
   }
 
-  function refreshSchedule() {
+  async function performScheduleRefresh() {
     if (!started || !state.enabled) return false;
     const current = clock();
     const target = nextRunAt(current);
-    const delay = Math.max(0, target.getTime() - current.getTime());
     const timeZone = String(getTimeZone() || 'local');
     const offsetMinutes = current.getTimezoneOffset();
+    const currentMonotonic = monotonicClock();
+    const expectedWallClock = (
+      Number.isFinite(scheduledWallClockMs)
+      && Number.isFinite(scheduledMonotonicMs)
+    )
+      ? scheduledWallClockMs + Math.max(0, currentMonotonic - scheduledMonotonicMs)
+      : null;
+    const wallClockDrift = expectedWallClock == null
+      ? Number.POSITIVE_INFINITY
+      : Math.abs(current.getTime() - expectedWallClock);
     const unchanged = scheduledAt === target.toISOString()
       && scheduledTimeZone === timeZone
       && scheduledOffsetMinutes === offsetMinutes
-      && Math.abs((scheduledDelayMs ?? delay) - delay) < 5_000;
+      && wallClockDrift < 5_000;
     if (unchanged) return false;
-    scheduleNext();
+    clearSchedule();
+    try {
+      await retry();
+    } finally {
+      scheduleNext();
+    }
     return true;
+  }
+
+  function refreshSchedule() {
+    if (scheduleRefreshInFlight) return scheduleRefreshInFlight;
+    const operation = performScheduleRefresh();
+    scheduleRefreshInFlight = operation;
+    operation.finally(() => {
+      if (scheduleRefreshInFlight === operation) scheduleRefreshInFlight = null;
+    }).catch(() => {});
+    return operation;
   }
 
   function getSnapshot() {
@@ -689,7 +739,7 @@ function createDailyArchiveService({
     started = true;
     if (state.enabled) {
       scheduleNext();
-      const catchUp = retry({ verifyLastSuccess: true });
+      const catchUp = retry({ verifyHistorical: true });
       if (backgroundCatchUp) {
         catchUp.catch(() => {
           // Failure is retained in state and can be retried from the visible UI.
@@ -720,6 +770,7 @@ function createDailyArchiveService({
       rootDirectory: physicalRoot,
       enabledAt: sameRoot && state.enabledAt ? state.enabledAt : clock().toISOString(),
       lastSuccessfulDate: sameRoot ? state.lastSuccessfulDate : null,
+      lastIntegrityCheckDate: sameRoot ? state.lastIntegrityCheckDate : null,
       lastAttemptAt: sameRoot ? state.lastAttemptAt : null,
       lastErrorCode: null,
       lastErrorAt: null
@@ -749,18 +800,29 @@ function createDailyArchiveService({
     return archiveDate(mostRecentDueDate(clock()));
   }
 
-  async function retry({ verifyLastSuccess = false } = {}) {
+  function nextIntegrityAuditDate() {
+    if (!state.lastSuccessfulDate) return null;
+    const firstDate = firstDueDateForEnabledAt(state.enabledAt);
+    if (!firstDate || firstDate > state.lastSuccessfulDate) return null;
+    const cursor = state.lastIntegrityCheckDate;
+    if (cursor && cursor >= firstDate && cursor < state.lastSuccessfulDate) {
+      return addLocalDays(cursor, 1);
+    }
+    return firstDate;
+  }
+
+  async function retry({ verifyHistorical = false } = {}) {
     await load();
     if (!state.enabled) return [];
     const results = [];
     const dueDates = enumerateDueDates(state, clock());
-    if (
-      verifyLastSuccess
-      && state.lastSuccessfulDate
-      && !dueDates.includes(state.lastSuccessfulDate)
-      && state.lastSuccessfulDate <= mostRecentDueDate(clock())
-    ) {
-      results.push(await archiveDate(state.lastSuccessfulDate));
+    if (verifyHistorical) {
+      const auditDate = nextIntegrityAuditDate();
+      if (auditDate && !dueDates.includes(auditDate)) {
+        results.push(await archiveDate(auditDate));
+        state.lastIntegrityCheckDate = auditDate;
+        await persist();
+      }
     }
     for (const date of dueDates) {
       results.push(await archiveDate(date));
@@ -773,7 +835,7 @@ function createDailyArchiveService({
     clearSchedule();
     if (state.enabled) {
       try {
-        await retry({ verifyLastSuccess: true });
+        await retry({ verifyHistorical: true });
       } catch {
         // Preserve the failure and keep the next scheduled retry.
       }

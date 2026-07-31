@@ -241,6 +241,31 @@ test('manual save disables only its own control while pending', async () => {
   assert.match(fixture.elements.status.textContent, /2026-07-31.*已保存/);
 });
 
+test('safe IPC archive errors remain specific while uncontrolled details stay hidden', async () => {
+  const snapshot = {
+    ...DEFAULT_SNAPSHOT,
+    enabled: true,
+    rootDirectory: 'D:\\Research'
+  };
+  const fixture = createFixture(snapshot, {
+    save: async () => {
+      throw new Error(
+        "Error invoking remote method 'daily-archive:save-current': "
+        + '新闻简报保存失败，请检查磁盘空间和目录权限。'
+      );
+    }
+  });
+  await fixture.controller.load();
+
+  await assert.rejects(fixture.controller.saveCurrent(), /磁盘空间和目录权限/);
+
+  assert.equal(
+    fixture.elements.status.textContent,
+    '新闻简报保存失败，请检查磁盘空间和目录权限。'
+  );
+  assert.doesNotMatch(fixture.elements.status.textContent, /remote method/);
+});
+
 test('retry disables only its own control and reports the completed catch-up count', async () => {
   const snapshot = {
     ...DEFAULT_SNAPSHOT,

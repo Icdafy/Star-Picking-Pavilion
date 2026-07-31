@@ -236,11 +236,9 @@ function unregisterDailyArchivePowerEvents() {
 function startDailyArchiveClockWatchdog() {
   if (dailyArchiveClockTimer) return;
   dailyArchiveClockTimer = setInterval(() => {
-    try {
-      dailyArchive?.refreshSchedule();
-    } catch (error) {
+    dailyArchive?.refreshSchedule().catch(error => {
       console.warn('[每日简报] 校准本地时钟失败:', error.message);
-    }
+    });
   }, 60_000);
   dailyArchiveClockTimer.unref?.();
 }

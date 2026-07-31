@@ -24,6 +24,17 @@
     'retryDailyArchives'
   ]);
   const STATUS_CLASS = 'test-result daily-archive-live';
+  const PUBLIC_ERROR_MESSAGES = Object.freeze([
+    '所选位置不是可用的普通文件夹，请重新选择。',
+    '所选位置当前不可用或不可写，请检查磁盘后重试。',
+    '请先选择每日新闻简报的保存位置。',
+    '新闻简报暂时无法生成，请稍后重试。',
+    '新闻简报数据校验失败，请稍后重试。',
+    '新闻简报保存失败，请检查磁盘空间和目录权限。',
+    '补存目录创建失败，请稍后重试。',
+    '新闻简报归档操作失败，请稍后重试。',
+    '新闻简报归档服务尚未就绪，请稍后重试。'
+  ]);
   const DEFAULT_SNAPSHOT = Object.freeze({
     schemaVersion: 1,
     enabled: false,
@@ -76,6 +87,11 @@
         ? { ...source.lastResult }
         : null
     };
+  }
+
+  function publicFailureMessage(error, fallback) {
+    const raw = typeof error?.message === 'string' ? error.message : '';
+    return PUBLIC_ERROR_MESSAGES.find(message => raw.includes(message)) || fallback;
   }
 
   function createDailyArchiveController({
@@ -236,7 +252,10 @@
         try {
           return await chooseInsideQueue();
         } catch (error) {
-          await restoreAfterFailure('保存位置设置失败，请重试。');
+          await restoreAfterFailure(publicFailureMessage(
+            error,
+            '保存位置设置失败，请重试。'
+          ));
           throw error;
         }
       });
@@ -251,7 +270,10 @@
           try {
             return await chooseInsideQueue();
           } catch (error) {
-            await restoreAfterFailure('自动归档设置保存失败，请重试。');
+            await restoreAfterFailure(publicFailureMessage(
+              error,
+              '自动归档设置保存失败，请重试。'
+            ));
             throw error;
           }
         }
@@ -266,7 +288,10 @@
           );
           return snapshot;
         } catch (error) {
-          await restoreAfterFailure('自动归档设置保存失败，请重试。');
+          await restoreAfterFailure(publicFailureMessage(
+            error,
+            '自动归档设置保存失败，请重试。'
+          ));
           throw error;
         }
       });
@@ -287,7 +312,10 @@
           );
           return response;
         } catch (error) {
-          await restoreAfterFailure('新闻简报保存失败，请检查保存位置后重试。');
+          await restoreAfterFailure(publicFailureMessage(
+            error,
+            '新闻简报保存失败，请检查保存位置后重试。'
+          ));
           throw error;
         }
       });
@@ -305,7 +333,10 @@
           );
           return response;
         } catch (error) {
-          await restoreAfterFailure('补存失败，请检查保存位置后重试。');
+          await restoreAfterFailure(publicFailureMessage(
+            error,
+            '补存失败，请检查保存位置后重试。'
+          ));
           throw error;
         }
       });

@@ -370,16 +370,24 @@ test('a verified conflict archive is reused instead of creating repeated recover
   assert.equal(requests, 1);
 });
 
-test('startup verifies and repairs only the most recent successful archive', async t => {
+test('startup rotates a one-day integrity audit across older successful archives', async t => {
   const userDataPath = await makeDirectory(t);
   const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
-  await fs.promises.writeFile(stateFile(userDataPath), `${JSON.stringify({
-    ...DEFAULT_DAILY_ARCHIVE_STATE,
-    enabled: true,
-    rootDirectory,
-    enabledAt: new Date(2026, 6, 29, 7, 0, 0).toISOString(),
-    lastSuccessfulDate: '2026-07-31'
-  })}\n`);
+  let current = new Date(2026, 6, 30, 7, 0, 0);
+  const seed = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => sampleBundle(date),
+    now: () => current
+  });
+  await seed.enable(rootDirectory);
+  current = new Date(2026, 6, 31, 10, 0, 0);
+  await seed.retry();
+  seed.stop();
+  await fs.promises.writeFile(
+    path.join(archiveDirectory(rootDirectory, '2026-07-30'), '新闻简报.md'),
+    'tampered historical archive'
+  );
+
   const requests = [];
   const service = createDailyArchiveService({
     userDataPath,
@@ -387,18 +395,36 @@ test('startup verifies and repairs only the most recent successful archive', asy
       requests.push(date);
       return sampleBundle(date);
     },
-    now: () => new Date(2026, 6, 31, 10, 0, 0)
+    now: () => current
   });
 
   const snapshot = await service.start();
   service.stop();
 
-  assert.deepEqual(requests, ['2026-07-31']);
+  assert.deepEqual(requests, ['2026-07-30']);
   assert.equal(snapshot.lastSuccessfulDate, '2026-07-31');
+  assert.equal(snapshot.lastIntegrityCheckDate, '2026-07-30');
   await fs.promises.access(path.join(
-    archiveDirectory(rootDirectory, '2026-07-31'),
+    path.dirname(archiveDirectory(rootDirectory, '2026-07-30')),
+    path.basename(archiveDirectory(rootDirectory, '2026-07-30')) + '-补存-100000',
     'manifest.json'
   ));
+
+  requests.length = 0;
+  const next = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => {
+      requests.push(date);
+      return sampleBundle(date);
+    },
+    now: () => current
+  });
+  const nextSnapshot = await next.start();
+  next.stop();
+
+  assert.deepEqual(requests, []);
+  assert.equal(nextSnapshot.lastSuccessfulDate, '2026-07-31');
+  assert.equal(nextSnapshot.lastIntegrityCheckDate, '2026-07-31');
 });
 
 test('catch-up requests every missed date in order and advances success one date at a time', async t => {
@@ -586,18 +612,24 @@ test('enabled service schedules exactly the next local 08:00 and reschedules aft
   assert.deepEqual(cleared, [1, 2]);
 });
 
-test('schedule refresh detects wall-clock or timezone changes without running catch-up', async t => {
+test('schedule refresh ignores normal passage and catches up after a clock jump over 08:00', async t => {
   const userDataPath = await makeDirectory(t);
   const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
   const delays = [];
   const cleared = [];
   let timerId = 0;
   let current = new Date(2026, 6, 31, 7, 0, 0);
+  let monotonic = 1_000;
   let timeZone = 'Asia/Shanghai';
+  const requests = [];
   const service = createDailyArchiveService({
     userDataPath,
-    requestBundle: async date => sampleBundle(date),
+    requestBundle: async date => {
+      requests.push(date);
+      return sampleBundle(date);
+    },
     now: () => current,
+    monotonicNow: () => monotonic,
     getTimeZone: () => timeZone,
     setTimer: (_callback, delay) => {
       delays.push(delay);
@@ -610,17 +642,24 @@ test('schedule refresh detects wall-clock or timezone changes without running ca
   await service.start();
   assert.deepEqual(delays, [3_600_000]);
 
-  assert.equal(service.refreshSchedule(), false);
+  assert.equal(await service.refreshSchedule(), false);
   assert.deepEqual(delays, [3_600_000]);
 
   current = new Date(2026, 6, 31, 7, 30, 0);
-  assert.equal(service.refreshSchedule(), true);
+  monotonic += 30 * 60 * 1_000;
+  assert.equal(await service.refreshSchedule(), false);
+  assert.deepEqual(cleared, []);
+  assert.deepEqual(delays, [3_600_000]);
+
+  current = new Date(2026, 6, 31, 9, 0, 0);
+  assert.equal(await service.refreshSchedule(), true);
   assert.deepEqual(cleared, [1]);
-  assert.deepEqual(delays, [3_600_000, 1_800_000]);
+  assert.deepEqual(delays, [3_600_000, 23 * 3_600_000]);
+  assert.deepEqual(requests, ['2026-07-31']);
 
   timeZone = 'Asia/Tokyo';
-  assert.equal(service.refreshSchedule(), true);
+  assert.equal(await service.refreshSchedule(), true);
   assert.deepEqual(cleared, [1, 2]);
-  assert.deepEqual(delays, [3_600_000, 1_800_000, 1_800_000]);
+  assert.deepEqual(delays, [3_600_000, 23 * 3_600_000, 23 * 3_600_000]);
   service.stop();
 });
