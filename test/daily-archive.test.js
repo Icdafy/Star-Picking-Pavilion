@@ -241,7 +241,7 @@ test('saveCurrent writes a complete date directory and a verifiable manifest', a
   await service.enable(rootDirectory);
 
   const result = await service.saveCurrent();
-  const destination = archiveDirectory(rootDirectory, '2026-07-31');
+  const destination = archiveDirectory(await fs.promises.realpath(rootDirectory), '2026-07-31');
   const markdown = await fs.promises.readFile(path.join(destination, '新闻简报.md'), 'utf8');
   const jsonl = await fs.promises.readFile(path.join(destination, 'news.jsonl'), 'utf8');
   const manifest = JSON.parse(
