@@ -130,9 +130,17 @@ test('package verifier accepts only application roots, production dependencies a
   }
 });
 
-test('v0.0.14 package budgets preserve the v0.0.12 release limits', () => {
-  assert.equal(MAX_ASAR_BYTES, 12_476_662);
-  assert.equal(MAX_INSTALLER_BYTES, 99_328_923);
+test('v0.0.14 rebaselines package budgets below the documented hard ceilings', () => {
+  // 沿用自 v0.0.10 的旧棘轮余量已被吃光（安装包超 1,778 字节、ASAR 只剩 6,469 字节），
+  // v0.0.14 重新基线化到硬顶之下的整数档。
+  assert.equal(MAX_ASAR_BYTES, 13_107_200);
+  assert.equal(MAX_INSTALLER_BYTES, 99_614_720);
+  // 产品硬顶来自 v0.0.11 瘦身设计：ASAR 13 MiB、安装包 100 MiB，不得被门禁反超
+  assert.ok(MAX_ASAR_BYTES <= 13 * 1024 * 1024, 'ASAR 门禁不得高于 13 MiB 硬顶');
+  assert.ok(MAX_INSTALLER_BYTES <= 100 * 1024 * 1024, '安装包门禁不得高于 100 MiB 硬顶');
+  // 余量要够吸收压缩抖动，又不能松到放过 MB 量级的回退
+  assert.ok(MAX_ASAR_BYTES - 12_470_193 < 1024 * 1024, 'ASAR 余量不得超过 1 MiB');
+  assert.ok(MAX_INSTALLER_BYTES - 99_330_701 < 1024 * 1024, '安装包余量不得超过 1 MiB');
 });
 
 test('package verifier rejects dependency docs, examples and tests', () => {

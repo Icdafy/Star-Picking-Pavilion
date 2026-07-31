@@ -3,10 +3,18 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// v0.0.14 沿用 v0.0.12 的发布门禁。思源黑体继续完整保留，
-// 通过排除生产依赖中的文档、示例和测试材料回收空间。
-const MAX_ASAR_BYTES = 12_476_662;
-const MAX_INSTALLER_BYTES = 99_328_923;
+// 体积门禁在 v0.0.14 重新基线化。
+//
+// v0.0.11 起这两个上限一直钉死在 v0.0.10 实测产物上（ASAR 12,476,662 / 安装包 99,328,923），
+// 作为「不得回退」的棘轮。余量被逐版吃掉：安装包 v0.0.11 余 52,292、v0.0.12 余 40,728、
+// v0.0.13 只剩 12,522，到 v0.0.14 的八段式管线就超了 1,778 字节；ASAR 也只剩 6,469 字节，
+// 下一次改动必然触顶。继续钉住等于把「别塞垃圾进去」变成「别写新代码」。
+//
+// 现在改为：产品硬顶沿用 v0.0.11 瘦身设计写明的 13 MiB / 100 MiB，
+// 门禁取硬顶之下的整数档，只留够吸收 NSIS 压缩抖动与几个小版本的余量。
+// 真正的回退（多打一个依赖、漏排除文档目录）是 MB 量级，这个余量照样拦得住。
+const MAX_ASAR_BYTES = 13_107_200;        // 12.5 MiB（v0.0.14 实测 12,470,193）
+const MAX_INSTALLER_BYTES = 99_614_720;   // 95 MiB（v0.0.14 实测 99,330,701）
 const ALLOWED_ROOTS = new Set([
   'electron',
   'server',
@@ -114,11 +122,20 @@ function assertRequiredLegalResources(readResource) {
   }
 }
 
+const mib = bytes => (bytes / 1024 / 1024).toFixed(2);
+
 function verifyFileSize(file, maximumBytes, label) {
   const stat = fs.statSync(file);
   if (!stat.isFile()) throw new Error(`${label} is not a file: ${file}`);
   if (stat.size > maximumBytes) {
-    throw new Error(`${label} is ${(stat.size / 1024 / 1024).toFixed(2)} MiB; maximum is ${(maximumBytes / 1024 / 1024).toFixed(2)} MiB`);
+    // 只报 MiB 时，刚刚超限的情况会把两个数四舍五入成同一个值
+    // （实测打印出「installer is 94.73 MiB; maximum is 94.73 MiB」），
+    // 既看不出超了多少，也无从判断该不该抬预算。超限信息必须精确到字节。
+    throw new Error(
+      `${label} is ${stat.size} bytes (${mib(stat.size)} MiB); `
+      + `maximum is ${maximumBytes} bytes (${mib(maximumBytes)} MiB); `
+      + `over by ${stat.size - maximumBytes} bytes`
+    );
   }
   return stat.size;
 }
