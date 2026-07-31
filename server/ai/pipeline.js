@@ -240,7 +240,7 @@ function breakthroughFor(article, {
   domain,
   result,
   context,
-  clusterSize,
+  sourceCount,
   breakthroughs
 }) {
   return analyzeBreakthrough({
@@ -250,7 +250,7 @@ function breakthroughFor(article, {
     summary: `${result.summary || ''} ${article.summary_raw || ''}`.trim(),
     tags: result.tags,
     tier: article.tier,
-    clusterSize,
+    sourceCount,
     noiseHits: context.noiseHits,
     scores: result.scores
   }, breakthroughs);
@@ -265,7 +265,7 @@ function persistResult(a, domain, result, scoring, breakthroughs, analyzedFlag) 
     domain: resolvedDomain,
     result,
     context,
-    clusterSize: 1,
+    sourceCount: 1,
     breakthroughs
   });
   const featured = isFeatured(quality, result.category, scoring, {
@@ -299,7 +299,12 @@ function rescoreAfterClustering() {
            a.scores_json, a.tags_json, a.quality_score, a.featured, a.analyzed,
            a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json,
            a.scoring_version, s.tier,
-           COALESCE(c.size, 1) AS cluster_size
+           COALESCE(c.size, 1) AS cluster_size,
+           max(1, COALESCE((
+             SELECT COUNT(DISTINCT member.source_id)
+             FROM articles member
+             WHERE member.cluster_id = a.cluster_id
+           ), 1)) AS source_count
     FROM articles a
     JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters c ON c.id = a.cluster_id
@@ -314,7 +319,7 @@ function rescoreAfterClustering() {
   for (const row of rows) {
     let scores;
     try { scores = JSON.parse(row.scores_json); } catch { continue; }
-    const context = scoringContext(row, { clusterSize: row.cluster_size });
+    const context = scoringContext(row, { clusterSize: row.source_count });
     const quality = computeQuality(scores, context, scoring);
     let tags = [];
     try {
@@ -330,7 +335,7 @@ function rescoreAfterClustering() {
         scores
       },
       context,
-      clusterSize: row.cluster_size,
+      sourceCount: row.source_count,
       breakthroughs
     });
     const featured = isFeatured(quality, row.category, scoring, {

@@ -102,3 +102,72 @@ test('heuristic analysis persists breakthrough evidence and cluster rescore refr
   assert.ok(result.second.breakthrough_bonus >= result.first.breakthrough_bonus);
   assert.equal(result.rescore.rescored, 1);
 });
+
+test('cluster rescore counts distinct source ids instead of duplicate reports', async t => {
+  const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-breakthrough-sources-'));
+  t.after(async () => fs.promises.rm(dataDir, { recursive: true, force: true }));
+  const dbPath = path.join(root, 'server', 'db.js');
+  const pipelinePath = path.join(root, 'server', 'ai', 'pipeline.js');
+  const child = runProgram(dataDir, `
+    (() => {
+      const { db, closeDatabase } = require(${JSON.stringify(dbPath)});
+      const { rescoreAfterClustering } = require(${JSON.stringify(pipelinePath)});
+      const insertSource = db.prepare(\`
+        INSERT INTO sources (name, type, url, tier, domain)
+        VALUES (?, 'rss', ?, 'T2', 'aerospace')
+      \`);
+      const firstSource = insertSource.run(
+        '同源媒体',
+        'https://example.com/source-one'
+      ).lastInsertRowid;
+      const secondSource = insertSource.run(
+        '独立媒体',
+        'https://example.com/source-two'
+      ).lastInsertRowid;
+      const insertArticle = db.prepare(\`
+        INSERT INTO articles (
+          source_id, title, url, summary_raw, fetched_at, published_at,
+          analyzed, relevant, domain, category, scores_json, tags_json,
+          quality_score, breakthrough_score, breakthrough_bonus
+        ) VALUES (?, ?, ?, ?, ?, ?, 1, 1, 'aerospace', '技术研发', ?, ?, 60, 0, 0)
+      \`);
+      const timestamp = new Date().toISOString();
+      const scores = JSON.stringify({
+        novelty: 80, importance: 75, credibility: 66, impact: 70, timeliness: 70
+      });
+      const tags = JSON.stringify(['火箭发动机', '测试通过']);
+      const title = '火箭发动机完成试验并测试通过';
+      const summary = '官方披露性能验证数据。';
+      const ids = [
+        insertArticle.run(firstSource, title, 'https://example.com/a', summary,
+          timestamp, timestamp, scores, tags).lastInsertRowid,
+        insertArticle.run(firstSource, title, 'https://example.com/b', summary,
+          timestamp, timestamp, scores, tags).lastInsertRowid,
+        insertArticle.run(firstSource, title, 'https://example.com/c', summary,
+          timestamp, timestamp, scores, tags).lastInsertRowid
+      ];
+      const clusterId = db.prepare(\`
+        INSERT INTO clusters (main_article_id, size, updated_at) VALUES (?, 3, ?)
+      \`).run(ids[0], timestamp).lastInsertRowid;
+      db.prepare('UPDATE articles SET cluster_id=? WHERE id IN (?, ?, ?)')
+        .run(clusterId, ...ids);
+      rescoreAfterClustering();
+      const sameSource = db.prepare(
+        'SELECT breakthrough_score FROM articles WHERE id=?'
+      ).get(ids[0]).breakthrough_score;
+
+      db.prepare('UPDATE articles SET source_id=? WHERE id=?').run(secondSource, ids[2]);
+      rescoreAfterClustering();
+      const distinctSources = db.prepare(
+        'SELECT breakthrough_score FROM articles WHERE id=?'
+      ).get(ids[0]).breakthrough_score;
+      process.stdout.write(JSON.stringify({ sameSource, distinctSources }));
+      closeDatabase();
+    })();
+  `);
+
+  assert.equal(child.status, 0, child.stderr);
+  const result = JSON.parse(child.stdout);
+  assert.equal(result.sameSource, 0);
+  assert.ok(result.distinctSources > 0);
+});

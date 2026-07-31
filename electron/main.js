@@ -32,6 +32,7 @@ const {
 } = require('./storage-maintenance');
 const { registerStorageMaintenanceIpc } = require('./storage-maintenance-ipc');
 const { createDailyArchiveService } = require('./daily-archive');
+const { createDailyArchiveBundleRequester } = require('./daily-archive-request');
 const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
@@ -50,6 +51,7 @@ let backgroundMode = null;
 let storageMaintenance = null;
 let dailyArchive = null;
 let dailyArchivePowerListenersRegistered = false;
+let dailyArchiveClockTimer = null;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
   ? path.resolve(process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR)
   : null;
@@ -211,22 +213,6 @@ function installApiAuthentication(serverPort, apiToken) {
   });
 }
 
-function createDailyArchiveBundleRequester(serverPort, apiToken, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== 'function') throw new TypeError('fetch is unavailable');
-  return async date => {
-    const url = `http://127.0.0.1:${serverPort}/api/daily/archive?date=${encodeURIComponent(date)}`;
-    const response = await fetchImpl(url, {
-      headers: {
-        'x-star-picking-pavilion-token': apiToken
-      }
-    });
-    if (!response.ok) {
-      throw new Error(`新闻简报服务返回 HTTP ${response.status}`);
-    }
-    return response.json();
-  };
-}
-
 function handleDailyArchiveResume() {
   dailyArchive?.handleResume().catch(error => {
     console.warn('[每日简报] 恢复定时任务失败:', error.message);
@@ -245,6 +231,23 @@ function unregisterDailyArchivePowerEvents() {
   dailyArchivePowerListenersRegistered = false;
   powerMonitor.removeListener('resume', handleDailyArchiveResume);
   powerMonitor.removeListener('unlock-screen', handleDailyArchiveResume);
+}
+
+function startDailyArchiveClockWatchdog() {
+  if (dailyArchiveClockTimer) return;
+  dailyArchiveClockTimer = setInterval(() => {
+    try {
+      dailyArchive?.refreshSchedule();
+    } catch (error) {
+      console.warn('[每日简报] 校准本地时钟失败:', error.message);
+    }
+  }, 60_000);
+  dailyArchiveClockTimer.unref?.();
+}
+
+function stopDailyArchiveClockWatchdog() {
+  if (dailyArchiveClockTimer) clearInterval(dailyArchiveClockTimer);
+  dailyArchiveClockTimer = null;
 }
 
 function installPermissionPolicy() {
@@ -438,7 +441,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     requestBundle: createDailyArchiveBundleRequester(serverPort, apiToken)
   });
   registerDailyArchivePowerEvents();
-  await dailyArchive.start();
+  startDailyArchiveClockWatchdog();
+  await dailyArchive.start({ backgroundCatchUp: true });
   await createWindow(serverPort);
 }).catch(async error => {
   if (!(error instanceof MigrationCancelledError)) {
@@ -464,6 +468,7 @@ function shutdownDesktop() {
     backendReady = false;
     dailyArchive?.stop();
     unregisterDailyArchivePowerEvents();
+    stopDailyArchiveClockWatchdog();
     if (autoUpdateTimer) clearInterval(autoUpdateTimer);
     autoUpdateTimer = null;
     if (serverController) await serverController.shutdown();

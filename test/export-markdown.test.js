@@ -72,8 +72,8 @@ test('Markdown 日报保留标题、分组、链接、来源与研判', () => {
   );
   assert.match(output, /- 民航局（T1） · 低空经济 · 政策法规 · 质量分 82/);
   assert.match(output, /- 研判：首个全国统一口径的空域管理规则。/);
-  // 多信源事件簇要在导出里保留「这条被几家报了」的信息
-  assert.match(output, /质量分 71 · 4 个信源/);
+  // 事件簇要在导出里保留「这条有几篇关联报道」的信息
+  assert.match(output, /质量分 71 · 4 篇关联报道/);
   assert.match(output, /由 摘星阁 v0\.0\.13 生成 · https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion/);
 });
 

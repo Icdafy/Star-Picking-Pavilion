@@ -6,6 +6,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+const archiveRequestSource = fs.readFileSync(
+  path.join(__dirname, '..', 'electron', 'daily-archive-request.js'),
+  'utf8'
+);
 
 test('Electron launches the service on a random port with secret token and nonce', () => {
   assert.match(source, /crypto\.randomBytes\(/);
@@ -52,13 +56,21 @@ test('daily archive integration keeps folder selection and authenticated export 
     source,
     /registerDailyArchiveIpc\(\{\s*ipcMain,\s*dialog,\s*getService:\s*\(\)\s*=>\s*dailyArchive,\s*getWindow:\s*\(\)\s*=>\s*win\s*\}\)/
   );
-  assert.match(source, /\/api\/daily\/archive\?date=\$\{encodeURIComponent\(date\)\}/);
-  assert.match(source, /'x-star-picking-pavilion-token':\s*apiToken/);
+  assert.match(
+    archiveRequestSource,
+    /\/api\/daily\/archive\?date=\$\{encodeURIComponent\(date\)\}/
+  );
+  assert.match(archiveRequestSource, /'x-star-picking-pavilion-token':\s*apiToken/);
+  assert.match(archiveRequestSource, /readBoundedBody/);
+  assert.match(archiveRequestSource, /AbortController/);
   assert.doesNotMatch(source, /webContents\.send\([^\n]*(?:apiToken|rootDirectory)/);
 
   const readyIndex = source.indexOf('await startServer(');
   const archiveIndex = source.indexOf('createDailyArchiveService(', readyIndex);
-  const startIndex = source.indexOf('await dailyArchive.start()', archiveIndex);
+  const startIndex = source.indexOf(
+    'await dailyArchive.start({ backgroundCatchUp: true })',
+    archiveIndex
+  );
   const windowIndex = source.indexOf('await createWindow(serverPort)', startIndex);
   assert.ok(readyIndex >= 0);
   assert.ok(archiveIndex > readyIndex);
@@ -73,6 +85,8 @@ test('daily archive timers recover after sleep and stop before desktop shutdown'
   assert.match(source, /dailyArchive\?\.stop\(\)/);
   assert.match(source, /powerMonitor\.removeListener\('resume', handleDailyArchiveResume\)/);
   assert.match(source, /powerMonitor\.removeListener\('unlock-screen', handleDailyArchiveResume\)/);
+  assert.match(source, /dailyArchive\?\.refreshSchedule\(\)/);
+  assert.match(source, /clearInterval\(dailyArchiveClockTimer\)/);
 });
 
 test('Electron brokers encrypted credentials without exposing them to the renderer', () => {

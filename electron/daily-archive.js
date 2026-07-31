@@ -208,6 +208,7 @@ function createDailyArchiveService({
   now = () => new Date(),
   setTimer = setTimeout,
   clearTimer = clearTimeout,
+  getTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'local',
   fileSystem = fs.promises,
   randomBytes = crypto.randomBytes
 } = {}) {
@@ -218,6 +219,7 @@ function createDailyArchiveService({
   if (typeof now !== 'function') throw new TypeError('now must be a function');
   if (typeof setTimer !== 'function') throw new TypeError('setTimer must be a function');
   if (typeof clearTimer !== 'function') throw new TypeError('clearTimer must be a function');
+  if (typeof getTimeZone !== 'function') throw new TypeError('getTimeZone must be a function');
   if (!fileSystem || typeof fileSystem !== 'object') {
     throw new TypeError('fileSystem must provide promise-based filesystem methods');
   }
@@ -229,6 +231,9 @@ function createDailyArchiveService({
   let started = false;
   let timer = null;
   let scheduledAt = null;
+  let scheduledDelayMs = null;
+  let scheduledTimeZone = null;
+  let scheduledOffsetMinutes = null;
   let runningDate = null;
   let lastResult = null;
   let writeQueue = Promise.resolve();
@@ -445,6 +450,20 @@ function createDailyArchiveService({
     throw new DailyArchiveError('archive-conflict', '无法创建唯一的补存目录。');
   }
 
+  async function findVerifiedArchive(monthDirectory, date) {
+    const preferred = path.join(monthDirectory, date);
+    if (await pathExists(preferred) && await verifyExistingArchive(preferred, date)) {
+      return preferred;
+    }
+    const pattern = new RegExp(`^${date}-补存-\\d{6}(?:-\\d+)?$`);
+    const names = await fileSystem.readdir(monthDirectory);
+    for (const name of names.filter(candidate => pattern.test(candidate)).sort()) {
+      const candidate = path.join(monthDirectory, name);
+      if (await verifyExistingArchive(candidate, date)) return candidate;
+    }
+    return null;
+  }
+
   function validateBundle(bundle, date) {
     if (
       !isPlainObject(bundle)
@@ -547,17 +566,17 @@ function createDailyArchiveService({
       const physicalRoot = await validateRoot(state.rootDirectory);
       const monthDirectory = await ensureArchiveMonth(physicalRoot, date);
       const preferredDirectory = path.join(monthDirectory, date);
-      const preferredExists = await pathExists(preferredDirectory);
-
-      if (preferredExists && await verifyExistingArchive(preferredDirectory, date)) {
+      const verifiedArchive = await findVerifiedArchive(monthDirectory, date);
+      if (verifiedArchive) {
         const result = {
           status: 'existing',
           date,
-          directory: preferredDirectory
+          directory: verifiedArchive
         };
         await markSuccess(date, result);
         return result;
       }
+      const preferredExists = await pathExists(preferredDirectory);
 
       const destination = preferredExists
         ? await chooseConflictDirectory(monthDirectory, date)
@@ -608,6 +627,9 @@ function createDailyArchiveService({
     if (timer !== null) clearTimer(timer);
     timer = null;
     scheduledAt = null;
+    scheduledDelayMs = null;
+    scheduledTimeZone = null;
+    scheduledOffsetMinutes = null;
   }
 
   function scheduleNext() {
@@ -615,7 +637,11 @@ function createDailyArchiveService({
     if (!started || !state.enabled) return;
     const current = clock();
     const target = nextRunAt(current);
+    const delay = Math.max(0, target.getTime() - current.getTime());
     scheduledAt = target.toISOString();
+    scheduledDelayMs = delay;
+    scheduledTimeZone = String(getTimeZone() || 'local');
+    scheduledOffsetMinutes = current.getTimezoneOffset();
     timer = setTimer(async () => {
       timer = null;
       scheduledAt = null;
@@ -626,7 +652,23 @@ function createDailyArchiveService({
       } finally {
         scheduleNext();
       }
-    }, Math.max(0, target.getTime() - current.getTime()));
+    }, delay);
+  }
+
+  function refreshSchedule() {
+    if (!started || !state.enabled) return false;
+    const current = clock();
+    const target = nextRunAt(current);
+    const delay = Math.max(0, target.getTime() - current.getTime());
+    const timeZone = String(getTimeZone() || 'local');
+    const offsetMinutes = current.getTimezoneOffset();
+    const unchanged = scheduledAt === target.toISOString()
+      && scheduledTimeZone === timeZone
+      && scheduledOffsetMinutes === offsetMinutes
+      && Math.abs((scheduledDelayMs ?? delay) - delay) < 5_000;
+    if (unchanged) return false;
+    scheduleNext();
+    return true;
   }
 
   function getSnapshot() {
@@ -641,17 +683,24 @@ function createDailyArchiveService({
     };
   }
 
-  async function start() {
+  async function start({ backgroundCatchUp = false } = {}) {
     await load();
     if (started) return getSnapshot();
     started = true;
     if (state.enabled) {
-      try {
-        await retry();
-      } catch {
-        // Startup remains available while the archive location is offline.
-      }
       scheduleNext();
+      const catchUp = retry({ verifyLastSuccess: true });
+      if (backgroundCatchUp) {
+        catchUp.catch(() => {
+          // Failure is retained in state and can be retried from the visible UI.
+        });
+      } else {
+        try {
+          await catchUp;
+        } catch {
+          // Startup remains available while the archive location is offline.
+        }
+      }
     }
     return getSnapshot();
   }
@@ -700,11 +749,20 @@ function createDailyArchiveService({
     return archiveDate(mostRecentDueDate(clock()));
   }
 
-  async function retry() {
+  async function retry({ verifyLastSuccess = false } = {}) {
     await load();
     if (!state.enabled) return [];
     const results = [];
-    for (const date of enumerateDueDates(state, clock())) {
+    const dueDates = enumerateDueDates(state, clock());
+    if (
+      verifyLastSuccess
+      && state.lastSuccessfulDate
+      && !dueDates.includes(state.lastSuccessfulDate)
+      && state.lastSuccessfulDate <= mostRecentDueDate(clock())
+    ) {
+      results.push(await archiveDate(state.lastSuccessfulDate));
+    }
+    for (const date of dueDates) {
       results.push(await archiveDate(date));
     }
     return results;
@@ -715,7 +773,7 @@ function createDailyArchiveService({
     clearSchedule();
     if (state.enabled) {
       try {
-        await retry();
+        await retry({ verifyLastSuccess: true });
       } catch {
         // Preserve the failure and keep the next scheduled retry.
       }
@@ -733,7 +791,8 @@ function createDailyArchiveService({
     disable,
     saveCurrent,
     retry,
-    handleResume
+    handleResume,
+    refreshSchedule
   });
 }
 

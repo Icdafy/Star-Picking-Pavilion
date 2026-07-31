@@ -61,6 +61,16 @@ function sampleBundle(date) {
   };
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -334,6 +344,63 @@ test('an incomplete target remains untouched and the replacement is saved to a c
   await fs.promises.access(path.join(result.directory, 'manifest.json'));
 });
 
+test('a verified conflict archive is reused instead of creating repeated recovery copies', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  const destination = archiveDirectory(rootDirectory, '2026-07-31');
+  await fs.promises.mkdir(destination, { recursive: true });
+  await fs.promises.writeFile(path.join(destination, 'keep-me.txt'), 'original');
+  let requests = 0;
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => {
+      requests += 1;
+      return sampleBundle(date);
+    },
+    now: () => new Date(2026, 6, 31, 10, 11, 12)
+  });
+  await service.enable(rootDirectory);
+
+  const first = await service.saveCurrent();
+  const second = await service.saveCurrent();
+
+  assert.equal(first.status, 'saved-conflict');
+  assert.equal(second.status, 'existing');
+  assert.equal(second.directory, first.directory);
+  assert.equal(requests, 1);
+});
+
+test('startup verifies and repairs only the most recent successful archive', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  await fs.promises.writeFile(stateFile(userDataPath), `${JSON.stringify({
+    ...DEFAULT_DAILY_ARCHIVE_STATE,
+    enabled: true,
+    rootDirectory,
+    enabledAt: new Date(2026, 6, 29, 7, 0, 0).toISOString(),
+    lastSuccessfulDate: '2026-07-31'
+  })}\n`);
+  const requests = [];
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => {
+      requests.push(date);
+      return sampleBundle(date);
+    },
+    now: () => new Date(2026, 6, 31, 10, 0, 0)
+  });
+
+  const snapshot = await service.start();
+  service.stop();
+
+  assert.deepEqual(requests, ['2026-07-31']);
+  assert.equal(snapshot.lastSuccessfulDate, '2026-07-31');
+  await fs.promises.access(path.join(
+    archiveDirectory(rootDirectory, '2026-07-31'),
+    'manifest.json'
+  ));
+});
+
 test('catch-up requests every missed date in order and advances success one date at a time', async t => {
   const userDataPath = await makeDirectory(t);
   const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
@@ -362,6 +429,40 @@ test('catch-up requests every missed date in order and advances success one date
   for (const date of requests) {
     await fs.promises.access(path.join(archiveDirectory(rootDirectory, date), 'manifest.json'));
   }
+});
+
+test('background startup returns a loaded snapshot before catch-up finishes', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  await fs.promises.writeFile(stateFile(userDataPath), `${JSON.stringify({
+    ...DEFAULT_DAILY_ARCHIVE_STATE,
+    enabled: true,
+    rootDirectory,
+    enabledAt: new Date(2026, 6, 31, 7, 0, 0).toISOString()
+  })}\n`);
+  const gate = deferred();
+  const requested = deferred();
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => {
+      requested.resolve(date);
+      await gate.promise;
+      return sampleBundle(date);
+    },
+    now: () => new Date(2026, 6, 31, 10, 0, 0)
+  });
+
+  const snapshot = await service.start({ backgroundCatchUp: true });
+
+  assert.equal(snapshot.enabled, true);
+  assert.deepEqual(snapshot.pendingDates, ['2026-07-31']);
+  assert.equal(await requested.promise, '2026-07-31');
+  assert.equal(service.getSnapshot().lastSuccessfulDate, null);
+
+  gate.resolve();
+  await service.retry();
+  assert.equal(service.getSnapshot().lastSuccessfulDate, '2026-07-31');
+  service.stop();
 });
 
 test('concurrent saves for the same date share one in-flight bundle request', async t => {
@@ -483,4 +584,43 @@ test('enabled service schedules exactly the next local 08:00 and reschedules aft
   assert.deepEqual(delays, [60_000, 60_000]);
   service.stop();
   assert.deepEqual(cleared, [1, 2]);
+});
+
+test('schedule refresh detects wall-clock or timezone changes without running catch-up', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  const delays = [];
+  const cleared = [];
+  let timerId = 0;
+  let current = new Date(2026, 6, 31, 7, 0, 0);
+  let timeZone = 'Asia/Shanghai';
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => sampleBundle(date),
+    now: () => current,
+    getTimeZone: () => timeZone,
+    setTimer: (_callback, delay) => {
+      delays.push(delay);
+      timerId += 1;
+      return timerId;
+    },
+    clearTimer: id => cleared.push(id)
+  });
+  await service.enable(rootDirectory);
+  await service.start();
+  assert.deepEqual(delays, [3_600_000]);
+
+  assert.equal(service.refreshSchedule(), false);
+  assert.deepEqual(delays, [3_600_000]);
+
+  current = new Date(2026, 6, 31, 7, 30, 0);
+  assert.equal(service.refreshSchedule(), true);
+  assert.deepEqual(cleared, [1]);
+  assert.deepEqual(delays, [3_600_000, 1_800_000]);
+
+  timeZone = 'Asia/Tokyo';
+  assert.equal(service.refreshSchedule(), true);
+  assert.deepEqual(cleared, [1, 2]);
+  assert.deepEqual(delays, [3_600_000, 1_800_000, 1_800_000]);
+  service.stop();
 });

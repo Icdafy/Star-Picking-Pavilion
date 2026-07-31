@@ -355,12 +355,12 @@ function breakthroughPresentation(item) {
     objects.length ? `技术对象：${objects.join('、')}` : '',
     actions.length ? `完成证据：${actions.join('、')}` : '',
     `可信依据：${evidence}`,
-    `突破置信度：${score}%`
+    `突破强度：${score}%`
   ].filter(Boolean);
   return {
     bonus,
     score,
-    explanation: `该条情报通过技术突破门槛，热度加成 ${bonus} 分。${details.join('；')}。`
+    explanation: `该条情报通过技术突破门槛，热度加成 ${bonus} 分，并按突破强度延长热度半衰期。${details.join('；')}。`
   };
 }
 
@@ -373,7 +373,7 @@ function cardInner(item) {
   const breakthrough = breakthroughPresentation(item);
   const breakthroughBadge = breakthrough ? `
     <span class="breakthrough-pill" role="note"
-      aria-label="技术突破热度加成 ${breakthrough.bonus} 分，置信度 ${breakthrough.score}%"
+      aria-label="技术突破热度加成 ${breakthrough.bonus} 分，突破强度 ${breakthrough.score}%"
       title="已通过技术对象、完成动作与可信度门槛">
       技术突破 <b>+${breakthrough.bonus}</b>
     </span>` : '';
@@ -386,7 +386,7 @@ function cardInner(item) {
   const cluster = item.clusterSize > 1 ? `
     <button class="cluster-toggle" data-cluster="${item.clusterId}" data-self="${item.id}" type="button" aria-expanded="false">
       <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      ${item.clusterSize} 个信源 · 关联报道
+      ${item.clusterSize} 篇关联报道
     </button>` : '';
   // 五维分解此前只能靠"盲点"卡片才展开，现在给出显式的可聚焦入口
   const dimsToggle = analysisDetails ? `
@@ -594,7 +594,7 @@ async function loadHotRail() {
           <span class="hi-title">${esc(it.title)}</span>
           <span class="hi-meta">
             <span class="hi-heat">${Math.round(it.heat ?? 0)}°</span>
-            ${it.clusterSize > 1 ? `<span>${it.clusterSize} 个信源</span>` : `<span>${esc(it.source)}</span>`}
+            ${it.clusterSize > 1 ? `<span>${it.clusterSize} 篇关联报道</span>` : `<span>${esc(it.source)}</span>`}
             <span>${timeAgo(it.publishedAt || it.fetchedAt)}</span>
           </span>
         </span>

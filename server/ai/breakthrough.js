@@ -24,6 +24,47 @@ function matches(text, terms) {
     haystack.includes(normalizedText(term))));
 }
 
+function matchOccurrences(text, terms) {
+  const haystack = normalizedText(text);
+  const occurrences = [];
+  for (const term of terms || []) {
+    const needle = normalizedText(term);
+    if (!needle) continue;
+    for (let index = haystack.indexOf(needle); index >= 0;
+      index = haystack.indexOf(needle, index + 1)) {
+      occurrences.push({
+        term,
+        index,
+        end: index + needle.length
+      });
+    }
+  }
+  return occurrences;
+}
+
+function isMeaningfulUncertaintyOccurrence(text, occurrence) {
+  if (normalizedText(occurrence.term) !== '拟') return true;
+  // “模拟、虚拟、比拟”中的“拟”是词的一部分，不表达尚未发生。
+  return !['模', '虚', '比'].includes(text[occurrence.index - 1]);
+}
+
+function evidenceIn(text, objects, actions, uncertaintyMarkers) {
+  const normalized = normalizedText(text);
+  const objectOccurrences = matchOccurrences(normalized, objects);
+  const actionOccurrences = matchOccurrences(normalized, actions).filter(action =>
+    !objectOccurrences.some(object =>
+      action.index >= object.index && action.end <= object.end));
+  const uncertaintyOccurrences = matchOccurrences(
+    normalized,
+    uncertaintyMarkers
+  ).filter(occurrence => isMeaningfulUncertaintyOccurrence(normalized, occurrence));
+  return {
+    objects: unique(objectOccurrences.map(occurrence => occurrence.term)),
+    actions: unique(actionOccurrences.map(occurrence => occurrence.term)),
+    uncertainty: unique(uncertaintyOccurrences.map(occurrence => occurrence.term))
+  };
+}
+
 function sentencesOf(article) {
   const tags = Array.isArray(article?.tags) ? article.tags.join('；') : '';
   return [article?.title, article?.summary, tags]
@@ -59,7 +100,7 @@ function rejected(config, signals, reason) {
 
 function credibilityGate(article, config) {
   const tier = String(article?.tier || '');
-  const clusterSize = Math.max(1, Number(article?.clusterSize) || 1);
+  const sourceCount = Math.max(1, Number(article?.sourceCount) || 1);
   const credibility = Number(article?.scores?.credibility);
   const hasModelCredibility = Number.isFinite(credibility);
   const minimums = config?.minimumScores || {};
@@ -69,7 +110,7 @@ function credibilityGate(article, config) {
     && credibility >= (Number(minimums.tier15Credibility) || 70)) {
     return { accepted: true, evidence: 'tier-t1.5-model', strength: 0.82 };
   }
-  if (clusterSize >= 2 && (
+  if (sourceCount >= 2 && (
     !hasModelCredibility
     || credibility >= (Number(minimums.corroboratedCredibility) || 60)
   )) {
@@ -111,16 +152,19 @@ function analyzeBreakthrough(article, config = {}) {
     ? config.uncertaintyMarkers
     : [];
   const sentences = sentencesOf(article);
-  const allText = sentences.join('；');
-  baseSignals.uncertainty = matches(allText, uncertaintyMarkers);
-  const allObjects = matches(allText, objects);
-  const allActions = matches(allText, actions);
+  const allEvidence = evidenceIn(
+    sentences.join('；'),
+    objects,
+    actions,
+    uncertaintyMarkers
+  );
+  baseSignals.uncertainty = allEvidence.uncertainty;
+  const allObjects = allEvidence.objects;
+  const allActions = allEvidence.actions;
 
   const cleanEvidence = sentences.map(sentence => ({
     sentence,
-    objects: matches(sentence, objects),
-    actions: matches(sentence, actions),
-    uncertainty: matches(sentence, uncertaintyMarkers)
+    ...evidenceIn(sentence, objects, actions, uncertaintyMarkers)
   })).filter(evidence =>
     evidence.objects.length
     && evidence.actions.length
@@ -144,6 +188,7 @@ function analyzeBreakthrough(article, config = {}) {
   if (!cleanEvidence.length) {
     baseSignals.objects = allObjects;
     baseSignals.actions = allActions;
+    return rejected(config, baseSignals, 'unlinked-evidence');
   }
 
   const credibility = credibilityGate(article, config);
@@ -160,7 +205,7 @@ function analyzeBreakthrough(article, config = {}) {
   const actionStrength = Math.min(1, 0.5 + (baseSignals.actions.length - 1) * 0.2);
   const objectStrength = Math.min(1, 0.5 + (baseSignals.objects.length - 1) * 0.15);
   const corroboration = Math.min(1,
-    Math.max(0, (Number(article?.clusterSize) || 1) - 1) / 2);
+    Math.max(0, (Number(article?.sourceCount) || 1) - 1) / 2);
 
   const score = clamp(
     novelty * 0.2
@@ -196,5 +241,7 @@ module.exports = {
   analyzeBreakthrough,
   credibilityGate,
   domainObjects,
+  evidenceIn,
+  matchOccurrences,
   matches
 };

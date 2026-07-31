@@ -156,6 +156,10 @@ test('load renders path, next run, last success, failure and pending count', asy
   assert.equal(fixture.elements.lastSuccess.textContent, '2026-07-30');
   assert.equal(fixture.elements.pending.textContent, '待补存 2 天');
   assert.match(fixture.elements.status.textContent, /上次归档未完成/);
+  assert.match(
+    fixture.elements.status.textContent,
+    /格式化:2026-07-31T02:00:00.000Z/
+  );
   assert.equal(fixture.elements.status.className.includes('error'), true);
   assert.equal(fixture.elements.retryButton.disabled, false);
   assert.equal(fixture.elements.status.getAttribute('aria-busy'), 'false');

@@ -27,7 +27,7 @@ const config = Object.freeze({
       '垂直起降', '适航', '低空智联网'
     ],
     aerospace: [
-      '可重复使用火箭', '火箭发动机', '推进系统', '卫星平台',
+      '可重复使用火箭', '可回收火箭', '火箭发动机', '推进系统', '卫星平台',
       '有效载荷', '星座组网', '热防护', '轨道转移'
     ]
   }
@@ -87,6 +87,7 @@ test('多源印证可让达到较低可信门槛的 T2 技术事件获得加成'
   const result = analyzeBreakthrough(article({
     tier: 'T2',
     clusterSize: 3,
+    sourceCount: 3,
     scores: { novelty: 80, importance: 75, credibility: 66 }
   }), config);
 
@@ -99,7 +100,8 @@ test('没有模型分数时只接受 T1 或多源印证', () => {
   const corroborated = analyzeBreakthrough(article({
     scores: null,
     tier: 'T2',
-    clusterSize: 2
+    clusterSize: 2,
+    sourceCount: 2
   }), config);
   const unsupported = analyzeBreakthrough(article({
     scores: null,
@@ -111,6 +113,43 @@ test('没有模型分数时只接受 T1 或多源印证', () => {
   assert.ok(corroborated.score > 0);
   assert.equal(unsupported.score, 0);
   assert.equal(unsupported.signals.rejectedReason, 'credibility-gate');
+});
+
+test('同一信源的重复报道不能冒充多源印证', () => {
+  const result = analyzeBreakthrough(article({
+    tier: 'T2',
+    clusterSize: 3,
+    sourceCount: 1,
+    scores: { novelty: 80, importance: 75, credibility: 66 }
+  }), config);
+
+  assert.equal(result.score, 0);
+  assert.equal(result.signals.rejectedReason, 'credibility-gate');
+});
+
+test('技术对象内部的动作子串不能单独证明已经完成', () => {
+  const result = analyzeBreakthrough(article({
+    title: '官方发布可回收火箭总体技术方案',
+    summary: '方案披露了总体参数与后续研制安排。',
+    tags: ['可回收火箭'],
+    tier: 'T1'
+  }), config);
+
+  assert.equal(result.score, 0);
+  assert.equal(result.signals.rejectedReason, 'completion-action');
+});
+
+test('模拟一词中的拟不应把已完成试验误判为计划', () => {
+  const result = analyzeBreakthrough(article({
+    title: '火箭发动机完成模拟试验并测试通过',
+    summary: '官方公布测试数据，性能验证达到预期。',
+    tags: ['火箭发动机', '性能验证'],
+    tier: 'T1'
+  }), config);
+
+  assert.ok(result.score > 0);
+  assert.equal(result.signals.rejectedReason, null);
+  assert.ok(!result.signals.uncertainty.includes('拟'));
 });
 
 test('计划性标题即使命中首飞和技术对象也不获得加成', () => {

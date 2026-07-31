@@ -65,7 +65,9 @@ function describeEntry(item) {
   const quality = Number(item.quality ?? item.quality_score);
   if (Number.isFinite(quality)) parts.push(`质量分 ${Math.round(quality)}`);
   const clusterSize = Number(item.clusterSize ?? item.cluster_size);
-  if (Number.isFinite(clusterSize) && clusterSize > 1) parts.push(`${clusterSize} 个信源`);
+  if (Number.isFinite(clusterSize) && clusterSize > 1) {
+    parts.push(`${clusterSize} 篇关联报道`);
+  }
   const breakthroughBonus = Number(item.breakthroughBonus ?? item.breakthrough_bonus);
   if (Number.isFinite(breakthroughBonus) && breakthroughBonus > 0) {
     parts.push(`技术突破 +${Math.round(breakthroughBonus * 10) / 10}`);

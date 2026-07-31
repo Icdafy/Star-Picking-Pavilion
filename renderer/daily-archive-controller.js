@@ -114,8 +114,11 @@
         };
       }
       if (confirmed.lastErrorCode) {
+        const failedAt = confirmed.lastErrorAt
+          ? `（${formatDateTime(confirmed.lastErrorAt)}）`
+          : '';
         return {
-          message: '上次归档未完成，请检查保存位置后重试。',
+          message: `上次归档未完成${failedAt}，请检查保存位置后重试。`,
           tone: 'error'
         };
       }
