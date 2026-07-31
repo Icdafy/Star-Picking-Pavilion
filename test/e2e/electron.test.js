@@ -659,7 +659,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
     const pathOutput = document.querySelector('#dailyArchivePath');
     const toggle = document.querySelector('#dailyArchiveEnabled');
     return toggle?.checked === true && pathOutput?.textContent === expectedPath;
-  }, archiveRoot);
+  }, await fs.promises.realpath(archiveRoot));
   const archiveDialogOptions = await firstApp.evaluate(() => (
     globalThis.__sppArchiveDialogOptions
   ));
