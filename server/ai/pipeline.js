@@ -304,7 +304,7 @@ function breakthroughFor(article, {
 // 全部基于「模型这一次已经返回的字段」+ 词库，不再额外发请求。
 // 模型没给 events（降级模式，或它自己偷懒）时用代码从标题动作反推一个主事件，
 // 保证聚类的精确通道对每条相关情报都有输入。
-function structureResult(article, result, fullText) {
+function structureResult(result, fullText) {
   const annotated = entities.analyzeEntities(fullText, result.entities);
   let atomicEvents = events.normalizeEvents(result.events, { fallbackText: fullText });
   if (!atomicEvents.length) atomicEvents = events.deriveEvents(fullText, annotated.entities);
@@ -321,7 +321,7 @@ function persistResult(a, domain, result, scoring, breakthroughs, analyzedFlag) 
   const context = scoringContext({ ...a, ai_summary: result.summary }, { clusterSize: 1 });
   const resolvedDomain = domain || context.lexicon.domain || a.domain || 'lowaltitude';
   const structured = structureResult(
-    a, result,
+    result,
     `${a.title || ''} ${result.summary || ''} ${a.summary_raw || ''}`
   );
   const quality = computeQuality(result.scores, context, scoring);
