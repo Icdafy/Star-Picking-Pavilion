@@ -9,11 +9,11 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('package and lockfile versions stay synchronized at v0.0.13', () => {
+test('package and lockfile versions stay synchronized at v0.0.14', () => {
   const packageJson = JSON.parse(read('package.json'));
   const packageLock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(packageJson.version, '0.0.13');
+  assert.equal(packageJson.version, '0.0.14');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
 });
@@ -31,7 +31,8 @@ test('public release documentation and compliance artifacts are complete', () =>
   ]) assert.equal(fs.existsSync(path.join(root, file)), true, `missing ${file}`);
 
   assert.match(read('LICENSE'), /MIT License[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
-  assert.equal(require('../package.json').version, '0.0.13');
+  assert.equal(require('../package.json').version, '0.0.14');
+  assert.match(read('CHANGELOG.md'), /\[0\.0\.14\].*2026-07-31/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.13\].*2026-07-31/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.12\].*2026-07-30/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.11\].*2026-07-28/);
@@ -46,13 +47,13 @@ test('public release documentation and compliance artifacts are complete', () =>
   assert.match(read('CHANGELOG.md'), /\[0\.0\.2\].*2026-07-23/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.1\].*2026-07-21/);
   assert.match(read('SECURITY.md'), /Security Advisories/);
-  // 按文档出现顺序断言 v0.0.13 的完整每日研究归档主线。
+  // 按文档出现顺序断言 v0.0.14 的八段式管线主线与模型统一。
   assert.match(
     read('RELEASE_NOTES.md'),
-    /v0\.0\.13[\s\S]*08:00[\s\S]*自动保存[\s\S]*news\.jsonl[\s\S]*manifest\.json[\s\S]*技术突破[\s\S]*隐私[\s\S]*补齐[\s\S]*未签名/
+    /v0\.0\.14[\s\S]*八段式[\s\S]*数据清洗[\s\S]*实体提取[\s\S]*原子事件[\s\S]*语义合并[\s\S]*DeepSeek-V4-Flash-0731[\s\S]*deepseek-v4-pro[\s\S]*兼容[\s\S]*未签名/
   );
   assert.match(read('THIRD_PARTY_NOTICES.txt'), /cheerio@1\.2\.0/);
-  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.0\.13/);
+  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.0\.14/);
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
@@ -68,7 +69,7 @@ test('README documents installation, privacy, recovery and security truthfully',
   const readme = read('README.md');
   for (const required of [
     /Windows 10\/11.*x64/,
-    /Star-Picking-Pavilion-Setup-0\.0\.13\.exe/,
+    /Star-Picking-Pavilion-Setup-0\.0\.14\.exe/,
     /SmartScreen/,
     /Get-FileHash/,
     /云幄\s*·\s*常用网址/,
@@ -106,18 +107,18 @@ test('version verifier matches package, tag, installer and latest metadata', asy
   const { verifyVersion } = require('../scripts/verify-version');
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-version-'));
   t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.0.13\n');
-  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.0.13.exe'), 'fixture');
+  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.0.14\n');
+  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.0.14.exe'), 'fixture');
 
   assert.deepEqual(verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.0.13',
+    tag: 'v0.0.14',
     distDir: directory,
     requireArtifacts: true
   }), {
-    version: '0.0.13',
-    tag: 'v0.0.13',
-    installer: 'Star-Picking-Pavilion-Setup-0.0.13.exe'
+    version: '0.0.14',
+    tag: 'v0.0.14',
+    installer: 'Star-Picking-Pavilion-Setup-0.0.14.exe'
   });
   assert.throws(() => verifyVersion({
     packageJson: require('../package.json'),

@@ -130,7 +130,7 @@ test('package verifier accepts only application roots, production dependencies a
   }
 });
 
-test('v0.0.13 package budgets preserve the v0.0.12 release limits', () => {
+test('v0.0.14 package budgets preserve the v0.0.12 release limits', () => {
   assert.equal(MAX_ASAR_BYTES, 12_476_662);
   assert.equal(MAX_INSTALLER_BYTES, 99_328_923);
 });
@@ -169,6 +169,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical package version', () => {
-  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.13.exe');
+  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.14.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.version)), '.exe');
 });

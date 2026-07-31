@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// v0.0.13 沿用 v0.0.12 的发布门禁。思源黑体继续完整保留，
+// v0.0.14 沿用 v0.0.12 的发布门禁。思源黑体继续完整保留，
 // 通过排除生产依赖中的文档、示例和测试材料回收空间。
 const MAX_ASAR_BYTES = 12_476_662;
 const MAX_INSTALLER_BYTES = 99_328_923;
