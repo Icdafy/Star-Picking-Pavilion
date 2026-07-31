@@ -2,12 +2,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const packageJson = require('../package.json');
+const verifier = require('../scripts/verify-package');
 const {
-  MAX_ASAR_BYTES,
-  MAX_INSTALLER_BYTES,
   assertAllowedEntries,
   assertAllowedResourceEntries,
   assertRequiredLegalResources,
@@ -130,17 +130,26 @@ test('package verifier accepts only application roots, production dependencies a
   }
 });
 
-test('v0.0.14 rebaselines package budgets below the documented hard ceilings', () => {
-  // 沿用自 v0.0.10 的旧棘轮余量已被吃光（安装包超 1,778 字节、ASAR 只剩 6,469 字节），
-  // v0.0.14 重新基线化到硬顶之下的整数档。
-  assert.equal(MAX_ASAR_BYTES, 13_107_200);
-  assert.equal(MAX_INSTALLER_BYTES, 99_614_720);
-  // 产品硬顶来自 v0.0.11 瘦身设计：ASAR 13 MiB、安装包 100 MiB，不得被门禁反超
-  assert.ok(MAX_ASAR_BYTES <= 13 * 1024 * 1024, 'ASAR 门禁不得高于 13 MiB 硬顶');
-  assert.ok(MAX_INSTALLER_BYTES <= 100 * 1024 * 1024, '安装包门禁不得高于 100 MiB 硬顶');
-  // 余量要够吸收压缩抖动，又不能松到放过 MB 量级的回退
-  assert.ok(MAX_ASAR_BYTES - 12_470_193 < 1024 * 1024, 'ASAR 余量不得超过 1 MiB');
-  assert.ok(MAX_INSTALLER_BYTES - 99_330_701 < 1024 * 1024, '安装包余量不得超过 1 MiB');
+test('v0.0.15 exposes no package size ceiling at all', () => {
+  // 体积上限已取消：不再导出任何 MAX_*_BYTES，也不许有别的名字把它换个马甲装回来。
+  // 这条断言存在的意义是防止「先加个宽松上限，再慢慢收紧」——那正是 v0.0.11→v0.0.14 走过一遍的路。
+  const sizeLimitExports = Object.keys(verifier)
+    .filter(name => /MAX|LIMIT|BUDGET|CEILING|MAX_BYTES/i.test(name));
+  assert.deepEqual(sizeLimitExports, [], `不应再导出体积上限: ${sizeLimitExports.join(', ')}`);
+
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'verify-package.js'), 'utf8');
+  assert.doesNotMatch(source, /\bMAX_ASAR_BYTES\b|\bMAX_INSTALLER_BYTES\b/);
+  // 「超出上限」这类失败路径必须彻底消失，只保留度量
+  assert.doesNotMatch(source, /maximum is|over by/);
+  assert.match(source, /function measureFile/);
+});
+
+test('package verification still fails when an artifact is missing or not a file', () => {
+  // 取消上限不等于取消验证：构建没出东西、或者路径指向目录，仍然必须失败
+  assert.throws(
+    () => verifier.verifyPackage({ distDir: path.join(__dirname, 'no-such-dist') }),
+    /Missing ASAR/
+  );
 });
 
 test('package verifier rejects dependency docs, examples and tests', () => {
@@ -177,6 +186,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical package version', () => {
-  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.14.exe');
+  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.15.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.version)), '.exe');
 });

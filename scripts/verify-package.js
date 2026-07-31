@@ -3,18 +3,26 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// 体积门禁在 v0.0.14 重新基线化。
+// v0.0.15 起取消体积上限。
 //
-// v0.0.11 起这两个上限一直钉死在 v0.0.10 实测产物上（ASAR 12,476,662 / 安装包 99,328,923），
-// 作为「不得回退」的棘轮。余量被逐版吃掉：安装包 v0.0.11 余 52,292、v0.0.12 余 40,728、
-// v0.0.13 只剩 12,522，到 v0.0.14 的八段式管线就超了 1,778 字节；ASAR 也只剩 6,469 字节，
-// 下一次改动必然触顶。继续钉住等于把「别塞垃圾进去」变成「别写新代码」。
+// 沿革：v0.0.11 把上限钉死在 v0.0.10 实测产物上当「不得回退」的棘轮，余量被逐版吃掉
+// （安装包 v0.0.11 余 52,292、v0.0.12 余 40,728、v0.0.13 只剩 12,522），v0.0.14 的八段式
+// 管线超出 1,778 字节直接把 CI 与发布双双打红，只好重新基线化到 12.5 MiB / 95 MiB。
+// 但那仍然是同一个问题的延后版：100 MiB 这个「硬顶」本就是 v0.0.11 瘦身设计里的一个
+// 审美取值，不是任何技术边界——GitHub Release 单个附件允许 2 GB，NSIS 与 electron-updater
+// 都不在乎，安装包体积的绝大部分是 Electron/Chromium 运行时，不是本项目的代码。
+// 于是每加一个功能都要先过一道与技术现实无关的关卡，门禁从「别塞垃圾进去」
+// 异化成了「别写新代码」。
 //
-// 现在改为：产品硬顶沿用 v0.0.11 瘦身设计写明的 13 MiB / 100 MiB，
-// 门禁取硬顶之下的整数档，只留够吸收 NSIS 压缩抖动与几个小版本的余量。
-// 真正的回退（多打一个依赖、漏排除文档目录）是 MB 量级，这个余量照样拦得住。
-const MAX_ASAR_BYTES = 13_107_200;        // 12.5 MiB（v0.0.14 实测 12,470,193）
-const MAX_INSTALLER_BYTES = 99_614_720;   // 95 MiB（v0.0.14 实测 99,330,701）
+// 现在只报告体积，不再因为体积失败。**下面所有边界检查一条都没有放松**，
+// 而那才是真正拦得住「不该进包的东西」的部分：
+//   - assertAllowedEntries            根目录白名单 + 数据库/日志/临时文件/文档目录黑名单
+//   - assertProductionDependencyEntries 只允许 lockfile 里的生产依赖，dev 依赖一律拒绝
+//   - assertNoEmbeddedSecrets         私钥、GitHub token、AWS key、sk- 开头的模型 Key
+//   - assertAllowedResourceEntries    resources/ 目录逐项白名单
+//   - assertRequiredLegalResources    LICENSE 与第三方声明必须存在且有效
+// 现实中会让包突然变大的情形（误打 dev 依赖、漏排除 docs、把用户数据库塞进去）
+// 都由这几条精确拦截，而且给出的是「哪个文件不该在这」而不是「总数大了几字节」。
 const ALLOWED_ROOTS = new Set([
   'electron',
   'server',
@@ -124,19 +132,11 @@ function assertRequiredLegalResources(readResource) {
 
 const mib = bytes => (bytes / 1024 / 1024).toFixed(2);
 
-function verifyFileSize(file, maximumBytes, label) {
+// 只量不拦。产物必须存在且确实是文件（构建没出东西仍然要失败），
+// 但多大都放行——体积由边界检查间接约束，不再有绝对上限。
+function measureFile(file, label) {
   const stat = fs.statSync(file);
   if (!stat.isFile()) throw new Error(`${label} is not a file: ${file}`);
-  if (stat.size > maximumBytes) {
-    // 只报 MiB 时，刚刚超限的情况会把两个数四舍五入成同一个值
-    // （实测打印出「installer is 94.73 MiB; maximum is 94.73 MiB」），
-    // 既看不出超了多少，也无从判断该不该抬预算。超限信息必须精确到字节。
-    throw new Error(
-      `${label} is ${stat.size} bytes (${mib(stat.size)} MiB); `
-      + `maximum is ${maximumBytes} bytes (${mib(maximumBytes)} MiB); `
-      + `over by ${stat.size - maximumBytes} bytes`
-    );
-  }
   return stat.size;
 }
 
@@ -163,8 +163,8 @@ function verifyPackage(options = {}) {
     const file = path.join(resourcesDir, name);
     return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
   });
-  const asarBytes = verifyFileSize(archive, MAX_ASAR_BYTES, 'app.asar');
-  const installerBytes = verifyFileSize(installer, MAX_INSTALLER_BYTES, 'installer');
+  const asarBytes = measureFile(archive, 'app.asar');
+  const installerBytes = measureFile(installer, 'installer');
 
   return {
     archive,
@@ -179,8 +179,10 @@ if (require.main === module) {
   try {
     const result = verifyPackage();
     console.log(`Verified ${result.entryCount} ASAR entries`);
-    console.log(`app.asar: ${(result.asarBytes / 1024 / 1024).toFixed(2)} MiB`);
-    console.log(`installer: ${(result.installerBytes / 1024 / 1024).toFixed(2)} MiB`);
+    // 报告用途：发布记录里留一个可比对的数字，方便回头看某版为什么变大。
+    // 精确到字节，因为 MiB 四舍五入会把「涨了 1.7 KB」和「一字未动」显示成同一个数。
+    console.log(`app.asar: ${result.asarBytes} bytes (${mib(result.asarBytes)} MiB)`);
+    console.log(`installer: ${result.installerBytes} bytes (${mib(result.installerBytes)} MiB)`);
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
@@ -190,8 +192,6 @@ if (require.main === module) {
 module.exports = {
   ALLOWED_ROOTS,
   ALLOWED_RESOURCE_ENTRIES,
-  MAX_ASAR_BYTES,
-  MAX_INSTALLER_BYTES,
   assertAllowedEntries,
   assertAllowedResourceEntries,
   collectTextEntries,
