@@ -1,5 +1,5 @@
 /* ============================================================
-   摘星阁 · 双主题设计系统 v4（观感精修）
+   摘星阁 · 双主题设计系统 v5（质感深化）
    深空夜航（默认）—— OLED 墨蓝液态玻璃，夜航塔台气质
    宣纸白 —— 墨色纸面，报馆情报看板气质
 
@@ -12,6 +12,19 @@
    - 控件：导航、领域筛选、缩放档位统一为带底槽的分段控件；
      卡片底部的「星标 / 复制」从幽灵小字改为常态可见的描边按钮——
      开源给同事用，功能要让人找得到。
+
+   v5 在 v4 的骨架上做「第二眼质感」，全部是可降级的装饰层：
+   - 卡片：悬停浮起一道领域色的渐变压边（mask 挖空的 1px 光环，
+     不占布局、不抢标题），暗色主题下再叠一层同色系远光；
+     精选卡的底色微微向旗标色倾斜，不用翻元信息就能感到「这张不一样」。
+   - 徽记：技术突破胶囊加一道周期性扫光——它是全站价值最高的标记，
+     值得唯一的常驻动效；精选胶囊在暗色下带一点余辉。
+   - 微交互：星标落定时五角星轻轻回弹一下；主按钮悬停有缎面扫光；
+     导航指示块在暗色下带光晕；卡片标题悬停长出下划线而不是只变色。
+   - 氛围：深空主题偶尔划过一颗流星（约 16 秒一次、转瞬即灭），
+     宣纸白主题不出现；所有新动效都被 prefers-reduced-motion 兜住。
+   - 榜单：热点榜前三名改用旗标色渐变数字，热度条尽头的微光
+     让「还在升温」这件事看得见。
 
    字体：中文一律思源黑体（随包内置，见 fonts/source-han-sans-sc/），
          英文与数字一律 Times New Roman。二者靠一条字体栈同时生效——
@@ -161,6 +174,11 @@
   --pill-feat-bg: linear-gradient(135deg, rgba(252,163,93,.2), rgba(252,163,93,.08));
   --pill-feat-border: rgba(252,163,93,.45);
   --pill-feat-fg: #ffc592;
+
+  /* v5：缎面扫光（主按钮悬停、技术突破徽记周期扫过共用） */
+  --sheen: rgba(178, 244, 226, .22);
+  /* v5：精选卡的底色向旗标色微倾 */
+  --card-bg-featured: linear-gradient(172deg, color-mix(in srgb, var(--flag) 6.5%, #0d1429), #090f20);
 }
 
 /* —— 宣纸白主题 —— */
@@ -224,6 +242,9 @@
   --pill-feat-bg: linear-gradient(135deg, rgba(217,111,30,.13), rgba(217,111,30,.05));
   --pill-feat-border: rgba(217,111,30,.4);
   --pill-feat-fg: #a9520f;
+
+  --sheen: rgba(255, 255, 255, .6);
+  --card-bg-featured: linear-gradient(172deg, color-mix(in srgb, var(--flag) 5%, #fffdf8), rgba(253,251,246,.88));
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -345,6 +366,28 @@ body {
 @keyframes drift-a { to { transform: translate(-70px, 50px) scale(1.12); } }
 @keyframes drift-b { to { transform: translate(60px, -45px) scale(1.08); } }
 
+/* v5：偶发的流星。夜航氛围的最后一块拼图——不是持续存在的装饰，
+   而是「偶尔抬头正好看见」的那种东西：16 秒一轮，真正可见的窗口不到 2 秒。
+   只在深空主题出现；宣纸白是白天，白天没有流星。 */
+.comet {
+  position: absolute; top: 14%; left: 78%;
+  width: 2px; height: 2px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 6px 1.5px rgba(220, 235, 255, .55);
+  opacity: 0; will-change: transform, opacity;
+  animation: comet-fall 16s linear infinite;
+}
+.comet::before {
+  content: ''; position: absolute; right: 1px; top: 50%;
+  width: 5.5rem; height: 1px; transform: translateY(-50%);
+  background: linear-gradient(90deg, rgba(200, 224, 255, .55), transparent);
+}
+[data-theme="light"] .comet { display: none; }
+@keyframes comet-fall {
+  0%, 84% { opacity: 0; transform: translate(0, 0); }
+  86% { opacity: .95; }
+  93%, 100% { opacity: 0; transform: translate(-34vw, 19vh); }
+}
+
 .stars {
   position: absolute; inset: 0;
   background-image:
@@ -372,7 +415,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .aurora, .stars, .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot {
+  .aurora, .stars, .comet, .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot {
     animation: none !important;
   }
   *, *::before, *::after {
@@ -572,9 +615,10 @@ body {
   background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
   padding: .25rem .3125rem .25rem .625rem; font-size: var(--t-sm); font-family: var(--font-ui);
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              background var(--dur) var(--ease);
+              background var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-.lex-term:hover { color: var(--c-fg); border-color: var(--accent-line); background: var(--hover-bg); }
+/* v5：词条悬停轻轻浮起，命中数胶囊跟着擦亮 */
+.lex-term:hover { color: var(--c-fg); border-color: var(--accent-line); background: var(--hover-bg); transform: translateY(-1px); }
 .lex-count {
   min-width: 1.25rem; padding: 0 .3125rem; border-radius: 99px;
   background: var(--accent-soft); color: var(--accent-ink);
@@ -620,16 +664,27 @@ body {
               box-shadow var(--dur) var(--ease);
 }
 .btn-primary {
+  position: relative; overflow: hidden;
   border: 1px solid var(--accent-line);
   background: linear-gradient(135deg, var(--accent-soft), transparent);
   color: var(--accent-ink); font-weight: 700;
 }
+/* v5：主按钮悬停时的缎面扫光——动作按钮里最重的那一档，
+   指尖扫过像绸面反了一下光 */
+.btn-primary::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+  transform: skewX(-18deg); pointer-events: none;
+  transition: left var(--dur-slow) var(--ease-out);
+}
+.btn-primary:hover::after { left: 130%; }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px var(--accent-glow); border-color: var(--accent); }
 .btn-primary:active { transform: translateY(0) scale(.98); }
 .btn-ghost { border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim); }
 .btn-ghost:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
 .btn-ghost:active { transform: scale(.98); }
 .btn-primary:disabled, .btn-ghost:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
+.btn-primary:disabled::after { display: none; }
 .btn-ghost.is-busy, .btn-primary.is-busy { opacity: .7; cursor: progress; }
 
 /* ---------- 导航 ---------- */
@@ -681,6 +736,8 @@ body.is-scrolled .nav {
               height var(--dur-slow) var(--ease-out), opacity var(--dur) var(--ease);
   pointer-events: none;
 }
+/* v5：夜航里指示块带一圈青光晕，当前位置在导航条上一眼可辨 */
+[data-theme="dark"] .tab-indicator { box-shadow: 0 0 16px -4px var(--accent-glow); }
 
 /* 筛选与视图分开一层：导航答「看哪一类」，筛选答「在哪条线里收窄」。
    用一条细分隔把两者拆开，而不是混排在同一行里互相挤压。 */
@@ -965,6 +1022,46 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 @keyframes card-in { from { opacity: 0; transform: translateY(12px); } }
 
+/* v5：悬停时浮起的渐变压边。用 mask 把 1px 的渐变描边「挖」出来——
+   不占布局、不改盒模型，鼠标离开时整层淡出，比换 border-color 更有光泽。
+   压边的颜色跟着领域走：低空经济泛青、商业航天泛靛、精选泛旗标橙。 */
+.card::before {
+  content: ''; position: absolute; inset: -1px; z-index: 1;
+  border-radius: calc(var(--radius-lg) + 1px);
+  padding: 1px;
+  background: linear-gradient(135deg, var(--glass-border-strong), transparent 42%, transparent 62%, var(--glass-border-strong));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+.card[data-domain="lowaltitude"]::before {
+  background: linear-gradient(135deg, var(--accent-line), transparent 42%, transparent 62%, var(--accent-line));
+}
+.card[data-domain="aerospace"]::before {
+  background: linear-gradient(135deg, var(--second-line), transparent 42%, transparent 62%, var(--second-line));
+}
+.card.is-featured::before {
+  background: linear-gradient(135deg, var(--flag-line), transparent 42%, transparent 62%, var(--flag-line));
+}
+.card:hover::before { opacity: .85; }
+
+/* v5：暗色下悬停再叠一层同领域色系的远光，卡片像被塔台的探照灯扫到 */
+[data-theme="dark"] .card[data-domain="lowaltitude"]:hover {
+  box-shadow: var(--card-shadow-lift), 0 16px 44px -20px var(--accent-ring);
+}
+[data-theme="dark"] .card[data-domain="aerospace"]:hover {
+  box-shadow: var(--card-shadow-lift), 0 16px 44px -20px var(--second-line);
+}
+[data-theme="dark"] .card.is-featured:hover {
+  box-shadow: var(--card-shadow-lift), 0 16px 44px -20px var(--flag-glow);
+}
+
+/* v5：精选卡底色向旗标色微倾——不翻元信息也能感到「这张不一样」 */
+.card.is-featured { background: var(--card-bg-featured); }
+
 /* 领域左缘色条：用颜色说出「这是哪条线」，不再靠元信息里的文字标签。
    青色=低空经济，靛色=商业航天；与领域胶囊的选中态同色系。 */
 .card[data-domain="lowaltitude"] { border-left: 3px solid var(--accent-line); }
@@ -1004,11 +1101,17 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .card-title {
   font-size: var(--t-lg); font-weight: 700; line-height: 1.5;
   letter-spacing: .012em;
-  color: var(--c-fg); text-decoration: none; cursor: pointer; display: block;
+  color: var(--c-fg); cursor: pointer; display: block;
   text-wrap: pretty;
-  transition: color var(--dur) var(--ease);
+  /* v5：悬停不只是变色，下划线从透明里「长」出来——多行标题也逐行贴合，
+     这是 text-decoration 相对背景渐变方案的决定性优势 */
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .22em;
+  transition: color var(--dur) var(--ease), text-decoration-color var(--dur) var(--ease);
 }
-.card-title:hover { color: var(--accent-ink); }
+.card-title:hover { color: var(--accent-ink); text-decoration-color: var(--accent-line); }
 
 .card-summary {
   margin-top: .4375rem; font-size: var(--t-md); color: var(--c-fg-dim);
@@ -1079,12 +1182,14 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* 事件簇展开项里的等级小标 */
 .ci-tier { font-family: var(--font-mono); font-size: var(--t-2xs); padding: 0 .3125rem; border-radius: .25rem; }
 
-/* 精选卡：左缘旗标加粗并整体微染，区别于普通卡但不再叠加彩色描边 */
+/* 精选卡：左缘旗标加粗并整体微染，区别于普通卡但不再叠加彩色描边。
+   v5：侧条拉通到接近全高，顶端实、尾端渐隐，像一枚插在卡片边缘的书签。 */
 .card.is-featured { border-left: 3px solid var(--flag-line); }
 .card.is-featured::after {
-  content: ''; position: absolute; left: 0; top: 14%; bottom: 14%; width: 2.5px;
-  border-radius: 2px; background: linear-gradient(var(--flag), transparent);
-  opacity: .7;
+  content: ''; position: absolute; left: 0; top: 7%; bottom: 7%; width: 2.5px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--flag), color-mix(in srgb, var(--flag) 55%, transparent) 55%, transparent);
+  opacity: .85;
 }
 [data-theme="dark"] .card.is-featured::after { box-shadow: 0 0 10px var(--flag-glow); }
 
@@ -1101,6 +1206,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .score-pill.featured {
   background: var(--pill-feat-bg); border-color: var(--pill-feat-border); color: var(--pill-feat-fg);
 }
+/* v5：精选胶囊在夜航里带一点余辉，和顶栏「今日精选」数字的辉光同一口径 */
+[data-theme="dark"] .score-pill.featured { box-shadow: 0 0 14px -5px var(--flag-glow); }
 .score-pill svg { width: .625rem; height: .625rem; }
 .card-score-group {
   display: flex;
@@ -1111,6 +1218,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   flex-shrink: 0;
 }
 .breakthrough-pill {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: .3125rem;
@@ -1122,6 +1231,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   font-size: var(--t-xs);
   font-weight: 700;
   white-space: nowrap;
+}
+/* v5：技术突破是全站价值最高的标记，配唯一的常驻动效——
+   一道缎面扫光每 4 秒掠过一次，其余时间它和别的胶囊一样安静 */
+.breakthrough-pill::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+  transform: skewX(-18deg); pointer-events: none;
+  animation: pill-sheen 4.2s var(--ease) infinite;
+}
+@keyframes pill-sheen {
+  0%, 55% { left: -70%; }
+  85%, 100% { left: 130%; }
 }
 .breakthrough-pill b {
   color: var(--flag);
@@ -1136,8 +1257,12 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   color: var(--c-fg-faint); min-width: 2.5rem; text-align: center; padding-top: var(--sp-3);
   font-variant-numeric: tabular-nums;
 }
-.card-rank.top { color: var(--flag); }
-[data-theme="dark"] .card-rank.top { text-shadow: 0 0 18px var(--flag-glow); }
+/* v5：热点榜前三名从纯色升级为渐变数字，暗色下保留辉光 */
+.card-rank.top {
+  background: linear-gradient(180deg, var(--flag-ink), var(--flag));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+[data-theme="dark"] .card-rank.top { text-shadow: none; filter: drop-shadow(0 0 10px var(--flag-glow)); }
 .rank-row { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 0 .625rem; padding-bottom: var(--sp-3); }
 
 /* —— 卡片底部操作条 —— */
@@ -1182,6 +1307,11 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .star-toggle.is-on {
   color: var(--flag-ink); border-color: var(--flag-line); background: var(--flag-soft);
 }
+/* v5：星标落定的一颗回弹——「收好了」需要一点身体上的确认感。
+   动画挂在 .is-on 上，每次点亮都会重放一次；首次渲染带星卡片时
+   也会轻轻弹一下，配合卡片错峰入场，像星标依次归位。 */
+.star-toggle.is-on svg { animation: star-pop var(--dur-slow) var(--ease-spring); transform-origin: center; }
+@keyframes star-pop { 40% { transform: scale(1.28) rotate(-10deg); } }
 .star-toggle.is-on:hover { color: var(--flag); border-color: var(--flag); }
 
 /* 导出工具条：把「当前这批情报」整份带走 */
@@ -1251,6 +1381,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   background: linear-gradient(90deg, var(--second), var(--accent));
   transform-origin: left; animation: dim-grow var(--dur-slow) var(--ease-out);
 }
+/* v5：进度条尽头一点微光，「分数走到这里」这件事变得可感 */
+[data-theme="dark"] .dim-bar i { box-shadow: 0 0 7px -1px var(--accent-ring); }
 .breakthrough-explanation {
   flex: 1 1 100%;
   min-width: min(100%, 18rem);
@@ -1294,14 +1426,22 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: var(--sp-2);
   padding: var(--sp-2) .375rem; border-radius: var(--radius-sm); text-decoration: none;
   border-left: 2px solid transparent;
-  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              transform var(--dur) var(--ease);
 }
-.hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); }
+/* v5：悬停时条目向右轻轻一让，像给指尖让出半个身位 */
+.hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); transform: translateX(2px); }
 .hot-item .hi-rank {
   font-family: var(--font-mono); font-size: var(--t-base); font-weight: 700;
   color: var(--c-fg-faint); text-align: center; padding-top: 1px; font-variant-numeric: tabular-nums;
 }
 .hot-item:nth-child(-n+5) .hi-rank { color: var(--flag); }
+/* v5：前三名用渐变数字，榜上最热的三条一眼跳出版面 */
+.hot-item:nth-child(-n+3) .hi-rank {
+  background: linear-gradient(180deg, var(--flag-ink), var(--flag));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+[data-theme="dark"] .hot-item:nth-child(-n+3) .hi-rank { filter: drop-shadow(0 0 6px var(--flag-glow)); }
 .hot-item .hi-title {
   font-size: var(--t-base); color: var(--c-fg); line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

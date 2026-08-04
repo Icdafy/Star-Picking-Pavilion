@@ -130,7 +130,7 @@ test('package verifier accepts only application roots, production dependencies a
   }
 });
 
-test('v0.0.15 exposes no package size ceiling at all', () => {
+test('v0.0.16 exposes no package size ceiling at all', () => {
   // 体积上限已取消：不再导出任何 MAX_*_BYTES，也不许有别的名字把它换个马甲装回来。
   // 这条断言存在的意义是防止「先加个宽松上限，再慢慢收紧」——那正是 v0.0.11→v0.0.14 走过一遍的路。
   const sizeLimitExports = Object.keys(verifier)
@@ -186,6 +186,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical package version', () => {
-  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.15.exe');
+  assert.equal(expectedInstallerName(packageJson.version), 'Star-Picking-Pavilion-Setup-0.0.16.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.version)), '.exe');
 });

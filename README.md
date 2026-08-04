@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.15.exe`，双击并按向导安装。v0.0.15 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.16.exe`，双击并按向导安装。v0.0.16 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.15.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.16.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -29,6 +29,8 @@ v0.0.12 新增完整的本地存储治理：设置页分别展示情报数据库
 v0.0.13 新增可选的每日研究归档：开启后先由系统原生弹窗选择本地文件夹，此后每天本地时间 08:00 自动保存过去 24 小时的完整新闻记录、可读简报和校验清单；启动、唤醒或解锁后会自动补齐漏存日期，且不会覆盖已有档案。低空经济与商业航天中经过信源和完成性门槛验证的技术突破，同时获得可解释的热度加成与更长衰减周期。
 
 v0.0.14 把情报处理补成完整的八段式管线：结构化、数据清洗、预筛、标注、实体提取、原子事件分离、聚类、语义合并。入库前规范化地址与标题正文，同一篇文章从不同入口进来只落库一条；实体走词库与模型双通道合并并做别名归一，点击卡片上的实体即按它检索；一条资讯里的多件事被拆成「主体 · 动作 · 客体」，同一件事的不同措辞落到同一个事件键，字面相似度并不到的报道由语义合并补齐。全部模型调用统一到 `deepseek-v4-flash`（当前指向 DeepSeek-V4-Flash-0731），`deepseek-v4-pro` 与两段式模型配置已移除；新增的四段全部是纯代码，模型请求数与升级前持平。
+
+v0.0.16 只做前端质感深化（设计系统 v5）：卡片悬停浮起领域色渐变压边并叠同色系远光，精选卡底色向旗标色微倾、左缘书签拉通全高；深空主题偶有流星划过；技术突破胶囊配周期性缎面扫光，精选胶囊与五维进度条尽头带余辉；星标回弹、主按钮扫光、标题逐行下划线、热点榜前三渐变数字等微交互全部接入 prefers-reduced-motion。信息架构、功能、数据与设置全部不变。
 
 ## 主要功能
 
@@ -221,7 +223,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.15 --artifacts
+npm run verify:version -- --tag v0.0.16 --artifacts
 npm run notices
 ```
 
