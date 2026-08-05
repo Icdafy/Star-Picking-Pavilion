@@ -133,7 +133,7 @@
 <!-- 主内容 -->
 <main id="main">
   <section id="viewFeed" class="view" role="tabpanel">
-    <div class="search-context" id="searchContext" hidden></div>
+    <div class="search-context" id="searchContext" role="status" aria-live="polite" hidden></div>
     <div class="feed-banner" id="feedBanner" hidden></div>
     <div class="feed-toolbar">
       <p class="feed-toolbar-note" id="feedToolbarNote"></p>
@@ -144,10 +144,10 @@
           title="把当前筛选下的情报存成 Markdown 文件">导出 .md</button>
       </div>
     </div>
-    <button class="new-flash" id="newFlash" hidden></button>
+    <button class="new-flash" id="newFlash" aria-live="polite" hidden></button>
     <div class="feed-layout">
       <div>
-        <div id="feedList" class="feed-list" aria-live="polite"></div>
+        <div id="feedList" class="feed-list" tabindex="-1"></div>
         <div class="feed-foot">
           <button class="btn-ghost" id="btnMore" hidden>加载更多</button>
           <div class="feed-end" id="feedEnd" hidden>— 风已捕尽 —</div>
@@ -206,7 +206,7 @@
       <h2 class="view-title">信源监控台</h2>
       <button class="btn-primary" id="btnAddSource">+ 提报信源</button>
     </div>
-    <div id="sourcesList" class="src-list"></div>
+    <div id="sourcesList" class="src-list" tabindex="-1"></div>
   </section>
 
   <section id="viewSettings" class="view" role="tabpanel" hidden>
@@ -433,6 +433,7 @@
           <li><span>聚焦检索框</span><kbd>/</kbd><kbd>Ctrl</kbd><kbd>K</kbd></li>
           <li><span>清空检索并退出输入</span><kbd>Esc</kbd></li>
           <li><span>切换第 1–8 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>8</kbd></li>
+          <li><span>焦点在导航上时切换相邻视图</span><kbd>←</kbd><kbd>→</kbd></li>
           <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
           <li><span>复制当前列表为文本</span><kbd>Alt</kbd><kbd>C</kbd></li>
@@ -477,6 +478,18 @@
     <div class="btn-row">
       <button class="btn-primary" value="ok">保存</button>
       <button class="btn-ghost" value="cancel" formnovalidate>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 破坏性操作的确认弹窗：与玻璃拟态同源，替代系统原生灰窗 -->
+<dialog id="confirmDialog" class="glass-dialog confirm-dialog" aria-labelledby="confirmDialogTitle">
+  <form method="dialog">
+    <h3 id="confirmDialogTitle">请确认</h3>
+    <p id="confirmDialogMessage" class="confirm-message"></p>
+    <div class="btn-row">
+      <button class="btn-primary" value="ok" id="confirmDialogOk">确定</button>
+      <button class="btn-ghost" value="cancel">取消</button>
     </div>
   </form>
 </dialog>

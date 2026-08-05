@@ -155,9 +155,30 @@ function toast(msg, isError) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.toggle('error', !!isError);
+  // 连续触发时强制重放弹簧入场：文本变了但气泡原地不动，用户分辨不出
+  // 「这是一条新消息」——撤下再挂上，与 switchView 重放视图入场同款手法
+  el.classList.remove('show');
+  void el.offsetWidth;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  // 驻留时长随字数走：短消息不晾着碍事，长消息让人读得完
+  const hold = Math.min(6000, 2400 + String(msg).length * 45);
+  toastTimer = setTimeout(() => el.classList.remove('show'), hold);
+}
+
+// ---------- 主题化确认 ----------
+// 破坏性操作的最后一道关卡。原生 confirm() 的系统灰窗与玻璃拟态设计语言
+// 完全脱节，且无法随主题、缩放档位变化；换上同源的 <dialog>。
+function confirmGlass(message, { title = '请确认', okText = '确定' } = {}) {
+  const dialog = $('#confirmDialog');
+  $('#confirmDialogTitle').textContent = title;
+  $('#confirmDialogMessage').textContent = message;
+  $('#confirmDialogOk').textContent = okText;
+  return new Promise(resolve => {
+    // method="dialog" 的表单把按钮 value 写进 returnValue；Esc/外点关闭一律视为取消
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok'), { once: true });
+    dialog.showModal();
+  });
 }
 
 // ---------- 剪贴板与文件导出 ----------
@@ -436,11 +457,11 @@ function cardInner(item) {
   // 留存与分发的入口固定在每张卡片上：星标留给自己，复制传给别人
   const actions = `
     <span class="card-foot-gap"></span>
-    <button class="card-act" data-act="copy" type="button" title="复制标题与链接">
+    <button class="card-act" data-act="copy" data-focus-key="copy:${item.id}" type="button" title="复制标题与链接">
       <svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 4.5v-1a1.5 1.5 0 0 0-1.5-1.5H3a1.5 1.5 0 0 0-1.5 1.5V8A1.5 1.5 0 0 0 3 9.5h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       复制
     </button>
-    <button class="card-act star-toggle${item.starred ? ' is-on' : ''}" data-act="star" type="button"
+    <button class="card-act star-toggle${item.starred ? ' is-on' : ''}" data-act="star" data-focus-key="star:${item.id}" type="button"
       aria-pressed="${item.starred ? 'true' : 'false'}" title="${item.starred ? '取消星标' : '星标留存（不受保留天数清理）'}">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="${item.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
       <span class="card-act-label">${item.starred ? '已星标' : '星标'}</span>
@@ -491,7 +512,10 @@ function parseLocalDate(value) {
 }
 
 document.addEventListener('error', event => {
-  if (event.target?.matches?.('img.card-thumb')) event.target.remove();
+  // 缩略图加载失败只隐去图形、保留占位：移除节点会让卡片正文横向撑开，
+  // 列表里出现一次可见的布局抖动
+  const img = event.target;
+  if (img?.matches?.('img.card-thumb')) img.classList.add('is-broken');
 }, true);
 
 // 时间轴的时间基准：星标视图按收藏时间排序，分组标题就必须同样用收藏时间，
@@ -543,13 +567,20 @@ function renderRanked(items, startIdx) {
 }
 
 function skeletons(n = 5) {
+  // 尺寸一律 rem：跟着界面缩放档位一起走，否则放大版面后骨架与真实卡片的
+  // 高度差会被进一步拉大，加载完成瞬间的跳变更明显
   return Array.from({ length: n }, () => `
-    <div class="card skeleton" style="margin-bottom:14px">
+    <div class="card skeleton" style="margin-bottom:.875rem">
       <div class="sk-line" style="width:70%"></div>
-      <div class="sk-line" style="width:38%;height:10px"></div>
-      <div class="sk-line" style="width:95%;height:11px"></div>
+      <div class="sk-line" style="width:38%;height:.625rem"></div>
+      <div class="sk-line" style="width:95%;height:.6875rem"></div>
     </div>`).join('');
 }
+
+// 骨架屏的最短驻留：本地接口常不到 100ms 返回，没有下限的话骨架只是
+// 一闪而过的噪点，比不显示更晃眼
+const SKELETON_MIN_MS = 240;
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // 检索上下文条：明确当前处于检索态，并给出一键退出
 function renderSearchContext() {
@@ -572,13 +603,18 @@ async function loadFeed(reset = true) {
   const request = feedRequestGuard.begin();
   state.loading = true;
   const list = $('#feedList');
+  // 整表替换会丢掉键盘焦点——先记住焦点所在的控件，渲染后归还
+  const focusKey = reset ? DomUtils.findFocusKey(list) : null;
   if (reset) { state.page = 0; state.listed = 0; list.innerHTML = skeletons(); $('#newFlash').hidden = true; }
   try {
     const params = new URLSearchParams({ view: state.view, page: state.page });
     if (state.domain) params.set('domain', state.domain);
     if (state.category) params.set('category', state.category);
     if (state.q) params.set('q', state.q);
-    const data = await api('/api/feed?' + params);
+    const [data] = await Promise.all([
+      api('/api/feed?' + params),
+      reset ? delay(SKELETON_MIN_MS) : Promise.resolve()
+    ]);
     if (!request.isCurrent()) return;
     const startIdx = state.page * 30;
     const html = state.view === 'hot'
@@ -610,18 +646,32 @@ async function loadFeed(reset = true) {
     syncFeedToolbar(data.items.length > 0 || state.listed > 0);
     $('#btnMore').hidden = !data.hasMore;
     $('#feedEnd').hidden = data.hasMore || !data.items.length;
+    if (reset && focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
   } catch (e) {
     if (!request.isCurrent()) return;
-    if (reset) list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>后端连接失败：${esc(e.message)}</p></div>`;
+    // 失败不是终点：给出重试动作，而不是留一行死文字让人去找全局刷新
+    if (reset) list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>后端连接失败：${esc(e.message)}</p>
+      <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-feed">重试</button></div>`;
   } finally {
     if (request.isCurrent()) state.loading = false;
   }
 }
 
 // ---------- 右侧热度栏 ----------
+function hotRailSkeletons() {
+  return Array.from({ length: 3 }, () => `
+    <div class="hot-item skeleton" aria-hidden="true">
+      <span class="hi-rank sk-line" style="width:1.2rem"></span>
+      <span><span class="sk-line" style="width:88%"></span><span class="sk-line" style="width:52%;height:.625rem"></span></span>
+    </div>`).join('');
+}
+
+// 首屏先给骨架占位，别让右栏空白地等响应；之后的轮询原地更新，不整列重放动画
 async function loadHotRail() {
   const box = $('#hotRailList');
   const request = hotRailRequestGuard.begin();
+  const firstPaint = !box.dataset.painted;
+  if (firstPaint) box.innerHTML = hotRailSkeletons();
   try {
     const params = new URLSearchParams({ view: 'hot', page: 0 });
     if (state.domain) params.set('domain', state.domain);
@@ -629,8 +679,9 @@ async function loadHotRail() {
     if (!request.isCurrent()) return;
     const top = data.items.slice(0, 10);
     if (!top.length) { box.innerHTML = '<div class="hot-rail-sub">暂无热点</div>'; return; }
+    box.dataset.painted = '1';
     box.innerHTML = top.map((it, i) => `
-      <a class="hot-item" href="${safeUrl(it.url)}" target="_blank" rel="noopener" title="${esc(it.title)}">
+      <a class="hot-item" href="${safeUrl(it.url)}" target="_blank" rel="noopener" title="${esc(it.title)}"${firstPaint ? ` style="animation-delay:${Math.min(i, 9) * 40}ms"` : ' style="animation:none"'}>
         <span class="hi-rank">${i + 1}</span>
         <span>
           <span class="hi-title">${esc(it.title)}</span>
@@ -685,6 +736,7 @@ async function toggleStar(card, button) {
 
 // 卡片交互：星标 / 复制 / 展开五维 / 事件簇
 $('#feedList').addEventListener('click', async e => {
+  if (e.target.closest('[data-act="retry-feed"]')) { loadFeed(); return; }
   const actionBtn = e.target.closest('.card-act');
   if (actionBtn) {
     const card = actionBtn.closest('.card');
@@ -714,7 +766,9 @@ $('#feedList').addEventListener('click', async e => {
     tgl.classList.toggle('open');
     if (box.hidden && !box.dataset.loaded) {
       box.hidden = false;
-      box.innerHTML = '<div class="sk-line" style="width:60%"></div>';
+      // 骨架要包在 .skeleton 里才有高度与微光——裸 .sk-line 是个隐形元素，
+      // 点击后到数据到达前看起来「毫无反应」
+      box.innerHTML = '<div class="skeleton"><div class="sk-line" style="width:60%"></div></div>';
       try {
         const items = await api('/api/cluster/' + tgl.dataset.cluster);
         const selfId = Number(tgl.dataset.self);
@@ -759,7 +813,10 @@ async function loadDaily(date) {
   const body = $('#dailyBody');
   body.innerHTML = skeletons(3);
   try {
-    const data = await api('/api/daily' + (date ? `?date=${date}` : ''));
+    const [data] = await Promise.all([
+      api('/api/daily' + (date ? `?date=${date}` : '')),
+      delay(SKELETON_MIN_MS)
+    ]);
     if (!request.isCurrent()) return;
     const r = data.report;
     state.dailyDate = r.date;
@@ -786,9 +843,14 @@ async function loadDaily(date) {
       </div>`).join('');
   } catch (e) {
     if (!request.isCurrent()) return;
-    body.innerHTML = `<div class="empty-state glass"><p>日报加载失败：${esc(e.message)}</p></div>`;
+    body.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>日报加载失败：${esc(e.message)}</p>
+      <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-daily">重试</button></div>`;
   }
 }
+
+$('#dailyBody').addEventListener('click', event => {
+  if (event.target.closest('[data-act="retry-daily"]')) loadDaily(state.dailyDate);
+});
 
 function shiftDaily(days) {
   const cur = state.dailyDate ? parseLocalDate(state.dailyDate) : new Date();
@@ -825,9 +887,14 @@ $('#dailyRegen').addEventListener('click', async () => {
 // ---------- 信源 ----------
 async function loadSources() {
   const list = $('#sourcesList');
+  // 每次操作后整表重载会丢键盘焦点——先记下，渲染后归还
+  const focusKey = DomUtils.findFocusKey(list);
   list.innerHTML = skeletons(4);
   try {
-    const sources = await api('/api/sources');
+    const [sources] = await Promise.all([
+      api('/api/sources'),
+      delay(SKELETON_MIN_MS)
+    ]);
     list.innerHTML = sources.map(s => {
       const st = !s.enabled ? 'idle' : s.last_status?.startsWith('error') ? 'err' : s.last_status === 'ok' ? 'ok' : 'idle';
       const health = s.health || {};
@@ -854,20 +921,23 @@ async function loadSources() {
         </div>
         ${s.note ? `<div class="src-meta" style="margin-top:4px">${esc(s.note)}</div>` : ''}
         <div class="src-actions">
-          <button data-act="toggle">${s.enabled ? '停用' : '启用'}</button>
-          ${health.pausedUntil ? '<button data-act="retry">立即重试</button>' : ''}
-          <button data-act="remove" class="danger"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
+          <button data-act="toggle" data-focus-key="src-toggle:${s.id}">${s.enabled ? '停用' : '启用'}</button>
+          ${health.pausedUntil ? `<button data-act="retry" data-focus-key="src-retry:${s.id}">立即重试</button>` : ''}
+          <button data-act="remove" class="danger" data-focus-key="src-remove:${s.id}"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
         </div>
       </div>`;
     }).join('');
+    if (focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
   } catch (e) {
-    list.innerHTML = `<div class="empty-state glass"><p>加载失败：${esc(e.message)}</p></div>`;
+    list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>加载失败：${esc(e.message)}</p>
+      <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-sources">重试</button></div>`;
   }
 }
 
 $('#sourcesList').addEventListener('click', async e => {
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
+  if (btn.dataset.act === 'retry-sources') { loadSources(); return; }
   const id = btn.closest('.src-card').dataset.id;
   try {
     if (btn.dataset.act === 'toggle') {
@@ -881,7 +951,7 @@ $('#sourcesList').addEventListener('click', async e => {
       loadSources();
     } else if (btn.dataset.act === 'remove') {
       if (btn.disabled) return;
-      if (!confirm('确定将该信源移出监控？已采集文章和信源记录都会保留。')) return;
+      if (!await confirmGlass('确定将该信源移出监控？已采集文章和信源记录都会保留。', { title: '移出信源', okText: '移出监控' })) return;
       await api(`/api/sources/${id}`, { method: 'DELETE' });
       toast('信源已移出监控');
       loadSources();
@@ -1079,7 +1149,7 @@ $('#btnSaveAi').addEventListener('click', async () => {
 });
 
 $('#btnClearAiKey').addEventListener('click', async () => {
-  if (!confirm('确定清除已由 Windows 安全保存的 AI API Key？清除后将使用关键词启发式降级模式。')) return;
+  if (!await confirmGlass('确定清除已由 Windows 安全保存的 AI API Key？清除后将使用关键词启发式降级模式。', { title: '清除密钥', okText: '清除' })) return;
   try {
     await settingsForm.clearApiKey();
     toast('AI API Key 已清除');
@@ -1300,6 +1370,19 @@ function switchView(view, { persist = true } = {}) {
 
 $$('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
 
+// APG 标签页约定：焦点落在标签上时，方向键在标签间移动并即选即切
+$('.nav-tabs').addEventListener('keydown', event => {
+  if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+  const tabs = $$('.tab');
+  const current = tabs.indexOf(document.activeElement);
+  if (current < 0) return;
+  const step = event.key === 'ArrowRight' ? 1 : tabs.length - 1;
+  const next = tabs[(current + step) % tabs.length];
+  next.focus();
+  switchView(next.dataset.view);
+  event.preventDefault();
+});
+
 function setDomain(domain, { persist = true, load = true } = {}) {
   state.domain = domain;
   // 选择器必须限定在领域胶囊内：页面上还有别处用同一视觉形态的按钮（如设置页的
@@ -1466,6 +1549,7 @@ async function loadLexicon(force = false) {
 
 function setLexiconOpen(open) {
   lexiconPanel.hidden = !open;
+  lexiconPanel.classList.toggle('is-open', open);
   lexiconToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   lexiconToggle.classList.toggle('is-on', open);
   if (open) {

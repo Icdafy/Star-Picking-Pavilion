@@ -314,7 +314,8 @@ body {
 .card-title:focus-visible, .cluster-toggle:focus-visible, .dims-toggle:focus-visible,
 .hot-item:focus-visible, .daily-item a:focus-visible, .src-actions button:focus-visible,
 .search-clear:focus-visible, .to-top:focus-visible, .common-links-category:focus-visible,
-.common-links-favorite:focus-visible, .common-links-open:focus-visible {
+.common-links-favorite:focus-visible, .common-links-open:focus-visible,
+.lexicon-toggle:focus-visible, .lex-term:focus-visible, .search-context button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
@@ -569,6 +570,9 @@ body {
    滚动正文之上的浮层，透过去就没法读了。与提报信源的对话框同样处理：给足底色。 */
 [data-theme="dark"] .lexicon-panel { background: linear-gradient(165deg, rgba(20,28,58,.97), rgba(10,16,38,.98)); }
 [data-theme="light"] .lexicon-panel { background: linear-gradient(168deg, rgba(255,255,255,.98), rgba(252,250,244,.97)); }
+/* v6：面板从顶栏下方浮出——与对话框同源的入场，收起仍是瞬时（Esc/外点不该拖泥带水）。
+   开合态走 .is-open 类（由 setLexiconOpen 维护），不写 :not([hidden]) 补丁规则 */
+.lexicon-panel.is-open { animation: dialog-in var(--dur-slow) var(--ease-out); }
 .lexicon-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
 .lexicon-head h3 {
   font-family: var(--font-display); font-size: var(--t-lg);
@@ -686,6 +690,16 @@ body {
 .btn-primary:disabled, .btn-ghost:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
 .btn-primary:disabled::after { display: none; }
 .btn-ghost.is-busy, .btn-primary.is-busy { opacity: .7; cursor: progress; }
+
+/* v6：全站按压反馈。悬停答「我在这里」，按压答「按下去了」——
+   此前只有四个按钮有 :active，其余控件按下去毫无身体感。 */
+.tab:active, .pill:active, .chip:active, .card-act:active, .lex-term:active,
+.rt-toggle:active, .new-flash:active, .search-context button:active,
+.src-actions button:active, .note-remove:active, .common-links-category:active,
+.common-links-favorite:active, .scale-option:active, .update-pill.ready:active,
+.cluster-toggle:active, .dims-toggle:active, .hot-item:active {
+  transform: scale(.97);
+}
 
 /* ---------- 导航 ---------- */
 /* v4：导航是全局唯一的玻璃浮层（内容卡片已落回素色），它需要在滚动时
@@ -1013,7 +1027,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   /* 首屏之外的卡片跳过布局与绘制，长列表滚动明显更省；
      已渲染高度由 intrinsic-size 占位，滚动条不回跳 */
   content-visibility: auto;
-  contain-intrinsic-size: auto 14rem;
+  /* 带缩略图/研判的卡片实际多在 18–22rem，估值偏低会让首屏外卡片
+     滚动进入时滚动条轻微回跳 */
+  contain-intrinsic-size: auto 18rem;
 }
 .card:hover {
   transform: translateY(-2px);
@@ -1118,6 +1134,10 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .card.expanded .card-summary { -webkit-line-clamp: unset; }
+
+/* v6：缩略图加载失败保留占位、只隐去图形——直接移除节点会让卡片正文
+   横向撑开，造成可见的布局抖动 */
+.card-thumb.is-broken { visibility: hidden; }
 
 .card-tags { display: flex; gap: .375rem; margin-top: .5625rem; flex-wrap: wrap; }
 .card-tag {
@@ -1431,6 +1451,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 /* v5：悬停时条目向右轻轻一让，像给指尖让出半个身位 */
 .hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); transform: translateX(2px); }
+/* v6：首次上榜时错峰入场（错峰延时由脚本内联）；后续轮询静默更新，
+   脚本会给条目补 animation:none，不会每 18 秒整列重放一次 */
+.hot-item { animation: flash-in var(--dur-slow) var(--ease-out) backwards; }
 .hot-item .hi-rank {
   font-family: var(--font-mono); font-size: var(--t-base); font-weight: 700;
   color: var(--c-fg-faint); text-align: center; padding-top: 1px; font-variant-numeric: tabular-nums;
@@ -1452,7 +1475,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 /* 骨架屏 */
 .skeleton { pointer-events: none; }
-.skeleton .sk-line {
+.skeleton .sk-line, .cluster-items .sk-line {
   height: .875rem; border-radius: .4375rem; margin: var(--sp-2) 0;
   background: linear-gradient(90deg, var(--hover-bg) 25%, var(--rail-line) 50%, var(--hover-bg) 75%);
   background-size: 200% 100%;
@@ -1466,6 +1489,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   opacity: .45; letter-spacing: .25em; color: var(--c-fg-dim);
 }
 .empty-state p { margin-top: .625rem; font-size: var(--t-base); }
+/* v6：加载失败的空态给出恢复动作，而不是留一行死文字 */
+.empty-state .es-retry { margin-top: var(--sp-4); }
 
 /* ---------- 日报 ---------- */
 .daily-head { display: flex; align-items: center; gap: var(--sp-5); padding: var(--sp-4) var(--sp-6); margin-bottom: var(--sp-5); }
@@ -2054,6 +2079,14 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 @keyframes dialog-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
 .glass-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(4px); }
 .glass-dialog h3 { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 800; letter-spacing: .06em; margin-bottom: var(--sp-5); }
+
+/* v6：主题化确认框——破坏性操作的最后一道关卡，替代与设计语言脱节的系统原生灰窗 */
+.confirm-dialog { width: 24rem; }
+.confirm-message {
+  margin: 0 0 var(--sp-5);
+  font-family: var(--font-body); font-size: var(--t-base); line-height: 1.9;
+  color: var(--c-fg-dim); text-wrap: pretty;
+}
 
 .toast {
   position: fixed; bottom: var(--sp-7); left: 50%; transform: translate(-50%, 20px);

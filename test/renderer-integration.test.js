@@ -364,7 +364,7 @@ test('daily loading begins a production request token and guards response and er
   const source = app.slice(start, end);
 
   assert.match(source, /const request = dailyRequestGuard\.begin\(\)/);
-  assert.match(source, /const data = await api\(/);
+  assert.match(source, /const \[data\] = await Promise\.all\(\[\s*api\(/);
   assert.match(source, /if \(!request\.isCurrent\(\)\) return/);
   assert.match(source, /catch \(e\)\s*\{[\s\S]*if \(!request\.isCurrent\(\)\) return/);
 });
@@ -494,7 +494,7 @@ test('v4 卡片使用领域色条、异步缩略图与样式表托管的日报�
 test('长信息流与日报跳过离屏渲染但保留固有占位', () => {
   assert.match(
     css,
-    /\.card\s*\{[^}]*content-visibility:\s*auto;[^}]*contain-intrinsic-size:\s*auto 14rem;/s
+    /\.card\s*\{[^}]*content-visibility:\s*auto;[^}]*contain-intrinsic-size:\s*auto 18rem;/s
   );
   assert.match(
     css,
@@ -538,7 +538,9 @@ test('信息流重载以最后一次请求为准，加载途中切换筛选不�
   assert.match(app, /if \(!reset && state\.loading\) return;/);
   assert.match(app, /const request = feedRequestGuard\.begin\(\);/);
   // 过期响应既不能改 DOM，也不能提前解除 loading 标志
-  assert.match(app, /const data = await api\('\/api\/feed\?' \+ params\);\s*\n\s*if \(!request\.isCurrent\(\)\) return;/);
+  assert.match(app, /const \[data\] = await Promise\.all\(\[\s*api\('\/api\/feed\?' \+ params\),[\s\S]{0,120}?\]\);\s*\n\s*if \(!request\.isCurrent\(\)\) return;/);
+  // 骨架屏有最短驻留：本地接口毫秒级返回时，骨架不该只是一闪而过的噪点
+  assert.match(app, /const SKELETON_MIN_MS = \d+;/);
   assert.match(app, /if \(request\.isCurrent\(\)\) state\.loading = false;/);
 });
 
