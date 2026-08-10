@@ -1,0 +1,808 @@
+﻿diff --git a/renderer/styles.css b/renderer/styles.css
+index 8fcd736..80253de 100644
+--- a/renderer/styles.css
++++ b/renderer/styles.css
+@@ -36,6 +36,18 @@
+          soft锛堣儗鏅檿鏌擄級銆乴ine锛堟弿杈癸級涓夋。锛屼富棰樺彧闇€瑕嗗啓浠ょ墝鏈韩銆?    鎬濇簮榛戜綋鐨?@font-face 鍒嗙墖澹版槑鍦?fonts/source-han-sans-sc/index.css锛?    鐢?index.html 鍗曠嫭寮曚竴鏉?<link>锛堜笌鏈〃骞惰涓嬭浇锛屾瘮 @import 灏戜竴璺筹級銆?+
++   v6.5 浠ょ墝涓庡姩鏁堟不鐞嗭紙鍙涓嶅垹锛屽弻涓婚鍙鎬т笉鍙橈級锛?+   - 璇箟浠ょ墝锛氶槾褰遍樁姊?--shadow-sm/md/lg銆佺幓鐠冨垎灞?--glass-bg-deep/soft
++     涓?--glass-border-subtle銆佺劍鐐圭幆 --focus-ring銆佺姸鎬佽壊
++     --state-success/warn/danger銆佸姩鏁堝埆鍚?--dur-base锛涚粍浠舵敼鐢ㄤ护鐗屽彇灞傜骇銆?+   - 鍔ㄦ晥娌荤悊锛氭壂鍏夛紙pill-sheen / 涓绘寜閽紟闈級涓庨鏋跺井鍏夛紙shimmer锛変粠
++     left / background-position 鏀逛负绾?transform 鍚堟垚灞傚姩鐢伙紱鏂版潯鐩珮浜?+     card-flash 鏀逛负瑕嗙洊灞?opacity 娣″嚭锛沚ody.is-idle 鏃舵殏鍋滄皼鍥村眰鍔ㄧ敾锛?+     渚涜剼鏈湪椤甸潰闅愯棌鏃舵寕 class銆傛恫鎬佺幓鐠冮樁娈靛悗鍏抽敭甯у叡 19缁勶紝
++     涓婇檺 20 缁勶紱鏂板鍔ㄦ晥浼樺厛澶嶇敤鏃㈡湁缁勩€?+   - 浜や簰鍙嶉锛氶€氱敤 :focus-visible 鐒︾偣鐜厹搴曘€乨isabled 鍏夋爣銆?+     aria-pressed=true 闆剁壒寮傛€ц瑙夊厹搴曪紱loading/empty/error 涓夋€佽瑙夌粺涓€銆?    ============================================================ */
+ 
+ :root {
+@@ -89,10 +101,33 @@
+   --dur-fast: 130ms;
+   --dur: 220ms;
+   --dur-slow: 380ms;
++  /* v6.5锛?-dur-base 鏄?--dur 鐨勮涔夊埆鍚嶏紝鏂拌鍒欐寜銆屽揩/鍩哄噯/鎱€嶄笁妗ｅ彇鍚?*/
++  --dur-base: var(--dur);
+   --ease: cubic-bezier(.3, .9, .35, 1);
+   --ease-out: cubic-bezier(.16, 1, .3, 1);
+   --ease-spring: cubic-bezier(.34, 1.4, .44, 1);
+ 
++  /* 鈥斺€?v7 娑叉€佺幓鐠冨姩鏁堜护鐗?鈥斺€?+     鏃堕暱琛ヤ袱妗ｏ細snap 缁欏紑鍏?鎸夊帇杩欑被鍗虫椂灏忓弽棣堬紝glide 缁欐诞灞備笌鍏夋枒鐨勫ぇ闈㈢Н缂撹繃娓°€?+     寮规€ф洸绾夸笁妗ｆ寜浣嶇Щ骞呭害鍒嗗眰锛歭ight 杞诲揩寰脊锛堣兌鍥娿€佸浘鏍囩瓑灏忔帶浠讹級锛?+     medium 鏍囧噯娑叉€佸脊锛堟诞灞傛偓鍋溿€佺幓鐠冨熀鍏冪殑榛樿妗ｏ級锛宧eavy 娌夌ǔ澶у脊鎬э紙澶у箙浣嶇Щ寮鸿皟鍔ㄧ敾锛夈€?*/
++  --dur-snap: 160ms;
++  --dur-glide: 480ms;
++  --spring-light: cubic-bezier(.3, 1.2, .4, 1);
++  --spring-medium: cubic-bezier(.34, 1.56, .5, 1);
++  --spring-heavy: cubic-bezier(.3, 1.8, .4, 1);
++  /* v7锛歴ticky 鏃ユ湡鏍囬钖勭罕鐨勬ā绯婂己搴︼紝渚?date-head 缁熶竴寮曠敤锛堜袱涓婚鍚屽€硷級 */
++  --veil-blur: blur(6px);
++
++  /* 鈥斺€?v6.5 璇箟浠ょ墝 鈥斺€?+     鐒︾偣鐜細outline 绠€鍐欏€硷紝閿洏鍙鐒︾偣鐨勭粺涓€鍙ｅ緞锛?+     鐘舵€佽壊锛氭垚鍔?璀︾ず/鍗遍櫓鍚勯殢涓婚璧帮紝鍙栧€兼部鐢ㄥ凡楠岃瘉瀵规瘮搴︾殑涓婚鑹层€?+     闃村奖闃舵 --shadow-sm/md/lg 涓庣幓鐠冨垎灞備护鐗屽垎涓婚瀹氫箟浜庝笅鏂逛袱鍧椼€?*/
++  --focus-ring: 2px solid var(--accent);
++  --state-success: var(--c-green);
++  --state-warn: var(--flag);
++  --state-danger: var(--c-red);
++
+   /* 鈥斺€?甯冨眬锛坮em锛氭爮瀹介殢瀛楀彿璧帮紝琛岄暱涓庡瓧鍙风殑姣斾緥鎵嶆槸鎭掑畾鐨勶級鈥斺€?*/
+   --shell: 85rem;
+   --gutter: 1rem;
+@@ -148,20 +183,44 @@
+   /* 娴眰鐜荤拑锛氬鑸€侀潰鏉裤€佺儹姒溿€佸璇濇杩欎簺銆屾诞鍦ㄥ唴瀹逛箣涓娿€嶇殑灞傘€?      v4 姣?v3 鏇村疄鈥斺€旀诞灞傜殑鑱岃矗鏄妸鑷繁鍜屼笅鏂规粴鍔ㄧ殑鍐呭鍒嗗紑锛?      澶€忎細鍙犲嚭閲嶅奖锛岃繖姝ｆ槸鏃х増銆屽埆鎵劅銆嶇殑鏉ユ簮涔嬩竴銆?*/
+-  --glass-bg: linear-gradient(165deg, rgba(148,178,255,.11), rgba(96,118,180,.05) 40%, rgba(70,90,150,.075));
++  /* v7 娑叉€佺幓鐠冿細鍙屽眰娓愬彉鈥斺€斿喎钃濅富娓愬彉鑷笂鑰屼笅涓夋。閫忔槑搴﹀垎灞傦紝鍙﹀彔涓€閬?+     闈掕壊杈呭厜鑷彸涓嬫极鍏ワ紝瑙掑害閿欏紑浜х敓娑叉€佹祦鍔ㄦ劅锛涜搴︿笌閫忔槑搴﹀垎涓婚鎺ㄦ暡杩囥€?*/
++  --glass-bg: linear-gradient(158deg, rgba(150,182,255,.13), rgba(96,118,180,.05) 42%, rgba(72,92,152,.085)),
++    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 5%, transparent), transparent 52%);
+   --glass-border: rgba(168,190,255,.16);
+-  --glass-border-strong: rgba(168,190,255,.3);
++  --glass-border-strong: rgba(198,218,255,.4);
+   --glass-highlight: linear-gradient(90deg, transparent, rgba(210,225,255,.5), transparent);
+-  --glass-blur: blur(24px) saturate(155%);
+-  --glass-shadow: 0 18px 50px -18px rgba(0,0,0,.7), 0 4px 14px -8px rgba(0,0,0,.55), inset 0 1px 0 rgba(190,212,255,.06);
+-  --glass-shadow-lift: 0 26px 64px -20px rgba(0,0,0,.78), 0 8px 22px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(190,212,255,.09);
++  /* v7锛歜lur 鎻愯嚦 28px 骞跺彔 saturate/brightness鈥斺€旂幓鐠冨悗鍐呭鎻愰ケ鍜屻€佸井寰彁浜紝
++     鎵嶆湁銆屽帤鐜荤拑鎶樺皠銆嶇殑閫氶€忔恫鎬佹劅锛岃€屼笉鏄伆钂欒挋鐨勪竴灞?*/
++  --glass-blur: blur(28px) saturate(170%) brightness(1.06);
++  /* v7锛氭捣鎷旀媺寮€鈥斺€旇繎褰卞瘑鑰屽皬銆佽繙褰卞ぇ鑰岃蒋锛宨nset 椤跺厜闅忔诞璧峰寮?*/
++  --glass-shadow: 0 2px 6px -3px rgba(0,0,0,.5), 0 22px 56px -20px rgba(0,0,0,.72), inset 0 1px 0 rgba(200,220,255,.07);
++  --glass-shadow-lift: 0 4px 12px -5px rgba(0,0,0,.52), 0 34px 72px -22px rgba(0,0,0,.8), inset 0 1px 0 rgba(200,220,255,.1);
++  /* v7锛氶暅闈㈤珮鍏夛紙.glass::before 鐨勫鍏夊甫锛変笌杈圭紭鎶樺皠鍏夛紙.glass::after 鐨勫唴椤跺厜锛夛紝涓や富棰樺悇涓€濂?*/
++  --glass-specular: linear-gradient(104deg, transparent 6%, rgba(214,230,255,.36) 32%, rgba(255,255,255,.15) 50%, transparent 68%);
++  --glass-rim: linear-gradient(180deg, rgba(220,236,255,.13), transparent 24%, transparent 80%, rgba(150,182,255,.07));
++
++  /* v6.5锛氶槾褰遍樁姊€斺€旀捣鎷旀寜妗ｅ彇鐢紝缁勪欢涓嶅啀鍚勫啓鍚勭殑闃村奖 */
++  --shadow-sm: 0 .0625rem .375rem -.125rem rgba(0,0,0,.55), 0 .125rem 1rem -.375rem rgba(0,0,0,.4);
++  --shadow-md: 0 .5rem 1.75rem -.75rem rgba(0,0,0,.6), 0 .25rem .75rem -.375rem rgba(0,0,0,.45);
++  --shadow-lg: 0 1.5rem 3.5rem -1.125rem rgba(0,0,0,.7), 0 .5rem 1.5rem -.5rem rgba(0,0,0,.5);
++
++  /* v6.5锛氱幓鐠冨垎灞傗€斺€?-glass-bg 鏄爣鍑嗘诞灞傦紱deep 鏇村疄锛岀粰瀵硅瘽妗嗕笌寮瑰眰锛?+     soft 鏇磋交锛岀粰娆＄骇闈㈡澘涓庣┖鎬侊紱subtle 鎻忚竟缁欎笉闇€瑕佹竻鏅拌竟鐣岀殑鍐呭祵鍧?*/
++  --glass-bg-deep: linear-gradient(158deg, rgba(150,182,255,.19), rgba(96,118,180,.1) 42%, rgba(72,92,152,.135)),
++    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 6%, transparent), transparent 58%);
++  --glass-bg-soft: linear-gradient(158deg, rgba(150,182,255,.07), rgba(96,118,180,.035) 55%, rgba(72,92,152,.05)),
++    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 3%, transparent), transparent 52%);
++  --glass-border-subtle: rgba(168,190,255,.09);
+ 
+   /* 鍗＄墖钀藉洖绱犺壊锛氫俊鎭祦鍗＄墖鏄€屽唴瀹广€嶏紝涓嶆槸娴眰銆傚崐閫忔槑鍗＄墖鍙犲湪鍗婇€忔槑
+      椤靛簳涓婁細璁╂枃瀛楁樉寰楄剰锛涜繎瀹炲簳鑹茬粰鍑哄共鍑€鐨勯槄璇婚潰锛岀幓鐠冩劅浜ょ粰娴眰銆?*/
+-  --card-bg: linear-gradient(172deg, #0d1429, #090f20);
++  /* v7锛氫繚鎸佽繎瀹炲簳鐨勬恫鎬佸井娓愬彉鈥斺€斾笁娈靛喎钃濈敱鏄庡埌鏆楃紦钀斤紝涓嶅紩鍏ラ€忔槑娴眰鎰燂紱
++     闃村奖鏀瑰弻灞傦細杩戝奖瀵嗐€佽繙褰辫蒋锛屾偓鍋滄诞璧锋椂涓ゆ。娴锋嫈宸洿鏄庢樉 */
++  --card-bg: linear-gradient(168deg, #0e1630, #0a1124 48%, #090e1e);
+   --card-border: rgba(148,170,230,.13);
+-  --card-shadow: 0 12px 32px -20px rgba(0,0,0,.6), 0 2px 8px -6px rgba(0,0,0,.5);
+-  --card-shadow-lift: 0 18px 44px -20px rgba(0,0,0,.7), 0 4px 14px -8px rgba(0,0,0,.55);
++  --card-shadow: 0 1px 3px rgba(0,0,0,.42), 0 14px 38px -22px rgba(0,0,0,.62);
++  --card-shadow-lift: 0 3px 8px -3px rgba(0,0,0,.46), 0 24px 52px -24px rgba(0,0,0,.72);
+ 
+   /* 鎺т欢搴曟Ы锛氬垎娈垫帶浠讹紙瀵艰埅 / 棰嗗煙 / 缂╂斁妗ｄ綅锛変笌杈撳叆妗嗗叡鐢ㄧ殑鍐呭嚬搴曡壊 */
+   --input-bg: rgba(8,13,30,.6);
+@@ -218,19 +277,36 @@
+   --danger-soft: rgba(220, 38, 38, .09);
+   --danger-line: rgba(220, 38, 38, .36);
+ 
+-  --glass-bg: linear-gradient(168deg, rgba(255,255,255,.92), rgba(255,255,255,.74));
++  /* v7 娑叉€佺幓鐠冿細鏆栫櫧涓绘笎鍙樹笁妗ｉ€忔槑搴﹀垎灞傦紝鍙﹀彔涓€閬撴贰闈掕緟鍏夎嚜鍙充笅婕叆锛?+     瀹ｇ焊搴曚笂淇濇寔閫氶€忎絾涓嶅彂鐏帮紱妯＄硦寮哄害杈冩殫鑹蹭富棰樿皟浣?*/
++  --glass-bg: linear-gradient(162deg, rgba(255,255,255,.94), rgba(251,252,253,.8) 52%, rgba(243,246,250,.72)),
++    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 4%, transparent), transparent 52%);
+   --glass-border: rgba(70,84,116,.14);
+-  --glass-border-strong: rgba(70,84,116,.28);
++  --glass-border-strong: rgba(70,84,116,.34);
+   --glass-highlight: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
+-  --glass-blur: blur(18px) saturate(120%);
+-  --glass-shadow: 0 10px 34px -16px rgba(46,58,89,.22), 0 2px 8px -4px rgba(46,58,89,.1);
+-  --glass-shadow-lift: 0 20px 48px -18px rgba(46,58,89,.3), 0 4px 14px -8px rgba(46,58,89,.14);
+-
+-  /* 瀹ｇ焊涓婚鍗＄墖鏈潵灏辨槸瀹炲簳锛岃繖閲屽彧鎶婃弿杈逛笌闃村奖缁熶竴鍒颁竴涓彛寰?*/
+-  --card-bg: linear-gradient(172deg, rgba(255,255,255,.92), rgba(253,251,246,.85));
++  --glass-blur: blur(22px) saturate(150%) brightness(1.03);
++  --glass-shadow: 0 2px 6px -3px rgba(46,58,89,.14), 0 16px 42px -18px rgba(46,58,89,.24);
++  --glass-shadow-lift: 0 4px 12px -5px rgba(46,58,89,.16), 0 28px 58px -20px rgba(46,58,89,.3);
++  /* v7锛氶暅闈㈤珮鍏変笌杈圭紭鎶樺皠鍏夛紙瀹ｇ焊鐧藉彛寰勶細楂樺厜鏇寸櫧鏇撮攼锛屾姌灏勫厜甯︽殩鐏帮級 */
++  --glass-specular: linear-gradient(104deg, transparent 6%, rgba(255,255,255,.85) 32%, rgba(255,255,255,.38) 50%, transparent 68%);
++  --glass-rim: linear-gradient(180deg, rgba(255,255,255,.65), transparent 24%, transparent 82%, rgba(110,132,176,.08));
++
++  /* v6.5锛氶槾褰遍樁姊笌鐜荤拑鍒嗗眰锛堝绾哥櫧鍙ｅ緞锛氶槾褰卞亸鍐风伆銆佹洿鏌旓級 */
++  --shadow-sm: 0 .0625rem .375rem -.125rem rgba(46,58,89,.18), 0 .125rem .875rem -.375rem rgba(46,58,89,.1);
++  --shadow-md: 0 .5rem 1.75rem -.75rem rgba(46,58,89,.22), 0 .25rem .75rem -.375rem rgba(46,58,89,.12);
++  --shadow-lg: 0 1.5rem 3.5rem -1.125rem rgba(46,58,89,.3), 0 .5rem 1.5rem -.5rem rgba(46,58,89,.16);
++  --glass-bg-deep: linear-gradient(162deg, rgba(255,255,255,.98), rgba(252,252,251,.9) 52%, rgba(246,247,249,.86)),
++    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 4%, transparent), transparent 58%);
++  --glass-bg-soft: linear-gradient(162deg, rgba(255,255,255,.72), rgba(251,252,251,.58) 55%, rgba(244,246,249,.5)),
++    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 2.5%, transparent), transparent 52%);
++  --glass-border-subtle: rgba(70,84,116,.08);
++
++  /* 瀹ｇ焊涓婚鍗＄墖鏈潵灏辨槸瀹炲簳锛泇7 鎹负鏆栫櫧涓夋娑叉€佸井娓愬彉锛?+     闃村奖鍙屽眰鏌斿寲锛堣繎褰卞瘑銆佽繙褰辫蒋锛夛紝淇濇寔杩戝疄搴曠殑闃呰闈?*/
++  --card-bg: linear-gradient(168deg, #fffefb, #fbf8f2 48%, #f7f3ea);
+   --card-border: rgba(70,84,116,.13);
+-  --card-shadow: 0 8px 26px -14px rgba(46,58,89,.16), 0 1px 6px -4px rgba(46,58,89,.08);
+-  --card-shadow-lift: 0 16px 38px -16px rgba(46,58,89,.24), 0 3px 12px -6px rgba(46,58,89,.12);
++  --card-shadow: 0 1px 3px rgba(46,58,89,.07), 0 12px 32px -18px rgba(46,58,89,.16);
++  --card-shadow-lift: 0 3px 8px -3px rgba(46,58,89,.09), 0 22px 46px -20px rgba(46,58,89,.24);
+ 
+   --input-bg: rgba(255,255,255,.78);
+   --hover-bg: rgba(70,84,116,.05);
+@@ -308,6 +384,12 @@ body {
+ 
+ /* 缁熶竴鐨勯敭鐩樺彲瑙佺劍鐐圭幆 */
+ :focus-visible { outline: none; }
++/* v6.5锛氶€氱敤鍏滃簳鈥斺€斾换浣曞彲鑱氱劍鍏冪礌鍙閿洏鑱氱劍灏辨湁鐒︾偣鐜紱:where 涓嶈鐗瑰紓鎬э紝
++   鑷甫鐒︾偣鏍峰紡鐨勭粍浠讹紙杈撳叆妗嗙殑 box-shadow 鐜€佷笅鏂圭櫧鍚嶅崟鍒楄〃绛夛級鑷劧鐩栬繃瀹?*/
++:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
++  outline: var(--focus-ring);
++  outline-offset: 2px;
++}
+ .tab:focus-visible, .pill:focus-visible, .chip:focus-visible, .scale-option:focus-visible,
+ .btn-icon:focus-visible, .btn-primary:focus-visible, .btn-ghost:focus-visible,
+ .rt-toggle:focus-visible, .update-pill:focus-visible, .new-flash:focus-visible,
+@@ -316,12 +398,22 @@ body {
+ .search-clear:focus-visible, .to-top:focus-visible, .common-links-category:focus-visible,
+ .common-links-favorite:focus-visible, .common-links-open:focus-visible,
+ .lexicon-toggle:focus-visible, .lex-term:focus-visible, .search-context button:focus-visible {
+-  outline: 2px solid var(--accent);
++  outline: var(--focus-ring);
+   outline-offset: 3px;
+   border-radius: var(--radius-sm);
+ }
+ .searchbox:focus-within { outline: none; }
+ 
++/* v6.5锛氱鐢ㄦ€佺粺涓€鐢ㄥ厜鏍囪銆屼笉鍙搷浣溿€嶏紝閫忔槑搴︿笌 pointer-events 鐢卞悇缁勪欢鑷畾 */
++button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; }
++
++/* v6.5锛歛ria-pressed=true 鐨勮瑙夊厹搴曘€?where 闆剁壒寮傛€э紝宸叉湁閫変腑鎬佺被鍚嶇殑
++   缁勪欢锛?scale-option / .star-toggle.is-on / .chip.active 绛夛級鍏ㄩ儴鐩栧緱杩囧畠锛?+   鍙帴浣忋€岃剼鏈彧鍐欎簡 aria-pressed 娌¤ˉ绫诲悕銆嶇殑鍦烘櫙 */
++:where([aria-pressed="true"]) {
++  color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft);
++}
++
+ /* ---------- 姘涘洿灞?----------
+    v4 鏁翠綋闄嶅櫔锛氭瀬鍏夊彉娣°€侀绮掑彉缁嗐€傛皼鍥村眰鐨勮亴璐ｆ槸銆屾湁澶滆埅鐨勬劅瑙夈€嶏紝
+    涓嶆槸銆屼竴鐪肩湅鍒颁笁鍥㈡瀬鍏夈€嶃€?*/
+@@ -407,6 +499,37 @@ body {
+ [data-theme="light"] .stars { display: none; }
+ @keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
+ 
++/* v7 娑叉€佺幓鐠冿細姘涘洿灞傜殑娑叉€佸厜鏂戔€斺€斾袱鏋氱紦婕傜殑鏌斿厜鍥紝缁欑幓鐠冩诞灞傛彁渚?+   銆屽彲鎶樺皠鐨勫厜婧愩€嶃€傜敤鍏冪礌鑷韩鐨?CSS filter 鏌斿寲锛屼笉鍗犳瘺鐜荤拑婊ら暅棰勭畻锛?+   瀹氫綅鍏ㄩ儴鍙?inset 瀹夊叏鐨勭櫨鍒嗘瘮锛屼綅绉诲箙搴﹀皬锛屼笉閫犳垚妯悜婧㈠嚭銆?+   鍔ㄧ敾浠呮涓€缁勶紙blob-drift锛夛紝涓ゆ灇鍏夋枒閿欑浉澶嶇敤銆?*/
++.blob {
++  position: absolute; border-radius: 50%;
++  filter: blur(70px); will-change: transform;
++  pointer-events: none;
++}
++[data-theme="dark"] .blob { opacity: .3; }
++[data-theme="light"] .blob { opacity: .38; }
++.blob-a {
++  width: 320px; height: 320px; top: 16%; left: 6%;
++  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%);
++  animation: blob-drift 36s ease-in-out infinite alternate;
++}
++.blob-b {
++  width: 280px; height: 280px; top: 58%; left: 60%;
++  background: radial-gradient(circle, color-mix(in srgb, var(--second) 22%, transparent), transparent 70%);
++  animation: blob-drift 46s ease-in-out infinite alternate-reverse;
++}
++@keyframes blob-drift {
++  from { transform: translate3d(0, 0, 0) scale(1); }
++  to { transform: translate3d(48px, -36px, 0) scale(1.12); }
++}
++
++/* v6.5锛氶〉闈㈤棽缃紙document.hidden 鎴栭暱鏃堕棿鏃犱氦浜掞級鏃舵殏鍋滄皼鍥村眰鍔ㄧ敾锛?+   class 鐢辫剼鏈樁娈垫寕鍒?body锛涢€愬眰澹版槑鑰岄潪鏆傚仠鐖剁骇锛宎nimation-play-state
++   涓嶄細浠庣埗鍏冪礌缁ф壙 */
++body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .blob { animation-play-state: paused; }
++
+ .grain {
+   position: absolute; inset: 0; mix-blend-mode: overlay;
+   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+@@ -416,7 +539,8 @@ body {
+ 
+ @media (prefers-reduced-motion: reduce) {
+   html { scroll-behavior: auto; }
+-  .aurora, .stars, .comet, .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot {
++  .aurora, .stars, .comet, .blob, .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot,
++  .card-new::before, .breakthrough-pill::after {
+     animation: none !important;
+   }
+   *, *::before, *::after {
+@@ -426,7 +550,9 @@ body {
+   }
+ }
+ 
+-/* ---------- 鐜荤拑鍩哄厓锛堟诞灞備笓鐢級 ---------- */
++/* ---------- 鐜荤拑鍩哄厓锛堟诞灞備笓鐢級 ----------
++   v7 娑叉€佸寲锛氭偓鍋滄椂鍊?spring 鏇茬嚎寰诞璧凤紙浠?transform/box-shadow锛?+   涓嶈Е鍙戝竷灞€锛夛紱::before 椤跺厜鍗囩骇涓哄闀滈潰鍏夊甫锛?:after 琛ュ唴椤跺厜/杈圭紭鎶樺皠銆?*/
+ .glass {
+   position: relative;
+   background: var(--glass-bg);
+@@ -435,10 +561,22 @@ body {
+   border: 1px solid var(--glass-border);
+   border-radius: var(--radius-lg);
+   box-shadow: var(--glass-shadow);
++  transition: transform var(--dur) var(--spring-medium), box-shadow var(--dur) var(--spring-medium);
++}
++.glass:hover {
++  transform: translateY(-2px);
++  box-shadow: var(--glass-shadow-lift);
+ }
+ .glass::before {
+-  content: ''; position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
+-  background: var(--glass-highlight);
++  content: ''; position: absolute; top: 0; left: 3%; right: 3%; height: 2px;
++  border-radius: 99px;
++  background: var(--glass-specular);
++  pointer-events: none;
++}
++.glass::after {
++  content: ''; position: absolute; inset: 0;
++  border-radius: inherit;
++  background: var(--glass-rim);
+   pointer-events: none;
+ }
+ 
+@@ -564,7 +702,7 @@ body {
+   max-height: min(38.75rem, calc(100vh - 7.5rem));
+   display: flex; flex-direction: column;
+   border-radius: var(--radius-lg); padding: var(--sp-4);
+-  box-shadow: var(--shadow-pop, 0 20px 50px rgba(0, 0, 0, .45));
++  box-shadow: var(--shadow-lg);
+ }
+ /* .glass 鐨勫簳鑹插彧鏈?8.5% 涓嶉€忔槑搴︹€斺€斿崱鐗囧帇鍦ㄩ〉闈㈠簳鑹蹭笂澶熺敤锛屼絾杩欐槸涓€鍧楁诞鍦?    婊氬姩姝ｆ枃涔嬩笂鐨勬诞灞傦紝閫忚繃鍘诲氨娌℃硶璇讳簡銆備笌鎻愭姤淇℃簮鐨勫璇濇鍚屾牱澶勭悊锛氱粰瓒冲簳鑹层€?*/
+@@ -572,7 +710,7 @@ body {
+ [data-theme="light"] .lexicon-panel { background: linear-gradient(168deg, rgba(255,255,255,.98), rgba(252,250,244,.97)); }
+ /* v6锛氶潰鏉夸粠椤舵爮涓嬫柟娴嚭鈥斺€斾笌瀵硅瘽妗嗗悓婧愮殑鍏ュ満锛屾敹璧蜂粛鏄灛鏃讹紙Esc/澶栫偣涓嶈鎷栨偿甯︽按锛夈€?    寮€鍚堟€佽蛋 .is-open 绫伙紙鐢?setLexiconOpen 缁存姢锛夛紝涓嶅啓 :not([hidden]) 琛ヤ竵瑙勫垯 */
+-.lexicon-panel.is-open { animation: dialog-in var(--dur-slow) var(--ease-out); }
++.lexicon-panel.is-open { animation: dialog-in var(--dur-glide) var(--spring-medium); }
+ .lexicon-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+ .lexicon-head h3 {
+   font-family: var(--font-display); font-size: var(--t-lg);
+@@ -619,7 +757,7 @@ body {
+   background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
+   padding: .25rem .3125rem .25rem .625rem; font-size: var(--t-sm); font-family: var(--font-ui);
+   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+-              background var(--dur) var(--ease), transform var(--dur) var(--ease);
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ /* v5锛氳瘝鏉℃偓鍋滆交杞绘诞璧凤紝鍛戒腑鏁拌兌鍥婅窡鐫€鎿︿寒 */
+ .lex-term:hover { color: var(--c-fg); border-color: var(--accent-line); background: var(--hover-bg); transform: translateY(-1px); }
+@@ -641,7 +779,7 @@ body {
+   border-radius: 50%; border: 1px solid var(--glass-border);
+   background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
+   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+-              transform var(--dur) var(--ease-spring), background var(--dur) var(--ease);
++              transform var(--dur-snap) var(--spring-light), background var(--dur) var(--ease);
+ }
+ .btn-icon svg { width: 1.0625rem; height: 1.0625rem; }
+ .btn-icon:hover { color: var(--accent); border-color: var(--accent-line); background: var(--hover-bg); transform: translateY(-1px); }
+@@ -653,7 +791,7 @@ body {
+ /* 涓婚鍒囨崲锛氬お闃?鏈堜寒鍥炬爣浜掓崲 */
+ #btnTheme .icon-sun, #btnTheme .icon-moon {
+   position: absolute;
+-  transition: opacity var(--dur) var(--ease), transform var(--dur-slow) var(--ease-spring);
++  transition: opacity var(--dur) var(--ease), transform var(--dur-slow) var(--spring-medium);
+ }
+ [data-theme="light"] #btnTheme .icon-moon { opacity: 0; transform: rotate(-90deg) scale(.5); }
+ [data-theme="light"] #btnTheme .icon-sun { opacity: 1; transform: none; }
+@@ -664,7 +802,7 @@ body {
+   font-family: var(--font-ui); font-size: var(--t-base); cursor: pointer;
+   padding: .5625rem var(--sp-5); border-radius: 99px; line-height: 1.5;
+   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+-              background var(--dur) var(--ease), transform var(--dur) var(--ease-spring),
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light),
+               box-shadow var(--dur) var(--ease);
+ }
+ .btn-primary {
+@@ -674,14 +812,16 @@ body {
+   color: var(--accent-ink); font-weight: 700;
+ }
+ /* v5锛氫富鎸夐挳鎮仠鏃剁殑缂庨潰鎵厜鈥斺€斿姩浣滄寜閽噷鏈€閲嶇殑閭ｄ竴妗ｏ紝
+-   鎸囧皷鎵繃鍍忕桓闈㈠弽浜嗕竴涓嬪厜 */
++   鎸囧皷鎵繃鍍忕桓闈㈠弽浜嗕竴涓嬪厜銆?+   v6.5锛氫綅绉讳粠 left 鏀逛负 transform锛堢櫨鍒嗘瘮鎶樼畻鍒拌嚜韬搴︼細
++   left -70%/130% 鈮?translateX(-156%)/289%锛夛紝涓嶅啀閫愬抚瑙﹀彂甯冨眬 */
+ .btn-primary::after {
+-  content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
++  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
+   background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+-  transform: skewX(-18deg); pointer-events: none;
+-  transition: left var(--dur-slow) var(--ease-out);
++  transform: translateX(-156%) skewX(-18deg); pointer-events: none;
++  transition: transform var(--dur-slow) var(--ease-out);
+ }
+-.btn-primary:hover::after { left: 130%; }
++.btn-primary:hover::after { transform: translateX(289%) skewX(-18deg); }
+ .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px var(--accent-glow); border-color: var(--accent); }
+ .btn-primary:active { transform: translateY(0) scale(.98); }
+ .btn-ghost { border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim); }
+@@ -699,6 +839,8 @@ body {
+ .common-links-favorite:active, .scale-option:active, .update-pill.ready:active,
+ .cluster-toggle:active, .dims-toggle:active, .hot-item:active {
+   transform: scale(.97);
++  /* 鎸夊帇璧扮嫭绔嬬殑鐭繃娓★細鎸変笅瑕佸揩鑰岃窡鎵嬶紝鎶捣鏃跺洖钀藉埌鍩虹嚎杩囨浮鑷劧甯﹀脊 */
++  transition: transform var(--dur-snap) var(--spring-light);
+ }
+ 
+ /* ---------- 瀵艰埅 ---------- */
+@@ -746,7 +888,10 @@ body.is-scrolled .nav {
+   border: 1px solid var(--accent-line);
+   background: linear-gradient(135deg, var(--accent-soft), transparent);
+   opacity: var(--ti-o, 0);
+-  transition: transform var(--dur-slow) var(--ease-out), width var(--dur-slow) var(--ease-out),
++  /* 璞佸厤锛歸idth/height 璺熼殢鐩爣 tab 鐨勫疄娴嬪昂瀵革紙鑴氭湰鍐?--ti-w/--ti-h锛?+     鎹㈣涓庣晫闈㈢缉鏀鹃兘瑕侀噸娴嬶級锛屽昂瀵歌窡闅忔病鏈?transform 绛変环鐗╋紝灞炲竷灞€鏈哄埗蹇呴渶锛?+     浣嶇Щ宸茶蛋 transform锛屾樉闅愯蛋 opacity锛屽潎涓嶈Е鍙戝洖娴?*/
++  transition: transform var(--dur) var(--spring-medium), width var(--dur-slow) var(--ease-out),
+               height var(--dur-slow) var(--ease-out), opacity var(--dur) var(--ease);
+   pointer-events: none;
+ }
+@@ -771,7 +916,8 @@ body.is-scrolled .nav {
+   font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
+   border: 1px solid transparent; background: transparent; color: var(--c-fg-dim);
+   font-family: var(--font-ui); line-height: 1.5; white-space: nowrap;
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
++              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .pill:hover { color: var(--c-fg); background: var(--hover-bg); }
+ .pill.active { color: var(--c-fg); background: var(--active-bg); border-color: var(--glass-border-strong); font-weight: 700; }
+@@ -783,7 +929,8 @@ body.is-scrolled .nav {
+   font-size: var(--t-sm); padding: .25rem .6875rem; border-radius: 99px; cursor: pointer;
+   border: 1px dashed var(--glass-border); background: transparent; color: var(--c-fg-faint);
+   font-family: var(--font-ui); line-height: 1.5;
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
++              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .chip:hover { color: var(--c-fg-dim); border-style: solid; background: var(--hover-bg); }
+ .chip.active {
+@@ -794,7 +941,7 @@ body.is-scrolled .nav {
+ /* ---------- 涓诲唴瀹?---------- */
+ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ 
+-.view { animation: view-in var(--dur-slow) var(--ease-out) backwards; }
++.view { animation: view-in var(--dur-slow) var(--spring-medium) backwards; }
+ @keyframes view-in {
+   from { opacity: 0; transform: translateY(10px); }
+ }
+@@ -826,7 +973,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ .common-links-category {
+   border: 1px solid var(--glass-border); border-radius: 99px; background: transparent;
+   color: var(--c-fg-dim); cursor: pointer; font-family: var(--font-ui);
+-  font-size: var(--t-base); padding: .375rem var(--sp-4); transition: all var(--dur) var(--ease);
++  font-size: var(--t-base); padding: .375rem var(--sp-4);
++  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
++              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .common-links-category:hover { background: var(--hover-bg); color: var(--c-fg); }
+ .common-links-category.is-active {
+@@ -840,8 +989,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ }
+ .common-links-card {
+   display: flex; flex-direction: column; gap: var(--sp-3); min-height: 15.5rem; padding: var(--sp-5);
+-  border-color: var(--glass-border); animation: view-in var(--dur-slow) var(--ease-out) backwards;
+-  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
++  border-color: var(--glass-border); animation: view-in var(--dur-slow) var(--spring-medium) backwards;
++  transition: transform var(--dur) var(--spring-medium), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--spring-medium);
+ }
+ .common-links-card:hover {
+   transform: translateY(-3px);
+@@ -855,7 +1004,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ .common-links-favorite {
+   display: inline-flex; align-items: center; gap: .3125rem; flex: 0 0 auto; border: 1px solid var(--glass-border);
+   border-radius: 99px; background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
+-  font-family: var(--font-ui); font-size: var(--t-sm); padding: .3125rem .625rem; transition: all var(--dur) var(--ease);
++  font-family: var(--font-ui); font-size: var(--t-sm); padding: .3125rem .625rem;
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .common-links-favorite:hover { color: var(--c-fg); border-color: var(--glass-border-strong); }
+ .common-links-favorite.is-active { color: var(--c-teal); border-color: var(--accent-line); background: var(--accent-soft); }
+@@ -868,7 +1019,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2); margin-top: auto;
+   min-height: 2.75rem; border: 1px solid var(--glass-border); border-radius: 99px;
+   color: var(--c-fg); font-weight: 700; text-decoration: none; font-size: var(--t-base);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .common-links-open:hover {
+   color: var(--accent-ink); border-color: var(--accent-line);
+@@ -902,7 +1054,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   margin-bottom: var(--sp-4); padding: .5625rem var(--sp-4);
+   border-radius: var(--radius-md); font-size: var(--t-base);
+   border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--c-fg-dim);
+-  animation: flash-in var(--dur-slow) var(--ease-out);
++  animation: flash-in var(--dur-slow) var(--spring-light);
+ }
+ .search-context strong { color: var(--accent-ink); }
+ .search-context .sc-count { font-family: var(--font-mono); color: var(--c-fg); font-variant-numeric: tabular-nums; }
+@@ -910,7 +1062,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   margin-left: auto; font-family: var(--font-ui); font-size: var(--t-sm); cursor: pointer;
+   padding: .1875rem var(--sp-3); border-radius: 99px;
+   border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .search-context button:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
+ 
+@@ -934,7 +1087,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   padding: .5rem var(--sp-3); border-radius: 99px;
+   border: 1px solid var(--second-line); color: var(--second-ink);
+   background: linear-gradient(135deg, var(--second-soft), transparent);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .update-pill.ready {
+   cursor: pointer; font-weight: 700;
+@@ -953,18 +1107,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   cursor: pointer; text-align: center;
+   border: 1px solid var(--accent-line); color: var(--accent-ink);
+   background: linear-gradient(135deg, var(--accent-soft), transparent);
+-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+-  animation: flash-in var(--dur-slow) var(--ease-out);
++  transition: transform var(--dur-snap) var(--spring-light), box-shadow var(--dur-snap) var(--spring-light);
++  animation: flash-in var(--dur-slow) var(--spring-light);
+ }
+ .new-flash:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px var(--accent-glow); }
+ @keyframes flash-in { from { opacity: 0; transform: translateY(-8px); } }
+ 
+-/* 瀹炴椂鏂板埌杈惧崱鐗囩殑楂樹寒娣″嚭 */
+-.card-new { animation: card-flash 2.6s var(--ease) forwards; }
+-@keyframes card-flash {
+-  0% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring), var(--card-shadow); }
+-  100% { border-color: var(--card-border); box-shadow: var(--card-shadow); }
+-}
++/* 瀹炴椂鏂板埌杈惧崱鐗囩殑楂樹寒娣″嚭锛堟牱寮忛鐣欙細闃舵 4 澧為噺鎻掑叆浼氱粰鏂板崱鎸?.card-new锛夈€?+   v6.5锛氭敼涓?::before 瑕嗙洊灞傜殑 opacity 娣″嚭鈥斺€旈鍩熻壊娓愬彉鍘嬭竟浜竴涓嬪啀閫€鍦猴紝
++   涓嶅啀鍔ㄧ敾 border-color / box-shadow锛涗笉鍔?forwards锛屽姩鐢荤粨鏉熻嚜鐒跺洖鍒?+   鍩哄簳 opacity 0锛屾偓鍋滃帇杈逛笉鍙楀奖鍝?*/
++.card-new::before { animation: card-flash 2.6s var(--ease-out); }
++@keyframes card-flash { from { opacity: 1; } }
+ 
+ /* 鈥斺€?鏃ユ湡鍒嗙粍 + 鏃堕棿杞?鈥斺€?*/
+ .date-group { margin-bottom: var(--sp-2); }
+@@ -976,8 +1130,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   position: sticky; top: var(--stack-top); z-index: 10;
+   /* 閫忔槑鐨?sticky 鏍囬浼氫笌涓嬫柟婊氬姩鐨勫崱鐗囧彔瀛楋紝鐢ㄥ悓鑹茶杽绾遍伄浣?*/
+   background: var(--sticky-veil);
+-  backdrop-filter: blur(6px);
+-  -webkit-backdrop-filter: blur(6px);
++  backdrop-filter: var(--veil-blur);
++  -webkit-backdrop-filter: var(--veil-blur);
+ }
+ .date-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--rail-line), transparent); }
+ .date-head .dh-count {
+@@ -1022,8 +1176,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   border: 1px solid var(--card-border);
+   box-shadow: var(--card-shadow);
+   position: relative;
+-  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+-  animation: card-in .42s var(--ease-out) backwards;
++  transition: transform var(--dur) var(--spring-medium), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--spring-medium);
++  animation: card-in var(--dur-slow) var(--spring-medium) backwards;
+   /* 棣栧睆涔嬪鐨勫崱鐗囪烦杩囧竷灞€涓庣粯鍒讹紝闀垮垪琛ㄦ粴鍔ㄦ槑鏄炬洿鐪侊紱
+      宸叉覆鏌撻珮搴︾敱 intrinsic-size 鍗犱綅锛屾粴鍔ㄦ潯涓嶅洖璺?*/
+   content-visibility: auto;
+@@ -1253,16 +1407,17 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   white-space: nowrap;
+ }
+ /* v5锛氭妧鏈獊鐮存槸鍏ㄧ珯浠峰€兼渶楂樼殑鏍囪锛岄厤鍞竴鐨勫父椹诲姩鏁堚€斺€?-   涓€閬撶紟闈㈡壂鍏夋瘡 4 绉掓帬杩囦竴娆★紝鍏朵綑鏃堕棿瀹冨拰鍒殑鑳跺泭涓€鏍峰畨闈?*/
++   涓€閬撶紟闈㈡壂鍏夋瘡 4 绉掓帬杩囦竴娆★紝鍏朵綑鏃堕棿瀹冨拰鍒殑鑳跺泭涓€鏍峰畨闈欍€?+   v6.5锛氬悓涓绘寜閽彛寰勶紝鎵厜浣嶇Щ鏀硅蛋 transform 鍚堟垚灞?*/
+ .breakthrough-pill::after {
+-  content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
++  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
+   background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+-  transform: skewX(-18deg); pointer-events: none;
++  transform: translateX(-156%) skewX(-18deg); pointer-events: none;
+   animation: pill-sheen 4.2s var(--ease) infinite;
+ }
+ @keyframes pill-sheen {
+-  0%, 55% { left: -70%; }
+-  85%, 100% { left: 130%; }
++  0%, 55% { transform: translateX(-156%) skewX(-18deg); }
++  85%, 100% { transform: translateX(289%) skewX(-18deg); }
+ }
+ .breakthrough-pill b {
+   color: var(--flag);
+@@ -1298,7 +1453,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   font-size: var(--t-sm); cursor: pointer; line-height: 1.6;
+   background: none; border: 1px solid transparent; padding: .1875rem .5625rem .1875rem .5rem;
+   border-radius: 99px; font-family: var(--font-ui);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
++              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .cluster-toggle { color: var(--second-ink); }
+ .cluster-toggle:hover { background: var(--second-soft); border-color: var(--second-line); }
+@@ -1318,7 +1474,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   border: 1px solid var(--glass-border); background: var(--input-bg);
+   padding: .25rem var(--sp-3); border-radius: 99px;
+   font-family: var(--font-ui); color: var(--c-fg-dim);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), opacity var(--dur) var(--ease),
++              transform var(--dur-snap) var(--spring-light);
+ }
+ .card-act svg { width: .75rem; height: .75rem; }
+ .card-act:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
+@@ -1330,7 +1488,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ /* v5锛氭槦鏍囪惤瀹氱殑涓€棰楀洖寮光€斺€斻€屾敹濂戒簡銆嶉渶瑕佷竴鐐硅韩浣撲笂鐨勭‘璁ゆ劅銆?    鍔ㄧ敾鎸傚湪 .is-on 涓婏紝姣忔鐐逛寒閮戒細閲嶆斁涓€娆★紱棣栨娓叉煋甯︽槦鍗＄墖鏃?    涔熶細杞昏交寮逛竴涓嬶紝閰嶅悎鍗＄墖閿欏嘲鍏ュ満锛屽儚鏄熸爣渚濇褰掍綅銆?*/
+-.star-toggle.is-on svg { animation: star-pop var(--dur-slow) var(--ease-spring); transform-origin: center; }
++.star-toggle.is-on svg { animation: star-pop var(--dur-slow) var(--spring-medium); transform-origin: center; }
+ @keyframes star-pop { 40% { transform: scale(1.28) rotate(-10deg); } }
+ .star-toggle.is-on:hover { color: var(--flag); border-color: var(--flag); }
+ 
+@@ -1361,7 +1519,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ .note-item {
+   display: flex; align-items: flex-start; gap: var(--sp-3);
+   padding: .5625rem var(--sp-3); border-radius: var(--radius-sm);
+-  border: 1px solid var(--glass-border); background: var(--hover-bg);
++  border: 1px solid var(--glass-border-subtle); background: var(--hover-bg);
+ }
+ .note-body { flex: 1; min-width: 0; }
+ .note-body p { font-family: var(--font-body); font-size: var(--t-base); line-height: 1.9; word-break: break-word; }
+@@ -1370,7 +1528,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   flex: none; font-family: var(--font-ui); font-size: var(--t-sm); cursor: pointer;
+   padding: .1875rem var(--sp-2); border-radius: 99px;
+   border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-faint);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .note-remove:hover { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
+ .note-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@@ -1378,7 +1537,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ .cluster-items {
+   margin-top: .5625rem; display: flex; flex-direction: column; gap: .4375rem;
+   padding-left: var(--sp-3); border-left: 2px solid var(--second-line);
+-  animation: reveal var(--dur) var(--ease-out);
++  animation: reveal var(--dur) var(--spring-light);
+ }
+ .cluster-item { font-size: var(--t-base); }
+ .cluster-item a { color: var(--c-fg-dim); text-decoration: none; }
+@@ -1390,7 +1549,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   display: none; gap: var(--sp-3); margin-top: var(--sp-3); padding-top: var(--sp-3);
+   border-top: 1px dashed var(--rail-line);
+ }
+-.card.expanded .dims { display: flex; flex-wrap: wrap; animation: reveal var(--dur) var(--ease-out); }
++.card.expanded .dims { display: flex; flex-wrap: wrap; animation: reveal var(--dur) var(--spring-light); }
+ @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } }
+ .dim { flex: 1; min-width: 5.75rem; }
+ .dim-label { font-size: var(--t-xs); color: var(--c-fg-faint); display: flex; justify-content: space-between; }
+@@ -1447,13 +1606,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   padding: var(--sp-2) .375rem; border-radius: var(--radius-sm); text-decoration: none;
+   border-left: 2px solid transparent;
+   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+-              transform var(--dur) var(--ease);
++              transform var(--dur-snap) var(--spring-light);
+ }
+ /* v5锛氭偓鍋滄椂鏉＄洰鍚戝彸杞昏交涓€璁╋紝鍍忕粰鎸囧皷璁╁嚭鍗婁釜韬綅 */
+ .hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); transform: translateX(2px); }
+ /* v6锛氶娆′笂姒滄椂閿欏嘲鍏ュ満锛堥敊宄板欢鏃剁敱鑴氭湰鍐呰仈锛夛紱鍚庣画杞闈欓粯鏇存柊锛?    鑴氭湰浼氱粰鏉＄洰琛?animation:none锛屼笉浼氭瘡 18 绉掓暣鍒楅噸鏀句竴娆?*/
+-.hot-item { animation: flash-in var(--dur-slow) var(--ease-out) backwards; }
++.hot-item { animation: flash-in var(--dur-slow) var(--spring-light) backwards; }
+ .hot-item .hi-rank {
+   font-family: var(--font-mono); font-size: var(--t-base); font-weight: 700;
+   color: var(--c-fg-faint); text-align: center; padding-top: 1px; font-variant-numeric: tabular-nums;
+@@ -1473,17 +1632,30 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ .hot-item .hi-meta { font-size: var(--t-xs); color: var(--c-fg-faint); margin-top: .125rem; display: flex; gap: var(--sp-2); align-items: center; }
+ .hot-item .hi-heat { font-family: var(--font-mono); color: var(--flag); font-weight: 700; }
+ 
+-/* 楠ㄦ灦灞?*/
++/* 楠ㄦ灦灞忋€倂6.5锛氬井鍏変粠 background-position 鏀逛负涓€鏉?transform 鎵繃鐨勯珮鍏夊甫锛?+   鍙蛋鍚堟垚灞傦紱display:block 椤哄甫璁╃儹搴︽爮楠ㄦ灦閲屽祵濂楃殑琛屽唴 span 鐪熸鍗犱綅 */
+ .skeleton { pointer-events: none; }
+ .skeleton .sk-line, .cluster-items .sk-line {
++  display: block; position: relative; overflow: hidden;
+   height: .875rem; border-radius: .4375rem; margin: var(--sp-2) 0;
+-  background: linear-gradient(90deg, var(--hover-bg) 25%, var(--rail-line) 50%, var(--hover-bg) 75%);
+-  background-size: 200% 100%;
++  background: var(--hover-bg);
++}
++.skeleton .sk-line::after, .cluster-items .sk-line::after {
++  content: ''; position: absolute; inset: 0;
++  background: linear-gradient(90deg, transparent, var(--rail-line), transparent);
+   animation: shimmer 1.4s linear infinite;
+ }
+-@keyframes shimmer { to { background-position: -200% 0; } }
++@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+ 
+-.empty-state { text-align: center; padding: 4.5rem var(--sp-5); color: var(--c-fg-faint); }
++/* 绌烘€佷笌澶辫触鎬佸叡鐢ㄤ竴涓３锛氬钩鏃舵槸鐜荤拑娴眰锛屽甫閲嶈瘯鎸夐挳鏃讹紙澶辫触鎬侊級
++   鎻忚竟涓庡浘鏍囪嚜鍔ㄨ浆鍗遍櫓鑹诧紝涓嶅繀鏀硅剼鏈篃鑳藉垎鍑轰袱绉嶇姸鎬?*/
++.empty-state {
++  text-align: center; padding: 4.5rem var(--sp-5); color: var(--c-fg-faint);
++  background: var(--glass-bg-soft);
++  animation: view-in var(--dur-slow) var(--spring-medium);
++}
++.empty-state:has(.es-retry) { border-color: var(--danger-line); }
++.empty-state:has(.es-retry) .es-icon { color: var(--state-danger); }
+ .empty-state .es-icon {
+   font-family: var(--font-display); font-size: var(--t-3xl); font-weight: 800;
+   opacity: .45; letter-spacing: .25em; color: var(--c-fg-dim);
+@@ -1533,13 +1705,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ }
+ .src-card {
+   padding: var(--sp-4) var(--sp-5); border-radius: var(--radius-md);
+-  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
++  transition: border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+-.src-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); }
++.src-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+ .src-row1 { display: flex; align-items: center; gap: .625rem; }
+ .src-status { width: .5625rem; height: .5625rem; border-radius: 50%; flex-shrink: 0; }
+-.src-status.ok { background: var(--c-green); box-shadow: 0 0 7px rgba(21,128,61,.45); }
+-.src-status.err { background: var(--c-red); box-shadow: 0 0 7px rgba(220,38,38,.45); }
++.src-status.ok { background: var(--state-success); box-shadow: 0 0 7px rgba(21,128,61,.45); }
++.src-status.err { background: var(--state-danger); box-shadow: 0 0 7px rgba(220,38,38,.45); }
+ .src-status.idle { background: var(--c-fg-faint); }
+ .src-name { font-weight: 700; font-size: var(--t-md); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ .src-meta { font-size: var(--t-sm); color: var(--c-fg-faint); margin-top: .375rem; display: flex; gap: .625rem; flex-wrap: wrap; }
+@@ -1555,7 +1727,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
+   background: transparent; border: 1px solid var(--glass-border); color: var(--c-fg-dim);
+   font-family: var(--font-ui);
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
++              background var(--dur) var(--ease), opacity var(--dur) var(--ease),
++              transform var(--dur-snap) var(--spring-light);
+ }
+ .src-actions button:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
+ .src-actions button.danger:hover { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
+@@ -1605,7 +1779,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
+   border: 1px solid transparent; background: transparent; color: var(--c-fg-dim);
+   font-family: var(--font-ui); line-height: 1.5; white-space: nowrap;
+-  transition: all var(--dur) var(--ease);
++  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
++              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+ }
+ .scale-option:hover { color: var(--c-fg); background: var(--hover-bg); }
+ .scale-option[aria-pressed="true"] {
+@@ -1615,7 +1790,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ 
+ .btn-row { display: flex; align-items: center; gap: .625rem; margin-top: var(--sp-1); flex-wrap: wrap; }
+ .test-result { font-size: var(--t-base); }
+-.test-result.ok { color: var(--c-green); }
++.test-result.ok { color: var(--state-success); }
+ .test-result.fail { color: var(--danger-ink); }
+ .desktop-switch {
+   display: grid;
+@@ -1645,7 +1820,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   border-radius: 999px;
+   border: 1px solid var(--glass-border);
+   background: var(--input-bg);
+-  transition: all var(--dur) var(--ease);
++  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
++              box-shadow var(--dur) var(--ease), opacity var(--dur) var(--ease);
+   flex-shrink: 0;
+ }
+ .switch-track::after {
+@@ -1657,7 +1833,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   top: .125rem;
+   border-radius: 50%;
+   background: var(--c-fg-faint);
+-  transition: all var(--dur) var(--ease-spring);
++  transition: transform var(--dur-snap) var(--spring-light), background var(--dur) var(--ease);
+ }
+ .desktop-switch input:checked + .switch-track {
+   border-color: var(--accent-line);
+@@ -1827,7 +2003,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   color: var(--c-fg-dim);
+   overflow-wrap: anywhere;
+ }
+-.daily-archive-live.ok { color: var(--c-green); }
++.daily-archive-live.ok { color: var(--state-success); }
+ .daily-archive-live.warning { color: var(--flag-ink); }
+ .daily-archive-live.error { color: var(--danger-ink); }
+ .daily-archive-live[aria-busy="true"] { color: var(--c-fg-faint); }
+@@ -2065,17 +2241,17 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+ 
+ /* ---------- 寮圭獥 / Toast ---------- */
+ .glass-dialog {
+-  background: var(--glass-bg);
++  background: var(--glass-bg-deep);
+   backdrop-filter: blur(28px) saturate(140%);
+   border: 1px solid var(--glass-border);
+   border-radius: var(--radius-lg);
+-  box-shadow: 0 40px 120px -30px rgba(0,0,0,.5);
++  box-shadow: var(--shadow-lg);
+   color: var(--c-fg); padding: var(--sp-7); width: 30rem; max-width: 92vw;
+   max-height: min(92vh, 45rem); overflow: auto;
+ }
+ [data-theme="light"] .glass-dialog { background: linear-gradient(168deg, rgba(255,255,255,.97), rgba(252,250,244,.95)); }
+ [data-theme="dark"] .glass-dialog { background: linear-gradient(165deg, rgba(20,28,58,.94), rgba(10,16,38,.96)); }
+-.glass-dialog[open] { animation: dialog-in var(--dur-slow) var(--ease-out); }
++.glass-dialog[open] { animation: dialog-in var(--dur-glide) var(--spring-medium); }
+ @keyframes dialog-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
+ .glass-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(4px); }
+ .glass-dialog h3 { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 800; letter-spacing: .06em; margin-bottom: var(--sp-5); }
+@@ -2095,7 +2271,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   color: var(--accent-ink); backdrop-filter: blur(14px) saturate(150%); font-weight: 700;
+   opacity: 0; pointer-events: none; z-index: 200; max-width: min(92vw, 35rem);
+   box-shadow: var(--glass-shadow-lift);
+-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-spring);
++  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--spring-medium);
+ }
+ [data-theme="light"] .toast { background: rgba(255,255,255,.95); }
+ [data-theme="dark"] .toast { background: rgba(14,20,44,.92); }
+@@ -2111,13 +2287,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   background: var(--glass-bg); backdrop-filter: blur(14px) saturate(150%);
+   box-shadow: var(--glass-shadow);
+   opacity: 0; transform: translateY(12px) scale(.9); pointer-events: none;
+-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-spring),
++  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--spring-medium),
+               color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+ }
+ .to-top svg { width: 1rem; height: 1rem; }
+ .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+ .to-top:hover { color: var(--accent-ink); border-color: var(--accent-line); transform: translateY(-2px); }
+-.to-top:active { transform: scale(.92); }
++.to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
+ 
+ /* ---------- 婊氬姩鏉?---------- */
+ ::-webkit-scrollbar { width: 10px; height: 10px; }
+@@ -2172,3 +2348,66 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
+   .storage-heading { align-items: flex-start; }
+   .storage-policy-badge { display: none; }
+ }
++
++/* ---------- 鍝嶅簲寮忚ˉ鍏紙闃舵 2锛氫氦浜掑寮轰笌鍝嶅簲寮忚ˉ鍏級 ----------
++   鍙涓嶆敼锛氫互涓嬪潎涓烘柊澧炵獎瀹瑰櫒鍦烘櫙閫傞厤锛屼笉瑙︾涓婃柟浠讳綍閿佸畾瑙勫垯锛?+   鏂偣寤剁画鍐呭椹卞姩鐨?rem 瀹瑰櫒鏌ヨ锛屼笉寮曞叆 px 濯掍綋鏂偣 */
++
++/* 淇℃伅娴佽嚜鍔ㄩ鍙栫殑鍝ㄥ叺锛氬彧鍗犱竴涓濋珮搴︼紝浣滀负 IntersectionObserver 鐨勮瀵熺偣 */
++.feed-sentinel { height: 1px; }
++
++/* 涓棿瀹藉害锛氳缃〉宸查檷涓轰袱鏍忥紝鍗″唴涓夋爮鍥哄畾杞ㄧ殑瀛樺偍缁熻浼氭孩鍑猴紝鍏堜竴姝ラ檷鏍忥紱
++   璇嶅簱闈㈡澘鏀剁獎鍐呰竟璺濆苟鍘嬩綆鍙楂樺害锛屽唴閮ㄦ粴鍔ㄧ敱 .lexicon-body 鏃㈡湁瑙勫垯鎺ョ锛?+   鏃ユ姤澶撮儴鎻愬墠鏀剁揣闂磋窛锛岀粰鎹㈣鐣欎綑鍦?*/
++@container app (max-width: 53.75rem) {
++  .maintenance-stats { grid-template-columns: 1fr 1fr; }
++  .storage-total { grid-column: 1 / -1; }
++  .lexicon-panel { padding: var(--sp-3); max-height: min(30rem, calc(100vh - 6rem)); }
++  .lexicon-body { gap: var(--sp-3); }
++  .daily-head { gap: var(--sp-3); padding: var(--sp-4); }
++}
++
++/* 800脳600 涓?xl 妗ｏ細寮圭獥灞傚唴杈硅窛涓庡瓧鍙峰眰娆℃敹鏁涳紝鏍囬闄嶄竴妗ｃ€佸瓧娈甸棿璺濆帇绱э紝
++   淇濊瘉 45rem 楂樹互鍐呭畬鏁村彲瑙侊紱鏃ユ姤鏍囬鐙崰涓€琛岋紝鍔ㄤ綔缁勬暣琛屽眳涓?*/
++@container app (max-width: 45rem) {
++  .glass-dialog { padding: var(--sp-5); width: min(26rem, 92vw); }
++  .glass-dialog h3 { font-size: var(--t-lg); margin-bottom: var(--sp-4); }
++  .glass-dialog .field { margin-bottom: var(--sp-2); }
++  .confirm-dialog { width: min(22rem, 92vw); }
++  .confirm-message { font-size: var(--t-sm); margin-bottom: var(--sp-4); }
++  .daily-title { flex-basis: 100%; order: -1; }
++  .daily-actions { width: 100%; justify-content: center; }
++}
++
++/* ---------- 娑叉€佺幓鐠冮樁娈?3锛氫富棰樺垏鎹㈠钩婊戣繃娓?----------
++   applyTheme 鍐?data-theme 鍓嶇粰 body 鎸備复鏃?theme-transition 绫伙紝
++   缁撴潫鍚庣Щ闄わ紙绾?320ms 鍚庣敱 app.js 瀹氭椂鍣ㄦ憳涓嬶級銆傚彧杩囨浮涓変釜棰滆壊鏃?+   灞炴€э紝閬垮厤甯搁┗鍏ㄨ〃 transition 鎷栫疮婊氬姩锛?reduced 鍋忓ソ鐢变笂鏂规棦鏈?+   鍏ㄥ眬 1ms 鍏滃簳瑕嗙洊锛屼笖 app.js 鍦?reduced 鍋忓ソ涓嬩笉鎸傛绫?*/
++body.theme-transition,
++body.theme-transition *,
++body.theme-transition *::before,
++body.theme-transition *::after {
++  transition: color 260ms var(--ease), background-color 260ms var(--ease), border-color 260ms var(--ease) !important;
++}
++
++/* ---------- 娑叉€佺幓鐠冮樁娈?3锛歠x-tier 杩愯鏃舵。浣嶈鐩?----------
++   app.js 鍚姩鏃跺嵆甯帹瀵兼。浣嶅啓鍏?<html data-fx-tier>锛坒ull / lite /
++   static锛屼笉鎸佷箙鍖栥€佷笉杩涘亸濂?schema锛夈€傝鐩栧潡鍙敼鏃㈡湁浠ょ墝鐨勫€硷細
++   鐜荤拑妯＄硦寮哄害浠ょ墝 --glass-blur 涓庢椂闀夸护鐗?--dur-glide锛屼笉鏂板
++   浠讳綍婊ら暅澹版槑鐐癸紙娑堣垂澶勪粛璇诲悓涓€涓护鐗岋級锛屼篃涓嶆柊澧炲惊鐜姩鐢汇€?+   lite锛氫綆鍐呭瓨/灏戞牳蹇冭澶囬檷妯＄硦涓庨ケ鍜屻€佺缉鐭厜鏂戠紦杩囨浮锛?+   static锛歳educed 鍋忓ソ鎴栨瀬浣庨厤璁惧锛岀幓鐠冩护闀滀护鐗岀疆 none锛?+   姘涘洿灞傚厜鏂戝姩鐢诲叧鍋滐紙涓庢棦鏈?reduced 濯掍綋鏌ヨ鍙屼繚闄╋級 */
++[data-fx-tier="lite"] {
++  --glass-blur: blur(8px) saturate(110%);
++  --dur-glide: 320ms;
++}
++[data-fx-tier="static"] {
++  --glass-blur: none;
++}
++[data-fx-tier="static"] .aurora,
++[data-fx-tier="static"] .stars,
++[data-fx-tier="static"] .comet,
++[data-fx-tier="static"] .blob { animation: none; }
++

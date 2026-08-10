@@ -15,3 +15,6 @@ output/
 screenshots/
 config/common-links.local.json
 dist/package-verification.json
+Star-Picking-Pavilion/
+.superpowers/
+docs/design/**/*.png

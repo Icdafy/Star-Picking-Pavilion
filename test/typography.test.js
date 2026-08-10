@@ -10,6 +10,9 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const css = read('renderer/styles.css');
 const html = read('renderer/index.html');
 const app = read('renderer/app.js');
+// 阶段 3 批 2：Ctrl 缩放快捷键随键盘快捷键迁到 renderer/shortcuts.js，
+// 相关字面断言同批改指新模块源码
+const shortcutsSource = read('renderer/shortcuts.js');
 const fontDir = path.join(root, 'renderer', 'fonts', 'source-han-sans-sc');
 const fontCss = read('renderer/fonts/source-han-sans-sc/index.css');
 
@@ -209,11 +212,12 @@ test('前端把档位落到 data-ui-scale 并持久化，快捷键与设置页�
   assert.match(app, /preferenceActions\.remember\('textScale', scale\)/);
   // 缩放改变导航条高度与标签位置，粘顶偏移必须跟着重算
   assert.match(app, /function applyTextScale[\s\S]{0,600}?syncNavHeight\(\);\s*\n\s*syncTabIndicator\(\);/);
-  // Ctrl +/-/0 必须排在「是否正在输入」判定之前，输入框里也要能用
-  const zoomIndex = app.indexOf("if (event.key === '=' || event.key === '+')");
-  const typingIndex = app.indexOf('if (isTypingTarget(document.activeElement)) return;');
+  // Ctrl +/-/0 必须排在「是否正在输入」判定之前，输入框里也能用
+  // 批 2：快捷键段迁到 renderer/shortcuts.js，顺序断言改指新模块
+  const zoomIndex = shortcutsSource.indexOf("if (event.key === '=' || event.key === '+')");
+  const typingIndex = shortcutsSource.indexOf('if (isTypingTarget(document.activeElement)) return;');
   assert.ok(zoomIndex >= 0 && zoomIndex < typingIndex);
-  assert.match(app, /applyTextScale\('md'\)/);
+  assert.match(shortcutsSource, /applyTextScale\('md'\)/);
   assert.match(app, /applyTextScale\(state\.textScale, \{ persist: false \}\)/);
 
   assert.match(html, /id="textScaleOptions"/);

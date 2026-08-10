@@ -1,0 +1,1826 @@
+﻿diff --git a/renderer/app.js b/renderer/app.js
+index 14efd3b..67a4dd9 100644
+--- a/renderer/app.js
++++ b/renderer/app.js
+@@ -1,8 +1,17 @@
+ 'use strict';
+ /* 鎽樻槦闃?路 鍓嶇閫昏緫锛堥浂渚濊禆鍘熺敓 JS锛?-   v0.4锛氬崱鐗囨敼涓烘寜棰嗗煙鐫€鑹诧紙宸︾紭鑹叉潯鐢?data-domain 椹卞姩锛夛紝
+-         鍏冧俊鎭洖褰掔函鏂囧瓧銆佽瘎鍒嗚兌鍥婃敹鏁涗负閰嶈锛涙棩鎶ヨ妭鏀硅蛋鏍峰紡琛ㄧ被锛?-         缂╃暐鍥捐В鐮佽鍑轰富绾跨▼銆備氦浜掍笌鐘舵€侀€昏緫涓?v0.3 涓€鑷淬€?*/
++   v0.6锛堥樁娈?4锛夛細app.js 浠呬负缁勫悎鏍光€斺€旂姸鎬佸０鏄庛€佷緷璧栬閰嶄笌鍚姩搴忓垪銆?+   鑱岃矗妯″潡鎸?UMD + 渚濊禆娉ㄥ叆鎷嗗垎锛?+     format-utils.js / feed-card.js          鈥斺€?绾嚱鏁般€佸崱鐗囨ā鏉挎覆鏌撲笌澧為噺 diff
++     stats-controller.js / export-controller.js
++     feed-controller.js / hot-rail-controller.js
++     daily-view-controller.js / sources-controller.js
++     search-controller.js / shortcuts.js
++     realtime-poller.js / update-pill.js / settings-view-controller.js
++     store.js / view-registry.js              鈥斺€?鐘舵€佸眰涓庤鍥炬煡琛ㄨ皟搴︼紙鎵?3锛?+     common-links-controller.js               鈥斺€?甯哥敤缃戝潃瑙嗗浘鎺ョ嚎锛堟壒 4锛?+   闃舵 4锛氭暣鍗℃ā鏉胯縼涓?index.html 鐨?<template id="cardTemplate">锛?+   娓叉煋璺緞鏀硅蛋 feed-card.js 鐨?createCardRenderer + createFeedDiffList銆?*/
+ 
+ const $ = s => document.querySelector(s);
+ const $$ = s => [...document.querySelectorAll(s)];
+@@ -15,6 +24,29 @@ const StorageMaintenanceController = window.StorageMaintenanceController;
+ const DailyArchiveController = window.DailyArchiveController;
+ const Bootstrap = window.StarPickingPavilionBootstrap;
+ const Desktop = window.starPickingPavilion || window.windcatcher;
++const FormatUtils = window.FormatUtils;
++const FeedCard = window.FeedCard;
++const StatsController = window.StatsController;
++const ExportController = window.ExportController;
++const FeedController = window.FeedController;
++const HotRailController = window.HotRailController;
++const DailyViewController = window.DailyViewController;
++const SourcesController = window.SourcesController;
++const SearchController = window.SearchController;
++const Shortcuts = window.Shortcuts;
++const RealtimePoller = window.RealtimePoller;
++const UpdatePill = window.UpdatePill;
++const SettingsViewController = window.SettingsViewController;
++const Store = window.Store;
++const ViewRegistry = window.ViewRegistry;
++const CommonLinksController = window.CommonLinksController;
++// 闃舵 3锛氱函鍑芥暟涓庤〃绀哄眰宸叉媶鍏?renderer/format-utils.js銆乺enderer/feed-card.js锛?+// 杩欓噷鎸夊悕瑙ｆ瀯锛屼繚鎸佺粍鍚堟牴鍐呰皟鐢ㄧ偣涓嶅彉
++const formatUtils = FormatUtils;
++const {
++  timeAgo, localDateString, parseLocalDate, formatBytes,
++  delay, SKELETON_MIN_MS, DOMAIN_NAME
++} = formatUtils;
+ const storage = Bootstrap.getSafeStorage(window);
+ const initialPreferences = Bootstrap.resolveInitialUiPreferences({
+   desktop: Desktop,
+@@ -43,6 +75,9 @@ const state = {
+   knownIds: new Set(),  // 褰撳墠 feed 宸叉樉绀虹殑鏂囩珷 id
+   freshIds: new Set()   // 涓嬫娓叉煋瑕侀珮浜殑鏂?id
+ };
++// 鎵?3锛氱姸鎬佸眰缁?renderer/store.js 鎸佹湁鍚屼竴涓?state 瀵硅薄锛堝紩鐢ㄤ笉鍙橈紝鎺у埗鍣?+// 娉ㄥ叆鐨?state 鐓ф棫鍙敤锛夛紱涓婚/缂╂斁/棰嗗煙绛?UI 鐘舵€佸垏鎹㈡敼缁?store.setState
++const store = Store.createStore(state);
+ 
+ // ---------- 鍔ㄦ晥涓庢粴鍔?----------
+ const reducedMotionQuery = window.matchMedia
+@@ -50,13 +85,58 @@ const reducedMotionQuery = window.matchMedia
+   : null;
+ const prefersReducedMotion = () => Boolean(reducedMotionQuery?.matches);
+ 
++// 娑叉€佺幓鐠冮樁娈?3锛歠x-tier 杩愯鏃舵。浣嶁€斺€斿嵆甯帹瀵硷紝涓嶈繘 store銆佷笉鎸佷箙鍖栥€?+// 涓嶈繘鍋忓ソ schema銆俽educed 鍋忓ソ 鈫?static锛涘惁鍒欒澶囧唴瀛樻垨閫昏緫鏍稿績鏁颁换涓€
++// 鍋忎綆锛堚墹4锛夆啋 lite锛屽叾浣?full銆俿tyles.css 灏鹃儴鐨?[data-fx-tier] 瑕嗙洊鍧?+// 鎸夋。浣嶈皟鏁寸幓鐠冩护闀滃己搴︿笌鏃堕暱浠ょ墝鐨勫€硷紙涓嶆柊澧炴护闀滃０鏄庣偣锛?+function resolveFxTier() {
++  if (prefersReducedMotion()) return 'static';
++  const memory = Number(navigator.deviceMemory);
++  const cores = Number(navigator.hardwareConcurrency);
++  const lowEnd = (Number.isFinite(memory) && memory > 0 && memory <= 4)
++    || (Number.isFinite(cores) && cores > 0 && cores <= 4);
++  return lowEnd ? 'lite' : 'full';
++}
++document.documentElement.dataset.fxTier = resolveFxTier();
++
++// 寰瀷杩愬姩寮曟搸锛坉om-utils 闃舵 3 鏂板 createMotion锛夛細matchMedia/document/rAF
++// 缁?deps 娉ㄥ叆锛涜鍥惧垏鎹㈠叆鍦轰笌淇℃伅娴侀敊宄板叆鍦哄叡鐢ㄨ繖涓€濂?WAAPI 寮圭哀
++const motion = DomUtils.createMotion({
++  document,
++  matchMedia: window.matchMedia ? query => window.matchMedia(query) : null,
++  raf: callback => requestAnimationFrame(callback)
++});
++
+ function scrollToTop() {
+   window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+ }
+ 
++// 姘涘洿灞傜┖闂叉殏鍋滐細椤甸潰闅愯棌鎴栫獥鍙ｅけ鐒︽椂缁?body 鎸?is-idle锛屾殏鍋?+// .aurora/.stars/.comet 鍔ㄧ敾锛堝搴?animation-play-state 瑙勫垯鍦?styles.css锛夛紱
++// 鍥炲埌鍓嶅彴鎴栭噸鏂拌仛鐒︾珛鍗虫仮澶?+function syncIdleState() {
++  document.body.classList.toggle('is-idle', document.hidden || !document.hasFocus());
++}
++document.addEventListener('visibilitychange', syncIdleState);
++window.addEventListener('blur', syncIdleState);
++window.addEventListener('focus', syncIdleState);
++syncIdleState();
++
+ // ---------- 涓婚 ----------
++let themeTransitionTimer;
++let themeAppliedOnce = false;
+ function applyTheme(theme, { persist = true } = {}) {
+-  state.theme = theme;
++  store.setState({ theme });
++  // 骞虫粦杩囨浮锛氬啓 data-theme 鍓嶇粰 body 鎸備复鏃?theme-transition 绫?+  //锛坰tyles.css 瀹氫箟 color/background-color/border-color 鐨?~260ms 鐭繃娓★級锛?+  // 缁撴潫鍚庣Щ闄も€斺€旈伩鍏嶅父椹诲叏琛?transition 鎷栫疮婊氬姩銆傞甯т笌 reduced
++  // 鍋忓ソ涓嬩笉鎸傜被锛涙皼鍥村眰 animation-play-state 鏈哄埗涓嶅彈褰卞搷
++  if (themeAppliedOnce && !prefersReducedMotion()) {
++    document.body.classList.add('theme-transition');
++    clearTimeout(themeTransitionTimer);
++    themeTransitionTimer = setTimeout(() => document.body.classList.remove('theme-transition'), 320);
++  }
++  themeAppliedOnce = true;
+   document.documentElement.dataset.theme = theme;
+   document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+   const meta = document.querySelector('meta[name="theme-color"]');
+@@ -77,7 +157,7 @@ $('#btnTheme').addEventListener('click', toggleTheme);
+ const TEXT_SCALES = ['sm', 'md', 'lg', 'xl'];
+ function applyTextScale(scale, { persist = true } = {}) {
+   if (!TEXT_SCALES.includes(scale)) return;
+-  state.textScale = scale;
++  store.setState({ textScale: scale });
+   document.documentElement.dataset.uiScale = scale;
+   $$('[data-text-scale]').forEach(button => {
+     const on = button.dataset.textScale === scale;
+@@ -119,35 +199,31 @@ function esc(s) {
+ }
+ const safeUrl = value => esc(DomUtils.safeHttpUrl(value));
+ 
+-function timeAgo(iso) {
+-  if (!iso) return '鏃堕棿鏈煡';
+-  const ms = Date.now() - new Date(iso).getTime();
+-  const m = Math.floor(ms / 60000);
+-  if (m < 1) return '鍒氬垰';
+-  if (m < 60) return `${m} 鍒嗛挓鍓峘;
+-  const h = Math.floor(m / 60);
+-  if (h < 24) return `${h} 灏忔椂鍓峘;
+-  const d = Math.floor(h / 24);
+-  if (d < 30) return `${d} 澶╁墠`;
+-  return new Date(iso).toLocaleDateString('zh-CN');
+-}
+-
+-function dateLabel(iso) {
+-  if (!iso) return '鏃ユ湡鏈煡';
+-  const d = new Date(iso);
+-  const today = new Date(); today.setHours(0, 0, 0, 0);
+-  const that = new Date(d); that.setHours(0, 0, 0, 0);
+-  const diff = Math.round((today - that) / 86400e3);
+-  if (diff === 0) return '浠婂ぉ';
+-  if (diff === 1) return '鏄ㄥぉ';
+-  return `${d.getMonth() + 1}鏈?{d.getDate()}鏃;
+-}
++// 鍗＄墖琛ㄧず灞傜函鍑芥暟锛堣瘎鍒嗚兌鍥?/ 鎶€鏈獊鐮?/ 瀹炰綋 / 鍘熷瓙浜嬩欢 / 楠ㄦ灦灞忥級
++// 宸叉媶鍏?renderer/feed-card.js锛宔sc 涓庡畨鍏?URL 宸ュ叿缁忎緷璧栨敞鍏ヤ氦缁欏伐鍘?+const feedCard = FeedCard.createFeedCard({
++  esc,
++  safeHttpUrl: DomUtils.safeHttpUrl,
++  format: formatUtils
++});
++const { skeletons } = feedCard;
+ 
+-function hhmm(iso) {
+-  if (!iso) return '--:--';
+-  const d = new Date(iso);
+-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+-}
++// 闃舵 4锛氬崱鐗囨ā鏉挎覆鏌撳櫒 + keyed diff 鍒楄〃娓叉煋鍣ㄣ€?+// 鏁村崱妯℃澘鍦?index.html 鐨?<template id="cardTemplate">锛宑loneNode(true)
++// + 瀛楁绾у～鍏咃紱淇℃伅娴佹暣琛ㄩ噸杞?鍒嗛〉杩藉姞/瀹炴椂鍓嶇疆鎻掑叆缁熶竴璧?diff 璋冨拰
++const cardRenderer = FeedCard.createCardRenderer({
++  esc,
++  safeHttpUrl: DomUtils.safeHttpUrl,
++  format: formatUtils,
++  template: $('#cardTemplate'),
++  doc: document
++});
++const feedDiffList = FeedCard.createFeedDiffList({
++  list: $('#feedList'),
++  renderer: cardRenderer,
++  // 闃舵 3锛堟恫鎬佺幓鐠冿級锛氭柊澧炶妭鐐归敊宄板叆鍦虹粡 motion 寮曟搸锛屽彲閫変緷璧?+  motion
++});
+ 
+ let toastTimer;
+ function toast(msg, isError) {
+@@ -182,69 +258,18 @@ function confirmGlass(message, { title = '璇风‘璁?, okText = '纭畾' } = {})
+ }
+ 
+ // ---------- 鍓创鏉夸笌鏂囦欢瀵煎嚭 ----------
+-// 娌欑娓叉煋杩涚▼閲?navigator.clipboard 闇€瑕佺敤鎴锋墜鍔匡紝涓旀棫鍐呮牳鍙兘缂哄け锛?-// 澶辫触鏃跺洖閫€鍒颁复鏃?textarea + execCommand锛屼繚璇併€屽鍒躲€嶈繖涓姩浣滄案杩滄湁缁撴灉銆?-async function copyText(text) {
+-  try {
+-    if (navigator.clipboard?.writeText) {
+-      await navigator.clipboard.writeText(text);
+-      return true;
+-    }
+-  } catch { /* 钀藉埌涓嬮潰鐨勫洖閫€璺緞 */ }
+-  const scratch = document.createElement('textarea');
+-  scratch.value = text;
+-  scratch.setAttribute('readonly', '');
+-  scratch.className = 'copy-scratch';
+-  document.body.appendChild(scratch);
+-  scratch.select();
+-  let copied = false;
+-  try { copied = document.execCommand('copy'); } catch { copied = false; }
+-  scratch.remove();
+-  return copied;
+-}
+-
+-// 鍐呭瀹夊叏绛栫暐鏄?default-src 'self'锛屽洜姝や笉鑳藉€熷姪浠讳綍澶栭儴鏈嶅姟钀界洏锛?-// blob: 鐢遍〉闈㈣嚜宸辩敓鎴愶紝閰嶅悎 a[download] 瀹屾垚涓€娆＄函鏈湴鐨勫彟瀛樹负銆?-function downloadText(filename, text) {
+-  // 甯?BOM锛歐indows 璁颁簨鏈寜 UTF-8 鎵撳紑涓枃锛屼笉浼氭樉绀烘垚涔辩爜
+-  const blob = new Blob([`\ufeff${text}`], { type: 'text/plain;charset=utf-8' });
+-  const url = URL.createObjectURL(blob);
+-  const anchor = document.createElement('a');
+-  anchor.href = url;
+-  anchor.download = filename;
+-  document.body.appendChild(anchor);
+-  anchor.click();
+-  anchor.remove();
+-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+-}
+-
+-function exportParams(kind, format) {
+-  const params = new URLSearchParams({ kind, format });
+-  if (kind === 'daily') {
+-    if (state.dailyDate) params.set('date', state.dailyDate);
+-    return params;
+-  }
+-  params.set('view', state.view);
+-  if (state.domain) params.set('domain', state.domain);
+-  if (state.category) params.set('category', state.category);
+-  if (state.q) params.set('q', state.q);
+-  return params;
+-}
+-
+-async function runExport(kind, format, mode) {
+-  try {
+-    const result = await api('/api/export?' + exportParams(kind, format));
+-    if (mode === 'copy') {
+-      const copied = await copyText(result.content);
+-      toast(copied ? `宸插鍒?${result.count} 鏉″埌鍓创鏉縛 : '澶嶅埗澶辫触锛岃鎵嬪姩閫夋嫨鏂囨湰', !copied);
+-      return;
+-    }
+-    downloadText(result.filename, result.content);
+-    toast(`宸插鍑?${result.count} 鏉″埌 ${result.filename}`);
+-  } catch (error) {
+-    toast('瀵煎嚭澶辫触锛? + error.message, true);
++// 闃舵 3 鎵?2 鎷嗗叆 renderer/export-controller.js锛?+// navigator/document 缁忎緷璧栨敞鍏ワ紝瀵煎嚭鎸夐挳闅忓伐鍘備竴骞舵帴绾?+const exportController = ExportController.createExportController({
++  api, toast, state, navigator, document,
++  elements: {
++    btnCopyFeed: $('#btnCopyFeed'),
++    btnExportFeed: $('#btnExportFeed'),
++    btnCopyDaily: $('#btnCopyDaily'),
++    btnExportDaily: $('#btnExportDaily')
+   }
+-}
++});
++const { runExport, copyText } = exportController;
+ 
+ function persistUiPreferences(patch) {
+   const sanitized = Bootstrap.sanitizeUiPreferencesPatch(patch, CommonLinks, {
+@@ -281,235 +306,31 @@ const hotRailRequestGuard = Bootstrap.createLatestRequestGuard();
+ 
+ // 鍏辩敤鍚屼竴涓俊鎭祦瑙嗗浘闆嗗悎锛氭槦鏍囪鍜岀簿閫?鐑偣/鍏ㄩ儴鍔ㄦ€佷竴鏍蜂韩鏈夌瓫閫夈€佸鍑轰笌瀹炴椂杞
+ const FEED_VIEWS = ['featured', 'hot', 'all', 'starred'];
+-const DOMAIN_NAME = { lowaltitude: '浣庣┖缁忔祹', aerospace: '鍟嗕笟鑸ぉ' };
+-const DIM_NAMES = {
+-  importance: '閲嶈鎬?, novelty: '鏂伴搴?, credibility: '鍙俊搴?,
+-  impact: '琛屼笟褰卞搷', timeliness: '鏃舵晥鎬?
+-};
+ 
+ // ---------- 濉斿彴鐘舵€?----------
+-// 缁熻鏁板瓧鍙樺寲鏃跺仛涓€娆＄煭淇冭ˉ闂达紝閬垮厤鍒锋柊鐬棿鐨勮烦瀛?-function setStat(el, value) {
+-  const target = Number(value);
+-  if (!Number.isFinite(target)) { el.textContent = '鈥?; return; }
+-  const previous = Number(el.dataset.value);
+-  el.dataset.value = String(target);
+-  if (!Number.isFinite(previous) || previous === target || prefersReducedMotion()) {
+-    el.textContent = target.toLocaleString('zh-CN');
+-    return;
+-  }
+-  const startedAt = performance.now();
+-  const tick = at => {
+-    const progress = Math.min(1, (at - startedAt) / 520);
+-    const eased = 1 - Math.pow(1 - progress, 3);
+-    el.textContent = Math.round(previous + (target - previous) * eased).toLocaleString('zh-CN');
+-    if (progress < 1) requestAnimationFrame(tick);
+-  };
+-  requestAnimationFrame(tick);
+-}
+-
+-async function refreshStats() {
+-  try {
+-    const s = await api('/api/stats');
+-    setStat($('#statSources'), s.sources);
+-    setStat($('#statToday'), s.today);
+-    setStat($('#statFeatured'), s.featuredToday);
+-    const starredCount = $('#tabStarredCount');
+-    starredCount.hidden = !s.starred;
+-    starredCount.textContent = s.starred > 99 ? '99+' : String(s.starred || '');
+-    const busy = s.pipeline?.running;
+-    $('#statStatus').innerHTML = `<span class="pulse-dot${busy ? ' busy' : ''}"></span>`;
+-    $('#statStatusLabel').textContent = busy ? '閲囬泦涓? : (s.aiConfigured ? 'AI 鍦ㄧ嚎' : '鍚彂妯″紡');
+-    const banner = $('#feedBanner');
+-    // 鏄熸爣鏄敤鎴锋墜鍔ㄦ敹鐨勶紝涓?AI 鏄惁閰嶇疆鏃犲叧锛岃繖閲屼笉璇ュ脊闄嶇骇鎻愮ず
+-    if (!s.aiConfigured && (state.view === 'featured' || state.view === 'hot')) {
+-      banner.hidden = false;
+-      banner.innerHTML = '褰撳墠涓?b>鍏抽敭璇嶅惎鍙戝紡</b>闄嶇骇妯″紡 鈥斺€?鍦ㄣ€庤缃€忎腑濉叆 DeepSeek API Key 鍗冲彲鍚敤浜旂淮 AI 璇勫垎涓庢櫤鑳界簿閫夈€?;
+-    } else banner.hidden = true;
+-    return s;
+-  } catch { /* 鍚庣鏈氨缁?*/ }
+-}
++// setStat/refreshStats 鎷嗗叆 renderer/stats-controller.js锛堟壒 2锛夛紝
++// 鏃堕挓涓庡抚鍥炶皟缁忎緷璧栨敞鍏ワ紝Node 鍗曟祴鍙洿鎺ラ┍鍔ㄨˉ闂?+const statsController = StatsController.createStatsController({
++  api, state,
++  elements: {
++    statSources: $('#statSources'),
++    statToday: $('#statToday'),
++    statFeatured: $('#statFeatured'),
++    tabStarredCount: $('#tabStarredCount'),
++    statStatus: $('#statStatus'),
++    statStatusLabel: $('#statStatusLabel'),
++    feedBanner: $('#feedBanner')
++  },
++  prefersReducedMotion,
++  now: () => performance.now(),
++  frame: callback => requestAnimationFrame(callback)
++});
++const { refreshStats } = statsController;
+ 
+ // ---------- 鍗＄墖娓叉煋 ----------
+-function scorePill(item) {
+-  const v = Math.round(item.quality ?? 0);
+-  if (item.featured) {
+-    return `<span class="score-pill featured" title="璐ㄩ噺鍒?${item.quality} 路 褰撳墠鐑害 ${item.heat}锛堥殢鏃堕棿娑堥€€锛?>
+-      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1C8 1 3 5.5 3 9.5a5 5 0 0 0 10 0c0-1.8-1-3.5-2-4.7C10.6 6.6 10 7.5 9 7.5 9.6 5.5 8 1 8 1z"/></svg>
+-      绮鹃€?<b>${v}</b></span>`;
+-  }
+-  if (item.quality != null) {
+-    return `<span class="score-pill" title="璐ㄩ噺鍒?${item.quality} 路 褰撳墠鐑害 ${item.heat}">璐ㄩ噺 <b>${v}</b></span>`;
+-  }
+-  return `<span class="score-pill">寰呰瘎</span>`;
+-}
+-
+-function breakthroughPresentation(item) {
+-  const rawBonus = Number(item.breakthroughBonus);
+-  if (!Number.isFinite(rawBonus) || rawBonus <= 0) return null;
+-  const bonusValue = Math.min(100, Math.max(0, rawBonus));
+-  const bonus = Number.isInteger(bonusValue)
+-    ? String(bonusValue)
+-    : bonusValue.toFixed(1).replace(/\.0$/, '');
+-  const score = Math.round(
+-    Math.min(1, Math.max(0, Number(item.breakthroughScore) || 0)) * 100
+-  );
+-  const signals = item.breakthroughSignals && typeof item.breakthroughSignals === 'object'
+-    ? item.breakthroughSignals
+-    : {};
+-  const safeTerms = value => Array.isArray(value)
+-    ? value
+-        .filter(term => typeof term === 'string' && term.trim())
+-        .map(term => term.trim().slice(0, 40))
+-        .slice(0, 4)
+-    : [];
+-  const objects = safeTerms(signals.objects);
+-  const actions = safeTerms(signals.actions);
+-  const evidenceNames = {
+-    'tier-t1': '瀹樻柟涓€鎵嬩俊婧?,
+-    'tier-t1.5-model': '瀹樻柟淇℃簮涓庢ā鍨嬪彲淇″害',
+-    'corroborated-model': '澶氫俊婧愪氦鍙夐獙璇?,
+-    'corroborated-no-model': '澶氫俊婧愪竴鑷存姤閬?
+-  };
+-  const evidence = evidenceNames[signals.credibilityEvidence] || '鍙俊淇℃簮楠岃瘉';
+-  const details = [
+-    objects.length ? `鎶€鏈璞★細${objects.join('銆?)}` : '',
+-    actions.length ? `瀹屾垚璇佹嵁锛?{actions.join('銆?)}` : '',
+-    `鍙俊渚濇嵁锛?{evidence}`,
+-    `绐佺牬寮哄害锛?{score}%`
+-  ].filter(Boolean);
+-  return {
+-    bonus,
+-    score,
+-    explanation: `璇ユ潯鎯呮姤閫氳繃鎶€鏈獊鐮撮棬妲涳紝鐑害鍔犳垚 ${bonus} 鍒嗭紝骞舵寜绐佺牬寮哄害寤堕暱鐑害鍗婅“鏈熴€?{details.join('锛?)}銆俙
+-  };
+-}
+-
+-// 瀹炰綋绫诲瀷 鈫?涓枃鐭爣绛俱€傚彧鐢ㄤ簬 title 鎻愮ず锛屼笉鍗犲崱鐗囩増闈€?-const ENTITY_TYPE_NAMES = {
+-  org: '鏈烘瀯', product: '鍨嬪彿', facility: '鍦虹珯', place: '鍦板煙', person: '浜虹墿', policy: '鏀跨瓥'
+-};
+-// 鍔ㄤ綔绫?鈫?涓枃銆傚師瀛愪簨浠堕噷妯″瀷鍐欑殑鍔ㄤ綔鍘熸枃鍚勫紡鍚勬牱锛?-// 褰掔被涔嬪悗鎵嶅ソ鍦ㄥ崱鐗囦笂缁欏嚭涓€鑷寸殑鎺緸銆?-const EVENT_CLASS_NAMES = {
+-  launch: '鍙戝皠鍏ヨ建', recovery: '鍥炴敹澶嶇敤', 'flight-test': '璇曢楠岃瘉',
+-  certification: '閫傝埅鍙栬瘉', funding: '铻嶈祫', listing: '涓婂競',
+-  order: '璁㈠崟涓爣', delivery: '浜や粯閲忎骇', partnership: '鍚堜綔绛剧害',
+-  policy: '鏀跨瓥鍙戝竷', facility: '鍦虹珯鍩哄缓', research: '鐮斿埗璇曢獙',
+-  personnel: '浜轰簨缁勭粐', incident: '寮傚父涓庡欢鏈?
+-};
+-
+-function entityChipsHtml(item) {
+-  const list = Array.isArray(item.entities) ? item.entities.filter(e => e?.name).slice(0, 6) : [];
+-  if (!list.length) return '';
+-  return `<div class="card-entities" role="group" aria-label="鐩稿叧瀹炰綋">${list.map(entity => {
+-    const type = ENTITY_TYPE_NAMES[entity.type] || '瀹炰綋';
+-    return `<button class="card-entity" type="button" data-entity="${esc(entity.name)}"
+-      title="鎸?{type}妫€绱€?{esc(entity.name)}銆?>${esc(entity.name)}</button>`;
+-  }).join('')}</div>`;
+-}
+-
+-// 鍘熷瓙浜嬩欢鍙湪鐪熺殑鎷嗗嚭澶氫欢浜嬫椂鎵嶅睍绀恒€傚崟浜嬩欢鐨勫崱鐗囨憳瑕佸凡缁忚娓呮浜嗭紝
+-// 鍐嶅垪涓€閬嶅彧鏄櫔澹帮紱鑰屻€岃繖鏉″叾瀹炶浜嗕袱浠朵簨銆嶆湰韬氨鏄鑰呴渶瑕佺煡閬撶殑淇℃伅銆?-function atomicEventsHtml(item) {
+-  const list = Array.isArray(item.events) ? item.events.filter(e => e?.actor) : [];
+-  if (list.length < 2) return '';
+-  const rows = list.map(event => {
+-    const action = EVENT_CLASS_NAMES[event.actionClass] || event.action || '鐩稿叧鍔ㄤ綔';
+-    const object = event.object ? ` 路 ${esc(event.object)}` : '';
+-    return `<li><b>${esc(event.actor)}</b><span>${esc(action)}</span>${object}</li>`;
+-  }).join('');
+-  return `<div class="card-events" role="note">
+-      <span class="ce-label">鍘熷瓙浜嬩欢 ${list.length}</span>
+-      <ol class="ce-list">${rows}</ol>
+-    </div>`;
+-}
+-
+-function cardInner(item) {
+-  const dims = item.scores ? Object.entries(DIM_NAMES).map(([k, name]) => `
+-    <div class="dim">
+-      <div class="dim-label"><span>${name}</span><b>${Math.round(item.scores[k] ?? 0)}</b></div>
+-      <div class="dim-bar"><i style="width:${Math.min(100, item.scores[k] ?? 0)}%"></i></div>
+-    </div>`).join('') : '';
+-  const breakthrough = breakthroughPresentation(item);
+-  const breakthroughBadge = breakthrough ? `
+-    <span class="breakthrough-pill" role="note"
+-      aria-label="鎶€鏈獊鐮寸儹搴﹀姞鎴?${breakthrough.bonus} 鍒嗭紝绐佺牬寮哄害 ${breakthrough.score}%"
+-      title="宸查€氳繃鎶€鏈璞°€佸畬鎴愬姩浣滀笌鍙俊搴﹂棬妲?>
+-      鎶€鏈獊鐮?<b>+${breakthrough.bonus}</b>
+-    </span>` : '';
+-  const breakthroughDetail = breakthrough ? `
+-    <div class="breakthrough-explanation" role="note">
+-      <strong>鎶€鏈獊鐮村姞鍒嗕緷鎹?/strong>
+-      <p>${esc(breakthrough.explanation)}</p>
+-    </div>` : '';
+-  const analysisDetails = `${dims}${breakthroughDetail}`;
+-  const cluster = item.clusterSize > 1 ? `
+-    <button class="cluster-toggle" data-cluster="${item.clusterId}" data-self="${item.id}" type="button" aria-expanded="false">
+-      <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+-      ${item.clusterSize} 绡囧叧鑱旀姤閬?-    </button>` : '';
+-  // 浜旂淮鍒嗚В姝ゅ墠鍙兘闈?鐩茬偣"鍗＄墖鎵嶅睍寮€锛岀幇鍦ㄧ粰鍑烘樉寮忕殑鍙仛鐒﹀叆鍙?-  const dimsToggle = analysisDetails ? `
+-    <button class="dims-toggle" type="button" aria-expanded="false">${dims ? '浜旂淮鐮斿垽' : '鐮斿垽璇︽儏'}
+-      <svg viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+-    </button>` : '';
+-  // 鐣欏瓨涓庡垎鍙戠殑鍏ュ彛鍥哄畾鍦ㄦ瘡寮犲崱鐗囦笂锛氭槦鏍囩暀缁欒嚜宸憋紝澶嶅埗浼犵粰鍒汉
+-  const actions = `
+-    <span class="card-foot-gap"></span>
+-    <button class="card-act" data-act="copy" data-focus-key="copy:${item.id}" type="button" title="澶嶅埗鏍囬涓庨摼鎺?>
+-      <svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 4.5v-1a1.5 1.5 0 0 0-1.5-1.5H3a1.5 1.5 0 0 0-1.5 1.5V8A1.5 1.5 0 0 0 3 9.5h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+-      澶嶅埗
+-    </button>
+-    <button class="card-act star-toggle${item.starred ? ' is-on' : ''}" data-act="star" data-focus-key="star:${item.id}" type="button"
+-      aria-pressed="${item.starred ? 'true' : 'false'}" title="${item.starred ? '鍙栨秷鏄熸爣' : '鏄熸爣鐣欏瓨锛堜笉鍙椾繚鐣欏ぉ鏁版竻鐞嗭級'}">
+-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="${item.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+-      <span class="card-act-label">${item.starred ? '宸叉槦鏍? : '鏄熸爣'}</span>
+-    </button>`;
+-  const foot = `<div class="card-foot">${cluster}${dimsToggle}${actions}</div>`
+-    + (cluster ? '<div class="cluster-items" hidden></div>' : '');
+-  const reason = item.reason ? `
+-    <div class="card-reason">
+-      <span class="cr-label"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>鎯呮姤鐮斿垽</span>
+-      <span class="cr-text">${esc(item.reason)}</span>
+-    </div>` : '';
+-  const thumb = DomUtils.safeHttpUrl(item.image) !== '#'
+-    ? `<img class="card-thumb" src="${safeUrl(item.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+-    : '';
+-
+-  return `
+-    <div class="card-head">
+-      <div class="card-meta">
+-        <span class="meta-source">${esc(item.source)}</span>
+-        <span class="tier-chip tier-${esc(item.tier)}">${esc(item.tier)}</span>
+-        ${item.category ? `<span class="cat-tag">${esc(item.category)}</span>` : ''}
+-        <span>${timeAgo(item.publishedAt || item.fetchedAt)}</span>
+-      </div>
+-      <div class="card-score-group">${breakthroughBadge}${scorePill(item)}</div>
+-    </div>
+-    <a class="card-title" href="${safeUrl(item.url)}" target="_blank" rel="noopener">${esc(item.title)}</a>
+-    <div class="card-content${thumb ? ' has-thumb' : ''}">
+-      <div class="card-text">
+-        ${item.summary ? `<p class="card-summary">${esc(item.summary)}</p>` : ''}
+-        ${item.tags?.length ? `<div class="card-tags">${item.tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+-        ${entityChipsHtml(item)}
+-      </div>
+-      ${thumb}
+-    </div>
+-    ${atomicEventsHtml(item)}
+-    ${reason}
+-    ${foot}
+-    ${analysisDetails ? `<div class="dims">${analysisDetails}</div>` : ''}`;
+-}
+-
+-function localDateString(date = new Date()) {
+-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+-}
+-
+-function parseLocalDate(value) {
+-  const [year, month, day] = value.split('-').map(Number);
+-  return new Date(year, month - 1, day);
+-}
++// 闃舵 4锛氭暣鍗℃ā鏉胯縼涓?index.html 鐨?<template id="cardTemplate">锛?+// cardInner/renderTimeline/renderRanked 杩佸叆 renderer/feed-card.js
++// 锛坈reateCardRenderer / createFeedDiffList锛夛紝缁勫悎鏍瑰彧鐣欎笂鏂硅閰嶃€? 
+ document.addEventListener('error', event => {
+   // 缂╃暐鍥惧姞杞藉け璐ュ彧闅愬幓鍥惧舰銆佷繚鐣欏崰浣嶏細绉婚櫎鑺傜偣浼氳鍗＄墖姝ｆ枃妯悜鎾戝紑锛?@@ -518,873 +339,134 @@ document.addEventListener('error', event => {
+   if (img?.matches?.('img.card-thumb')) img.classList.add('is-broken');
+ }, true);
+ 
+-// 鏃堕棿杞寸殑鏃堕棿鍩哄噯锛氭槦鏍囪鍥炬寜鏀惰棌鏃堕棿鎺掑簭锛屽垎缁勬爣棰樺氨蹇呴』鍚屾牱鐢ㄦ敹钘忔椂闂达紝
+-// 鍚﹀垯鏃ユ湡鍒嗙粍浼氶殢鍙戝竷鏃堕棿鏉ュ洖璺筹紝鍑虹幇銆屼粖澶?/ 3鏈?鏃?/ 浠婂ぉ銆嶈繖鏍风殑涔卞簭鏍囬銆?-const publishedTime = item => item.publishedAt || item.fetchedAt;
+-const starredTime = item => item.starredAt || item.fetchedAt;
+-
+-// 鏃堕棿杞磋锛堢簿閫?/ 鍏ㄩ儴鍔ㄦ€?/ 鏄熸爣锛?-function renderTimeline(items, startIdx, timeOf = publishedTime) {
+-  // 鎸夋棩鏈熷垎缁?-  const groups = [];
+-  let cur = null;
+-  for (const item of items) {
+-    const label = dateLabel(timeOf(item));
+-    if (!cur || cur.label !== label) {
+-      cur = { label, items: [] };
+-      groups.push(cur);
+-    }
+-    cur.items.push(item);
+-  }
+-  return groups.map(g => `
+-    <div class="date-group">
+-      <div class="date-head">${esc(g.label)}<span class="dh-count">${g.items.length} 鏉?/span></div>
+-      ${g.items.map((item, i) => `
+-        <div class="tl-row">
+-          <div class="tl-left">
+-            <span class="tl-time">${hhmm(timeOf(item))}</span>
+-            <i class="tl-dot ${item.domain === 'lowaltitude' ? 'la' : item.domain === 'aerospace' ? 'ae' : ''}"></i>
+-          </div>
+-          <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}"${item.domain ? ` data-domain="${esc(item.domain)}"` : ''} style="animation-delay:${Math.min(startIdx + i, 10) * 35}ms">
+-            ${cardInner(item)}
+-          </article>
+-        </div>`).join('')}
+-    </div>`).join('');
+-}
+-
+-// 鎺掕锛堢儹鐐规锛?-function renderRanked(items, startIdx) {
+-  return items.map((item, i) => {
+-    const rank = startIdx + i + 1;
+-    return `
+-    <div class="rank-row">
+-      <div class="card-rank${rank <= 3 ? ' top' : ''}">${String(rank).padStart(2, '0')}</div>
+-      <article class="card${item.featured ? ' is-featured' : ''}" data-id="${item.id}"${item.domain ? ` data-domain="${esc(item.domain)}"` : ''} style="animation-delay:${Math.min(i, 10) * 35}ms">
+-        ${cardInner(item)}
+-      </article>
+-    </div>`;
+-  }).join('');
+-}
+-
+-function skeletons(n = 5) {
+-  // 灏哄涓€寰?rem锛氳窡鐫€鐣岄潰缂╂斁妗ｄ綅涓€璧疯蛋锛屽惁鍒欐斁澶х増闈㈠悗楠ㄦ灦涓庣湡瀹炲崱鐗囩殑
+-  // 楂樺害宸細琚繘涓€姝ユ媺澶э紝鍔犺浇瀹屾垚鐬棿鐨勮烦鍙樻洿鏄庢樉
+-  return Array.from({ length: n }, () => `
+-    <div class="card skeleton" style="margin-bottom:.875rem">
+-      <div class="sk-line" style="width:70%"></div>
+-      <div class="sk-line" style="width:38%;height:.625rem"></div>
+-      <div class="sk-line" style="width:95%;height:.6875rem"></div>
+-    </div>`).join('');
+-}
+-
+-// 楠ㄦ灦灞忕殑鏈€鐭┗鐣欙細鏈湴鎺ュ彛甯镐笉鍒?100ms 杩斿洖锛屾病鏈変笅闄愮殑璇濋鏋跺彧鏄?-// 涓€闂€岃繃鐨勫櫔鐐癸紝姣斾笉鏄剧ず鏇存檭鐪?-const SKELETON_MIN_MS = 240;
+-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+-
+-// 妫€绱笂涓嬫枃鏉★細鏄庣‘褰撳墠澶勪簬妫€绱㈡€侊紝骞剁粰鍑轰竴閿€€鍑?-function renderSearchContext() {
+-  const box = $('#searchContext');
+-  if (!state.q) {
+-    box.hidden = true;
+-    box.innerHTML = '';
+-    return;
+-  }
+-  box.hidden = false;
+-  box.innerHTML = `妫€绱?<strong>銆?{esc(state.q)}銆?/strong>`
+-    + ` 路 宸插垪鍑?<span class="sc-count">${state.listed}</span> 鏉
+-    + '<button type="button" data-act="clear-search">娓呴櫎妫€绱?/button>';
+-}
+-
+-async function loadFeed(reset = true) {
+-  // 鍒嗛〉杩藉姞涓嶈兘骞跺彂锛屽惁鍒欎袱鎵圭粨鏋滀細浜ら敊锛涙暣琛ㄩ噸杞藉垯浠ユ渶鍚庝竴娆¤姹備负鍑嗭紝
+-  // 杩欐牱鍦ㄥ姞杞介€斾腑鍒囨崲棰嗗煙/鍒嗙被涓嶄細琚潤榛樹涪寮冦€?-  if (!reset && state.loading) return;
+-  const request = feedRequestGuard.begin();
+-  state.loading = true;
+-  const list = $('#feedList');
+-  // 鏁磋〃鏇挎崲浼氫涪鎺夐敭鐩樼劍鐐光€斺€斿厛璁颁綇鐒︾偣鎵€鍦ㄧ殑鎺т欢锛屾覆鏌撳悗褰掕繕
+-  const focusKey = reset ? DomUtils.findFocusKey(list) : null;
+-  if (reset) { state.page = 0; state.listed = 0; list.innerHTML = skeletons(); $('#newFlash').hidden = true; }
+-  try {
+-    const params = new URLSearchParams({ view: state.view, page: state.page });
+-    if (state.domain) params.set('domain', state.domain);
+-    if (state.category) params.set('category', state.category);
+-    if (state.q) params.set('q', state.q);
+-    const [data] = await Promise.all([
+-      api('/api/feed?' + params),
+-      reset ? delay(SKELETON_MIN_MS) : Promise.resolve()
+-    ]);
+-    if (!request.isCurrent()) return;
+-    const startIdx = state.page * 30;
+-    const html = state.view === 'hot'
+-      ? renderRanked(data.items, startIdx)
+-      : renderTimeline(data.items, 0, state.view === 'starred' ? starredTime : publishedTime);
+-    if (reset) list.innerHTML = html;
+-    else list.insertAdjacentHTML('beforeend', html);
+-    state.listed = reset ? data.items.length : state.listed + data.items.length;
+-    renderSearchContext();
+-    // 璁板綍宸茬煡 id锛涢珮浜湰娆℃柊鍒拌揪鐨勬潯鐩紙瀹炴椂鎻掑叆锛?-    if (reset) state.knownIds = new Set(data.items.map(i => i.id));
+-    else data.items.forEach(i => state.knownIds.add(i.id));
+-    if (state.freshIds.size) {
+-      for (const id of state.freshIds) {
+-        const el = list.querySelector(`.card[data-id="${id}"]`);
+-        if (el) el.classList.add('card-new');
+-      }
+-      state.freshIds.clear();
+-    }
+-    if (reset && !data.items.length) {
+-      const emptyCopy = state.q ? '娌℃湁妫€绱㈠埌鐩稿叧鎯呮姤锛屾崲涓叧閿瘝璇曡瘯'
+-        : state.view === 'starred' ? '杩樻病鏈夋槦鏍囨儏鎶?鈥斺€?鍦ㄤ换鎰忓崱鐗囧彸涓嬭鐐广€屾槦鏍囥€嶏紝鏀惰捣鏉ョ殑鎯呮姤涓嶄細琚繚鐣欑瓥鐣ユ竻鐞?
+-          : '鏆傛棤鍐呭 鈥斺€?鐐瑰嚮鍙充笂瑙掑埛鏂版寜閽珛鍗抽噰闆嗭紝鎴栫瓑寰呭畾鏃朵换鍔?;
+-      list.innerHTML = `<div class="empty-state glass">
+-        <div class="es-icon">${state.view === 'starred' && !state.q ? '灏?鏈?鎽?鏄? : '椋?骞?娴?闈?}</div>
+-        <p>${emptyCopy}</p>
+-      </div>`;
+-    }
+-    syncFeedToolbar(data.items.length > 0 || state.listed > 0);
+-    $('#btnMore').hidden = !data.hasMore;
+-    $('#feedEnd').hidden = data.hasMore || !data.items.length;
+-    if (reset && focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
+-  } catch (e) {
+-    if (!request.isCurrent()) return;
+-    // 澶辫触涓嶆槸缁堢偣锛氱粰鍑洪噸璇曞姩浣滐紝鑰屼笉鏄暀涓€琛屾鏂囧瓧璁╀汉鍘绘壘鍏ㄥ眬鍒锋柊
+-    if (reset) list.innerHTML = `<div class="empty-state glass"><div class="es-icon">淇?鍙?涓?鏂?/div><p>鍚庣杩炴帴澶辫触锛?{esc(e.message)}</p>
+-      <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-feed">閲嶈瘯</button></div>`;
+-  } finally {
+-    if (request.isCurrent()) state.loading = false;
+-  }
+-}
+-
+-// ---------- 鍙充晶鐑害鏍?----------
+-function hotRailSkeletons() {
+-  return Array.from({ length: 3 }, () => `
+-    <div class="hot-item skeleton" aria-hidden="true">
+-      <span class="hi-rank sk-line" style="width:1.2rem"></span>
+-      <span><span class="sk-line" style="width:88%"></span><span class="sk-line" style="width:52%;height:.625rem"></span></span>
+-    </div>`).join('');
+-}
+-
+-// 棣栧睆鍏堢粰楠ㄦ灦鍗犱綅锛屽埆璁╁彸鏍忕┖鐧藉湴绛夊搷搴旓紱涔嬪悗鐨勮疆璇㈠師鍦版洿鏂帮紝涓嶆暣鍒楅噸鏀惧姩鐢?-async function loadHotRail() {
+-  const box = $('#hotRailList');
+-  const request = hotRailRequestGuard.begin();
+-  const firstPaint = !box.dataset.painted;
+-  if (firstPaint) box.innerHTML = hotRailSkeletons();
+-  try {
+-    const params = new URLSearchParams({ view: 'hot', page: 0 });
+-    if (state.domain) params.set('domain', state.domain);
+-    const data = await api('/api/feed?' + params);
+-    if (!request.isCurrent()) return;
+-    const top = data.items.slice(0, 10);
+-    if (!top.length) { box.innerHTML = '<div class="hot-rail-sub">鏆傛棤鐑偣</div>'; return; }
+-    box.dataset.painted = '1';
+-    box.innerHTML = top.map((it, i) => `
+-      <a class="hot-item" href="${safeUrl(it.url)}" target="_blank" rel="noopener" title="${esc(it.title)}"${firstPaint ? ` style="animation-delay:${Math.min(i, 9) * 40}ms"` : ' style="animation:none"'}>
+-        <span class="hi-rank">${i + 1}</span>
+-        <span>
+-          <span class="hi-title">${esc(it.title)}</span>
+-          <span class="hi-meta">
+-            <span class="hi-heat">${Math.round(it.heat ?? 0)}掳</span>
+-            ${it.clusterSize > 1 ? `<span>${it.clusterSize} 绡囧叧鑱旀姤閬?/span>` : `<span>${esc(it.source)}</span>`}
+-            <span>${timeAgo(it.publishedAt || it.fetchedAt)}</span>
+-          </span>
+-        </span>
+-      </a>`).join('');
+-  } catch { if (request.isCurrent()) box.innerHTML = ''; }
+-}
+-
+-// 瀵煎嚭鎸夐挳鍙湪鐪熺殑鏈夊唴瀹瑰彲瀵兼椂鎵嶅彲鐢紝閬垮厤澶嶅埗鍑轰竴浠界┖鏂囨。
+-const VIEW_EXPORT_LABEL = {
+-  featured: '绮鹃€?, hot: '鐑偣', all: '鍏ㄩ儴鍔ㄦ€?, starred: '鏄熸爣'
+-};
+-function syncFeedToolbar(hasItems) {
+-  $('#btnCopyFeed').disabled = !hasItems;
+-  $('#btnExportFeed').disabled = !hasItems;
+-  $('#feedToolbarNote').textContent = hasItems
+-    ? `鍙妸褰撳墠銆?{VIEW_EXPORT_LABEL[state.view] || '鍒楄〃'}銆嶅垪琛ㄦ暣浠藉甫璧帮紙鏈€澶?200 鏉★級`
+-    : '';
+-}
+-
+-async function toggleStar(card, button) {
+-  const id = Number(card.dataset.id);
+-  const starred = button.getAttribute('aria-pressed') !== 'true';
+-  button.disabled = true;
+-  try {
+-    const result = await api(`/api/articles/${id}/star`, { body: { starred } });
+-    // 鍦ㄦ槦鏍囪鍥鹃噷鍙栨秷鏄熸爣 = 浠庢敹钘忓す閲岀Щ鍑猴紝蹇呴』鏁磋〃閲嶈浇锛屽惁鍒欏崱鐗囦細鐣欏湪鍘熷湴
+-    if (state.view === 'starred' && !result.starred) {
+-      toast('宸插彇娑堟槦鏍?);
+-      await loadFeed();
+-      refreshStats();
+-      return;
+-    }
+-    button.classList.toggle('is-on', result.starred);
+-    button.setAttribute('aria-pressed', String(result.starred));
+-    button.querySelector('.card-act-label').textContent = result.starred ? '宸叉槦鏍? : '鏄熸爣';
+-    button.title = result.starred ? '鍙栨秷鏄熸爣' : '鏄熸爣鐣欏瓨锛堜笉鍙椾繚鐣欏ぉ鏁版竻鐞嗭級';
+-    button.querySelector('path')?.setAttribute('fill', result.starred ? 'currentColor' : 'none');
+-    toast(result.starred ? '宸叉槦鏍囷紝璇ユ儏鎶ヤ笉浼氳淇濈暀绛栫暐娓呯悊' : '宸插彇娑堟槦鏍?);
+-    refreshStats();
+-  } catch (error) {
+-    toast('鏄熸爣鎿嶄綔澶辫触锛? + error.message, true);
+-  } finally {
+-    button.disabled = false;
+-  }
+-}
+-
+-// 鍗＄墖浜や簰锛氭槦鏍?/ 澶嶅埗 / 灞曞紑浜旂淮 / 浜嬩欢绨?-$('#feedList').addEventListener('click', async e => {
+-  if (e.target.closest('[data-act="retry-feed"]')) { loadFeed(); return; }
+-  const actionBtn = e.target.closest('.card-act');
+-  if (actionBtn) {
+-    const card = actionBtn.closest('.card');
+-    if (actionBtn.dataset.act === 'star') return toggleStar(card, actionBtn);
+-    const title = card.querySelector('.card-title');
+-    const copied = await copyText(`${title.textContent.trim()}\n${title.href}`);
+-    toast(copied ? '宸插鍒舵爣棰樹笌閾炬帴' : '澶嶅埗澶辫触锛岃鎵嬪姩閫夋嫨鏂囨湰', !copied);
+-    return;
+-  }
+-  // 瀹炰綋鏍囩鍗虫绱㈠叆鍙ｏ細鐪嬪埌銆岃摑绠埅澶┿€嶅氨鎯崇煡閬撳畠鏈€杩戣繕鏈変粈涔堝姩闈欙紝
+-  // 杩欎竴姝ヤ笉璇ュ啀璁╀汉鍥炲埌鎼滅储妗嗛噷鎵嬫墦涓€閬?-  const entityBtn = e.target.closest('.card-entity');
+-  if (entityBtn) {
+-    runTermSearch(entityBtn.dataset.entity);
+-    return;
+-  }
+-  const dimsBtn = e.target.closest('.dims-toggle');
+-  if (dimsBtn) {
+-    const card = dimsBtn.closest('.card');
+-    dimsBtn.setAttribute('aria-expanded', String(card.classList.toggle('expanded')));
+-    return;
+-  }
+-  const tgl = e.target.closest('.cluster-toggle');
+-  if (tgl) {
+-    const box = tgl.closest('.card').querySelector('.cluster-items');
+-    if (!box) return;
+-    tgl.classList.toggle('open');
+-    if (box.hidden && !box.dataset.loaded) {
+-      box.hidden = false;
+-      // 楠ㄦ灦瑕佸寘鍦?.skeleton 閲屾墠鏈夐珮搴︿笌寰厜鈥斺€旇８ .sk-line 鏄釜闅愬舰鍏冪礌锛?-      // 鐐瑰嚮鍚庡埌鏁版嵁鍒拌揪鍓嶇湅璧锋潵銆屾鏃犲弽搴斻€?-      box.innerHTML = '<div class="skeleton"><div class="sk-line" style="width:60%"></div></div>';
+-      try {
+-        const items = await api('/api/cluster/' + tgl.dataset.cluster);
+-        const selfId = Number(tgl.dataset.self);
+-        box.innerHTML = items.filter(i => i.id !== selfId).map(i => `
+-          <div class="cluster-item">
+-            <a href="${safeUrl(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>
+-            <span class="ci-meta">${esc(i.source)} 路 <b class="ci-tier tier-${esc(i.tier)}">${esc(i.tier)}</b> 路 ${timeAgo(i.publishedAt || i.fetchedAt)}</span>
+-          </div>`).join('') || '<div class="cluster-item">锛堟棤鍏朵粬鎶ラ亾锛?/div>';
+-        box.dataset.loaded = '1';
+-      } catch { box.innerHTML = '<div class="cluster-item">鍔犺浇澶辫触</div>'; }
+-    } else {
+-      box.hidden = !box.hidden;
+-    }
+-    tgl.setAttribute('aria-expanded', String(!box.hidden));
+-    return;
+-  }
+-  const card = e.target.closest('.card');
+-  if (card && !e.target.closest('a, button')) {
+-    const expanded = card.classList.toggle('expanded');
+-    card.querySelector('.dims-toggle')?.setAttribute('aria-expanded', String(expanded));
+-  }
+-});
+-
+-$('#btnMore').addEventListener('click', async () => {
+-  const btn = $('#btnMore');
+-  btn.disabled = true;
+-  btn.classList.add('is-busy');
+-  btn.textContent = '鍔犺浇涓€?;
+-  state.page++;
+-  try {
+-    await loadFeed(false);
+-  } finally {
+-    btn.disabled = false;
+-    btn.classList.remove('is-busy');
+-    btn.textContent = '鍔犺浇鏇村';
+-  }
+-});
+-
+-// ---------- 鏃ユ姤 ----------
+-async function loadDaily(date) {
+-  const request = dailyRequestGuard.begin();
+-  const body = $('#dailyBody');
+-  body.innerHTML = skeletons(3);
+-  try {
+-    const [data] = await Promise.all([
+-      api('/api/daily' + (date ? `?date=${date}` : '')),
+-      delay(SKELETON_MIN_MS)
+-    ]);
+-    if (!request.isCurrent()) return;
+-    const r = data.report;
+-    state.dailyDate = r.date;
+-    state.dailyDates = data.dates;
+-    $('#dailyDate').textContent = r.date.replace(/-/g, ' / ');
+-    $('#dailySub').textContent =
+-      `${r.total} 鏉＄簿閫?路 浣庣┖缁忔祹 ${r.byDomain.lowaltitude} 鏉?路 鍟嗕笟鑸ぉ ${r.byDomain.aerospace} 鏉?路 鐢熸垚浜?${new Date(r.generatedAt).toLocaleTimeString('zh-CN')}`;
+-    if (!r.sections.length) {
+-      body.innerHTML = `<div class="empty-state glass"><div class="es-icon">浠?鏃?鏃?椋?/div><p>璇ユ棩鏈熸殏鏃犵簿閫夋儏鎶ワ紙鍙兘灏氭湭閲囬泦鎴栧叏閮ㄤ綆浜庣簿閫夐槇鍊硷級</p></div>`;
+-      return;
+-    }
+-    body.innerHTML = r.sections.map(sec => `
+-      <div class="daily-section glass">
+-        <div class="daily-section-title">${esc(sec.category)}</div>
+-        ${sec.items.map(it => `
+-          <div class="daily-item">
+-            <span class="di-score">${Math.round(it.quality_score)}</span>
+-            <div>
+-              <a href="${safeUrl(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+-              ${it.ai_summary ? `<div class="di-meta">${esc(it.ai_summary)}</div>` : ''}
+-              <div class="di-meta">${esc(it.source_name)} 路 ${esc(it.tier)} 路 ${DOMAIN_NAME[it.domain] || ''}</div>
+-            </div>
+-          </div>`).join('')}
+-      </div>`).join('');
+-  } catch (e) {
+-    if (!request.isCurrent()) return;
+-    body.innerHTML = `<div class="empty-state glass"><div class="es-icon">淇?鍙?涓?鏂?/div><p>鏃ユ姤鍔犺浇澶辫触锛?{esc(e.message)}</p>
+-      <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-daily">閲嶈瘯</button></div>`;
+-  }
+-}
+-
+-$('#dailyBody').addEventListener('click', event => {
+-  if (event.target.closest('[data-act="retry-daily"]')) loadDaily(state.dailyDate);
+-});
+-
+-function shiftDaily(days) {
+-  const cur = state.dailyDate ? parseLocalDate(state.dailyDate) : new Date();
+-  cur.setDate(cur.getDate() + days);
+-  const d = localDateString(cur);
+-  if (d > localDateString()) return;
+-  state.dailyDate = d;
+-  preferenceActions.remember('dailyDate', d);
+-  loadDaily(d);
+-}
+-$('#btnCopyFeed').addEventListener('click', () => runExport('feed', 'text', 'copy'));
+-$('#btnExportFeed').addEventListener('click', () => runExport('feed', 'markdown', 'download'));
+-$('#btnCopyDaily').addEventListener('click', () => runExport('daily', 'text', 'copy'));
+-$('#btnExportDaily').addEventListener('click', () => runExport('daily', 'markdown', 'download'));
+-
+-$('#dailyPrev').addEventListener('click', () => shiftDaily(-1));
+-$('#dailyNext').addEventListener('click', () => shiftDaily(1));
+-$('#dailyRegen').addEventListener('click', async () => {
+-  const btn = $('#dailyRegen');
+-  btn.disabled = true;
+-  btn.classList.add('is-busy');
+-  try {
+-    await api('/api/daily/regenerate', { body: { date: state.dailyDate } });
+-    toast('鏃ユ姤宸查噸鏂扮敓鎴?);
+-    loadDaily(state.dailyDate);
+-  } catch (error) {
+-    toast('鏃ユ姤閲嶆柊鐢熸垚澶辫触锛? + error.message, true);
+-  } finally {
+-    btn.disabled = false;
+-    btn.classList.remove('is-busy');
+-  }
+-});
+-
+-// ---------- 淇℃簮 ----------
+-async function loadSources() {
+-  const list = $('#sourcesList');
+-  // 姣忔鎿嶄綔鍚庢暣琛ㄩ噸杞戒細涓㈤敭鐩樼劍鐐光€斺€斿厛璁颁笅锛屾覆鏌撳悗褰掕繕
+-  const focusKey = DomUtils.findFocusKey(list);
+-  list.innerHTML = skeletons(4);
+-  try {
+-    const [sources] = await Promise.all([
+-      api('/api/sources'),
+-      delay(SKELETON_MIN_MS)
+-    ]);
+-    list.innerHTML = sources.map(s => {
+-      const st = !s.enabled ? 'idle' : s.last_status?.startsWith('error') ? 'err' : s.last_status === 'ok' ? 'ok' : 'idle';
+-      const health = s.health || {};
+-      const paused = health.pausedUntil
+-        ? `<span class="src-backoff" title="杩炵画澶辫触鍚庤嚜鍔ㄦ媺闀块噸璇曢棿闅旓紝閬垮厤姣忚疆绌鸿浆">
+-             鏆傚仠鑷?${esc(hhmm(health.pausedUntil))}</span>`
+-        : '';
+-      return `
+-      <div class="src-card glass${health.state === 'failing' ? ' is-failing' : ''}" data-id="${s.id}">
+-        <div class="src-row1">
+-          <span class="src-status ${st}" title="${esc(s.last_status || '鏈噰闆?)}"></span>
+-          <span class="src-name" title="${esc(s.url)}">${esc(s.name)}</span>
+-          <span class="tier-chip tier-${esc(s.tier)}">${esc(s.tier)}</span>
+-          ${paused}
+-        </div>
+-        <div class="src-meta">
+-          <span>${esc(s.type.toUpperCase())}</span>
+-          <span>${DOMAIN_NAME[s.domain] || '鍙岄鍩?}</span>
+-          <span>绱 ${s.item_count} 鏉?/span>
+-          ${health.consecutiveErrors
+-            ? `<span style="color:var(--danger-ink)">杩炵画澶辫触 ${health.consecutiveErrors} 娆?/span>`
+-            : s.error_count ? `<span>绱澶辫触 ${s.error_count} 娆?/span>` : ''}
+-          <span>${s.last_fetch_at ? timeAgo(s.last_fetch_at) : '鏈噰闆?}</span>
+-        </div>
+-        ${s.note ? `<div class="src-meta" style="margin-top:4px">${esc(s.note)}</div>` : ''}
+-        <div class="src-actions">
+-          <button data-act="toggle" data-focus-key="src-toggle:${s.id}">${s.enabled ? '鍋滅敤' : '鍚敤'}</button>
+-          ${health.pausedUntil ? `<button data-act="retry" data-focus-key="src-retry:${s.id}">绔嬪嵆閲嶈瘯</button>` : ''}
+-          <button data-act="remove" class="danger" data-focus-key="src-remove:${s.id}"${s.enabled ? '' : ' disabled'}>${s.enabled ? '绉诲嚭鐩戞帶' : '宸茬Щ鍑虹洃鎺?}</button>
+-        </div>
+-      </div>`;
+-    }).join('');
+-    if (focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
+-  } catch (e) {
+-    list.innerHTML = `<div class="empty-state glass"><div class="es-icon">淇?鍙?涓?鏂?/div><p>鍔犺浇澶辫触锛?{esc(e.message)}</p>
+-      <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-sources">閲嶈瘯</button></div>`;
+-  }
+-}
+-
+-$('#sourcesList').addEventListener('click', async e => {
+-  const btn = e.target.closest('button[data-act]');
+-  if (!btn) return;
+-  if (btn.dataset.act === 'retry-sources') { loadSources(); return; }
+-  const id = btn.closest('.src-card').dataset.id;
+-  try {
+-    if (btn.dataset.act === 'toggle') {
+-      const enabled = btn.textContent === '鍚敤';
+-      await api(`/api/sources/${id}`, { method: 'PATCH', body: { enabled } });
+-      toast(enabled ? '淇℃簮宸插惎鐢? : '淇℃簮宸插仠鐢?);
+-      loadSources();
+-    } else if (btn.dataset.act === 'retry') {
+-      await api(`/api/sources/${id}/retry`, { body: {} });
+-      toast('宸叉竻闄ら€€閬匡紝涓嬭疆閲囬泦浼氶噸鏂板皾璇?);
+-      loadSources();
+-    } else if (btn.dataset.act === 'remove') {
+-      if (btn.disabled) return;
+-      if (!await confirmGlass('纭畾灏嗚淇℃簮绉诲嚭鐩戞帶锛熷凡閲囬泦鏂囩珷鍜屼俊婧愯褰曢兘浼氫繚鐣欍€?, { title: '绉诲嚭淇℃簮', okText: '绉诲嚭鐩戞帶' })) return;
+-      await api(`/api/sources/${id}`, { method: 'DELETE' });
+-      toast('淇℃簮宸茬Щ鍑虹洃鎺?);
+-      loadSources();
+-    }
+-  } catch (error) {
+-    toast('淇℃簮鎿嶄綔澶辫触锛? + error.message, true);
+-  }
+-});
+-
+-$('#btnAddSource').addEventListener('click', () => $('#srcDialog').showModal());
+-$('#srcForm').addEventListener('submit', async e => {
+-  if (e.submitter?.value !== 'ok') return;
+-  const fd = new FormData(e.target);
+-  const body = Object.fromEntries(fd.entries());
+-  try {
+-    await api('/api/sources', { body });
+-    toast('淇℃簮宸叉彁鎶ワ紝涓嬭疆閲囬泦鐢熸晥');
+-    e.target.reset();
+-    loadSources();
+-  } catch (err) {
+-    toast('淇濆瓨澶辫触锛? + err.message, true);
+-  }
+-});
+-
+-// ---------- 璁剧疆 ----------
+-const settingsForm = SettingsFormController.createSettingsFormController({
++// ---------- 淇℃伅娴?/ 鐑害鏍?/ 鏃ユ姤 / 淇℃簮 / 璁剧疆锛堟壒 2 鎺у埗鍣ㄨ閰嶏級 ----------
++// renderSearchContext 鍦ㄦ绱㈡帶鍒跺櫒閲屽疄鐜帮紱淇℃伅娴佹覆鏌撳悗闇€瑕佸埛鏂板畠锛?+// 鐢ㄥ欢杩熼棴鍖呮墦鐮翠袱涓帶鍒跺櫒鐨勮閰嶅厛鍚庝緷璧?+const feedController = FeedController.createFeedController({
++  api, state, esc, DomUtils,
++  format: formatUtils,
++  card: { skeletons, publishedTime: FeedCard.publishedTime, starredTime: FeedCard.starredTime },
++  diff: feedDiffList,
++  feedRequestGuard,
++  renderSearchContext: () => searchController.renderSearchContext(),
++  // 鎵?4锛氬崱鐗囦氦浜掑眰锛坱oggleStar + 鐐瑰嚮濮旀墭锛夐殢宸ュ巶鎺ョ嚎锛?+  // runTermSearch 鏉ヨ嚜鍚庨潰瑁呴厤鐨勬绱㈡帶鍒跺櫒锛岀敤闂寘鎳掕В鏋?+  toast, refreshStats, safeUrl, timeAgo,
++  copyText,
++  runTermSearch: term => searchController.runTermSearch(term),
+   elements: {
+-    apiKey: $('#setApiKey'),
+-    baseUrl: $('#setBaseUrl'),
+-    model: $('#setModel'),
+-    intervalMinutes: $('#setInterval'),
+-    rsshubBase: $('#setRsshub'),
+-    retentionDays: $('#setRetentionDays'),
+-    irrelevantRetentionDays: $('#setIrrelevantRetentionDays'),
+-    clearApiKeyButton: $('#btnClearAiKey')
++    list: $('#feedList'),
++    btnMore: $('#btnMore'),
++    feedEnd: $('#feedEnd'),
++    newFlash: $('#newFlash'),
++    btnCopyFeed: $('#btnCopyFeed'),
++    btnExportFeed: $('#btnExportFeed'),
++    feedToolbarNote: $('#feedToolbarNote'),
++    feedSentinel: $('#feedSentinel')
+   },
+-  request: api
++  IntersectionObserver: window.IntersectionObserver
+ });
++const { loadFeed, syncFeedToolbar } = feedController;
+ 
+-const desktopSettings = (
+-  DesktopSettingsController
+-  && Desktop?.getDesktopSettings
+-  && Desktop?.updateDesktopSettings
+-) ? DesktopSettingsController.createDesktopSettingsController({
+-    elements: {
+-      closeToTray: $('#setCloseToTray'),
+-      launchAtLogin: $('#setLaunchAtLogin'),
+-      status: $('#desktopSettingsResult')
+-    },
+-    getSettings: () => Desktop.getDesktopSettings(),
+-    updateSettings: patch => Desktop.updateDesktopSettings(patch)
+-  }) : null;
+-
+-if (!desktopSettings) {
+-  $('#setCloseToTray').disabled = true;
+-  $('#setLaunchAtLogin').disabled = true;
+-  $('#desktopSettingsResult').textContent = '妗岄潰杩愯璁剧疆浠呭湪瀹夎鐗堜腑鍙敤銆?;
+-  $('#desktopSettingsResult').className = 'test-result desktop-settings-result warning';
+-}
+-
+-const dailyArchiveAvailable = Boolean(
+-  DailyArchiveController
+-  && Desktop?.getDailyArchiveSettings
+-  && Desktop?.chooseDailyArchiveDirectory
+-  && Desktop?.setDailyArchiveEnabled
+-  && Desktop?.saveCurrentDailyArchive
+-  && Desktop?.retryDailyArchives
+-);
+-const dailyArchive = dailyArchiveAvailable
+-  ? DailyArchiveController.createDailyArchiveController({
+-      elements: {
+-        enabled: $('#dailyArchiveEnabled'),
+-        rootDirectory: $('#dailyArchivePath'),
+-        chooseButton: $('#btnChooseDailyArchive'),
+-        saveButton: $('#btnSaveDailyArchive'),
+-        retryButton: $('#btnRetryDailyArchive'),
+-        nextRun: $('#dailyArchiveNextRun'),
+-        lastSuccess: $('#dailyArchiveLastSuccess'),
+-        pending: $('#dailyArchivePending'),
+-        status: $('#dailyArchiveStatus')
+-      },
+-      bridge: {
+-        getDailyArchiveSettings: () => Desktop.getDailyArchiveSettings(),
+-        chooseDailyArchiveDirectory: () => Desktop.chooseDailyArchiveDirectory(),
+-        setDailyArchiveEnabled: enabled => Desktop.setDailyArchiveEnabled(enabled),
+-        saveCurrentDailyArchive: () => Desktop.saveCurrentDailyArchive(),
+-        retryDailyArchives: () => Desktop.retryDailyArchives()
+-      }
+-    })
+-  : null;
+-
+-if (!dailyArchive) {
+-  $('#dailyArchiveEnabled').disabled = true;
+-  $('#btnChooseDailyArchive').disabled = true;
+-  $('#btnSaveDailyArchive').disabled = true;
+-  $('#btnRetryDailyArchive').disabled = true;
+-  $('#dailyArchiveStatus').textContent = '姣忔棩鏂伴椈绠€鎶ヨ嚜鍔ㄥ綊妗ｄ粎鍦ㄥ畨瑁呯増涓彲鐢紱褰撳墠浠嶅彲鍦ㄢ€滄儏鎶ユ棩鎶モ€濅腑鎵嬪姩瀵煎嚭 Markdown銆?;
+-  $('#dailyArchiveStatus').className = 'test-result daily-archive-live warning';
+-}
+-
+-$('#setCloseToTray').addEventListener('change', event => {
+-  desktopSettings?.update('closeToTray', event.currentTarget.checked).catch(() => {});
+-});
+-$('#setLaunchAtLogin').addEventListener('change', event => {
+-  desktopSettings?.update('launchAtLogin', event.currentTarget.checked).catch(() => {});
+-});
+-$('#dailyArchiveEnabled').addEventListener('change', event => {
+-  dailyArchive?.toggle(event.currentTarget.checked).catch(() => {});
+-});
+-$('#btnChooseDailyArchive').addEventListener('click', () => {
+-  dailyArchive?.chooseDirectory().catch(() => {});
+-});
+-$('#btnSaveDailyArchive').addEventListener('click', () => {
+-  dailyArchive?.saveCurrent().catch(() => {});
+-});
+-$('#btnRetryDailyArchive').addEventListener('click', () => {
+-  dailyArchive?.retry().catch(() => {});
++const hotRailController = HotRailController.createHotRailController({
++  api, state, esc, safeUrl,
++  safeHttpUrl: DomUtils.safeHttpUrl,
++  timeAgo,
++  hotRailRequestGuard,
++  elements: { list: $('#hotRailList') }
+ });
++const { loadHotRail } = hotRailController;
+ 
+-function formatBytes(bytes) {
+-  const value = Number(bytes);
+-  if (!Number.isFinite(value) || value <= 0) return '0 MB';
+-  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+-  if (value < 1024 * 1024 * 1024) return `${(value / 1048576).toFixed(1)} MB`;
+-  return `${(value / 1073741824).toFixed(2)} GB`;
+-}
++// 鎵?4锛歵oggleStar 涓?#feedList 鐐瑰嚮濮旀墭宸查殢淇℃伅娴佹帶鍒跺櫒杩佸嚭锛?+// 缁勫悎鏍瑰彧淇濈暀 loadFeed/宸ュ叿鏉℃帴绾? 
+-const desktopStorageAvailable = Boolean(
+-  Desktop?.getStorageSnapshot
+-  && Desktop?.clearManagedCache
+-  && Desktop?.deleteLegacyData
+-);
+-const desktopStorageUnavailable = async () => {
+-  throw new Error('妗岄潰瀛樺偍娌荤悊浠呭湪瀹夎鐗堜腑鍙敤');
+-};
+-const storageMaintenance = StorageMaintenanceController.createStorageMaintenanceController({
++const dailyViewController = DailyViewController.createDailyViewController({
++  api, state, esc, safeUrl,
++  format: formatUtils,
++  skeletons,
++  toast, preferenceActions, dailyRequestGuard,
+   elements: {
+-    articles: $('#msArticles'),
+-    expiring: $('#msExpiring'),
+-    database: $('#msDatabase'),
+-    reclaimable: $('#msReclaimable'),
+-    cache: $('#msCache'),
+-    migrationResidue: $('#msMigrationResidue'),
+-    legacy: $('#msLegacy'),
+-    total: $('#msTotal'),
+-    hint: $('#lastPruneHint'),
+-    pruneButton: $('#btnPruneNow'),
+-    compactButton: $('#btnCompactNow'),
+-    cacheButton: $('#btnClearCache'),
+-    legacyButton: $('#btnDeleteLegacy'),
+-    pruneStatus: $('#pruneResult'),
+-    compactStatus: $('#compactResult'),
+-    cacheStatus: $('#cacheResult'),
+-    legacyStatus: $('#legacyResult')
+-  },
+-  requestDatabase: () => api('/api/maintenance'),
+-  pruneDatabase: () => api('/api/maintenance/prune', { body: {} }),
+-  compactDatabase: () => api('/api/maintenance/compact', { body: {} }),
+-  getDesktopStorage: desktopStorageAvailable
+-    ? () => Desktop.getStorageSnapshot()
+-    : desktopStorageUnavailable,
+-  clearDesktopCache: desktopStorageAvailable
+-    ? () => Desktop.clearManagedCache()
+-    : desktopStorageUnavailable,
+-  deleteLegacyData: desktopStorageAvailable
+-    ? candidateId => Desktop.deleteLegacyData(candidateId)
+-    : desktopStorageUnavailable,
+-  formatBytes
+-});
+-
+-async function loadMaintenance() {
+-  return storageMaintenance.load().catch(() => null);
+-}
+-
+-async function loadSettings() {
+-  try {
+-    await Promise.all([
+-      settingsForm.load(),
+-      desktopSettings?.load(),
+-      dailyArchive?.load()
+-    ]);
+-  } catch {}
+-  loadMaintenance();
+-  loadFeedback();
+-}
+-
+-$('#btnSaveAi').addEventListener('click', async () => {
+-  try {
+-    await settingsForm.saveAi();
+-    toast('AI 閰嶇疆宸蹭繚瀛橈紝涓嬭疆鍒嗘瀽鐢熸晥');
+-    refreshStats();
+-  } catch (error) {
+-    toast('AI 閰嶇疆淇濆瓨澶辫触锛? + error.message, true);
+-  }
+-});
+-
+-$('#btnClearAiKey').addEventListener('click', async () => {
+-  if (!await confirmGlass('纭畾娓呴櫎宸茬敱 Windows 瀹夊叏淇濆瓨鐨?AI API Key锛熸竻闄ゅ悗灏嗕娇鐢ㄥ叧閿瘝鍚彂寮忛檷绾фā寮忋€?, { title: '娓呴櫎瀵嗛挜', okText: '娓呴櫎' })) return;
+-  try {
+-    await settingsForm.clearApiKey();
+-    toast('AI API Key 宸叉竻闄?);
+-    refreshStats();
+-  } catch (error) {
+-    toast('娓呴櫎瀵嗛挜澶辫触锛? + error.message, true);
+-  }
+-});
+-
+-$('#btnTestAi').addEventListener('click', async () => {
+-  const el = $('#aiTestResult');
+-  el.textContent = '娴嬭瘯涓€?; el.className = 'test-result';
+-  $('#btnTestAi').disabled = true;
+-  try {
+-    const r = await api('/api/settings/test', { body: {} });
+-    el.textContent = r.ok ? '鉁?杩炴帴姝ｅ父' : '鉁?' + r.error;
+-    el.classList.add(r.ok ? 'ok' : 'fail');
+-  } catch (e) {
+-    el.textContent = '鉁?' + e.message; el.classList.add('fail');
+-  } finally {
+-    $('#btnTestAi').disabled = false;
+-  }
+-});
+-
+-$('#btnSaveCollect').addEventListener('click', async () => {
+-  try {
+-    await settingsForm.saveCollect();
+-    toast('閲囬泦璁剧疆宸蹭繚瀛橈紙闂撮殧閲嶅惎鍚庣敓鏁堬紝RSSHub 绔嬪嵆鐢熸晥锛?);
+-  } catch (error) {
+-    toast('閲囬泦璁剧疆淇濆瓨澶辫触锛? + error.message, true);
+-  }
+-});
+-
+-$('#btnSaveRetention').addEventListener('click', async () => {
+-  try {
+-    await settingsForm.saveRetention();
+-    toast('鏁版嵁淇濈暀璁剧疆宸蹭繚瀛?);
+-    loadMaintenance();
+-  } catch (error) {
+-    toast('鏁版嵁淇濈暀璁剧疆淇濆瓨澶辫触锛? + error.message, true);
++    body: $('#dailyBody'),
++    date: $('#dailyDate'),
++    sub: $('#dailySub'),
++    prev: $('#dailyPrev'),
++    next: $('#dailyNext'),
++    regen: $('#dailyRegen')
+   }
+ });
++const { loadDaily } = dailyViewController;
+ 
+-$('#btnPruneNow').addEventListener('click', async () => {
+-  try {
+-    await storageMaintenance.prune();
+-    refreshStats();
+-  } catch {}
+-});
+-
+-$('#btnCompactNow').addEventListener('click', () => {
+-  storageMaintenance.compact().catch(() => {});
+-});
+-
+-$('#btnClearCache').addEventListener('click', () => {
+-  storageMaintenance.clearCache().catch(() => {});
+-});
+-
+-$('#btnDeleteLegacy').addEventListener('click', () => {
+-  storageMaintenance.deleteLegacy().catch(() => {});
+-});
+-
+-// 鎯呮姤澶囧繕锛氬啓杩涙湰鏈哄簱鍚庤鑳藉洖鐪嬪拰鍒犻櫎锛屽惁鍒欐彁浜ょ瓑浜庡啓杩涢粦娲?-async function loadFeedback() {
+-  const list = $('#feedbackList');
+-  try {
+-    const notes = await api('/api/feedback');
+-    list.innerHTML = notes.map(note => `
+-      <li class="note-item" data-id="${note.id}">
+-        <div class="note-body">
+-          <p>${esc(note.content)}</p>
+-          <span class="note-time">${esc(timeAgo(note.createdAt))}</span>
+-        </div>
+-        <button class="note-remove" data-act="remove-note" type="button"
+-          aria-label="鍒犻櫎杩欐潯澶囧繕">鍒犻櫎</button>
+-      </li>`).join('');
+-  } catch {
+-    list.innerHTML = '';
+-  }
+-}
+-
+-$('#feedbackList').addEventListener('click', async event => {
+-  const button = event.target.closest('button[data-act="remove-note"]');
+-  if (!button) return;
+-  const id = button.closest('.note-item').dataset.id;
+-  try {
+-    await api(`/api/feedback/${id}`, { method: 'DELETE' });
+-    loadFeedback();
+-  } catch (error) {
+-    toast('澶囧繕鍒犻櫎澶辫触锛? + error.message, true);
++const sourcesController = SourcesController.createSourcesController({
++  api, state, esc, DomUtils,
++  format: formatUtils,
++  skeletons,
++  toast, confirmGlass,
++  elements: {
++    list: $('#sourcesList'),
++    addButton: $('#btnAddSource'),
++    dialog: $('#srcDialog'),
++    form: $('#srcForm')
+   }
+ });
++const { loadSources } = sourcesController;
+ 
+-$('#btnFeedback').addEventListener('click', async () => {
+-  const t = $('#feedbackText').value.trim();
+-  if (!t) return toast('璇峰厛鍐欑偣浠€涔?, true);
+-  try {
+-    await api('/api/feedback', { body: { kind: 'feedback', content: t } });
+-    $('#feedbackText').value = '';
+-    toast('宸茶鍏ユ儏鎶ュ蹇?);
+-    loadFeedback();
+-  } catch (error) {
+-    toast('鍙嶉淇濆瓨澶辫触锛? + error.message, true);
++// ---------- 璁剧疆 ----------
++// 璁剧疆椤靛叏閮ㄦ帴绾挎媶鍏?renderer/settings-view-controller.js锛堟壒 2锛夛紝
++// 缁勫悎鏍瑰彧璐熻矗娉ㄥ叆 $銆乤pi 涓庡悇瀛愭帶鍒跺櫒宸ュ巶
++const settingsViewController = SettingsViewController.createSettingsViewController({
++  $, api, esc, timeAgo, formatBytes, toast, confirmGlass, refreshStats,
++  Desktop, SettingsFormController, DesktopSettingsController,
++  StorageMaintenanceController, DailyArchiveController
++});
++const { loadSettings } = settingsViewController;
++
++// ---------- 浜戝箘 路 甯哥敤缃戝潃锛堟壒 4 鎷嗗叆 renderer/common-links-controller.js锛?----------
++// renderCommonLinks 妯℃澘涓庡垎绫?甯哥敤鐐瑰嚮鎺ョ嚎闅忓伐鍘傝縼鍑猴紝
++// $銆乨ocument銆丆ommonLinks銆丏omUtils 缁忎緷璧栨敞鍏?+const commonLinksController = CommonLinksController.createCommonLinksController({
++  $, document, state, esc, safeUrl,
++  commonLinks: CommonLinks,
++  domUtils: DomUtils,
++  preferenceActions,
++  elements: {
++    categories: $('#commonLinksCategories'),
++    grid: $('#commonLinksGrid'),
++    count: $('#commonLinksCount')
+   }
+ });
+-
+-// ---------- 浜戝箘 路 甯哥敤缃戝潃 ----------
+-function renderCommonLinks(focusKey, fallbackTarget) {
+-  const categories = CommonLinks.getCategories();
+-  $('#commonLinksCategories').innerHTML = categories.map(category => `
+-    <button class="common-links-category${category === state.linksCategory ? ' is-active' : ''}"
+-      data-links-category="${esc(category)}" data-focus-key="category:${esc(category)}" type="button"
+-      aria-pressed="${category === state.linksCategory}">${esc(category)}</button>
+-  `).join('');
+-
+-  const items = CommonLinks.filterAndSortLinks({
+-    category: state.linksCategory,
+-    favoriteIds: state.commonLinksFavorites
+-  });
+-  $('#commonLinksCount').textContent = String(items.length);
+-  $('#commonLinksGrid').innerHTML = items.map((item, index) => `
+-    <article class="common-links-card glass" style="animation-delay:${Math.min(index * 28, 280)}ms">
+-      <div class="common-links-card-head">
+-        <div>
+-          <span class="common-links-label">${esc(item.category)}</span>
+-          <h3>${esc(item.name)}</h3>
+-        </div>
+-        <button class="common-links-favorite${item.isFavorite ? ' is-active' : ''}"
+-          data-link-favorite="${esc(item.id)}" data-focus-key="favorite:${esc(item.id)}" type="button"
+-          aria-pressed="${item.isFavorite}" title="${item.isFavorite ? '鍙栨秷甯哥敤' : '璁句负甯哥敤'}">
+-          <span aria-hidden="true">${item.isFavorite ? '鈽? : '鈽?}</span>
+-          ${item.isFavorite ? '宸插父鐢? : '璁句负甯哥敤'}
+-        </button>
+-      </div>
+-      <p>${esc(item.description)}</p>
+-      <div class="common-links-tags">${item.tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
+-      <a class="common-links-open" href="${safeUrl(item.url)}" target="_blank" rel="noopener">鎵撳紑 <span aria-hidden="true">鈫?/span></a>
+-    </article>
+-  `).join('');
+-  DomUtils.restoreFocusByKey(document, focusKey, fallbackTarget);
+-}
+-
+-$('#commonLinksCategories').addEventListener('click', event => {
+-  const button = event.target.closest('button[data-links-category]');
+-  if (!button) return;
+-  const focusKey = button.dataset.focusKey;
+-  state.linksCategory = button.dataset.linksCategory;
+-  preferenceActions.remember('linksCategory', state.linksCategory);
+-  renderCommonLinks(focusKey, $('#commonLinksCategories'));
+-});
+-
+-$('#commonLinksGrid').addEventListener('click', event => {
+-  const button = event.target.closest('button[data-link-favorite]');
+-  if (!button) return;
+-  const focusKey = button.dataset.focusKey;
+-  const id = button.dataset.linkFavorite;
+-  if (state.commonLinksFavorites.has(id)) state.commonLinksFavorites.delete(id);
+-  else state.commonLinksFavorites.add(id);
+-  preferenceActions.remember(
+-    'commonLinksFavorites',
+-    [...state.commonLinksFavorites]
+-  );
+-  renderCommonLinks(focusKey, $('#commonLinksGrid'));
+-});
++const renderCommonLinks = commonLinksController.renderCommonLinks;
+ 
+ // ---------- 瑙嗗浘鍒囨崲 ----------
+-// 瀵艰埅婵€娲诲潡璺熼殢褰撳墠鏍囩婊戝姩锛屽垏鎹㈡椂鏄繛缁綅绉昏€屼笉鏄烦鍙?-function syncTabIndicator() {
+-  const active = $('.tab.active');
+-  const bar = $('.tab-indicator');
+-  if (!active || !bar) return;
+-  bar.style.setProperty('--ti-x', `${active.offsetLeft}px`);
+-  bar.style.setProperty('--ti-y', `${active.offsetTop}px`);
+-  bar.style.setProperty('--ti-w', `${active.offsetWidth}px`);
+-  bar.style.setProperty('--ti-h', `${active.offsetHeight}px`);
+-  bar.style.setProperty('--ti-o', '1');
+-}
+-
+-// sticky 鏃ユ湡鏍囬涓庣儹搴︽爮鐨勫亸绉婚噺鍙栧喅浜庡鑸潯瀹為檯楂樺害锛堟崲琛屾椂浼氬彉锛?-function syncNavHeight() {
+-  const nav = $('.nav');
+-  if (!nav) return;
+-  document.documentElement.style.setProperty(
+-    '--nav-h', `${Math.round(nav.getBoundingClientRect().height)}px`
+-  );
+-}
++// 鎵?3锛歴witchView 鐨?if-else 鍒嗗彂鏀逛负鏌ヨ〃璋冨害锛坮enderer/view-registry.js锛夈€?+// loadFeed 绛変緷璧栫粡 registryDeps 浠ｇ悊鎳掕В鏋愶紝娉ㄥ唽琛ㄥ彲浠ュ厛浜庡悇鎺у埗鍣ㄨ閰嶏紱
++// syncTabIndicator/syncNavHeight 闅忔敞鍐岃〃杩佸嚭锛岃繖閲岃В鏋勪繚鎸佽皟鐢ㄧ偣涓嶅彉
++const registryDeps = {};
++const viewRegistry = ViewRegistry.createViewRegistry({
++  $, $$, document, state, FEED_VIEWS,
++  preferenceActions, scrollToTop,
++  // 闃舵 3锛堟恫鎬佺幓鐠冿級锛氳鍥惧垏鎹㈠叆鍦烘敼缁?motion 寮曟搸锛屼笉鍐嶅己鍒堕噸鎺掗噸鏀?+  motion,
++  refreshStats: () => registryDeps.refreshStats && registryDeps.refreshStats()
++});
++const { syncTabIndicator, syncNavHeight } = viewRegistry;
++
++// 8 涓鍥惧叏閮ㄦ敞鍐岋細鍥涗釜淇℃伅娴佽鍥惧叡浜?#viewFeed锛宱nEnter 鍚勮嚜瑙﹀彂鍔犺浇
++for (const feedView of FEED_VIEWS) {
++  viewRegistry.registerView({ id: feedView, tab: '#viewFeed', isFeed: true, onEnter: () => { registryDeps.loadFeed(); registryDeps.loadHotRail(); } });
++}
++viewRegistry.registerView({ id: 'daily', tab: '#viewDaily', onEnter: () => registryDeps.loadDaily(state.dailyDate) });
++viewRegistry.registerView({ id: 'links', tab: '#viewLinks', onEnter: () => registryDeps.renderCommonLinks() });
++viewRegistry.registerView({ id: 'sources', tab: '#viewSources', onEnter: () => registryDeps.loadSources() });
++viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => registryDeps.loadSettings() });
+ 
+ function switchView(view, { persist = true } = {}) {
+-  state.view = view;
+-  if (persist) preferenceActions.remember('view', view);
+-  $$('.tab').forEach(t => {
+-    const on = t.dataset.view === view;
+-    t.classList.toggle('active', on);
+-    t.setAttribute('aria-selected', on);
+-  });
+-  syncTabIndicator();
+-  const isFeed = FEED_VIEWS.includes(view);
+-  // 閲嶆斁鍏ュ満鍔ㄧ敾
+-  for (const sec of $$('.view')) {
+-    sec.style.animation = 'none';
+-    void sec.offsetHeight;
+-    sec.style.animation = '';
+-  }
+-  $('#viewFeed').hidden = !isFeed;
+-  $('#viewDaily').hidden = view !== 'daily';
+-  $('#viewLinks').hidden = view !== 'links';
+-  $('#viewSources').hidden = view !== 'sources';
+-  $('#viewSettings').hidden = view !== 'settings';
+-  $('#feedFilters').style.display = isFeed ? '' : 'none';
+-  if (isFeed) { loadFeed(); loadHotRail(); }
+-  else if (view === 'daily') loadDaily(state.dailyDate);
+-  else if (view === 'links') renderCommonLinks();
+-  else if (view === 'sources') loadSources();
+-  else if (view === 'settings') loadSettings();
+-  refreshStats();
+-  scrollToTop();
++  return viewRegistry.switchView(view, { persist });
+ }
+ 
+-$$('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
+-
+-// APG 鏍囩椤电害瀹氾細鐒︾偣钀藉湪鏍囩涓婃椂锛屾柟鍚戦敭鍦ㄦ爣绛鹃棿绉诲姩骞跺嵆閫夊嵆鍒?-$('.nav-tabs').addEventListener('keydown', event => {
+-  if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+-  const tabs = $$('.tab');
+-  const current = tabs.indexOf(document.activeElement);
+-  if (current < 0) return;
+-  const step = event.key === 'ArrowRight' ? 1 : tabs.length - 1;
+-  const next = tabs[(current + step) % tabs.length];
+-  next.focus();
+-  switchView(next.dataset.view);
+-  event.preventDefault();
+-});
++viewRegistry.wireTabs($('.nav-tabs'));
+ 
+ function setDomain(domain, { persist = true, load = true } = {}) {
+-  state.domain = domain;
++  store.setState({ domain });
+   // 閫夋嫨鍣ㄥ繀椤婚檺瀹氬湪棰嗗煙鑳跺泭鍐咃細椤甸潰涓婅繕鏈夊埆澶勭敤鍚屼竴瑙嗚褰㈡€佺殑鎸夐挳锛堝璁剧疆椤电殑
+   // 缂╂斁妗ｄ綅锛夛紝鍏ㄥ眬鎶?.pill 浼氭妸瀹冧滑鐨勯€変腑鎬佷竴璧锋竻鎺夛紝杩樹細缁欏畠浠粦涓婇鍩熺瓫閫夈€?   $$('.domain-pills .pill').forEach(pill => {
+@@ -1430,189 +512,30 @@ async function initCategories() {
+   } catch {}
+ }
+ 
+-// ---------- 妫€绱?----------
+-const searchInput = $('#searchInput');
+-
+-function syncSearchBox() {
+-  $('#searchBox').classList.toggle('has-value', Boolean(searchInput.value));
+-}
+-
+-function clearSearch() {
+-  const hadQuery = Boolean(state.q);
+-  clearTimeout(searchTimer);   // 涓㈡帀灏氭湭瑙﹀彂鐨勯槻鎶栵紝閬垮厤娓呯┖鍚庡張璺戜竴娆＄┖妫€绱?-  searchInput.value = '';
+-  state.q = '';
+-  syncSearchBox();
+-  renderSearchContext();
+-  if (hadQuery) loadFeed();
+-}
+-
+-let searchTimer;
+-searchInput.addEventListener('input', e => {
+-  syncSearchBox();
+-  clearTimeout(searchTimer);
+-  searchTimer = setTimeout(() => {
+-    state.q = e.target.value.trim();
+-    if (!FEED_VIEWS.includes(state.view)) {
+-      switchView('all', { persist: false });
+-    }
+-    else loadFeed();
+-  }, 350);
+-});
+-
+-$('#searchClear').addEventListener('click', () => {
+-  clearSearch();
+-  searchInput.focus();
+-});
+-
+-$('#searchContext').addEventListener('click', event => {
+-  if (event.target.closest('button[data-act="clear-search"]')) clearSearch();
+-});
+-
+-// ---------- 鏍稿績璇嶅簱闈㈡澘 ----------
+-// 涓€浠界函璇嶈〃娌℃湁鐢ㄥ锛氱敤鎴风湡姝ｈ鍒ゆ柇鐨勬槸銆岃繖涓瘝鍦ㄦ垜宸茬粡鎹曞埌鐨勬儏鎶ラ噷鏈夊灏戞潯銆嶃€?-// 鎵€浠ラ潰鏉挎妸璇嶅簱鍜屾湰鍦板簱鐨勫懡涓暟涓€璧峰睍绀衡€斺€? 鏉＄殑璇嶈嚜鐒舵矇涓嬪幓锛屾湁閲忕殑璇嶄竴鐪煎彲瑙侊紝
+-// 鐐逛竴涓嬪氨鎶婂畠濉繘妫€绱㈡锛岀渷鎺夈€屾兂涓嶈捣鏉ヨ鎼滀粈涔堛€嶈繖涓€姝ャ€?-const lexiconPanel = $('#lexiconPanel');
+-const lexiconToggle = $('#btnLexicon');
+-const lexiconFilter = $('#lexiconFilter');
+-const lexiconState = { data: null, loading: false, domain: '', onlyHits: false, filter: '' };
+-
+-function lexiconVisibleGroups() {
+-  const keyword = lexiconState.filter.trim().toLowerCase();
+-  return (lexiconState.data?.groups || [])
+-    .filter(group => !lexiconState.domain || group.domain === lexiconState.domain)
+-    .map(group => ({
+-      ...group,
+-      terms: group.terms.filter(item => {
+-        if (lexiconState.onlyHits && !item.count) return false;
+-        if (!keyword) return true;
+-        return [item.term, ...(item.aliases || [])]
+-          .some(surface => String(surface).toLowerCase().includes(keyword));
+-      })
+-    }))
+-    .filter(group => group.terms.length);
+-}
+-
+-// 鏈嶅姟绔細鍦ㄨ鑼冭瘝涓庡埆鍚嶉噷鎸戝懡涓渶澶氱殑閭ｄ釜褰撴绱㈠紡銆傛寫涓殑鑻ヤ笉鏄鑼冭瘝锛?-// 寰楀湪鎮诞鎻愮ず閲岃娓呮鈥斺€斿惁鍒欑敤鎴风偣銆屼嚎鑸櫤鑳姐€嶃€佹绱㈡閲屽嚭鐜般€屼嚎鑸€嶄細浠ヤ负鏄?bug銆?-function lexiconTermHint(item) {
+-  const parts = [];
+-  if (item.query && item.query !== item.term) parts.push(`鎸夈€?{item.query}銆嶆绱紝鍛戒腑鏈€澶歚);
+-  if (item.aliases?.length) parts.push('鍚埆鍚嶏細' + item.aliases.join('銆?));
+-  return parts.join(' 路 ') || item.term;
+-}
+-
+-function renderLexicon() {
+-  const body = $('#lexiconBody');
+-  const summary = $('#lexiconSummary');
+-  if (lexiconState.loading) { body.innerHTML = '<p class="lexicon-empty">姝ｅ湪缁熻搴撳唴鍛戒腑鈥?/p>'; return; }
+-  if (!lexiconState.data) { body.innerHTML = '<p class="lexicon-empty">璇嶅簱杞藉叆澶辫触锛岀◢鍚庨噸璇?/p>'; return; }
+-
+-  const groups = lexiconVisibleGroups();
+-  const shown = groups.reduce((sum, group) => sum + group.terms.length, 0);
+-  summary.textContent = `${lexiconState.data.termCount} 涓牳蹇冭瘝 路 ${lexiconState.data.matchedTermCount} 涓湪搴撲腑鏈夊懡涓璥
+-    + (shown === lexiconState.data.termCount ? '' : ` 路 褰撳墠鏄剧ず ${shown} 涓猔);
+-
+-  if (!groups.length) {
+-    body.innerHTML = '<p class="lexicon-empty">娌℃湁绗﹀悎鏉′欢鐨勮瘝</p>';
+-    return;
+-  }
+-  body.innerHTML = groups.map(group => `
+-    <section class="lexicon-group">
+-      <h4><span class="lex-dot lex-dot-${group.domain === 'aerospace' ? 'ae' : 'la'}" aria-hidden="true"></span>${esc(group.label)}</h4>
+-      <div class="lexicon-terms">
+-        ${group.terms.map(item => `
+-          <button type="button" class="lex-term${item.count ? '' : ' is-empty'}"
+-                  data-lex-term="${esc(item.term)}"
+-                  data-lex-query="${esc(item.query || item.term)}"
+-                  title="${esc(lexiconTermHint(item))}">
+-            ${esc(item.term)}<span class="lex-count">${item.count}</span>
+-          </button>`).join('')}
+-      </div>
+-    </section>`).join('');
+-}
+-
+-async function loadLexicon(force = false) {
+-  if (lexiconState.data && !force) return;
+-  lexiconState.loading = true;
+-  renderLexicon();
+-  try {
+-    lexiconState.data = await api('/api/lexicon');
+-  } catch {
+-    lexiconState.data = null;
+-  } finally {
+-    lexiconState.loading = false;
+-    renderLexicon();
+-  }
+-}
+-
+-function setLexiconOpen(open) {
+-  lexiconPanel.hidden = !open;
+-  lexiconPanel.classList.toggle('is-open', open);
+-  lexiconToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+-  lexiconToggle.classList.toggle('is-on', open);
+-  if (open) {
+-    loadLexicon();
+-    lexiconFilter.focus();
+-  }
+-}
+-
+-lexiconToggle.addEventListener('click', () => setLexiconOpen(lexiconPanel.hidden));
+-$('#lexiconClose').addEventListener('click', () => {
+-  setLexiconOpen(false);
+-  lexiconToggle.focus();
+-});
+-
+-lexiconFilter.addEventListener('input', event => {
+-  lexiconState.filter = event.target.value;
+-  renderLexicon();
+-});
+-
+-$('.lexicon-scopes').addEventListener('click', event => {
+-  const button = event.target.closest('button');
+-  if (!button) return;
+-  if (button.dataset.lexHits !== undefined) {
+-    lexiconState.onlyHits = !lexiconState.onlyHits;
+-    button.classList.toggle('active', lexiconState.onlyHits);
+-    button.setAttribute('aria-pressed', lexiconState.onlyHits ? 'true' : 'false');
+-  } else {
+-    lexiconState.domain = button.dataset.lexDomain || '';
+-    for (const scope of $$('.lexicon-scopes [data-lex-domain]')) {
+-      scope.classList.toggle('active', scope === button);
+-    }
++// ---------- 妫€绱笌璇嶅簱锛堟壒 2 鎺у埗鍣ㄨ閰嶏級 ----------
++const searchController = SearchController.createSearchController({
++  api, state, esc, FEED_VIEWS, loadFeed, switchView, document,
++  elements: {
++    searchInput: $('#searchInput'),
++    searchBox: $('#searchBox'),
++    searchClear: $('#searchClear'),
++    searchContext: $('#searchContext'),
++    lexiconPanel: $('#lexiconPanel'),
++    lexiconToggle: $('#btnLexicon'),
++    lexiconFilter: $('#lexiconFilter'),
++    lexiconClose: $('#lexiconClose'),
++    lexiconBody: $('#lexiconBody'),
++    lexiconSummary: $('#lexiconSummary'),
++    lexiconScopes: $('.lexicon-scopes'),
++    lexiconScopeButtons: $$('.lexicon-scopes [data-lex-domain]')
+   }
+-  renderLexicon();
+ });
++const { syncSearchBox, clearSearch, setLexiconOpen, runTermSearch } = searchController;
+ 
+-// 閫夎瘝鍗虫绱€傚浐瀹氳惤鍒般€屽叏閮ㄥ姩鎬併€嶏紝涓嶇褰撳墠鍦ㄥ摢涓鍥撅細
+-// 闈㈡澘涓婄殑鏉℃暟鏄寜鍏ㄩ儴鍔ㄦ€佺殑鍙ｅ緞绠楃殑锛岃嫢鍋滃湪銆岀簿閫夈€嶉噷妫€绱紝
+-// 闈㈡澘鍐?45銆佺粨鏋滃彧鏈?1 鏉★紝杩欎釜鏁板瓧绔嬪埢灏变笉鍙俊浜嗐€?-// 銆岀偣涓€涓瘝灏辨绱㈠畠銆嶇殑鍞竴瀹炵幇锛氳瘝搴撻潰鏉夸笌鍗＄墖涓婄殑瀹炰綋鏍囩鍏辩敤銆?-// 涓ゅ鑻ュ悇鍐欎竴浠斤紝闃叉姈璁℃椂鍣ㄥ拰瑙嗗浘鍒囨崲鐨勫鐞嗚繜鏃╀細婕傚紑銆?-function runTermSearch(term) {
+-  const query = String(term || '').trim();
+-  if (!query) return;
+-  clearTimeout(searchTimer);
+-  searchInput.value = query;
+-  state.q = query;
+-  syncSearchBox();
+-  if (state.view === 'all') loadFeed();
+-  else switchView('all', { persist: false });
+-}
+-
+-$('#lexiconBody').addEventListener('click', event => {
+-  const button = event.target.closest('button[data-lex-term]');
+-  if (!button) return;
+-  setLexiconOpen(false);
+-  runTermSearch(button.dataset.lexQuery || button.dataset.lexTerm);
+-});
+-
+-// 鐐归潰鏉夸箣澶栨垨鎸?Esc 鏀惰捣锛氶潰鏉挎诞鍦ㄩ《鏍忎笅鏂癸紝涓嶈璧栫潃涓嶈蛋
+-document.addEventListener('click', event => {
+-  if (lexiconPanel.hidden) return;
+-  if (lexiconPanel.contains(event.target) || lexiconToggle.contains(event.target)) return;
+-  setLexiconOpen(false);
++// 鎵?3锛氳鍥炬敞鍐岃〃鐨勫姞杞戒緷璧栧湪鍚勬帶鍒跺櫒鍏ㄩ儴瑁呴厤瀹屾垚鍚庣粺涓€鎺ョ嚎锛?+// 鎳掕В鏋愯繘 registryDeps 浠ｇ悊锛坮enderCommonLinks 涓哄嚱鏁板０鏄庯紝鍙洿鎺ュ紩鐢級
++Object.assign(registryDeps, {
++  loadFeed, loadHotRail, loadDaily, loadSources, loadSettings, renderCommonLinks, refreshStats
+ });
+ 
+ // 鎵嬪姩閲囬泦
+@@ -1637,66 +560,15 @@ $('#btnRefresh').addEventListener('click', async function () {
+   }
+ });
+ 
+-// ---------- 閿洏蹇嵎閿?----------
+-function isTypingTarget(element) {
+-  if (!element) return false;
+-  const tag = element.tagName;
+-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable === true;
+-}
+-
+-document.addEventListener('keydown', event => {
+-  if (event.key === 'Escape') {
+-    // 璇嶅簱闈㈡澘浼樺厛浜庢绱㈡锛氶潰鏉垮紑鐫€鏃?Esc 鐨勬剰鎬濇槸銆屾敹璧峰畠銆嶏紝涓嶆槸銆屾竻绌烘垜鍒氳緭鐨勮瘝銆?-    if (!lexiconPanel.hidden) {
+-      setLexiconOpen(false);
+-      lexiconToggle.focus();
+-      event.preventDefault();
+-      return;
+-    }
+-    if (document.activeElement === searchInput) {
+-      clearSearch();
+-      searchInput.blur();
+-      event.preventDefault();
+-    }
+-    return;
+-  }
+-  if (event.altKey && !event.ctrlKey && !event.metaKey) {
+-    const tabIndex = '12345678'.indexOf(event.key);
+-    if (tabIndex >= 0) {
+-      const tab = $$('.tab')[tabIndex];
+-      if (tab) { switchView(tab.dataset.view); event.preventDefault(); }
+-      return;
+-    }
+-    const letter = String(event.key).toLowerCase();
+-    if (letter === 't') { toggleTheme(); event.preventDefault(); return; }
+-    if (letter === 'r') { $('#btnRefresh').click(); event.preventDefault(); return; }
+-    if (letter === 'k') { setLexiconOpen(lexiconPanel.hidden); event.preventDefault(); return; }
+-    // 澶嶅埗褰撳墠瑙嗗浘锛氫俊鎭祦澶嶅埗鍒楄〃锛屾棩鎶ュ鍒舵暣浠芥棩鎶?-    if (letter === 'c') {
+-      if (FEED_VIEWS.includes(state.view)) runExport('feed', 'text', 'copy');
+-      else if (state.view === 'daily') runExport('daily', 'text', 'copy');
+-      event.preventDefault();
+-      return;
+-    }
+-    return;
+-  }
+-  // 缂╂斁蹇嵎閿斁鍦ㄣ€屾槸鍚︽鍦ㄨ緭鍏ャ€嶅垽瀹氫箣鍓嶏細Ctrl +/- 鏄叏灞€鎵嬪娍锛?-  // 鍏夋爣鍋滃湪妫€绱㈡閲屾椂涔熻绠＄敤銆?-  if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+-    if (event.key === '=' || event.key === '+') { stepTextScale(1); event.preventDefault(); return; }
+-    if (event.key === '-' || event.key === '_') { stepTextScale(-1); event.preventDefault(); return; }
+-    if (event.key === '0') { applyTextScale('md'); toast('鐣岄潰缂╂斁锛氭爣鍑?); event.preventDefault(); return; }
+-  }
+-  if (isTypingTarget(document.activeElement)) return;
+-  const focusesSearch = event.key === '/'
+-    || ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'k');
+-  if (focusesSearch) {
+-    searchInput.focus();
+-    searchInput.select();
+-    event.preventDefault();
+-    return;
+-  }
+-  if (event.key === 'Home') { scrollToTop(); event.preventDefault(); }
++// ---------- 閿洏蹇嵎閿紙鎵?2 鎷嗗叆 renderer/shortcuts.js锛?----------
++Shortcuts.createShortcuts({
++  document, state, FEED_VIEWS,
++  getTabs: () => $$('.tab'),
++  switchView, toggleTheme, stepTextScale, applyTextScale, toast,
++  scrollToTop, runExport,
++  clickRefresh: () => $('#btnRefresh').click(),
++  searchInput: $('#searchInput'), clearSearch,
++  lexiconPanel: $('#lexiconPanel'), lexiconToggle: $('#btnLexicon'), setLexiconOpen
+ });
+ 
+ // ---------- 婊氬姩鎬侊細瀵艰埅鍔犻噸銆佸洖鍒伴《閮?----------
+@@ -1721,82 +593,26 @@ window.addEventListener('scroll', syncScrollState, { passive: true });
+ window.addEventListener('resize', () => { syncNavHeight(); syncTabIndicator(); });
+ $('#toTop').addEventListener('click', scrollToTop);
+ 
+-// ---------- 瀹炴椂鏇存柊 ----------
+-function setRealtime(on, { persist = true } = {}) {
+-  state.realtime = on;
+-  const btn = $('#btnRealtime');
+-  btn.classList.toggle('active', on);
+-  btn.setAttribute('aria-pressed', String(on));
+-  if (persist) preferenceActions.remember('realtime', on);
+-}
+-$('#btnRealtime').addEventListener('click', () => {
+-  setRealtime(!state.realtime);
+-  toast(state.realtime ? '宸插紑鍚疄鏃舵洿鏂? : '宸叉殏鍋滃疄鏃舵洿鏂?);
+-  if (state.realtime) pollRealtime();
+-});
+-
+-function showNewFlash(n) {
+-  const f = $('#newFlash');
+-  f.textContent = `馃洶 ${n} 鏉℃柊鎯呮姤 路 鐐瑰嚮鏌ョ湅`;
+-  f.hidden = false;
+-}
+-$('#newFlash').addEventListener('click', () => {
+-  $('#newFlash').hidden = true;
+-  scrollToTop();
+-  loadFeed();           // freshIds 宸插湪杞涓缃紝娓叉煋鍚庝細楂樹寒
+-  loadHotRail();
+-});
+-
+-let pollTimer;
+-async function pollRealtime() {
+-  clearTimeout(pollTimer);
+-  const schedule = () => { pollTimer = setTimeout(pollRealtime, 18000); };
+-  if (document.hidden) return schedule();          // 鍚庡彴鏍囩椤垫殏鍋?-  await refreshStats();
+-  // 浠呬俊鎭祦瑙嗗浘銆侀潪妫€绱€侀潪鍔犺浇涓墠鍋氬閲忔帰娴?-  if (!FEED_VIEWS.includes(state.view) || state.q || state.loading) { loadHotRail(); return schedule(); }
+-  try {
+-    const params = new URLSearchParams({ view: state.view, page: 0 });
+-    if (state.domain) params.set('domain', state.domain);
+-    if (state.category) params.set('category', state.category);
+-    const data = await api('/api/feed?' + params);
+-    const newItems = data.items.filter(i => !state.knownIds.has(i.id));
+-    if (newItems.length) {
+-      const atTop = window.scrollY < 220;
+-      const reading = document.querySelector('.card.expanded, .cluster-items:not([hidden])');
+-      state.freshIds = new Set(newItems.map(i => i.id));
+-      if (state.realtime && atTop && !reading) {
+-        $('#newFlash').hidden = true;
+-        await loadFeed();                            // 鍦ㄩ《閮ㄤ笖鏈睍寮€闃呰 鈫?鐩存帴鍒锋柊骞堕珮浜柊鏉＄洰
+-      } else {
+-        showNewFlash(newItems.length);               // 姝ｅ湪闃呰 鈫?涓嶆墦鏂紝缁欏彲鐐规í骞?-      }
+-    }
+-    loadHotRail();
+-  } catch { /* 鍚庣娉㈠姩锛屽拷鐣ユ湰杞?*/ }
+-  schedule();
+-}
+-document.addEventListener('visibilitychange', () => { if (!document.hidden) pollRealtime(); });
+-
+-// ---------- 鑷姩鏇存柊鎻愮ず锛堜粎妗岄潰澹冲唴鐢熸晥锛?---------
+-if (Desktop && Desktop.onUpdateStatus) {
+-  const pill = $('#updatePill');
+-  let updState = 'idle';
+-  Desktop.onUpdateStatus(({ status, version, percent, message }) => {
+-    updState = status;
+-    pill.classList.toggle('error', status === 'error');
+-    if (status === 'available') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `鍙戠幇鏂扮増鏈?${version}鈥; }
+-    else if (status === 'downloading') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `涓嬭浇鏇存柊 ${percent}%`; }
+-    else if (status === 'downloaded') { pill.hidden = false; pill.classList.add('ready'); pill.textContent = `鈻?閲嶅惎瀹夎 ${version}`; }
+-    else if (status === 'error') {
+-      pill.hidden = false;
+-      pill.classList.remove('ready');
+-      pill.textContent = '鏇存柊妫€鏌ュけ璐?;
+-      pill.title = message || '绋嶅悗灏嗚嚜鍔ㄩ噸璇?;
+-    }
+-  });
+-  pill.addEventListener('click', () => { if (updState === 'downloaded') Desktop.installUpdate(); });
+-}
++// ---------- 瀹炴椂鏇存柊锛堟壒 2 鎷嗗叆 renderer/realtime-poller.js锛?----------
++const realtimePoller = RealtimePoller.createRealtimePoller({
++  api, state, FEED_VIEWS, toast, preferenceActions,
++  refreshStats, loadFeed, loadHotRail, scrollToTop,
++  document,
++  getScrollY: () => window.scrollY,
++  elements: { btnRealtime: $('#btnRealtime'), newFlash: $('#newFlash') },
++  diff: feedDiffList,
++  // 闃舵 3锛堟恫鎬佺幓鐠冿級锛氶潪鍏抽敭 DOM 鏇存柊锛堢儹鏍忓埛鏂帮級缁?idle 寤惰繜 + rAF 鎵瑰鐞嗭紱
++  // requestIdleCallback 涓嶅彲鐢ㄦ椂 setTimeout 32ms 闄嶇骇銆備富寰幆 setTimeout
++  // 鑷皟搴︿笉鍙楀奖鍝嶏紙绐楀彛闅愯棌鏃?rAF 浼氳鏆傚仠锛屽叧閿皟搴﹀繀椤荤淮鎸?setTimeout锛?+  requestIdleCallback: typeof window.requestIdleCallback === 'function'
++    ? callback => window.requestIdleCallback(callback, { timeout: 1200 })
++    : callback => setTimeout(callback, 32),
++  requestAnimationFrame: callback => requestAnimationFrame(callback)
++});
++const { setRealtime } = realtimePoller;
++
++// ---------- 鑷姩鏇存柊鎻愮ず锛堟壒 2 鎷嗗叆 renderer/update-pill.js锛?----------
++UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill') });
+ 
+ // ---------- 鍚姩 ----------
+ async function start() {
+@@ -1820,7 +636,7 @@ async function start() {
+     switchView(state.view, { persist: false });
+     initCategories();
+   }
+-  pollTimer = setTimeout(pollRealtime, 18000);   // 鑷皟搴﹀疄鏃跺閲忓惊鐜?+  realtimePoller.start();   // 鑷皟搴﹀疄鏃跺閲忓惊鐜? }
+ 
+ start().catch(() => toast('鐣岄潰鍒濆鍖栧け璐ワ紝璇峰埛鏂伴噸璇?, true));

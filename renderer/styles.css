@@ -36,6 +36,18 @@
          soft（背景晕染）、line（描边）三档，主题只需覆写令牌本身。
    思源黑体的 @font-face 分片声明在 fonts/source-han-sans-sc/index.css，
    由 index.html 单独引一条 <link>（与本表并行下载，比 @import 少一跳）。
+
+   v6.5 令牌与动效治理（只增不删，双主题可读性不变）：
+   - 语义令牌：阴影阶梯 --shadow-sm/md/lg、玻璃分层 --glass-bg-deep/soft
+     与 --glass-border-subtle、焦点环 --focus-ring、状态色
+     --state-success/warn/danger、动效别名 --dur-base；组件改用令牌取层级。
+   - 动效治理：扫光（pill-sheen / 主按钮缎面）与骨架微光（shimmer）从
+     left / background-position 改为纯 transform 合成层动画；新条目高亮
+     card-flash 改为覆盖层 opacity 淡出；body.is-idle 时暂停氛围层动画，
+     供脚本在页面隐藏时挂 class。液态玻璃阶段后关键帧共 19组，
+     上限 20 组；新增动效优先复用既有组。
+   - 交互反馈：通用 :focus-visible 焦点环兜底、disabled 光标、
+     aria-pressed=true 零特异性视觉兜底；loading/empty/error 三态视觉统一。
    ============================================================ */
 
 :root {
@@ -89,9 +101,32 @@
   --dur-fast: 130ms;
   --dur: 220ms;
   --dur-slow: 380ms;
+  /* v6.5：--dur-base 是 --dur 的语义别名，新规则按「快/基准/慢」三档取名 */
+  --dur-base: var(--dur);
   --ease: cubic-bezier(.3, .9, .35, 1);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
   --ease-spring: cubic-bezier(.34, 1.4, .44, 1);
+
+  /* —— v7 液态玻璃动效令牌 ——
+     时长补两档：snap 给开关/按压这类即时小反馈，glide 给浮层与光斑的大面积缓过渡。
+     弹性曲线三档按位移幅度分层：light 轻快微弹（胶囊、图标等小控件），
+     medium 标准液态弹（浮层悬停、玻璃基元的默认档），heavy 沉稳大弹性（大幅位移强调动画）。 */
+  --dur-snap: 160ms;
+  --dur-glide: 480ms;
+  --spring-light: cubic-bezier(.3, 1.2, .4, 1);
+  --spring-medium: cubic-bezier(.34, 1.56, .5, 1);
+  --spring-heavy: cubic-bezier(.3, 1.8, .4, 1);
+  /* v7：sticky 日期标题薄纱的模糊强度，供 date-head 统一引用（两主题同值） */
+  --veil-blur: blur(6px);
+
+  /* —— v6.5 语义令牌 ——
+     焦点环：outline 简写值，键盘可见焦点的统一口径；
+     状态色：成功/警示/危险各随主题走，取值沿用已验证对比度的主题色。
+     阴影阶梯 --shadow-sm/md/lg 与玻璃分层令牌分主题定义于下方两块。 */
+  --focus-ring: 2px solid var(--accent);
+  --state-success: var(--c-green);
+  --state-warn: var(--flag);
+  --state-danger: var(--c-red);
 
   /* —— 布局（rem：栏宽随字号走，行长与字号的比例才是恒定的）—— */
   --shell: 85rem;
@@ -148,20 +183,44 @@
   /* 浮层玻璃：导航、面板、热榜、对话框这些「浮在内容之上」的层。
      v4 比 v3 更实——浮层的职责是把自己和下方滚动的内容分开，
      太透会叠出重影，这正是旧版「别扭感」的来源之一。 */
-  --glass-bg: linear-gradient(165deg, rgba(148,178,255,.11), rgba(96,118,180,.05) 40%, rgba(70,90,150,.075));
+  /* v7 液态玻璃：双层渐变——冷蓝主渐变自上而下三档透明度分层，另叠一道
+     青色辅光自右下漫入，角度错开产生液态流动感；角度与透明度分主题推敲过。 */
+  --glass-bg: linear-gradient(158deg, rgba(150,182,255,.13), rgba(96,118,180,.05) 42%, rgba(72,92,152,.085)),
+    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 5%, transparent), transparent 52%);
   --glass-border: rgba(168,190,255,.16);
-  --glass-border-strong: rgba(168,190,255,.3);
+  --glass-border-strong: rgba(198,218,255,.4);
   --glass-highlight: linear-gradient(90deg, transparent, rgba(210,225,255,.5), transparent);
-  --glass-blur: blur(24px) saturate(155%);
-  --glass-shadow: 0 18px 50px -18px rgba(0,0,0,.7), 0 4px 14px -8px rgba(0,0,0,.55), inset 0 1px 0 rgba(190,212,255,.06);
-  --glass-shadow-lift: 0 26px 64px -20px rgba(0,0,0,.78), 0 8px 22px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(190,212,255,.09);
+  /* v7：blur 提至 28px 并叠 saturate/brightness——玻璃后内容提饱和、微微提亮，
+     才有「厚玻璃折射」的通透液态感，而不是灰蒙蒙的一层 */
+  --glass-blur: blur(28px) saturate(170%) brightness(1.06);
+  /* v7：海拔拉开——近影密而小、远影大而软，inset 顶光随浮起增强 */
+  --glass-shadow: 0 2px 6px -3px rgba(0,0,0,.5), 0 22px 56px -20px rgba(0,0,0,.72), inset 0 1px 0 rgba(200,220,255,.07);
+  --glass-shadow-lift: 0 4px 12px -5px rgba(0,0,0,.52), 0 34px 72px -22px rgba(0,0,0,.8), inset 0 1px 0 rgba(200,220,255,.1);
+  /* v7：镜面高光（.glass::before 的宽光带）与边缘折射光（.glass::after 的内顶光），两主题各一套 */
+  --glass-specular: linear-gradient(104deg, transparent 6%, rgba(214,230,255,.36) 32%, rgba(255,255,255,.15) 50%, transparent 68%);
+  --glass-rim: linear-gradient(180deg, rgba(220,236,255,.13), transparent 24%, transparent 80%, rgba(150,182,255,.07));
+
+  /* v6.5：阴影阶梯——海拔按档取用，组件不再各写各的阴影 */
+  --shadow-sm: 0 .0625rem .375rem -.125rem rgba(0,0,0,.55), 0 .125rem 1rem -.375rem rgba(0,0,0,.4);
+  --shadow-md: 0 .5rem 1.75rem -.75rem rgba(0,0,0,.6), 0 .25rem .75rem -.375rem rgba(0,0,0,.45);
+  --shadow-lg: 0 1.5rem 3.5rem -1.125rem rgba(0,0,0,.7), 0 .5rem 1.5rem -.5rem rgba(0,0,0,.5);
+
+  /* v6.5：玻璃分层——--glass-bg 是标准浮层；deep 更实，给对话框与弹层；
+     soft 更轻，给次级面板与空态；subtle 描边给不需要清晰边界的内嵌块 */
+  --glass-bg-deep: linear-gradient(158deg, rgba(150,182,255,.19), rgba(96,118,180,.1) 42%, rgba(72,92,152,.135)),
+    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 6%, transparent), transparent 58%);
+  --glass-bg-soft: linear-gradient(158deg, rgba(150,182,255,.07), rgba(96,118,180,.035) 55%, rgba(72,92,152,.05)),
+    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 3%, transparent), transparent 52%);
+  --glass-border-subtle: rgba(168,190,255,.09);
 
   /* 卡片落回素色：信息流卡片是「内容」，不是浮层。半透明卡片叠在半透明
      页底上会让文字显得脏；近实底色给出干净的阅读面，玻璃感交给浮层。 */
-  --card-bg: linear-gradient(172deg, #0d1429, #090f20);
+  /* v7：保持近实底的液态微渐变——三段冷蓝由明到暗缓落，不引入透明浮层感；
+     阴影改双层：近影密、远影软，悬停浮起时两档海拔差更明显 */
+  --card-bg: linear-gradient(168deg, #0e1630, #0a1124 48%, #090e1e);
   --card-border: rgba(148,170,230,.13);
-  --card-shadow: 0 12px 32px -20px rgba(0,0,0,.6), 0 2px 8px -6px rgba(0,0,0,.5);
-  --card-shadow-lift: 0 18px 44px -20px rgba(0,0,0,.7), 0 4px 14px -8px rgba(0,0,0,.55);
+  --card-shadow: 0 1px 3px rgba(0,0,0,.42), 0 14px 38px -22px rgba(0,0,0,.62);
+  --card-shadow-lift: 0 3px 8px -3px rgba(0,0,0,.46), 0 24px 52px -24px rgba(0,0,0,.72);
 
   /* 控件底槽：分段控件（导航 / 领域 / 缩放档位）与输入框共用的内凹底色 */
   --input-bg: rgba(8,13,30,.6);
@@ -218,19 +277,36 @@
   --danger-soft: rgba(220, 38, 38, .09);
   --danger-line: rgba(220, 38, 38, .36);
 
-  --glass-bg: linear-gradient(168deg, rgba(255,255,255,.92), rgba(255,255,255,.74));
+  /* v7 液态玻璃：暖白主渐变三档透明度分层，另叠一道淡青辅光自右下漫入，
+     宣纸底上保持通透但不发灰；模糊强度较暗色主题调低 */
+  --glass-bg: linear-gradient(162deg, rgba(255,255,255,.94), rgba(251,252,253,.8) 52%, rgba(243,246,250,.72)),
+    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 4%, transparent), transparent 52%);
   --glass-border: rgba(70,84,116,.14);
-  --glass-border-strong: rgba(70,84,116,.28);
+  --glass-border-strong: rgba(70,84,116,.34);
   --glass-highlight: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
-  --glass-blur: blur(18px) saturate(120%);
-  --glass-shadow: 0 10px 34px -16px rgba(46,58,89,.22), 0 2px 8px -4px rgba(46,58,89,.1);
-  --glass-shadow-lift: 0 20px 48px -18px rgba(46,58,89,.3), 0 4px 14px -8px rgba(46,58,89,.14);
+  --glass-blur: blur(22px) saturate(150%) brightness(1.03);
+  --glass-shadow: 0 2px 6px -3px rgba(46,58,89,.14), 0 16px 42px -18px rgba(46,58,89,.24);
+  --glass-shadow-lift: 0 4px 12px -5px rgba(46,58,89,.16), 0 28px 58px -20px rgba(46,58,89,.3);
+  /* v7：镜面高光与边缘折射光（宣纸白口径：高光更白更锐，折射光带暖灰） */
+  --glass-specular: linear-gradient(104deg, transparent 6%, rgba(255,255,255,.85) 32%, rgba(255,255,255,.38) 50%, transparent 68%);
+  --glass-rim: linear-gradient(180deg, rgba(255,255,255,.65), transparent 24%, transparent 82%, rgba(110,132,176,.08));
 
-  /* 宣纸主题卡片本来就是实底，这里只把描边与阴影统一到一个口径 */
-  --card-bg: linear-gradient(172deg, rgba(255,255,255,.92), rgba(253,251,246,.85));
+  /* v6.5：阴影阶梯与玻璃分层（宣纸白口径：阴影偏冷灰、更柔） */
+  --shadow-sm: 0 .0625rem .375rem -.125rem rgba(46,58,89,.18), 0 .125rem .875rem -.375rem rgba(46,58,89,.1);
+  --shadow-md: 0 .5rem 1.75rem -.75rem rgba(46,58,89,.22), 0 .25rem .75rem -.375rem rgba(46,58,89,.12);
+  --shadow-lg: 0 1.5rem 3.5rem -1.125rem rgba(46,58,89,.3), 0 .5rem 1.5rem -.5rem rgba(46,58,89,.16);
+  --glass-bg-deep: linear-gradient(162deg, rgba(255,255,255,.98), rgba(252,252,251,.9) 52%, rgba(246,247,249,.86)),
+    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 4%, transparent), transparent 58%);
+  --glass-bg-soft: linear-gradient(162deg, rgba(255,255,255,.72), rgba(251,252,251,.58) 55%, rgba(244,246,249,.5)),
+    linear-gradient(296deg, color-mix(in srgb, var(--c-teal) 2.5%, transparent), transparent 52%);
+  --glass-border-subtle: rgba(70,84,116,.08);
+
+  /* 宣纸主题卡片本来就是实底；v7 换为暖白三段液态微渐变，
+     阴影双层柔化（近影密、远影软），保持近实底的阅读面 */
+  --card-bg: linear-gradient(168deg, #fffefb, #fbf8f2 48%, #f7f3ea);
   --card-border: rgba(70,84,116,.13);
-  --card-shadow: 0 8px 26px -14px rgba(46,58,89,.16), 0 1px 6px -4px rgba(46,58,89,.08);
-  --card-shadow-lift: 0 16px 38px -16px rgba(46,58,89,.24), 0 3px 12px -6px rgba(46,58,89,.12);
+  --card-shadow: 0 1px 3px rgba(46,58,89,.07), 0 12px 32px -18px rgba(46,58,89,.16);
+  --card-shadow-lift: 0 3px 8px -3px rgba(46,58,89,.09), 0 22px 46px -20px rgba(46,58,89,.24);
 
   --input-bg: rgba(255,255,255,.78);
   --hover-bg: rgba(70,84,116,.05);
@@ -308,6 +384,12 @@ body {
 
 /* 统一的键盘可见焦点环 */
 :focus-visible { outline: none; }
+/* v6.5：通用兜底——任何可聚焦元素只要键盘聚焦就有焦点环；:where 不计特异性，
+   自带焦点样式的组件（输入框的 box-shadow 环、下方白名单列表等）自然盖过它 */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
 .tab:focus-visible, .pill:focus-visible, .chip:focus-visible, .scale-option:focus-visible,
 .btn-icon:focus-visible, .btn-primary:focus-visible, .btn-ghost:focus-visible,
 .rt-toggle:focus-visible, .update-pill:focus-visible, .new-flash:focus-visible,
@@ -316,11 +398,21 @@ body {
 .search-clear:focus-visible, .to-top:focus-visible, .common-links-category:focus-visible,
 .common-links-favorite:focus-visible, .common-links-open:focus-visible,
 .lexicon-toggle:focus-visible, .lex-term:focus-visible, .search-context button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
 }
 .searchbox:focus-within { outline: none; }
+
+/* v6.5：禁用态统一用光标说「不可操作」，透明度与 pointer-events 由各组件自定 */
+button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; }
+
+/* v6.5：aria-pressed=true 的视觉兜底。:where 零特异性，已有选中态类名的
+   组件（.scale-option / .star-toggle.is-on / .chip.active 等）全部盖得过它，
+   只接住「脚本只写了 aria-pressed 没补类名」的场景 */
+:where([aria-pressed="true"]) {
+  color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft);
+}
 
 /* ---------- 氛围层 ----------
    v4 整体降噪：极光变淡、颗粒变细。氛围层的职责是「有夜航的感觉」，
@@ -407,6 +499,37 @@ body {
 [data-theme="light"] .stars { display: none; }
 @keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
 
+/* v7 液态玻璃：氛围层的液态光斑——两枚缓漂的柔光团，给玻璃浮层提供
+   「可折射的光源」。用元素自身的 CSS filter 柔化，不占毛玻璃滤镜预算；
+   定位全部取 inset 安全的百分比，位移幅度小，不造成横向溢出。
+   动画仅此一组（blob-drift），两枚光斑错相复用。 */
+.blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(70px); will-change: transform;
+  pointer-events: none;
+}
+[data-theme="dark"] .blob { opacity: .3; }
+[data-theme="light"] .blob { opacity: .38; }
+.blob-a {
+  width: 320px; height: 320px; top: 16%; left: 6%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%);
+  animation: blob-drift 36s ease-in-out infinite alternate;
+}
+.blob-b {
+  width: 280px; height: 280px; top: 58%; left: 60%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--second) 22%, transparent), transparent 70%);
+  animation: blob-drift 46s ease-in-out infinite alternate-reverse;
+}
+@keyframes blob-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(48px, -36px, 0) scale(1.12); }
+}
+
+/* v6.5：页面隐藏或失焦（document.hidden || !document.hasFocus()）时暂停
+   氛围层动画，class 由脚本阶段挂到 body；逐层声明而非暂停父级，
+   animation-play-state 不会从父元素继承 */
+body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .blob { animation-play-state: paused; }
+
 .grain {
   position: absolute; inset: 0; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -416,7 +539,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .aurora, .stars, .comet, .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot {
+  .aurora, .stars, .comet, .blob, .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot,
+  .card-new::before, .breakthrough-pill::after {
     animation: none !important;
   }
   *, *::before, *::after {
@@ -426,7 +550,9 @@ body {
   }
 }
 
-/* ---------- 玻璃基元（浮层专用） ---------- */
+/* ---------- 玻璃基元（浮层专用） ----------
+   v7 液态化：悬停时借 spring 曲线微浮起（仅 transform/box-shadow，
+   不触发布局）；::before 顶光升级为宽镜面光带，::after 补内顶光/边缘折射。 */
 .glass {
   position: relative;
   background: var(--glass-bg);
@@ -435,10 +561,22 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-shadow);
+  transition: transform var(--dur) var(--spring-medium), box-shadow var(--dur) var(--spring-medium);
+}
+.glass:not(.nav):not(.hot-rail):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-lift);
 }
 .glass::before {
-  content: ''; position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
-  background: var(--glass-highlight);
+  content: ''; position: absolute; top: 0; left: 3%; right: 3%; height: 2px;
+  border-radius: 99px;
+  background: var(--glass-specular);
+  pointer-events: none;
+}
+.glass::after {
+  content: ''; position: absolute; inset: 0;
+  border-radius: inherit;
+  background: var(--glass-rim);
   pointer-events: none;
 }
 
@@ -564,7 +702,9 @@ body {
   max-height: min(38.75rem, calc(100vh - 7.5rem));
   display: flex; flex-direction: column;
   border-radius: var(--radius-lg); padding: var(--sp-4);
-  box-shadow: var(--shadow-pop, 0 20px 50px rgba(0, 0, 0, .45));
+  /* 海拔取中档：页内锚定浮层（z-index 60）低于最高层弹层——--shadow-lg
+     留给 .glass-dialog 一类模态，--shadow-md 正是中型浮层的语义档 */
+  box-shadow: var(--shadow-md);
 }
 /* .glass 的底色只有 8.5% 不透明度——卡片压在页面底色上够用，但这是一块浮在
    滚动正文之上的浮层，透过去就没法读了。与提报信源的对话框同样处理：给足底色。 */
@@ -572,7 +712,7 @@ body {
 [data-theme="light"] .lexicon-panel { background: linear-gradient(168deg, rgba(255,255,255,.98), rgba(252,250,244,.97)); }
 /* v6：面板从顶栏下方浮出——与对话框同源的入场，收起仍是瞬时（Esc/外点不该拖泥带水）。
    开合态走 .is-open 类（由 setLexiconOpen 维护），不写 :not([hidden]) 补丁规则 */
-.lexicon-panel.is-open { animation: dialog-in var(--dur-slow) var(--ease-out); }
+.lexicon-panel.is-open { animation: dialog-in var(--dur-glide) var(--spring-medium); }
 .lexicon-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
 .lexicon-head h3 {
   font-family: var(--font-display); font-size: var(--t-lg);
@@ -619,7 +759,7 @@ body {
   background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
   padding: .25rem .3125rem .25rem .625rem; font-size: var(--t-sm); font-family: var(--font-ui);
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              background var(--dur) var(--ease), transform var(--dur) var(--ease);
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 /* v5：词条悬停轻轻浮起，命中数胶囊跟着擦亮 */
 .lex-term:hover { color: var(--c-fg); border-color: var(--accent-line); background: var(--hover-bg); transform: translateY(-1px); }
@@ -641,7 +781,7 @@ body {
   border-radius: 50%; border: 1px solid var(--glass-border);
   background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              transform var(--dur) var(--ease-spring), background var(--dur) var(--ease);
+              transform var(--dur-snap) var(--spring-light), background var(--dur) var(--ease);
 }
 .btn-icon svg { width: 1.0625rem; height: 1.0625rem; }
 .btn-icon:hover { color: var(--accent); border-color: var(--accent-line); background: var(--hover-bg); transform: translateY(-1px); }
@@ -653,7 +793,7 @@ body {
 /* 主题切换：太阳/月亮图标互换 */
 #btnTheme .icon-sun, #btnTheme .icon-moon {
   position: absolute;
-  transition: opacity var(--dur) var(--ease), transform var(--dur-slow) var(--ease-spring);
+  transition: opacity var(--dur) var(--ease), transform var(--dur-slow) var(--spring-medium);
 }
 [data-theme="light"] #btnTheme .icon-moon { opacity: 0; transform: rotate(-90deg) scale(.5); }
 [data-theme="light"] #btnTheme .icon-sun { opacity: 1; transform: none; }
@@ -664,7 +804,7 @@ body {
   font-family: var(--font-ui); font-size: var(--t-base); cursor: pointer;
   padding: .5625rem var(--sp-5); border-radius: 99px; line-height: 1.5;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              background var(--dur) var(--ease), transform var(--dur) var(--ease-spring),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light),
               box-shadow var(--dur) var(--ease);
 }
 .btn-primary {
@@ -674,14 +814,16 @@ body {
   color: var(--accent-ink); font-weight: 700;
 }
 /* v5：主按钮悬停时的缎面扫光——动作按钮里最重的那一档，
-   指尖扫过像绸面反了一下光 */
+   指尖扫过像绸面反了一下光。
+   v6.5：位移从 left 改为 transform（百分比折算到自身宽度：
+   left -70%/130% ≡ translateX(-156%)/289%），不再逐帧触发布局 */
 .btn-primary::after {
-  content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
   background: linear-gradient(100deg, transparent, var(--sheen), transparent);
-  transform: skewX(-18deg); pointer-events: none;
-  transition: left var(--dur-slow) var(--ease-out);
+  transform: translateX(-156%) skewX(-18deg); pointer-events: none;
+  transition: transform var(--dur-slow) var(--ease-out);
 }
-.btn-primary:hover::after { left: 130%; }
+.btn-primary:hover::after { transform: translateX(289%) skewX(-18deg); }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px var(--accent-glow); border-color: var(--accent); }
 .btn-primary:active { transform: translateY(0) scale(.98); }
 .btn-ghost { border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim); }
@@ -699,6 +841,8 @@ body {
 .common-links-favorite:active, .scale-option:active, .update-pill.ready:active,
 .cluster-toggle:active, .dims-toggle:active, .hot-item:active {
   transform: scale(.97);
+  /* 按压走独立的短过渡：按下要快而跟手，抬起时回落到基线过渡自然带弹 */
+  transition: transform var(--dur-snap) var(--spring-light);
 }
 
 /* ---------- 导航 ---------- */
@@ -746,7 +890,10 @@ body.is-scrolled .nav {
   border: 1px solid var(--accent-line);
   background: linear-gradient(135deg, var(--accent-soft), transparent);
   opacity: var(--ti-o, 0);
-  transition: transform var(--dur-slow) var(--ease-out), width var(--dur-slow) var(--ease-out),
+  /* 豁免：width/height 跟随目标 tab 的实测尺寸（脚本写 --ti-w/--ti-h，
+     换行与界面缩放都要重测），尺寸跟随没有 transform 等价物，属布局机制必需；
+     位移已走 transform，显隐走 opacity，均不触发回流 */
+  transition: transform var(--dur) var(--spring-medium), width var(--dur-slow) var(--ease-out),
               height var(--dur-slow) var(--ease-out), opacity var(--dur) var(--ease);
   pointer-events: none;
 }
@@ -771,7 +918,8 @@ body.is-scrolled .nav {
   font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
   border: 1px solid transparent; background: transparent; color: var(--c-fg-dim);
   font-family: var(--font-ui); line-height: 1.5; white-space: nowrap;
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .pill:hover { color: var(--c-fg); background: var(--hover-bg); }
 .pill.active { color: var(--c-fg); background: var(--active-bg); border-color: var(--glass-border-strong); font-weight: 700; }
@@ -783,7 +931,8 @@ body.is-scrolled .nav {
   font-size: var(--t-sm); padding: .25rem .6875rem; border-radius: 99px; cursor: pointer;
   border: 1px dashed var(--glass-border); background: transparent; color: var(--c-fg-faint);
   font-family: var(--font-ui); line-height: 1.5;
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .chip:hover { color: var(--c-fg-dim); border-style: solid; background: var(--hover-bg); }
 .chip.active {
@@ -794,7 +943,7 @@ body.is-scrolled .nav {
 /* ---------- 主内容 ---------- */
 main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
-.view { animation: view-in var(--dur-slow) var(--ease-out) backwards; }
+.view { animation: view-in var(--dur-slow) var(--spring-medium) backwards; }
 @keyframes view-in {
   from { opacity: 0; transform: translateY(10px); }
 }
@@ -826,7 +975,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .common-links-category {
   border: 1px solid var(--glass-border); border-radius: 99px; background: transparent;
   color: var(--c-fg-dim); cursor: pointer; font-family: var(--font-ui);
-  font-size: var(--t-base); padding: .375rem var(--sp-4); transition: all var(--dur) var(--ease);
+  font-size: var(--t-base); padding: .375rem var(--sp-4);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .common-links-category:hover { background: var(--hover-bg); color: var(--c-fg); }
 .common-links-category.is-active {
@@ -840,8 +991,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 .common-links-card {
   display: flex; flex-direction: column; gap: var(--sp-3); min-height: 15.5rem; padding: var(--sp-5);
-  border-color: var(--glass-border); animation: view-in var(--dur-slow) var(--ease-out) backwards;
-  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  border-color: var(--glass-border); animation: view-in var(--dur-slow) var(--spring-medium) backwards;
+  transition: transform var(--dur) var(--spring-medium), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--spring-medium);
 }
 .common-links-card:hover {
   transform: translateY(-3px);
@@ -855,7 +1006,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .common-links-favorite {
   display: inline-flex; align-items: center; gap: .3125rem; flex: 0 0 auto; border: 1px solid var(--glass-border);
   border-radius: 99px; background: var(--input-bg); color: var(--c-fg-dim); cursor: pointer;
-  font-family: var(--font-ui); font-size: var(--t-sm); padding: .3125rem .625rem; transition: all var(--dur) var(--ease);
+  font-family: var(--font-ui); font-size: var(--t-sm); padding: .3125rem .625rem;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .common-links-favorite:hover { color: var(--c-fg); border-color: var(--glass-border-strong); }
 .common-links-favorite.is-active { color: var(--c-teal); border-color: var(--accent-line); background: var(--accent-soft); }
@@ -868,7 +1021,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2); margin-top: auto;
   min-height: 2.75rem; border: 1px solid var(--glass-border); border-radius: 99px;
   color: var(--c-fg); font-weight: 700; text-decoration: none; font-size: var(--t-base);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .common-links-open:hover {
   color: var(--accent-ink); border-color: var(--accent-line);
@@ -902,7 +1056,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   margin-bottom: var(--sp-4); padding: .5625rem var(--sp-4);
   border-radius: var(--radius-md); font-size: var(--t-base);
   border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--c-fg-dim);
-  animation: flash-in var(--dur-slow) var(--ease-out);
+  animation: flash-in var(--dur-slow) var(--spring-light);
 }
 .search-context strong { color: var(--accent-ink); }
 .search-context .sc-count { font-family: var(--font-mono); color: var(--c-fg); font-variant-numeric: tabular-nums; }
@@ -910,7 +1064,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   margin-left: auto; font-family: var(--font-ui); font-size: var(--t-sm); cursor: pointer;
   padding: .1875rem var(--sp-3); border-radius: 99px;
   border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-dim);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .search-context button:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
 
@@ -934,7 +1089,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   padding: .5rem var(--sp-3); border-radius: 99px;
   border: 1px solid var(--second-line); color: var(--second-ink);
   background: linear-gradient(135deg, var(--second-soft), transparent);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .update-pill.ready {
   cursor: pointer; font-weight: 700;
@@ -953,18 +1109,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   cursor: pointer; text-align: center;
   border: 1px solid var(--accent-line); color: var(--accent-ink);
   background: linear-gradient(135deg, var(--accent-soft), transparent);
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
-  animation: flash-in var(--dur-slow) var(--ease-out);
+  transition: transform var(--dur-snap) var(--spring-light), box-shadow var(--dur-snap) var(--spring-light);
+  animation: flash-in var(--dur-slow) var(--spring-light);
 }
 .new-flash:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px var(--accent-glow); }
 @keyframes flash-in { from { opacity: 0; transform: translateY(-8px); } }
 
-/* 实时新到达卡片的高亮淡出 */
-.card-new { animation: card-flash 2.6s var(--ease) forwards; }
-@keyframes card-flash {
-  0% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring), var(--card-shadow); }
-  100% { border-color: var(--card-border); box-shadow: var(--card-shadow); }
-}
+/* 实时新到达卡片的高亮淡出（样式预留：阶段 4 增量插入会给新卡挂 .card-new）。
+   v6.5：改为 ::before 覆盖层的 opacity 淡出——领域色渐变压边亮一下再退场，
+   不再动画 border-color / box-shadow；不加 forwards，动画结束自然回到
+   基底 opacity 0，悬停压边不受影响 */
+.card-new::before { animation: card-flash 2.6s var(--ease-out); }
+@keyframes card-flash { from { opacity: 1; } }
 
 /* —— 日期分组 + 时间轴 —— */
 .date-group { margin-bottom: var(--sp-2); }
@@ -976,8 +1132,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   position: sticky; top: var(--stack-top); z-index: 10;
   /* 透明的 sticky 标题会与下方滚动的卡片叠字，用同色薄纱遮住 */
   background: var(--sticky-veil);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: var(--veil-blur);
+  -webkit-backdrop-filter: var(--veil-blur);
 }
 .date-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--rail-line), transparent); }
 .date-head .dh-count {
@@ -1022,8 +1178,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   border: 1px solid var(--card-border);
   box-shadow: var(--card-shadow);
   position: relative;
-  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
-  animation: card-in .42s var(--ease-out) backwards;
+  transition: transform var(--dur) var(--spring-medium), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--spring-medium);
+  animation: card-in var(--dur-slow) var(--spring-medium) backwards;
   /* 首屏之外的卡片跳过布局与绘制，长列表滚动明显更省；
      已渲染高度由 intrinsic-size 占位，滚动条不回跳 */
   content-visibility: auto;
@@ -1037,6 +1193,11 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   box-shadow: var(--card-shadow-lift);
 }
 @keyframes card-in { from { opacity: 0; transform: translateY(12px); } }
+/* 评审修复：命中错峰入场（diff 新建行，feed-card staggerCreated 挂标）的行
+   入场整体交给行级运动引擎，这里据此关掉行内卡片的 CSS 入场，避免祖孙
+   两层 transform 叠加、步长不同步导致入场轨迹错乱；首屏整表渲染与复用
+   行不挂此类，CSS 入场保持原样 */
+.stagger-in .card { animation: none; }
 
 /* v5：悬停时浮起的渐变压边。用 mask 把 1px 的渐变描边「挖」出来——
    不占布局、不改盒模型，鼠标离开时整层淡出，比换 border-color 更有光泽。
@@ -1253,16 +1414,17 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   white-space: nowrap;
 }
 /* v5：技术突破是全站价值最高的标记，配唯一的常驻动效——
-   一道缎面扫光每 4 秒掠过一次，其余时间它和别的胶囊一样安静 */
+   一道缎面扫光每 4 秒掠过一次，其余时间它和别的胶囊一样安静。
+   v6.5：同主按钮口径，扫光位移改走 transform 合成层 */
 .breakthrough-pill::after {
-  content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
   background: linear-gradient(100deg, transparent, var(--sheen), transparent);
-  transform: skewX(-18deg); pointer-events: none;
+  transform: translateX(-156%) skewX(-18deg); pointer-events: none;
   animation: pill-sheen 4.2s var(--ease) infinite;
 }
 @keyframes pill-sheen {
-  0%, 55% { left: -70%; }
-  85%, 100% { left: 130%; }
+  0%, 55% { transform: translateX(-156%) skewX(-18deg); }
+  85%, 100% { transform: translateX(289%) skewX(-18deg); }
 }
 .breakthrough-pill b {
   color: var(--flag);
@@ -1298,7 +1460,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   font-size: var(--t-sm); cursor: pointer; line-height: 1.6;
   background: none; border: 1px solid transparent; padding: .1875rem .5625rem .1875rem .5rem;
   border-radius: 99px; font-family: var(--font-ui);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .cluster-toggle { color: var(--second-ink); }
 .cluster-toggle:hover { background: var(--second-soft); border-color: var(--second-line); }
@@ -1318,7 +1481,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   border: 1px solid var(--glass-border); background: var(--input-bg);
   padding: .25rem var(--sp-3); border-radius: 99px;
   font-family: var(--font-ui); color: var(--c-fg-dim);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), opacity var(--dur) var(--ease),
+              transform var(--dur-snap) var(--spring-light);
 }
 .card-act svg { width: .75rem; height: .75rem; }
 .card-act:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
@@ -1330,7 +1495,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* v5：星标落定的一颗回弹——「收好了」需要一点身体上的确认感。
    动画挂在 .is-on 上，每次点亮都会重放一次；首次渲染带星卡片时
    也会轻轻弹一下，配合卡片错峰入场，像星标依次归位。 */
-.star-toggle.is-on svg { animation: star-pop var(--dur-slow) var(--ease-spring); transform-origin: center; }
+.star-toggle.is-on svg { animation: star-pop var(--dur-slow) var(--spring-medium); transform-origin: center; }
 @keyframes star-pop { 40% { transform: scale(1.28) rotate(-10deg); } }
 .star-toggle.is-on:hover { color: var(--flag); border-color: var(--flag); }
 
@@ -1361,7 +1526,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .note-item {
   display: flex; align-items: flex-start; gap: var(--sp-3);
   padding: .5625rem var(--sp-3); border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border); background: var(--hover-bg);
+  border: 1px solid var(--glass-border-subtle); background: var(--hover-bg);
 }
 .note-body { flex: 1; min-width: 0; }
 .note-body p { font-family: var(--font-body); font-size: var(--t-base); line-height: 1.9; word-break: break-word; }
@@ -1370,7 +1535,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   flex: none; font-family: var(--font-ui); font-size: var(--t-sm); cursor: pointer;
   padding: .1875rem var(--sp-2); border-radius: 99px;
   border: 1px solid var(--glass-border); background: transparent; color: var(--c-fg-faint);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .note-remove:hover { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
 .note-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1378,7 +1544,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .cluster-items {
   margin-top: .5625rem; display: flex; flex-direction: column; gap: .4375rem;
   padding-left: var(--sp-3); border-left: 2px solid var(--second-line);
-  animation: reveal var(--dur) var(--ease-out);
+  animation: reveal var(--dur) var(--spring-light);
 }
 .cluster-item { font-size: var(--t-base); }
 .cluster-item a { color: var(--c-fg-dim); text-decoration: none; }
@@ -1390,7 +1556,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   display: none; gap: var(--sp-3); margin-top: var(--sp-3); padding-top: var(--sp-3);
   border-top: 1px dashed var(--rail-line);
 }
-.card.expanded .dims { display: flex; flex-wrap: wrap; animation: reveal var(--dur) var(--ease-out); }
+.card.expanded .dims { display: flex; flex-wrap: wrap; animation: reveal var(--dur) var(--spring-light); }
 @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } }
 .dim { flex: 1; min-width: 5.75rem; }
 .dim-label { font-size: var(--t-xs); color: var(--c-fg-faint); display: flex; justify-content: space-between; }
@@ -1447,13 +1613,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   padding: var(--sp-2) .375rem; border-radius: var(--radius-sm); text-decoration: none;
   border-left: 2px solid transparent;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              transform var(--dur) var(--ease);
+              transform var(--dur-snap) var(--spring-light);
 }
 /* v5：悬停时条目向右轻轻一让，像给指尖让出半个身位 */
 .hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); transform: translateX(2px); }
 /* v6：首次上榜时错峰入场（错峰延时由脚本内联）；后续轮询静默更新，
    脚本会给条目补 animation:none，不会每 18 秒整列重放一次 */
-.hot-item { animation: flash-in var(--dur-slow) var(--ease-out) backwards; }
+.hot-item { animation: flash-in var(--dur-slow) var(--spring-light) backwards; }
 .hot-item .hi-rank {
   font-family: var(--font-mono); font-size: var(--t-base); font-weight: 700;
   color: var(--c-fg-faint); text-align: center; padding-top: 1px; font-variant-numeric: tabular-nums;
@@ -1473,17 +1639,30 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .hot-item .hi-meta { font-size: var(--t-xs); color: var(--c-fg-faint); margin-top: .125rem; display: flex; gap: var(--sp-2); align-items: center; }
 .hot-item .hi-heat { font-family: var(--font-mono); color: var(--flag); font-weight: 700; }
 
-/* 骨架屏 */
+/* 骨架屏。v6.5：微光从 background-position 改为一条 transform 扫过的高光带，
+   只走合成层；display:block 顺带让热度栏骨架里嵌套的行内 span 真正占位 */
 .skeleton { pointer-events: none; }
 .skeleton .sk-line, .cluster-items .sk-line {
+  display: block; position: relative; overflow: hidden;
   height: .875rem; border-radius: .4375rem; margin: var(--sp-2) 0;
-  background: linear-gradient(90deg, var(--hover-bg) 25%, var(--rail-line) 50%, var(--hover-bg) 75%);
-  background-size: 200% 100%;
+  background: var(--hover-bg);
+}
+.skeleton .sk-line::after, .cluster-items .sk-line::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--rail-line), transparent);
   animation: shimmer 1.4s linear infinite;
 }
-@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 
-.empty-state { text-align: center; padding: 4.5rem var(--sp-5); color: var(--c-fg-faint); }
+/* 空态与失败态共用一个壳：平时是玻璃浮层，带重试按钮时（失败态）
+   描边与图标自动转危险色，不必改脚本也能分出两种状态 */
+.empty-state {
+  text-align: center; padding: 4.5rem var(--sp-5); color: var(--c-fg-faint);
+  background: var(--glass-bg-soft);
+  animation: view-in var(--dur-slow) var(--spring-medium);
+}
+.empty-state:has(.es-retry) { border-color: var(--danger-line); }
+.empty-state:has(.es-retry) .es-icon { color: var(--state-danger); }
 .empty-state .es-icon {
   font-family: var(--font-display); font-size: var(--t-3xl); font-weight: 800;
   opacity: .45; letter-spacing: .25em; color: var(--c-fg-dim);
@@ -1533,13 +1712,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 .src-card {
   padding: var(--sp-4) var(--sp-5); border-radius: var(--radius-md);
-  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
-.src-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); }
+.src-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .src-row1 { display: flex; align-items: center; gap: .625rem; }
 .src-status { width: .5625rem; height: .5625rem; border-radius: 50%; flex-shrink: 0; }
-.src-status.ok { background: var(--c-green); box-shadow: 0 0 7px rgba(21,128,61,.45); }
-.src-status.err { background: var(--c-red); box-shadow: 0 0 7px rgba(220,38,38,.45); }
+.src-status.ok { background: var(--state-success); box-shadow: 0 0 7px rgba(21,128,61,.45); }
+.src-status.err { background: var(--state-danger); box-shadow: 0 0 7px rgba(220,38,38,.45); }
 .src-status.idle { background: var(--c-fg-faint); }
 .src-name { font-weight: 700; font-size: var(--t-md); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .src-meta { font-size: var(--t-sm); color: var(--c-fg-faint); margin-top: .375rem; display: flex; gap: .625rem; flex-wrap: wrap; }
@@ -1555,7 +1734,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
   background: transparent; border: 1px solid var(--glass-border); color: var(--c-fg-dim);
   font-family: var(--font-ui);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), opacity var(--dur) var(--ease),
+              transform var(--dur-snap) var(--spring-light);
 }
 .src-actions button:hover { color: var(--c-fg); border-color: var(--glass-border-strong); background: var(--hover-bg); }
 .src-actions button.danger:hover { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
@@ -1605,7 +1786,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   font-size: var(--t-sm); padding: .25rem var(--sp-3); border-radius: 99px; cursor: pointer;
   border: 1px solid transparent; background: transparent; color: var(--c-fg-dim);
   font-family: var(--font-ui); line-height: 1.5; white-space: nowrap;
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+              border-color var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
 }
 .scale-option:hover { color: var(--c-fg); background: var(--hover-bg); }
 .scale-option[aria-pressed="true"] {
@@ -1615,7 +1797,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 .btn-row { display: flex; align-items: center; gap: .625rem; margin-top: var(--sp-1); flex-wrap: wrap; }
 .test-result { font-size: var(--t-base); }
-.test-result.ok { color: var(--c-green); }
+.test-result.ok { color: var(--state-success); }
 .test-result.fail { color: var(--danger-ink); }
 .desktop-switch {
   display: grid;
@@ -1645,7 +1827,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   border-radius: 999px;
   border: 1px solid var(--glass-border);
   background: var(--input-bg);
-  transition: all var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease), opacity var(--dur) var(--ease);
   flex-shrink: 0;
 }
 .switch-track::after {
@@ -1657,7 +1840,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   top: .125rem;
   border-radius: 50%;
   background: var(--c-fg-faint);
-  transition: all var(--dur) var(--ease-spring);
+  transition: transform var(--dur-snap) var(--spring-light), background var(--dur) var(--ease);
 }
 .desktop-switch input:checked + .switch-track {
   border-color: var(--accent-line);
@@ -1827,7 +2010,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   color: var(--c-fg-dim);
   overflow-wrap: anywhere;
 }
-.daily-archive-live.ok { color: var(--c-green); }
+.daily-archive-live.ok { color: var(--state-success); }
 .daily-archive-live.warning { color: var(--flag-ink); }
 .daily-archive-live.error { color: var(--danger-ink); }
 .daily-archive-live[aria-busy="true"] { color: var(--c-fg-faint); }
@@ -2065,17 +2248,17 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 /* ---------- 弹窗 / Toast ---------- */
 .glass-dialog {
-  background: var(--glass-bg);
+  background: var(--glass-bg-deep);
   backdrop-filter: blur(28px) saturate(140%);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 40px 120px -30px rgba(0,0,0,.5);
+  box-shadow: var(--shadow-lg);
   color: var(--c-fg); padding: var(--sp-7); width: 30rem; max-width: 92vw;
   max-height: min(92vh, 45rem); overflow: auto;
 }
 [data-theme="light"] .glass-dialog { background: linear-gradient(168deg, rgba(255,255,255,.97), rgba(252,250,244,.95)); }
 [data-theme="dark"] .glass-dialog { background: linear-gradient(165deg, rgba(20,28,58,.94), rgba(10,16,38,.96)); }
-.glass-dialog[open] { animation: dialog-in var(--dur-slow) var(--ease-out); }
+.glass-dialog[open] { animation: dialog-in var(--dur-glide) var(--spring-medium); }
 @keyframes dialog-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
 .glass-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(4px); }
 .glass-dialog h3 { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 800; letter-spacing: .06em; margin-bottom: var(--sp-5); }
@@ -2095,7 +2278,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   color: var(--accent-ink); backdrop-filter: blur(14px) saturate(150%); font-weight: 700;
   opacity: 0; pointer-events: none; z-index: 200; max-width: min(92vw, 35rem);
   box-shadow: var(--glass-shadow-lift);
-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-spring);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--spring-medium);
 }
 [data-theme="light"] .toast { background: rgba(255,255,255,.95); }
 [data-theme="dark"] .toast { background: rgba(14,20,44,.92); }
@@ -2111,13 +2294,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   background: var(--glass-bg); backdrop-filter: blur(14px) saturate(150%);
   box-shadow: var(--glass-shadow);
   opacity: 0; transform: translateY(12px) scale(.9); pointer-events: none;
-  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-spring),
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--spring-medium),
               color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .to-top svg { width: 1rem; height: 1rem; }
 .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent-line); transform: translateY(-2px); }
-.to-top:active { transform: scale(.92); }
+.to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
 
 /* ---------- 滚动条 ---------- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -2172,3 +2355,67 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   .storage-heading { align-items: flex-start; }
   .storage-policy-badge { display: none; }
 }
+
+/* ---------- 响应式补全（阶段 2：交互增强与响应式补全） ----------
+   只增不改：以下均为新增窄容器场景适配，不触碰上方任何锁定规则；
+   断点延续内容驱动的 rem 容器查询，不引入 px 媒体断点 */
+
+/* 信息流自动预取的哨兵：只占一丝高度，作为 IntersectionObserver 的观察点 */
+.feed-sentinel { height: 1px; }
+
+/* 中间宽度：设置页已降为两栏，卡内三栏固定轨的存储统计会溢出，先一步降栏；
+   词库面板收窄内边距并压低可视高度，内部滚动由 .lexicon-body 既有规则接管；
+   日报头部提前收紧间距，给换行留余地 */
+@container app (max-width: 53.75rem) {
+  .maintenance-stats { grid-template-columns: 1fr 1fr; }
+  .storage-total { grid-column: 1 / -1; }
+  .lexicon-panel { padding: var(--sp-3); max-height: min(30rem, calc(100vh - 6rem)); }
+  .lexicon-body { gap: var(--sp-3); }
+  .daily-head { gap: var(--sp-3); padding: var(--sp-4); }
+}
+
+/* 800×600 与 xl 档：弹窗层内边距与字号层次收敛，标题降一档、字段间距压紧，
+   保证 45rem 高以内完整可见；日报标题独占一行，动作组整行居中 */
+@container app (max-width: 45rem) {
+  .glass-dialog { padding: var(--sp-5); width: min(26rem, 92vw); }
+  .glass-dialog h3 { font-size: var(--t-lg); margin-bottom: var(--sp-4); }
+  .glass-dialog .field { margin-bottom: var(--sp-2); }
+  .confirm-dialog { width: min(22rem, 92vw); }
+  .confirm-message { font-size: var(--t-sm); margin-bottom: var(--sp-4); }
+  .daily-title { flex-basis: 100%; order: -1; }
+  .daily-actions { width: 100%; justify-content: center; }
+}
+
+/* ---------- 液态玻璃阶段 3：主题切换平滑过渡 ----------
+   applyTheme 写 data-theme 前给 body 挂临时 theme-transition 类，
+   结束后移除（约 320ms 后由 app.js 定时器摘下）。只过渡三个颜色族
+   属性，避免常驻全表 transition 拖累滚动； reduced 偏好由上方既有
+   全局 1ms 兜底覆盖，且 app.js 在 reduced 偏好下不挂此类 */
+body.theme-transition,
+body.theme-transition *,
+body.theme-transition *::before,
+body.theme-transition *::after {
+  transition: color 260ms var(--ease), background-color 260ms var(--ease), border-color 260ms var(--ease) !important;
+}
+
+/* ---------- 液态玻璃阶段 3：fx-tier 运行时档位覆盖 ----------
+   app.js 启动时即席推导档位写入 <html data-fx-tier>（full / lite /
+   static，不持久化、不进偏好 schema）。覆盖块只改既有令牌的值：
+   玻璃模糊强度令牌 --glass-blur 与时长令牌 --dur-glide，不新增
+   任何滤镜声明点（消费处仍读同一个令牌），也不新增循环动画。
+   lite：低内存/少核心设备降模糊与饱和、缩短光斑缓过渡，并关停两枚
+   液态光斑的持续动画（与 static 同口径，仅 full 档保留）；
+   static：reduced 偏好或极低配设备，玻璃滤镜令牌置 none，
+   氛围层光斑动画关停（与既有 reduced 媒体查询双保险） */
+[data-fx-tier="lite"] {
+  --glass-blur: blur(8px) saturate(110%);
+  --dur-glide: 320ms;
+}
+[data-fx-tier="lite"] .blob { animation: none; }
+[data-fx-tier="static"] {
+  --glass-blur: none;
+}
+[data-fx-tier="static"] .aurora,
+[data-fx-tier="static"] .stars,
+[data-fx-tier="static"] .comet,
+[data-fx-tier="static"] .blob { animation: none; }

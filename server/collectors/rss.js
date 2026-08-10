@@ -26,7 +26,7 @@ function resolveUrl(url, settings) {
 
 async function fetch(source, settings) {
   const xml = await fetchText(resolveUrl(source.url, settings), settings);
-  const feed = await parser.parseString(xml);
+  const feed = await parser.parseString(sanitizeXml(xml));
   return (feed.items || []).map(it => ({
     title: cleanText(it.title),
     url: normalizeUrl(it.link),
@@ -34,6 +34,15 @@ async function fetch(source, settings) {
     publishedAt: toIso(it.isoDate || it.pubDate),
     image: extractImage(it)
   }));
+}
+
+// 部分媒体 feed 会把标题里的 R&D 等裸 & 直接写进 XML，导致整个信源
+// 无法解析。只转义不构成合法 XML 实体的 &，保留已有命名/数字实体。
+function sanitizeXml(xml) {
+  return String(xml || '').replace(
+    /&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[\da-f]+;)/gi,
+    '&amp;'
+  );
 }
 
 // 依次尝试：media:content / media:thumbnail / enclosure / 正文首个 <img>
@@ -84,4 +93,4 @@ function normalizeUrl(link) {
   } catch { return link; }
 }
 
-module.exports = { fetch };
+module.exports = { fetch, sanitizeXml };

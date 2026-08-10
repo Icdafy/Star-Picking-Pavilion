@@ -72,3 +72,37 @@ test('daily archive status and long native paths adapt without horizontal overfl
   );
   assert.match(css, /\.daily-archive-actions\s*\{[^}]*flex-wrap:\s*wrap;/s);
 });
+
+// 阶段 2 响应式补全：词库面板、弹窗层、日报头部、存储治理在窄容器下的适配，
+// 均为新增 @container app 规则，不改动上方锁定行
+test('阶段 2：词库面板、弹窗层、日报头部与存储治理在窄容器下收敛', () => {
+  assert.ok(css.includes('.feed-sentinel'), '缺少哨兵元素样式');
+  // 词库面板收窄内边距并压低可视高度，内部滚动仍由 .lexicon-body 接管
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.lexicon-panel\s*\{[^}]*max-height:/s
+  );
+  // 存储治理统计在中间宽度先一步降栏，不等 45rem
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.maintenance-stats\s*\{[^}]*grid-template-columns:\s*1fr 1fr;/s
+  );
+  // 800×600 与 xl 档：弹窗层内边距与字号层次收敛（rem-only，不引入 px 字号）
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.glass-dialog\s*\{[^}]*padding:\s*var\(--sp-5\);/s
+  );
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.glass-dialog h3\s*\{[^}]*font-size:\s*var\(--t-lg\);/s
+  );
+  // 日报头部：标题独占一行，动作组整行居中
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-title\s*\{[^}]*flex-basis:\s*100%;/s
+  );
+  assert.match(
+    css,
+    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-actions\s*\{[^}]*width:\s*100%;/s
+  );
+});

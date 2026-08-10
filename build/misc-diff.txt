@@ -1,0 +1,340 @@
+﻿diff --git a/renderer/dom-utils.js b/renderer/dom-utils.js
+index af075ec..eaa9bf9 100644
+--- a/renderer/dom-utils.js
++++ b/renderer/dom-utils.js
+@@ -52,10 +52,150 @@
+     return true;
+   }
+ 
++  // ---------- 娑叉€佺幓鐠冮樁娈?3锛氬井鍨嬭繍鍔ㄥ紩鎿庯紙WAAPI锛?----------
++  // 鍙仛 transform/opacity 鐨勫悎鎴愬眰鍔ㄧ敾锛歴pring 鏇茬嚎棰勭儤鐒欐垚灏戦噺 offset
++  // 閲囨牱甯т氦缁?el.animate()锛屼笉鍋氳繍琛屾椂姹傝В銆俽educed 鍋忓ソ鎴?static 妗ｄ綅
++  // 鐩存帴钀界粓鎬佷笉鎾姩鐢伙紱el.animate 缂哄腑鍚屾牱浼橀泤闄嶇骇涓虹粓鎬併€俤ocument /
++  // matchMedia / rAF 涓€寰嬬粡 deps 娉ㄥ叆锛屽伐鍘備綋鍐呬笉瑁歌鍏ㄥ眬銆?+  const MOTION_STIFFNESS = Object.freeze({
++    light: Object.freeze({ duration: 240 }),
++    medium: Object.freeze({ duration: 320 }),
++    heavy: Object.freeze({ duration: 440 })
++  });
++  const SPRING_SAMPLES = 10;    // 閲囨牱甯ф暟锛堝惈棣栧熬鍏?11 甯э紝钀藉湪 8-12 棰勭畻鍐咃級
++  const STAGGER_LIMIT = 8;      // 閿欏嘲鍏ュ満涓婇檺锛氬彧浣滅敤浜庢湰娆℃柊澧炵殑鍓?N 涓妭鐐?+  const SPRING_EASING = 'cubic-bezier(.34, 1.56, .5, 1)';
++
++  // 闃诲凹鎸崱閲囨牱锛? 鈫?绾?+9% 杩囧啿 鈫?鍥炴憜鏀舵暃浜?1锛坱=1 寮哄埗钀藉畾锛?+  function springProgress(t) {
++    if (t >= 1) return 1;
++    return 1 - Math.exp(-6 * t) * Math.cos(8 * t);
++  }
++
++  function createMotion(deps = {}) {
++    const { document: doc = null, matchMedia = null, raf = null } = deps || {};
++
++    function prefersReducedMotion() {
++      try {
++        return typeof matchMedia === 'function'
++          && Boolean(matchMedia('(prefers-reduced-motion: reduce)')?.matches);
++      } catch {
++        return false;
++      }
++    }
++    function fxTier() {
++      try {
++        return doc?.documentElement?.dataset?.fxTier || '';
++      } catch {
++        return '';
++      }
++    }
++    // reduced 鍋忓ソ涓?static 妗ｉ兘璺宠繃鍔ㄧ敾锛岀洿鎺ヨ惤缁堟€?+    function shouldSkip() {
++      return prefersReducedMotion() || fxTier() === 'static';
++    }
++
++    function settle(el, endStyle) {
++      if (!el?.style || !endStyle) return;
++      for (const [name, value] of Object.entries(endStyle)) {
++        try { el.style[name] = value; } catch { /* 鍔ㄧ敾鏄寮哄眰锛屽啓鏍峰紡澶辫触涓嶅奖鍝嶅唴瀹?*/ }
++      }
++    }
++
++    function lastFrameStyle(keyframes) {
++      if (!Array.isArray(keyframes) || !keyframes.length) return null;
++      const last = keyframes[keyframes.length - 1] || {};
++      const style = {};
++      if ('transform' in last) style.transform = last.transform;
++      if ('opacity' in last) style.opacity = last.opacity;
++      return Object.keys(style).length ? style : null;
++    }
++
++    // spring(el, { keyframes | from/to, duration, stiffness, delay })
++    // 浼樺厛 el.animate()锛氶鐑樼剻甯ц蛋 linear锛屽弻甯ц蛋寮圭哀 bezier锛涘厛鎶婄粓鎬佸啓鎴?+    // inline锛屽姩鐢荤粨鏉熻嚜鐒惰惤瀹氾紝鏃犻渶 fill 缁存寔锛屼篃涓嶇暀 fill 閿佷綇鍚堟垚灞?+    function spring(el, { keyframes, from, to, duration, stiffness = 'medium', delay = 0 } = {}) {
++      if (!el) return null;
++      const preset = MOTION_STIFFNESS[stiffness] || MOTION_STIFFNESS.medium;
++      const total = Number(duration) > 0 ? Number(duration) : preset.duration;
++      const endStyle = to || lastFrameStyle(keyframes);
++      if (shouldSkip() || typeof el.animate !== 'function') {
++        settle(el, endStyle);
++        return null;
++      }
++      const preBaked = Array.isArray(keyframes) && keyframes.length >= 2;
++      const frames = preBaked ? keyframes : [from || {}, endStyle || {}];
++      try {
++        settle(el, endStyle);
++        const animation = el.animate(frames, {
++          duration: total,
++          delay: Number(delay) > 0 ? Number(delay) : 0,
++          easing: preBaked ? 'linear' : SPRING_EASING
++        });
++        // 缁撴潫鍚庣粡娉ㄥ叆鐨?rAF 寤惰繜鍙栨秷鍔ㄧ敾瀵硅薄锛岄噴鏀惧悎鎴愬眰璧勬簮锛?+        // 缁堟€佸凡钀藉湪 inline style锛屽彇娑堜笉浜х敓瑙嗚璺冲彉
++        if (animation && typeof animation.finished?.then === 'function' && typeof raf === 'function') {
++          animation.finished
++            .then(() => raf(() => { try { animation.cancel(); } catch {} }))
++            .catch(() => {});
++        }
++        return animation;
++      } catch {
++        return null;
++      }
++    }
++
++    // 棰勭儤鐒?fadeSlideIn 閲囨牱甯э細translateY(distance)鈫? + opacity 0鈫?
++    function fadeSlideFrames(distance) {
++      const frames = [];
++      for (let i = 0; i <= SPRING_SAMPLES; i += 1) {
++        const t = i / SPRING_SAMPLES;
++        const progress = springProgress(t);
++        frames.push({
++          offset: Number(t.toFixed(3)),
++          transform: `translateY(${((1 - progress) * distance).toFixed(2)}px)`,
++          opacity: String(Math.max(0, Math.min(1, progress)))
++        });
++      }
++      return frames;
++    }
++
++    function fadeSlideIn(el, opts = {}) {
++      const distance = Number(opts.distance) > 0 ? Number(opts.distance) : 10;
++      return spring(el, {
++        keyframes: fadeSlideFrames(distance),
++        to: { transform: 'translateY(0)', opacity: '1' },
++        duration: opts.duration,
++        stiffness: opts.stiffness || 'medium',
++        delay: opts.delay
++      });
++    }
++
++    // 閿欏嘲鍏ュ満锛氬彧浣滅敤浜庡垪琛ㄥ墠 STAGGER_LIMIT 涓妭鐐癸紙涓婇檺鎴柇锛夛紝
++    // 杩斿洖瀹為檯鍙備笌鍔ㄧ敾鐨勮妭鐐规暟
++    function staggerIn(els, opts = {}) {
++      const nodes = (Array.isArray(els) ? els : Array.from(els || [])).filter(Boolean);
++      const limited = nodes.slice(0, STAGGER_LIMIT);
++      const step = Number(opts.step) > 0 ? Number(opts.step) : 45;
++      const baseDelay = Number(opts.delay) > 0 ? Number(opts.delay) : 0;
++      limited.forEach((el, index) => fadeSlideIn(el, { ...opts, delay: baseDelay + index * step }));
++      return limited.length;
++    }
++
++    return Object.freeze({
++      spring,
++      fadeSlideIn,
++      staggerIn,
++      STAGGER_LIMIT,
++      MOTION_STIFFNESS
++    });
++  }
++
+   return Object.freeze({
+     escapeHTML,
+     safeHttpUrl,
+     findFocusKey,
+-    restoreFocusByKey
++    restoreFocusByKey,
++    createMotion
+   });
+ });
+diff --git a/test/dom-utils.test.js b/test/dom-utils.test.js
+index 5fb2b79..3b70f73 100644
+--- a/test/dom-utils.test.js
++++ b/test/dom-utils.test.js
+@@ -7,7 +7,8 @@ const {
+   escapeHTML,
+   safeHttpUrl,
+   findFocusKey,
+-  restoreFocusByKey
++  restoreFocusByKey,
++  createMotion
+ } = require('../renderer/dom-utils');
+ 
+ test('CommonJS loading exports the API without creating a global DomUtils property', () => {
+@@ -97,3 +98,113 @@ test('restoreFocusByKey focuses a stable fallback when the keyed control disappe
+   assert.deepEqual(fallbackOptions, { preventScroll: true });
+   assert.equal(restoreFocusByKey(root, null), false);
+ });
++
++// ---------- 娑叉€佺幓鐠冮樁娈?3锛氬井鍨嬭繍鍔ㄥ紩鎿庯紙WAAPI锛?----------
++// 娉ㄥ叆 mock 鐨?matchMedia/document/rAF 椹卞姩锛氶鐑樼剻甯т笌缁堟€併€?+// reduced 鍋忓ソ涓?static 妗ｈ烦杩囥€侀敊宄颁笂闄愭埅鏂兘鍦ㄥ亣 DOM 涓婃柇瑷€
++
++function makeAnimatableElement() {
++  const element = {
++    style: {},
++    animations: [],
++    animate(keyframes, options) {
++      element.animations.push({ keyframes, options });
++      return { cancel() {}, finished: Promise.resolve() };
++    }
++  };
++  return element;
++}
++const noReduced = () => ({ matches: false });
++
++test('createMotion 瀵煎嚭鍐荤粨涓斾緷璧栧叏閮ㄧ粡娉ㄥ叆锛堢己澶变笉鎶涖€侀潤榛橀檷绾э級', () => {
++  const motion = createMotion({});
++  assert.equal(Object.isFrozen(motion), true);
++  assert.equal(typeof motion.spring, 'function');
++  assert.equal(typeof motion.fadeSlideIn, 'function');
++  assert.equal(typeof motion.staggerIn, 'function');
++  // 鏃?el.animate 鐨勫厓绱犵洿鎺ヨ惤缁堟€侊紝涓嶆姏寮傚父
++  const bare = { style: {} };
++  assert.equal(motion.fadeSlideIn(bare), null);
++  assert.equal(bare.style.transform, 'translateY(0)');
++  assert.equal(bare.style.opacity, '1');
++});
++
++test('spring 缁忔敞鍏ョ殑 el.animate 鎾鐑樼剻閲囨牱甯э紝鍙秹鍙?transform/opacity', () => {
++  const motion = createMotion({ matchMedia: noReduced });
++  const el = makeAnimatableElement();
++  motion.fadeSlideIn(el, { duration: 260 });
++  assert.equal(el.animations.length, 1);
++  const { keyframes, options } = el.animations[0];
++  assert.ok(keyframes.length >= 8 && keyframes.length <= 12, '閲囨牱甯ф暟钀藉湪 8-12');
++  for (const frame of keyframes) {
++    assert.ok('transform' in frame && 'opacity' in frame);
++    assert.match(frame.transform, /^translateY\(/);
++  }
++  assert.equal(keyframes[0].opacity, '0');
++  assert.equal(keyframes[keyframes.length - 1].opacity, '1');
++  assert.equal(options.duration, 260);
++  assert.equal(options.easing, 'linear', '棰勭儤鐒欏抚璧?linear锛屽脊鎬у湪閲囨牱閲?);
++  // 缁堟€佸厛钀?inline锛屽姩鐢荤粨鏉熻嚜鐒惰惤瀹氾紝涓嶉潬 fill 缁存寔
++  assert.equal(el.style.transform, 'translateY(0)');
++  assert.equal(el.style.opacity, '1');
++});
++
++test('spring 鍙屽抚妯″紡锛坒rom/to锛夎蛋寮圭哀 bezier锛宻tiffness 棰勮鍐冲畾鏃堕暱', () => {
++  const motion = createMotion({ matchMedia: noReduced });
++  const el = makeAnimatableElement();
++  motion.spring(el, { from: { opacity: '0' }, to: { opacity: '1' }, stiffness: 'heavy' });
++  const { keyframes, options } = el.animations[0];
++  assert.equal(keyframes.length, 2);
++  assert.match(options.easing, /cubic-bezier/);
++  assert.equal(options.duration, motion.MOTION_STIFFNESS.heavy.duration);
++});
++
++test('reduced-motion 鍋忓ソ涓嬭烦鍔ㄧ敾鐩存帴钀界粓鎬侊紝涓嶈皟 el.animate', () => {
++  const motion = createMotion({ matchMedia: query => ({ matches: query.includes('reduce') }) });
++  const el = makeAnimatableElement();
++  assert.equal(motion.fadeSlideIn(el), null);
++  assert.equal(el.animations.length, 0);
++  assert.equal(el.style.transform, 'translateY(0)');
++  assert.equal(el.style.opacity, '1');
++});
++
++test('fx-tier 涓?static 鏃跺悓鏍疯烦鍔ㄧ敾锛堢粡娉ㄥ叆鐨?document 璇绘。浣嶏級', () => {
++  const motion = createMotion({
++    matchMedia: noReduced,
++    document: { documentElement: { dataset: { fxTier: 'static' } } }
++  });
++  const el = makeAnimatableElement();
++  assert.equal(motion.spring(el, { from: {}, to: { opacity: '1' } }), null);
++  assert.equal(el.animations.length, 0);
++  // lite/full 妗ｇ収甯告挱
++  const fullMotion = createMotion({
++    matchMedia: noReduced,
++    document: { documentElement: { dataset: { fxTier: 'full' } } }
++  });
++  const fullEl = makeAnimatableElement();
++  fullMotion.fadeSlideIn(fullEl);
++  assert.equal(fullEl.animations.length, 1);
++});
++
++test('staggerIn 瓒呰繃涓婇檺鐨勮妭鐐硅鎴柇锛宒elay 閫愪釜閫掑', () => {
++  const motion = createMotion({ matchMedia: noReduced });
++  const elements = Array.from({ length: 12 }, makeAnimatableElement);
++  const animated = motion.staggerIn(elements, { step: 40 });
++  assert.equal(animated, motion.STAGGER_LIMIT);
++  assert.equal(motion.STAGGER_LIMIT, 8);
++  elements.slice(0, 8).forEach(el => assert.equal(el.animations.length, 1));
++  elements.slice(8).forEach(el => assert.equal(el.animations.length, 0));
++  const delays = elements.slice(0, 8).map(el => el.animations[0].options.delay);
++  assert.deepEqual(delays, [0, 40, 80, 120, 160, 200, 240, 280]);
++});
++
++test('鍔ㄧ敾缁撴潫鍚庣粡娉ㄥ叆鐨?rAF 娓呯悊鍔ㄧ敾瀵硅薄锛屽け璐ヤ笉褰卞搷缁堟€?, async () => {
++  const rafQueue = [];
++  const motion = createMotion({ matchMedia: noReduced, raf: fn => rafQueue.push(fn) });
++  const el = makeAnimatableElement();
++  motion.fadeSlideIn(el);
++  await Promise.resolve();           // 绛?finished promise 寰换鍔?+  assert.equal(rafQueue.length, 1);
++  rafQueue[0]();                     // 娓呯悊涓嶆姏寮傚父鍗抽€氳繃
++  assert.equal(el.style.transform, 'translateY(0)', '缁堟€佸湪 inline 涓嶅彈鍙栨秷褰卞搷');
++});
+diff --git a/test/responsive-layout.test.js b/test/responsive-layout.test.js
+index 364be17..3e0a072 100644
+--- a/test/responsive-layout.test.js
++++ b/test/responsive-layout.test.js
+@@ -72,3 +72,37 @@ test('daily archive status and long native paths adapt without horizontal overfl
+   );
+   assert.match(css, /\.daily-archive-actions\s*\{[^}]*flex-wrap:\s*wrap;/s);
+ });
++
++// 闃舵 2 鍝嶅簲寮忚ˉ鍏細璇嶅簱闈㈡澘銆佸脊绐楀眰銆佹棩鎶ュご閮ㄣ€佸瓨鍌ㄦ不鐞嗗湪绐勫鍣ㄤ笅鐨勯€傞厤锛?+// 鍧囦负鏂板 @container app 瑙勫垯锛屼笉鏀瑰姩涓婃柟閿佸畾琛?+test('闃舵 2锛氳瘝搴撻潰鏉裤€佸脊绐楀眰銆佹棩鎶ュご閮ㄤ笌瀛樺偍娌荤悊鍦ㄧ獎瀹瑰櫒涓嬫敹鏁?, () => {
++  assert.ok(css.includes('.feed-sentinel'), '缂哄皯鍝ㄥ叺鍏冪礌鏍峰紡');
++  // 璇嶅簱闈㈡澘鏀剁獎鍐呰竟璺濆苟鍘嬩綆鍙楂樺害锛屽唴閮ㄦ粴鍔ㄤ粛鐢?.lexicon-body 鎺ョ
++  assert.match(
++    css,
++    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.lexicon-panel\s*\{[^}]*max-height:/s
++  );
++  // 瀛樺偍娌荤悊缁熻鍦ㄤ腑闂村搴﹀厛涓€姝ラ檷鏍忥紝涓嶇瓑 45rem
++  assert.match(
++    css,
++    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.maintenance-stats\s*\{[^}]*grid-template-columns:\s*1fr 1fr;/s
++  );
++  // 800脳600 涓?xl 妗ｏ細寮圭獥灞傚唴杈硅窛涓庡瓧鍙峰眰娆℃敹鏁涳紙rem-only锛屼笉寮曞叆 px 瀛楀彿锛?+  assert.match(
++    css,
++    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.glass-dialog\s*\{[^}]*padding:\s*var\(--sp-5\);/s
++  );
++  assert.match(
++    css,
++    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.glass-dialog h3\s*\{[^}]*font-size:\s*var\(--t-lg\);/s
++  );
++  // 鏃ユ姤澶撮儴锛氭爣棰樼嫭鍗犱竴琛岋紝鍔ㄤ綔缁勬暣琛屽眳涓?+  assert.match(
++    css,
++    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-title\s*\{[^}]*flex-basis:\s*100%;/s
++  );
++  assert.match(
++    css,
++    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-actions\s*\{[^}]*width:\s*100%;/s
++  );
++});
+diff --git a/test/typography.test.js b/test/typography.test.js
+index 7324e38..c1d9486 100644
+--- a/test/typography.test.js
++++ b/test/typography.test.js
+@@ -10,6 +10,9 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+ const css = read('renderer/styles.css');
+ const html = read('renderer/index.html');
+ const app = read('renderer/app.js');
++// 闃舵 3 鎵?2锛欳trl 缂╂斁蹇嵎閿殢閿洏蹇嵎閿縼鍒?renderer/shortcuts.js锛?+// 鐩稿叧瀛楅潰鏂█鍚屾壒鏀规寚鏂版ā鍧楁簮鐮?+const shortcutsSource = read('renderer/shortcuts.js');
+ const fontDir = path.join(root, 'renderer', 'fonts', 'source-han-sans-sc');
+ const fontCss = read('renderer/fonts/source-han-sans-sc/index.css');
+ 
+@@ -209,11 +212,12 @@ test('鍓嶇鎶婃。浣嶈惤鍒?data-ui-scale 骞舵寔涔呭寲锛屽揩鎹烽敭涓庤缃〉
+   assert.match(app, /preferenceActions\.remember\('textScale', scale\)/);
+   // 缂╂斁鏀瑰彉瀵艰埅鏉￠珮搴︿笌鏍囩浣嶇疆锛岀矘椤跺亸绉诲繀椤昏窡鐫€閲嶇畻
+   assert.match(app, /function applyTextScale[\s\S]{0,600}?syncNavHeight\(\);\s*\n\s*syncTabIndicator\(\);/);
+-  // Ctrl +/-/0 蹇呴』鎺掑湪銆屾槸鍚︽鍦ㄨ緭鍏ャ€嶅垽瀹氫箣鍓嶏紝杈撳叆妗嗛噷涔熻鑳界敤
+-  const zoomIndex = app.indexOf("if (event.key === '=' || event.key === '+')");
+-  const typingIndex = app.indexOf('if (isTypingTarget(document.activeElement)) return;');
++  // Ctrl +/-/0 蹇呴』鎺掑湪銆屾槸鍚︽鍦ㄨ緭鍏ャ€嶅垽瀹氫箣鍓嶏紝杈撳叆妗嗛噷涔熻兘鐢?+  // 鎵?2锛氬揩鎹烽敭娈佃縼鍒?renderer/shortcuts.js锛岄『搴忔柇瑷€鏀规寚鏂版ā鍧?+  const zoomIndex = shortcutsSource.indexOf("if (event.key === '=' || event.key === '+')");
++  const typingIndex = shortcutsSource.indexOf('if (isTypingTarget(document.activeElement)) return;');
+   assert.ok(zoomIndex >= 0 && zoomIndex < typingIndex);
+-  assert.match(app, /applyTextScale\('md'\)/);
++  assert.match(shortcutsSource, /applyTextScale\('md'\)/);
+   assert.match(app, /applyTextScale\(state\.textScale, \{ persist: false \}\)/);
+ 
+   assert.match(html, /id="textScaleOptions"/);

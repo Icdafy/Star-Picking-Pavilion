@@ -1,0 +1,14 @@
+﻿ .gitignore                        |    3 +
+ config/sources.default.json       |    1 -
+ package-lock.json                 |    1 -
+ package.json                      |    1 -
+ renderer/app.js                   | 1776 +++++++------------------------------
+ renderer/dom-utils.js             |  142 ++-
+ renderer/index.html               |   67 ++
+ renderer/styles.css               |  425 +++++++--
+ test/dependency-policy.test.js    |    1 -
+ test/dom-utils.test.js            |  113 ++-
+ test/renderer-integration.test.js |  523 ++++++++---
+ test/responsive-layout.test.js    |   34 +
+ test/typography.test.js           |   12 +-
+ 13 files changed, 1378 insertions(+), 1721 deletions(-)
