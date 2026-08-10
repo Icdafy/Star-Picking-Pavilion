@@ -96,7 +96,7 @@ iconv-lite@0.7.3
 License: MIT
 Source: https://github.com/pillarjs/iconv-lite.git
 
-js-yaml@4.3.0
+js-yaml@4.3.1
 License: MIT
 Source: nodeca/js-yaml
 
