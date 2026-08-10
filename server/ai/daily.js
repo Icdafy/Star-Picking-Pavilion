@@ -5,13 +5,29 @@ const { db, now } = require('../db');
 const { localDateString } = require('../date-time');
 const { loadScoring } = require('../config');
 const { buildDailyBundle } = require('../archive/daily-bundle');
+const { HttpError } = require('../http-security');
 
 const PER_SECTION = 8;
 
-function generateDaily(dateStr) {
-  // dateStr: YYYY-MM-DD（日报覆盖该日期 8:00 往前 24 小时；默认今天）。
+function isValidReport(report, date) {
+  return Boolean(report && report.date === date && report.windowVersion === 3
+    && Number.isFinite(report.total) && report.byDomain && Array.isArray(report.sections));
+}
+
+function tryReadReport(date) {
+  const row = db.prepare('SELECT content_json FROM daily_reports WHERE date=?').get(date);
+  if (!row) return null;
+  try {
+    const report = JSON.parse(row.content_json);
+    if (isValidReport(report, date)) return report;
+  } catch {}
+  // 行存在但内容解析/校验失败：返回标记让调用方知道原行已损坏，但绝不动原行
+  return { corrupt: true };
+}
+
+function buildDailyContent(date) {
+  // 日报覆盖该日期 8:00 往前 24 小时。
   // v3 以 fetched_at 归档，每条入库记录只属于一个窗口，迟到新闻不会永久漏失。
-  const date = dateStr || localDateString();
   const bundle = buildDailyBundle({
     database: db,
     date,
@@ -23,10 +39,11 @@ function generateDaily(dateStr) {
   }));
   const featuredItems = sections.flatMap(section => section.items);
 
-  const content = {
+  return {
     date,
     windowVersion: 3,
     window: bundle.window,
+    truncated: bundle.truncated,
     generatedAt: now(),
     total: featuredItems.length,
     totalCollected: bundle.summary.total,
@@ -41,7 +58,25 @@ function generateDaily(dateStr) {
     },
     sections
   };
+}
 
+function generateDaily(dateStr, { overwrite = false } = {}) {
+  // dateStr: YYYY-MM-DD（默认今天）
+  const date = dateStr || localDateString();
+  if (date > localDateString()) {
+    throw new HttpError(400, '日报日期不能晚于今天');
+  }
+  const existing = tryReadReport(date);
+  if (existing && !existing.corrupt && !overwrite) {
+    // 已有有效日报：默认不重生成，直接返回现有行
+    return existing;
+  }
+  const content = buildDailyContent(date);
+  if (existing && existing.corrupt && !overwrite) {
+    // 原行损坏但调用方没显式要求覆写：保留原行留待取证，
+    // 只返回内存里的重建副本并携带警告标记
+    return { ...content, warning: 'daily-report-corrupt' };
+  }
   db.prepare(`INSERT INTO daily_reports (date, content_json, created_at) VALUES (?, ?, ?)
     ON CONFLICT(date) DO UPDATE SET content_json=excluded.content_json, created_at=excluded.created_at`)
     .run(date, JSON.stringify(content), now());
@@ -50,14 +85,7 @@ function generateDaily(dateStr) {
 
 function getDaily(dateStr) {
   const date = dateStr || localDateString();
-  const row = db.prepare('SELECT content_json FROM daily_reports WHERE date=?').get(date);
-  if (row) {
-    try {
-      const report = JSON.parse(row.content_json);
-      if (report && report.date === date && report.windowVersion === 3 && Number.isFinite(report.total)
-        && report.byDomain && Array.isArray(report.sections)) return report;
-    } catch {}
-  }
+  // 有效行直接返回；损坏行不会被覆写，重建副本带警告标记（见 generateDaily）
   return generateDaily(date);
 }
 

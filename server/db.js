@@ -11,15 +11,85 @@ const DATA_DIR = process.env.STAR_PICKING_PAVILION_DATA_DIR
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DATABASE_PATH = path.join(DATA_DIR, 'star-picking-pavilion.db');
-const db = new DatabaseSync(DATABASE_PATH);
-db.exec('PRAGMA foreign_keys = ON');
-db.exec('PRAGMA journal_mode = WAL');
 
-const integrity = db.prepare('PRAGMA quick_check').get();
-if (integrity.quick_check !== 'ok') {
-  db.close();
-  throw new Error(`数据库完整性检查失败: ${integrity.quick_check}`);
+const SQLITE_BUSY_PATTERN = /SQLITE_BUSY/;
+const SQLITE_CORRUPT_PATTERN = /SQLITE_CORRUPT|SQLITE_NOTADB|SQLITE_DAMAGED|database disk image is malformed|file is not a database|database table is corrupted/i;
+
+function openConnection() {
+  const database = new DatabaseSync(DATABASE_PATH);
+  try {
+    // 打开后第一件事就是设 busy_timeout：之后任何操作撞锁都会重试 5 秒再报错，
+    // 而不是立刻 SQLITE_BUSY（桌面端多进程共享同一个库文件是常态）
+    database.exec('PRAGMA busy_timeout = 5000');
+    database.exec('PRAGMA foreign_keys = ON');
+    // 断言 WAL 真正生效，否则并发写入会退回到排它锁，问题要能在日志里被看见
+    const mode = database.prepare('PRAGMA journal_mode = WAL').get();
+    if (String(mode?.journal_mode).toLowerCase() !== 'wal') {
+      console.warn(`[db] journal_mode 未能设置为 WAL（当前值: ${mode?.journal_mode}），并发写入能力会下降`);
+    }
+    return database;
+  } catch (error) {
+    // 初始 PRAGMA 阶段就会暴露「文件不是数据库」类损坏；失败必须先断开句柄，
+    // 否则 Windows 上文件被占用，后续的隔离重命名会跟着失败
+    try { database.close(); } catch {}
+    throw error;
+  }
 }
+
+// 损坏恢复第一步是把现场原样隔离（db/-wal/-shm 一起改名），留给事后取证，
+// 而不是直接抛错让启动陷入「损坏→启动失败→再启动还是损坏」的死循环
+function quarantineCorruptFiles() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const quarantined = [];
+  for (const suffix of ['', '-wal', '-shm']) {
+    const file = `${DATABASE_PATH}${suffix}`;
+    if (!fs.existsSync(file)) continue;
+    const target = `${file}.corrupt-${stamp}`;
+    try {
+      fs.renameSync(file, target);
+      quarantined.push(target);
+    } catch (error) {
+      console.error(`[db] 隔离损坏文件失败: ${file}`, error);
+    }
+  }
+  return quarantined;
+}
+
+function checkIntegrity(database) {
+  try {
+    const row = database.prepare('PRAGMA quick_check').get();
+    return row?.quick_check === 'ok' ? null : (row?.quick_check || 'unknown');
+  } catch (error) {
+    return String(error?.message || error);
+  }
+}
+
+let db;
+function initializeDatabase() {
+  try {
+    db = openConnection();
+  } catch (error) {
+    const message = String(error?.message || error);
+    // 「被锁」是可重试的环境问题，给出明确提示；「损坏」走隔离重建，两种失败不能混为一谈
+    if (SQLITE_BUSY_PATTERN.test(message)) {
+      throw new Error(`数据库被其它进程占用（SQLITE_BUSY），请关闭占用该文件的进程后重试: ${DATABASE_PATH}`);
+    }
+    if (!SQLITE_CORRUPT_PATTERN.test(message)) throw error;
+    console.error(`[db] 打开数据库失败，疑似文件损坏: ${message}；隔离现场并以空库重建`);
+    db = null;
+  }
+  if (db) {
+    const problem = checkIntegrity(db);
+    if (!problem) return;
+    console.error(`[db] 完整性检查未通过: ${problem}；隔离损坏文件并以空库重建`);
+    db.close(); // 重命名前必须先断开连接，否则 Windows 上文件句柄会让 rename 失败
+    db = null;
+  }
+  const quarantined = quarantineCorruptFiles();
+  console.error(`[db] 损坏文件已隔离至: ${quarantined.length ? quarantined.join(', ') : '(无可隔离文件)'}`);
+  db = openConnection();
+}
+initializeDatabase();
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS sources (
@@ -145,6 +215,20 @@ migrate();
 // ---------- 通用助手 ----------
 function now() { return new Date().toISOString(); }
 
+// articles 与 articles_fts 必须原子双写：任一失败整体回滚，
+// 否则主表行和全文影子行会永久错位（检索到不存在的条目，或条目永远搜不到）
+function withTransaction(action) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = action();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    try { db.exec('ROLLBACK'); } catch {}
+    throw error;
+  }
+}
+
 function insertArticle(a) {
   // url 上的唯一约束只能挡住「一字不差」的重复。真实世界里同一篇文章会带着不同的
   // utm/spm/share 参数从多个入口进来，规范化后的 canonical_url 才是可靠的去重键。
@@ -153,34 +237,42 @@ function insertArticle(a) {
     const existing = db.prepare('SELECT id FROM articles WHERE canonical_url = ? LIMIT 1').get(canonicalUrl);
     if (existing) return false;
   }
-  const stmt = db.prepare(`INSERT OR IGNORE INTO articles
-    (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
-    a.publishedAt || null, now(), a.domain || null, a.image || null,
-    Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0);
-  if (r.changes > 0) {
-    db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
-      .run(r.lastInsertRowid, a.title, a.summaryRaw || '');
-  }
-  return r.changes > 0;
+  return withTransaction(() => {
+    const stmt = db.prepare(`INSERT OR IGNORE INTO articles
+      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
+      a.publishedAt || null, now(), a.domain || null, a.image || null,
+      Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0);
+    if (r.changes > 0) {
+      db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
+        .run(r.lastInsertRowid, a.title, a.summaryRaw || '');
+    }
+    return r.changes > 0;
+  });
 }
 
 function updateArticleFts(id, title, summary) {
-  db.prepare('DELETE FROM articles_fts WHERE rowid = ?').run(id);
-  db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
-    .run(id, title, summary || '');
+  withTransaction(() => {
+    db.prepare('DELETE FROM articles_fts WHERE rowid = ?').run(id);
+    db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
+      .run(id, title, summary || '');
+  });
 }
 
-// 删除文章时必须同步删掉 FTS 影子行，否则 trigram 索引会越积越大且检索到已删条目
+// 删除文章时必须同步删掉 FTS 影子行，否则 trigram 索引会越积越大且检索到已删条目。
+// 集合式分批删除（每批不超过 SQLite 参数上限），每批一个事务，失败只回滚当批
+const DELETE_BATCH_SIZE = 900;
 function deleteArticles(ids) {
   if (!ids.length) return 0;
-  const removeFts = db.prepare('DELETE FROM articles_fts WHERE rowid = ?');
-  const removeArticle = db.prepare('DELETE FROM articles WHERE id = ?');
   let removed = 0;
-  for (const id of ids) {
-    removeFts.run(id);
-    removed += removeArticle.run(id).changes;
+  for (let start = 0; start < ids.length; start += DELETE_BATCH_SIZE) {
+    const batch = ids.slice(start, start + DELETE_BATCH_SIZE);
+    const placeholders = batch.map(() => '?').join(',');
+    removed += withTransaction(() => {
+      db.prepare(`DELETE FROM articles_fts WHERE rowid IN (${placeholders})`).run(...batch);
+      return db.prepare(`DELETE FROM articles WHERE id IN (${placeholders})`).run(...batch).changes;
+    });
   }
   return removed;
 }
@@ -190,7 +282,8 @@ function checkpointWal() {
   try {
     db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('[db] WAL checkpoint 失败:', error?.message || error);
     return false;
   }
 }
@@ -212,5 +305,6 @@ function closeDatabase() {
 
 module.exports = {
   db, now, insertArticle, updateArticleFts, deleteArticles,
-  checkpointWal, databaseFileBytes, closeDatabase, DATA_DIR, DATABASE_PATH
+  checkpointWal, databaseFileBytes, closeDatabase, withTransaction, DATA_DIR, DATABASE_PATH,
+  DELETE_BATCH_SIZE
 };

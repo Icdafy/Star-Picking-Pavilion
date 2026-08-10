@@ -20,7 +20,8 @@
     getDesktopStorage,
     clearDesktopCache,
     deleteLegacyData,
-    formatBytes
+    formatBytes,
+    prunePollIntervalMs = 1500
   } = {}) {
     if (!elements) throw new TypeError('elements are required');
     [
@@ -51,6 +52,9 @@
       eligibleLegacy: null,
       busy: new Set()
     };
+
+    // 后台清理轮询的总时长上限：大库清理可能很久，封顶后也要把按钮还给用户
+    const PRUNE_POLL_MAX_ATTEMPTS = 240;
 
     const asBytes = value => {
       const bytes = Number(value);
@@ -176,13 +180,52 @@
       }
     }
 
-    function prune() {
-      return run('prune', operations.pruneDatabase, result => {
-        if (result?.skipped) return '清理已在进行中，请稍候';
-        return result?.removedArticles
-          ? `✓ 已清理 ${result.removedArticles} 条`
-          : '✓ 没有需要清理的内容';
-      });
+    const isPruneRunning = snapshot => Boolean(
+      snapshot?.pruneRunning || snapshot?.scheduler?.pruneRunning
+    );
+
+    // 轮询维护快照直到后台清理结束：结束前刷新只能拿到清理前旧值
+    async function waitForPruneCompletion() {
+      for (let attempt = 0; attempt < PRUNE_POLL_MAX_ATTEMPTS; attempt += 1) {
+        await new Promise(resolve => { setTimeout(resolve, prunePollIntervalMs); });
+        let snapshot = null;
+        try { snapshot = await operations.requestDatabase(); } catch { continue; }
+        if (!isPruneRunning(snapshot)) return;
+      }
+    }
+
+    async function prune() {
+      if (state.busy.has('prune')) throw new Error('该维护操作正在进行中');
+      state.busy.add('prune');
+      setStatus('prune', '处理中…', '', true);
+      renderButtons();
+      try {
+        const result = await operations.pruneDatabase();
+        if (result?.started) {
+          // 202 异步契约：服务端后台执行，result 不再携带 skipped/removedArticles；
+          // 保持按钮忙态与轮询，清理结束后再刷新数字，避免闪回清理前旧值
+          setStatus('prune', '已开始清理，完成后自动刷新…', '', true);
+          await waitForPruneCompletion();
+          await load();
+          setStatus('prune', '✓ 清理完成', 'ok', false);
+          return result;
+        }
+        // 旧同步契约兼容：直接读清理结果
+        const feedback = result?.skipped
+          ? '清理已在进行中，请稍候'
+          : (result?.removedArticles
+            ? `✓ 已清理 ${result.removedArticles} 条`
+            : '✓ 没有需要清理的内容');
+        setStatus('prune', feedback, 'ok', false);
+        await load();
+        return result;
+      } catch (error) {
+        setStatus('prune', `✗ ${error.message}`, 'fail', false);
+        throw error;
+      } finally {
+        state.busy.delete('prune');
+        renderButtons();
+      }
     }
 
     function compact() {

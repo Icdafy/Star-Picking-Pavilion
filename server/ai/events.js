@@ -43,8 +43,15 @@ function classifyAction(text) {
   return null;
 }
 
+// L7 类型守卫：只接受字符串；数字经 Number.isFinite 校验后转字符串；
+// 其余类型（对象、布尔、null 等）一律返回空串，让事件在上层被丢弃，
+// 而不是 String(value) 出「[object Object]」这种垃圾键
 function shortField(value) {
-  const text = String(value ?? '').trim().replace(/\s+/g, ' ');
+  let text;
+  if (typeof value === 'string') text = value;
+  else if (typeof value === 'number' && Number.isFinite(value)) text = String(value);
+  else return '';
+  text = text.trim().replace(/\s+/g, ' ');
   return text ? [...text].slice(0, MAX_FIELD_LENGTH).join('') : '';
 }
 

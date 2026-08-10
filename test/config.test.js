@@ -15,8 +15,13 @@ const {
   SETTINGS_PATH,
   applySettingsPatch,
   loadSettings,
-  saveSettings
+  saveSettings,
+  loadScoring,
+  loadBreakthroughs
 } = require('../server/config');
+
+const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
+const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
 test.after(async () => {
   closeDatabase();
@@ -147,4 +152,54 @@ test('loading a malformed legacy settings file normalizes scheduler and request 
   assert.equal(loaded.collect.rsshubBase, '');
   assert.equal(Object.hasOwn(loaded, 'unknown'), false);
   assert.equal({}.polluted, undefined);
+});
+
+test('loadScoring 遇非法字段不抛异常，逐字段回落内置默认', async () => {
+  const originalScoring = await fs.promises.readFile(SCORING_PATH, 'utf8');
+  try {
+    await fs.promises.writeFile(SCORING_PATH, JSON.stringify({
+      dimensionWeights: { importance: 2.5, novelty: 0.18, credibility: 0.16, impact: 0.22, timeliness: 0.12 },
+      featuredThresholds: { default: 200 },
+      heatDecayHalfLifeHours: 1e9,
+      clusterWindowHours: '72; DROP TABLE items--',
+      tierMultiplier: { T1: 1.15, 'T1.5': 1.0, T2: 0.85 }
+    }), 'utf8');
+
+    const scoring = loadScoring();
+    // 权重 >1 → 整组回落内置默认
+    assert.deepEqual(scoring.dimensionWeights,
+      { importance: 0.32, novelty: 0.18, credibility: 0.16, impact: 0.22, timeliness: 0.12 });
+    // 阈值 200 越界 → 丢弃后 default 补 70
+    assert.equal(scoring.featuredThresholds.default, 70);
+    // halfLife 1e9 越界 → 回落 36
+    assert.equal(scoring.heatDecayHalfLifeHours, 36);
+    // SQL 载荷串解析不出数值 → 回落 72，且不得把载荷带进数值字段
+    assert.equal(scoring.clusterWindowHours, 72);
+    assert.ok(Number.isFinite(scoring.clusterWindowHours));
+  } finally {
+    await fs.promises.writeFile(SCORING_PATH, originalScoring, 'utf8');
+  }
+});
+
+test('loadScoring/loadBreakthroughs 解析失败时返回缓存或内置默认，永不抛异常', async () => {
+  const originalScoring = await fs.promises.readFile(SCORING_PATH, 'utf8');
+  const originalBreakthroughs = await fs.promises.readFile(BREAKTHROUGHS_PATH, 'utf8');
+  try {
+    // 先建立「最后一次成功加载」的缓存
+    const goodScoring = loadScoring();
+
+    await fs.promises.writeFile(SCORING_PATH, '{这不是合法 JSON', 'utf8');
+    const recoveredScoring = loadScoring();
+    assert.deepEqual(recoveredScoring.dimensionWeights, goodScoring.dimensionWeights);
+    assert.ok(recoveredScoring.breakthroughBoost, '回落缓存仍应携带突破加成配置');
+
+    await fs.promises.writeFile(BREAKTHROUGHS_PATH, 'not-json', 'utf8');
+    const breakthroughs = loadBreakthroughs();
+    assert.ok(breakthroughs && typeof breakthroughs === 'object');
+    assert.ok(Number.isFinite(Number(breakthroughs.maxBonus)));
+    assert.ok(Array.isArray(breakthroughs.eligibleCategories));
+  } finally {
+    await fs.promises.writeFile(SCORING_PATH, originalScoring, 'utf8');
+    await fs.promises.writeFile(BREAKTHROUGHS_PATH, originalBreakthroughs, 'utf8');
+  }
 });

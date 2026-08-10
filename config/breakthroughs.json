@@ -4,6 +4,7 @@
   "maxBonus": 10,
   "maxHalfLifeExtensionHours": 18,
   "minimumScores": {
+    "tier1Credibility": 40,
     "tier15Credibility": 70,
     "corroboratedCredibility": 60
   },
@@ -40,6 +41,24 @@
     "预计",
     "意向",
     "宣布将"
+  ],
+  "failureMarkers": [
+    "取消",
+    "推迟",
+    "延期",
+    "中止",
+    "终止",
+    "失利",
+    "失败",
+    "坠毁",
+    "爆炸",
+    "解体",
+    "未成功",
+    "未能成功",
+    "被迫终止",
+    "停飞",
+    "破产",
+    "夭折"
   ],
   "objects": {
     "lowaltitude": [

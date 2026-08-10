@@ -225,6 +225,69 @@ test('each maintenance action owns its busy and error state independently', asyn
   assert.equal(view.compactStatus.textContent, '✓ 已释放 4 KB');
 });
 
+test('async 202 prune keeps busy state and only refreshes numbers after the background run ends', async () => {
+  const view = elements();
+  let pruneRunning = true;
+  let articles = 1234;
+  let loadCount = 0;
+  const controller = createStorageMaintenanceController({
+    elements: view,
+    requestDatabase: async () => {
+      loadCount++;
+      return databaseSnapshot({ articles, pruneRunning, scheduler: { pruneRunning } });
+    },
+    pruneDatabase: async () => ({ ok: true, started: true }),
+    compactDatabase: async () => ({}),
+    getDesktopStorage: async () => desktopSnapshot(),
+    clearDesktopCache: async () => ({}),
+    deleteLegacyData: async () => ({}),
+    formatBytes,
+    prunePollIntervalMs: 5
+  });
+  await controller.load();
+
+  const pending = controller.prune();
+  // 后台清理未结束时：按钮保持禁用，状态保持忙态，数字仍是清理前旧值
+  await new Promise(resolve => { setTimeout(resolve, 10); });
+  assert.equal(view.pruneButton.disabled, true);
+  assert.equal(view.pruneStatus.attributes.get('aria-busy'), 'true');
+  assert.match(view.pruneStatus.textContent, /已开始清理/);
+  assert.equal(view.articles.textContent, '1,234');
+
+  // 后台清理结束：下一轮轮询感知后才刷新数字并解除忙态
+  pruneRunning = false;
+  articles = 1000;
+  const result = await pending;
+  assert.deepEqual(result, { ok: true, started: true });
+  assert.equal(view.pruneButton.disabled, false);
+  assert.equal(view.pruneStatus.attributes.get('aria-busy'), 'false');
+  assert.equal(view.pruneStatus.textContent, '✓ 清理完成');
+  assert.match(view.pruneStatus.className, /ok/);
+  assert.equal(view.articles.textContent, '1,000');
+  assert.ok(loadCount >= 3, '应至少轮询过一次快照并在结束后整体刷新');
+});
+
+test('async prune rejects when the trigger request fails and releases the busy state', async () => {
+  const view = elements();
+  const controller = createStorageMaintenanceController({
+    elements: view,
+    requestDatabase: async () => databaseSnapshot(),
+    pruneDatabase: async () => { throw new Error('prune trigger failed'); },
+    compactDatabase: async () => ({}),
+    getDesktopStorage: async () => desktopSnapshot(),
+    clearDesktopCache: async () => ({}),
+    deleteLegacyData: async () => ({}),
+    formatBytes,
+    prunePollIntervalMs: 5
+  });
+  await controller.load();
+
+  await assert.rejects(controller.prune(), /prune trigger failed/);
+  assert.equal(view.pruneButton.disabled, false);
+  assert.equal(view.pruneStatus.textContent, '✗ prune trigger failed');
+  assert.match(view.pruneStatus.className, /fail/);
+});
+
 test('busy checkpoints and partial cleanup results are reported without false success', async () => {
   const view = elements();
   let compactResult = { skipped: true, reason: 'busy' };

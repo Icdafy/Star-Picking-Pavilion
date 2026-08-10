@@ -103,7 +103,14 @@ function lexiconEntities(hits) {
 function modelEntities(raw) {
   const found = [];
   for (const item of Array.isArray(raw) ? raw : []) {
-    const canonical = canonicalizeName(typeof item === 'string' ? item : item?.n ?? item?.name);
+    const rawName = typeof item === 'string' ? item : item?.n ?? item?.name;
+    // L7 类型守卫：实体名只接受字符串（有限数字转字符串），
+    // 其余类型直接丢弃，不让脏类型流进规范化与聚类通道
+    let name;
+    if (typeof rawName === 'string') name = rawName;
+    else if (typeof rawName === 'number' && Number.isFinite(rawName)) name = String(rawName);
+    else continue;
+    const canonical = canonicalizeName(name);
     if (!canonical) continue;
     const declared = String((typeof item === 'object' && (item?.t ?? item?.type)) || '').toLowerCase();
     found.push({

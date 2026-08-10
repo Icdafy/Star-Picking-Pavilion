@@ -52,6 +52,20 @@ async function getJson(server, pathname) {
   return JSON.parse(response.body);
 }
 
+// prune 已改为 202 异步：触发后后台 setImmediate 执行删除，
+// 这里轮询维护快照直到谓词成立，等价于「等待后台清理完成后再查库」
+async function waitForMaintenance(server, predicate, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const snapshot = await getJson(server, '/api/maintenance');
+    if (predicate(snapshot)) return snapshot;
+    if (Date.now() > deadline) {
+      throw new Error(`等待后台清理超时，最后快照: ${JSON.stringify(snapshot)}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
 function star(server, id, starred) {
   return server.request({
     pathname: `/api/articles/${id}/star`,
@@ -157,11 +171,20 @@ test('保留清理永不删除星标情报，「待清理」计数也不把它�
   // 三条都已过保留期，但两条有星标：只有一条真的会被删
   assert.equal(before.expiring, 1);
 
-  const pruned = JSON.parse((await server.request({
+  // prune 不再同步返回删除计数：立即 202，后台异步执行
+  const pruneResponse = await server.request({
     pathname: '/api/maintenance/prune', method: 'POST', headers: headers(server)
-  })).body);
-  assert.equal(pruned.removedArticles, 1);
+  });
+  assert.equal(pruneResponse.status, 202, '清理触发必须立即 202 返回');
+  const pruned = JSON.parse(pruneResponse.body);
+  assert.equal(pruned.ok, true);
+  assert.equal(pruned.started, true);
+  assert.equal(pruned.removedArticles, undefined, '202 响应不应再携带同步删除计数');
 
+  // 轮询等待后台删除生效：到期且无星标的条目从库里消失
+  await waitForMaintenance(server, snapshot => snapshot.articles === 2);
+
+  // 再查库（走信息流）确认删除生效且星标条目幸存
   const remaining = await getJson(server, '/api/feed?view=starred&page=0');
   assert.deepEqual(remaining.items.map(item => item.title).sort(), [
     '过期且被星标的情报',

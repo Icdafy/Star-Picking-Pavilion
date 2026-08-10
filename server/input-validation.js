@@ -112,11 +112,18 @@ function parseFeedQuery(query, categories) {
   return { view, domain, category, search, page };
 }
 
+// 日期只允许落在 2020-01-01 至明天之间：更早的数据不属于本产品，
+// 更远的未来只会是伪造或误传的请求，提前拦掉避免白跑归档/日报
+const SANITIZE_DATE_MIN = '2020-01-01';
 function sanitizeDate(value) {
   if (value == null || value === '') return null;
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) badRequest('日期必须使用 YYYY-MM-DD 格式');
   const parsed = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) badRequest('日期不是有效日历日期');
+  const max = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  if (value < SANITIZE_DATE_MIN || value > max) {
+    badRequest(`日期必须在 ${SANITIZE_DATE_MIN} 至 ${max} 之间`);
+  }
   return value;
 }
 

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createCredentialIpcTracer } = require('../electron/credential-ipc-trace');
 const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
-const { db, now, closeDatabase, databaseFileBytes, DATABASE_PATH } = require('./db');
+const { db, now, closeDatabase, DATABASE_PATH } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
 const { persistApiKey } = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
@@ -102,10 +102,11 @@ function articleRow(r, scoring, nowMs) {
     quality,
     heat: quality != null ? Math.round(heatScore(
       quality,
-      publishedAt || fetchedAt,
+      publishedAt,
       scoring,
       nowMs,
-      { score: breakthroughScore, bonus: breakthroughBonus }
+      { score: breakthroughScore, bonus: breakthroughBonus },
+      fetchedAt
     ) * 10) / 10 : null,
     featured: !!r.featured,
     scores: parseOptionalJson(r.scores_json, null, value => value && typeof value === 'object' && !Array.isArray(value)),
@@ -139,12 +140,22 @@ function escapeLikePattern(value) {
 
 // 热度 = 质量分 × 指数时间衰减。与 scoring.heatScore 同式，放进 SQL 才能只取需要的一页，
 // 否则每次请求都要把上千行读进内存再在 JS 里排序（实时轮询每 18 秒会请求两次）。
+// 时间基准与 scoring.heatScore 的规则完全一致：
+//   published_at 为 NULL/无效 → 视为当前时刻（hours=0）
+//   published_at 晚于当前超过 48 小时 → 数据错误，改用 fetched_at
+//   其余未来时间 → hours 夹取为 0（max(0.0, ...)）
+const HEAT_TIME_BASIS = `CASE
+  WHEN julianday(a.published_at) IS NULL THEN julianday('now')
+  WHEN julianday(a.published_at) > julianday('now') + 2.0
+    THEN COALESCE(julianday(a.fetched_at), julianday('now'))
+  ELSE julianday(a.published_at)
+END`;
 const HEAT_EXPRESSION = `min(
   100.0,
   max(0.0, COALESCE(a.quality_score, 0) + COALESCE(a.breakthrough_bonus, 0))
 ) * pow(
   0.5,
-  max(0.0, (julianday('now') - julianday(COALESCE(a.published_at, a.fetched_at))) * 24.0)
+  max(0.0, (julianday('now') - (${HEAT_TIME_BASIS})) * 24.0)
     / (? + ? * min(1.0, max(0.0, COALESCE(a.breakthrough_score, 0))))
 )`;
 // 半衰期 36 小时下，超出此窗口的条目热度已衰减到千分之一以下，排进热榜没有意义
@@ -176,14 +187,20 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
     let ids;
     if ([...search].length >= 3) {
       try {
-        ids = db.prepare('SELECT rowid FROM articles_fts WHERE articles_fts MATCH ? LIMIT 500')
-          .all(`"${search.replace(/"/g, '""')}"`).map(r => r.rowid);
+        // 与短词 LIKE 降级同口径：前置 analyzed >= 1，待分析条目（还没有可检索正文）
+        // 两条检索路径的可见性必须一致，否则搜 2 字与搜 3 字会得到不同的条目集
+        ids = db.prepare(`SELECT a.id FROM articles_fts
+          JOIN articles a ON a.id = articles_fts.rowid
+          WHERE articles_fts MATCH ? AND a.analyzed >= 1 LIMIT 500`)
+          .all(`"${search.replace(/"/g, '""')}"`).map(r => r.id);
       } catch { ids = null; }
     }
     if (!ids) {
       const pattern = `%${escapeLikePattern(search)}%`;
+      // 短词降级 LIKE 无法走全文索引：前置 analyzed >= 1 可走 idx_articles_analyzed，
+      // 避免每次短词检索都全表扫描（待分析条目此时也还没有可检索的正文）
       ids = db.prepare(`SELECT id FROM articles
-        WHERE title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' LIMIT 500`)
+        WHERE analyzed >= 1 AND (title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\') LIMIT 500`)
         .all(pattern, pattern).map(r => r.id);
     }
     if (!ids.length) return { items: [], page, hasMore: false };
@@ -290,13 +307,19 @@ let lexiconCache = null;
 function matchingArticleIds(surface) {
   if ([...surface].length >= 3) {
     try {
-      return db.prepare('SELECT rowid AS id FROM articles_fts WHERE articles_fts MATCH ? LIMIT 500')
+      // 与 queryFeed 的 FTS 路径同口径：前置 analyzed >= 1，
+      // 词库面板计数与点进去能看到的卡片数才不会对不上
+      return db.prepare(`SELECT a.id AS id FROM articles_fts
+        JOIN articles a ON a.id = articles_fts.rowid
+        WHERE articles_fts MATCH ? AND a.analyzed >= 1 LIMIT 500`)
         .all(`"${surface.replace(/"/g, '""')}"`).map(row => row.id);
     } catch { /* 词里含 FTS 语法字符时降级 LIKE */ }
   }
   const pattern = `%${escapeLikePattern(surface)}%`;
+  // 与 queryFeed 的 LIKE 降级同口径：前置 analyzed >= 1 让扫描能走索引
   return db.prepare(
-    `SELECT id FROM articles WHERE title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' LIMIT 500`)
+    `SELECT id FROM articles WHERE analyzed >= 1
+      AND (title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\') LIMIT 500`)
     .all(pattern, pattern).map(row => row.id);
 }
 
@@ -415,13 +438,16 @@ const server = http.createServer(async (req, res) => {
             productVersion: packageJson.version,
             generatedAt: bundle.generatedAt,
             window: bundle.window,
+            // 窗口内记录触顶 20000 条硬上限时为 true，消费方据此判断归档不完整
+            truncated: bundle.truncated,
             summary: bundle.summary
           }
         });
       }
       if (p === '/api/daily/regenerate' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        return json(res, 200, generateDaily(sanitizeDate(body.date)));
+        // regenerate 是用户的显式覆写意思表示；默认路径（overwrite=false）不会碰已有有效/损坏行
+        return json(res, 200, generateDaily(sanitizeDate(body.date), { overwrite: true }));
       }
 
       // 导出：情报的最后一公里。渲染在服务端完成，界面只负责复制到剪贴板或存成文件，
@@ -477,6 +503,7 @@ const server = http.createServer(async (req, res) => {
           irrelevantRetentionDays: settings.collect.irrelevantRetentionDays
         });
         const database = databaseStorageSnapshot({ database: db, databasePath: DATABASE_PATH });
+        const schedulerStatus = getStatus();
         return json(res, 200, {
           databaseBytes: database.fileBytes,
           database,
@@ -487,14 +514,25 @@ const server = http.createServer(async (req, res) => {
           expiring: countExpiring(plan),
           retentionDays: plan.retentionDays,
           irrelevantRetentionDays: plan.irrelevantRetentionDays,
+          // prune 已改为 202 异步契约：前端靠这个布尔判断后台清理是否结束，
+          // 结束前轮询到的数字都是清理前旧值，不得拿去刷新界面
+          pruneRunning: schedulerStatus.pruneRunning,
           ...getMaintenanceSnapshot(),
-          scheduler: getStatus()
+          scheduler: schedulerStatus
         });
       }
       if (p === '/api/maintenance/prune' && req.method === 'POST') {
-        const result = pruneOnce('manual');
-        invalidateStatsCache();
-        return json(res, 200, { ok: true, ...result, databaseBytes: databaseFileBytes() });
+        // 大清理可能持续很久：触发后立即 202 返回，后台异步执行，
+        // HTTP 请求不再同步阻塞在删除循环上
+        setImmediate(() => {
+          try {
+            const result = pruneOnce('manual');
+            if (result && !result.skipped) invalidateStatsCache();
+          } catch (error) {
+            console.error('[maintenance:prune]', error);
+          }
+        });
+        return json(res, 202, { ok: true, started: true });
       }
       if (p === '/api/maintenance/compact' && req.method === 'POST') {
         try {

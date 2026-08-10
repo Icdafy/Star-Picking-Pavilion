@@ -5,6 +5,18 @@ const keywords = require('../ai/keywords');
 const { heatScore } = require('../ai/scoring');
 
 const SCHEMA_VERSION = 1;
+// 单个归档窗口的记录数硬上限：防止异常大窗口把整个进程内存吃满；
+// 触顶时 bundle.truncated 会置 true，manifest 里看得见
+const DAILY_RECORD_HARD_LIMIT = 20_000;
+// 只取 mapRecord 真正消费的列，不再 a.* 把整行拖进内存
+const DAILY_RECORD_COLUMNS = `
+  a.id, a.source_id, a.title, a.url, a.summary_raw, a.ai_summary, a.ai_reason,
+  a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
+  a.scores_json, a.quality_score, a.featured, a.tags_json, a.cluster_id, a.starred,
+  a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json, a.scoring_version`;
+const DAILY_RECORD_WINDOW_WHERE = `
+  julianday(a.fetched_at) > julianday(?)
+  AND julianday(a.fetched_at) <= julianday(?)`;
 const SECTION_ORDER = [
   '政策法规',
   '发射与任务',
@@ -92,12 +104,15 @@ function mapRecord(row, { date, window, scoring }) {
     tags.join(' ')
   ].filter(Boolean).join(' ');
   const lexiconSummary = lexicon.analyze(text);
+  // 与 scoring.resolveHeatAnchor 新规则对齐：第 4 参传归档窗口截止时刻，
+  // 第 6 参传条目自身 fetchedAt（publishedAt 无效→按截止时刻，晚于截止超 48h→回落 fetchedAt）
   const heatAtCutoff = quality == null ? null : Math.round(heatScore(
     quality,
-    publishedAt || fetchedAt,
+    publishedAt,
     scoring,
     Date.parse(window.end),
-    { score: breakthroughScore, bonus: breakthroughBonus }
+    { score: breakthroughScore, bonus: breakthroughBonus },
+    fetchedAt
   ) * 10) / 10;
 
   return {
@@ -140,15 +155,23 @@ function mapRecord(row, { date, window, scoring }) {
 
 function queryDailyRecords(database, date, window, scoring) {
   const rows = database.prepare(`
-    SELECT a.*, s.name AS source_name, s.tier, c.size AS cluster_size
+    SELECT ${DAILY_RECORD_COLUMNS}, s.name AS source_name, s.tier, c.size AS cluster_size
     FROM articles a
     JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters c ON c.id = a.cluster_id
-    WHERE julianday(a.fetched_at) > julianday(?)
-      AND julianday(a.fetched_at) <= julianday(?)
+    WHERE ${DAILY_RECORD_WINDOW_WHERE}
     ORDER BY a.fetched_at ASC, a.id ASC
+    LIMIT ${DAILY_RECORD_HARD_LIMIT}
   `).all(window.start, window.end);
   return rows.map(row => mapRecord(row, { date, window, scoring }));
+}
+
+function countWindowRecords(database, window) {
+  // 不带 sources JOIN 的 COUNT 依赖 foreign_keys=ON 保证 articles.source_id 无悬空行，
+  // 否则会与 queryDailyRecords（JOIN sources）的取数口径产生偏差
+  return database.prepare(`
+    SELECT COUNT(*) c FROM articles a WHERE ${DAILY_RECORD_WINDOW_WHERE}
+  `).get(window.start, window.end).c;
 }
 
 function compareImportance(left, right) {
@@ -209,6 +232,9 @@ function buildDailyBundle({
   }
   const window = resolveDailyWindow(date);
   const records = queryDailyRecords(database, date, window, scoring);
+  // 只有触顶才需要多付一次 COUNT，确认窗口里是否真的还有没取到的记录
+  const truncated = records.length >= DAILY_RECORD_HARD_LIMIT
+    && countWindowRecords(database, window) > records.length;
   const relevant = records.filter(record => record.relevant === true);
   const folded = foldClusters(relevant);
   const featured = relevant.filter(record => record.featured);
@@ -216,6 +242,7 @@ function buildDailyBundle({
     schemaVersion: SCHEMA_VERSION,
     date,
     window,
+    truncated,
     generatedAt: new Date(generatedAt).toISOString(),
     summary: summarize(records),
     records,
@@ -243,6 +270,7 @@ function serializeJsonl(records) {
 module.exports = {
   SCHEMA_VERSION,
   SECTION_ORDER,
+  DAILY_RECORD_HARD_LIMIT,
   resolveDailyWindow,
   queryDailyRecords,
   foldClusters,

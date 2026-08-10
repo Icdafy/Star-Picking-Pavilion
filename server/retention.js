@@ -2,7 +2,7 @@
 // 数据保留 —— 桌面端长期驻留运行，若只进不出，articles 与 trigram FTS 索引会无限膨胀。
 // 分两档保留：判为无关的噪声很快清掉，相关情报按用户设置的天数保留；
 // 事件簇随之收敛，日报是自包含快照因此单独按更长周期保留。
-const { db, now, deleteArticles, checkpointWal } = require('./db');
+const { db, now, deleteArticles, checkpointWal, withTransaction, DELETE_BATCH_SIZE } = require('./db');
 const { optimizeDatabase, readMeta } = require('./database-maintenance');
 
 const DAILY_REPORT_RETENTION_DAYS = 730;
@@ -48,25 +48,32 @@ function countExpiring(plan) {
     .get(plan.articleCutoff, plan.irrelevantCutoff).c;
 }
 
-// 删除文章后，成员不足 2 条的簇失去意义；主条被删的簇要改推剩余最优条目
+// 删除文章后，成员不足 2 条的簇失去意义；主条被删的簇要改推剩余最优条目。
+// 全部用集合式 SQL 完成：不再逐簇查成员（N+1），而是一条聚合重算、一条批量修正
+const SURVIVING_CLUSTERS = `
+  SELECT cluster_id FROM articles
+  WHERE cluster_id IS NOT NULL
+  GROUP BY cluster_id HAVING COUNT(*) >= 2`;
+
 function repairClusters() {
-  const TIER_RANK = { 'T1': 3, 'T1.5': 2, 'T2': 1 };
-  let removed = 0;
-  const clusterIds = db.prepare('SELECT id FROM clusters').all().map(row => row.id);
-  for (const clusterId of clusterIds) {
-    const members = db.prepare(`SELECT a.id, a.quality_score, s.tier
-      FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.cluster_id = ?`).all(clusterId);
-    if (members.length < 2) {
-      db.prepare('UPDATE articles SET cluster_id = NULL WHERE cluster_id = ?').run(clusterId);
-      db.prepare('DELETE FROM clusters WHERE id = ?').run(clusterId);
-      removed++;
-      continue;
-    }
-    members.sort((a, b) =>
-      ((TIER_RANK[b.tier] || 0) - (TIER_RANK[a.tier] || 0)) || ((b.quality_score || 0) - (a.quality_score || 0)));
-    db.prepare('UPDATE clusters SET main_article_id = ?, size = ?, updated_at = ? WHERE id = ?')
-      .run(members[0].id, members.length, now(), clusterId);
-  }
+  // 小簇（含孤儿簇）：释放成员后删除簇行
+  db.prepare(`UPDATE articles SET cluster_id = NULL
+    WHERE cluster_id IN (SELECT id FROM clusters)
+      AND cluster_id NOT IN (${SURVIVING_CLUSTERS})`).run();
+  const removed = db.prepare(`DELETE FROM clusters WHERE id NOT IN (${SURVIVING_CLUSTERS})`).run().changes;
+  // 存活簇：一条 UPDATE 重算计数与主条（源等级降序 → 质量分降序 → id 升序，与原逐簇排序一致）
+  // 注：size 统计不带 sources JOIN，依赖 foreign_keys=ON 保证 articles.source_id 无悬空行，
+  // 否则重算出的 size/main_article_id 会与带 JOIN 的查询口径不一致
+  db.prepare(`UPDATE clusters SET
+      size = (SELECT COUNT(*) FROM articles a WHERE a.cluster_id = clusters.id),
+      main_article_id = (
+        SELECT a2.id FROM articles a2 JOIN sources s2 ON s2.id = a2.source_id
+        WHERE a2.cluster_id = clusters.id
+        ORDER BY CASE s2.tier WHEN 'T1' THEN 3 WHEN 'T1.5' THEN 2 WHEN 'T2' THEN 1 ELSE 0 END DESC,
+                 COALESCE(a2.quality_score, 0) DESC, a2.id ASC
+        LIMIT 1),
+      updated_at = ?
+    WHERE id IN (${SURVIVING_CLUSTERS})`).run(now());
   return removed;
 }
 
@@ -76,25 +83,27 @@ function pruneDatabase({ settings, nowMs = Date.now(), maxDeletions = MAX_DELETI
     irrelevantRetentionDays: settings?.collect?.irrelevantRetentionDays,
     nowMs
   });
-  const expiredIds = selectExpiredIds(plan, maxDeletions + 1);
-  const hasMore = expiredIds.length > maxDeletions;
-  const doomed = hasMore ? expiredIds.slice(0, maxDeletions) : expiredIds;
 
+  // 分批删除，每批一个独立事务（deleteArticles 内部管理）：
+  // 大清理不再一次性长锁整个库，单轮总量仍由 maxDeletions 封顶
   let removedArticles = 0;
+  let remaining = maxDeletions;
+  while (remaining > 0) {
+    const batch = selectExpiredIds(plan, Math.min(DELETE_BATCH_SIZE, remaining));
+    if (!batch.length) break;
+    removedArticles += deleteArticles(batch);
+    remaining -= batch.length;
+  }
+  const hasMore = remaining === 0 && countExpiring(plan) > 0;
+
   let removedClusters = 0;
   let removedReports = 0;
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    removedArticles = deleteArticles(doomed);
+  withTransaction(() => {
     if (removedArticles > 0) removedClusters = repairClusters();
     removedReports = db.prepare('DELETE FROM daily_reports WHERE date < ?').run(plan.dailyReportCutoff).changes;
     db.prepare(`INSERT INTO meta (key, value) VALUES ('lastPruneAt', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(new Date(nowMs).toISOString());
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 
   if (removedArticles > 0 || removedReports > 0) checkpointWal();
   let optimized = false;

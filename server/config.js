@@ -255,9 +255,38 @@ function nonEmptyStringArray(value, field) {
   return [...new Set(value.map(item => item.trim()))];
 }
 
-function loadBreakthroughs() {
-  const raw = JSON.parse(fs.readFileSync(BREAKTHROUGHS_PATH, 'utf8'));
-  if (!Number.isInteger(raw.version) || raw.version < 1) {
+// 内置最小默认值：读文件/解析/校验失败且无缓存时的最后防线。
+// maxBonus 归零——宁可暂时不给突破加成，也不让无效配置刷出假热度。
+const FALLBACK_BREAKTHROUGHS = {
+  version: 1,
+  maxBonus: 0,
+  maxHalfLifeExtensionHours: 0,
+  minimumScores: { tier1Credibility: 40, tier15Credibility: 70, corroboratedCredibility: 60 },
+  eligibleCategories: ['技术研发', '发射与任务'],
+  completionActions: ['首飞', '试飞成功', '入轨', '回收', '交付'],
+  uncertaintyMarkers: ['拟', '计划', '有望', '传闻'],
+  objects: {
+    lowaltitude: ['eVTOL', '电动垂直起降', '无人机系统'],
+    aerospace: ['可重复使用火箭', '火箭发动机', '推进系统']
+  }
+};
+
+const FALLBACK_SCORING = {
+  dimensionWeights: { importance: 0.32, novelty: 0.18, credibility: 0.16, impact: 0.22, timeliness: 0.12 },
+  tierMultiplier: { T1: 1.15, 'T1.5': 1.0, T2: 0.85 },
+  featuredThresholds: { default: 70 },
+  heatDecayHalfLifeHours: 36,
+  clusterWindowHours: 72,
+  heuristicThresholdDiscount: 0.85
+};
+
+// 模块级「最后一次成功加载」缓存：配置文件损坏时维持上一次有效行为，
+// 而不是让整个管线在读取时抛异常。
+let lastGoodBreakthroughs = null;
+let lastGoodScoring = null;
+
+function parseBreakthroughs(raw) {
+  if (!Number.isInteger(raw?.version) || raw.version < 1) {
     throw new Error('技术突破配置无效: version');
   }
   for (const field of ['maxBonus', 'maxHalfLifeExtensionHours']) {
@@ -266,10 +295,11 @@ function loadBreakthroughs() {
     }
   }
   const minimumScores = raw.minimumScores || {};
-  for (const field of ['tier15Credibility', 'corroboratedCredibility']) {
-    if (!Number.isFinite(Number(minimumScores[field]))
-      || Number(minimumScores[field]) < 0
-      || Number(minimumScores[field]) > 100) {
+  for (const field of ['tier1Credibility', 'tier15Credibility', 'corroboratedCredibility']) {
+    const value = Number(minimumScores[field]);
+    // tier1Credibility 允许缺席（代码内有 40 的内置底线），另外两个必须齐备
+    if (field === 'tier1Credibility' && minimumScores[field] === undefined) continue;
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
       throw new Error(`技术突破配置无效: minimumScores.${field}`);
     }
   }
@@ -279,6 +309,9 @@ function loadBreakthroughs() {
     eligibleCategories: nonEmptyStringArray(raw.eligibleCategories, 'eligibleCategories'),
     completionActions: nonEmptyStringArray(raw.completionActions, 'completionActions'),
     uncertaintyMarkers: nonEmptyStringArray(raw.uncertaintyMarkers, 'uncertaintyMarkers'),
+    failureMarkers: Array.isArray(raw.failureMarkers) && raw.failureMarkers.length
+      ? nonEmptyStringArray(raw.failureMarkers, 'failureMarkers')
+      : [],
     objects: {
       lowaltitude: nonEmptyStringArray(objects.lowaltitude, 'objects.lowaltitude'),
       aerospace: nonEmptyStringArray(objects.aerospace, 'objects.aerospace')
@@ -286,15 +319,116 @@ function loadBreakthroughs() {
   };
 }
 
-function loadScoring() {
-  const scoring = JSON.parse(fs.readFileSync(SCORING_PATH, 'utf8'));
-  const breakthroughs = loadBreakthroughs();
-  scoring.breakthroughBoost = {
-    maxBonus: breakthroughs.maxBonus,
-    maxHalfLifeExtensionHours: breakthroughs.maxHalfLifeExtensionHours,
-    version: breakthroughs.version
-  };
+// 契约：永不抛异常。读取/解析/校验失败 → warn + 返回上次成功加载的缓存；
+// 无缓存时返回内置最小默认值。
+function loadBreakthroughs() {
+  try {
+    const parsed = parseBreakthroughs(JSON.parse(fs.readFileSync(BREAKTHROUGHS_PATH, 'utf8')));
+    lastGoodBreakthroughs = parsed;
+    return parsed;
+  } catch (error) {
+    console.warn(`技术突破配置加载失败（${error.message}），回落${lastGoodBreakthroughs ? '上次成功加载的缓存' : '内置最小默认值'}`);
+    return lastGoodBreakthroughs || structuredClone(FALLBACK_BREAKTHROUGHS);
+  }
+}
+
+// 下划线开头的键是配置内的说明文字，不参与数值校验
+function configEntries(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.entries(value).filter(([key]) => !key.startsWith('_'))
+    : [];
+}
+
+function sanitizeScoring(raw) {
+  const scoring = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {};
+
+  // dimensionWeights：各值 ∈[0,1]；总和偏离 1.0 超过 0.01 时告警并整体回落默认
+  const weightEntries = configEntries(scoring.dimensionWeights);
+  const weightsValid = weightEntries.length
+    && weightEntries.every(([, value]) => {
+      const number = Number(value);
+      return Number.isFinite(number) && number >= 0 && number <= 1;
+    });
+  const weightSum = weightEntries.reduce((total, [, value]) => total + Number(value), 0);
+  if (!weightsValid) {
+    console.warn('计分配置 dimensionWeights 含非法值（须 ∈[0,1]），回落内置默认');
+    scoring.dimensionWeights = { ...FALLBACK_SCORING.dimensionWeights };
+  } else if (Math.abs(weightSum - 1) > 0.01) {
+    console.warn(`计分配置 dimensionWeights 权重总和 ${weightSum} 偏离 1.0 超过 0.01，回落内置默认`);
+    scoring.dimensionWeights = { ...FALLBACK_SCORING.dimensionWeights };
+  } else {
+    scoring.dimensionWeights = Object.fromEntries(
+      weightEntries.map(([key, value]) => [key, Number(value)])
+    );
+  }
+
+  // featuredThresholds：各值 ∈[0,100]，非法值丢弃；default 缺失时补 70
+  const thresholds = {};
+  for (const [key, value] of configEntries(scoring.featuredThresholds)) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number >= 0 && number <= 100) thresholds[key] = number;
+    else console.warn(`计分配置 featuredThresholds.${key} 非法（须 ∈[0,100]），已回落丢弃`);
+  }
+  if (!Number.isFinite(thresholds.default)) {
+    console.warn('计分配置 featuredThresholds.default 缺失或非法，回落默认 70');
+    thresholds.default = FALLBACK_SCORING.featuredThresholds.default;
+  }
+  scoring.featuredThresholds = thresholds;
+
+  // heatDecayHalfLifeHours ∈[1,720]
+  const halfLife = Number(scoring.heatDecayHalfLifeHours);
+  if (!Number.isFinite(halfLife) || halfLife < 1 || halfLife > 720) {
+    console.warn('计分配置 heatDecayHalfLifeHours 非法（须 ∈[1,720]），回落默认 36');
+    scoring.heatDecayHalfLifeHours = FALLBACK_SCORING.heatDecayHalfLifeHours;
+  }
+
+  // heuristicThresholdDiscount ∈(0,1]
+  const discount = Number(scoring.heuristicThresholdDiscount);
+  if (!Number.isFinite(discount) || discount <= 0 || discount > 1) {
+    console.warn('计分配置 heuristicThresholdDiscount 非法（须 ∈(0,1]），回落默认 0.85');
+    scoring.heuristicThresholdDiscount = FALLBACK_SCORING.heuristicThresholdDiscount;
+  }
+
+  // clusterWindowHours：钳制为 1..720 的整数，非法时默认 72
+  const windowHours = Number(scoring.clusterWindowHours);
+  scoring.clusterWindowHours = Number.isFinite(windowHours)
+    ? Math.max(1, Math.min(720, Math.round(windowHours)))
+    : FALLBACK_SCORING.clusterWindowHours;
+
+  // tierMultiplier 缺失时 computeQuality 会直接崩，一并兼顾
+  if (!scoring.tierMultiplier || typeof scoring.tierMultiplier !== 'object'
+    || Array.isArray(scoring.tierMultiplier)) {
+    console.warn('计分配置 tierMultiplier 缺失或非法，回落内置默认');
+    scoring.tierMultiplier = { ...FALLBACK_SCORING.tierMultiplier };
+  }
   return scoring;
+}
+
+// 契约：永不抛异常。读取/解析失败 → warn + 返回上次成功加载的缓存；
+// 无缓存时返回内置最小默认值（breakthroughBoost 由永不抛异常的 loadBreakthroughs 提供）。
+function loadScoring() {
+  try {
+    const scoring = sanitizeScoring(JSON.parse(fs.readFileSync(SCORING_PATH, 'utf8')));
+    const breakthroughs = loadBreakthroughs();
+    scoring.breakthroughBoost = {
+      maxBonus: breakthroughs.maxBonus,
+      maxHalfLifeExtensionHours: breakthroughs.maxHalfLifeExtensionHours,
+      version: breakthroughs.version
+    };
+    lastGoodScoring = scoring;
+    return scoring;
+  } catch (error) {
+    console.warn(`计分配置加载失败（${error.message}），回落${lastGoodScoring ? '上次成功加载的缓存' : '内置最小默认值'}`);
+    if (lastGoodScoring) return lastGoodScoring;
+    const fallback = structuredClone(FALLBACK_SCORING);
+    const breakthroughs = loadBreakthroughs();
+    fallback.breakthroughBoost = {
+      maxBonus: breakthroughs.maxBonus,
+      maxHalfLifeExtensionHours: breakthroughs.maxHalfLifeExtensionHours,
+      version: breakthroughs.version
+    };
+    return fallback;
+  }
 }
 
 module.exports = {

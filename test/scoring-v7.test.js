@@ -200,3 +200,66 @@ test('maxShift 是精选的质量地板：整批都不合格时宁可空着也�
   assert.equal(result.shift, -15);
   assert.equal(qualities.filter(q => q >= 70 + result.shift).length, 0);
 });
+
+// —— heatScore 发布时间防护（与 SQL 侧 HEAT_EXPRESSION 规则一致）——
+
+test('heatScore：无效发布时间（解析不出有限值）按当前时刻取值', () => {
+  const now = Date.parse('2026-07-31T08:00:00.000Z');
+  const expected = scoring.heatScore(80, null, config, now);
+  assert.equal(expected, 80, 'hours=0 时热度等于有效质量分');
+
+  for (const publishedAt of ['not-a-date', null, '']) {
+    const value = scoring.heatScore(80, publishedAt, config, now);
+    assert.ok(Number.isFinite(value), `${publishedAt} 应产出有限值`);
+    assert.equal(value, expected, `${publishedAt} 应按当前时刻取值`);
+  }
+});
+
+test('heatScore：晚于当前超 48 小时的发布时间改用 fetchedAt（未传则按当前时刻）', () => {
+  const now = Date.parse('2026-07-31T08:00:00.000Z');
+  const future = new Date(now + 72 * 3600e3).toISOString();
+  const fetchedAt = new Date(now - 12 * 3600e3).toISOString();
+
+  const value = scoring.heatScore(80, future, config, now, {}, fetchedAt);
+  assert.equal(value, scoring.heatScore(80, fetchedAt, config, now));
+  assert.equal(value, 80 * Math.pow(0.5, 12 / config.heatDecayHalfLifeHours));
+
+  // 未传第 6 参时回落当前时刻，不抛异常
+  assert.equal(scoring.heatScore(80, future, config, now), 80);
+});
+
+test('heatScore：48 小时内的未来时间 hours 夹取为 0', () => {
+  const now = Date.parse('2026-07-31T08:00:00.000Z');
+  const soon = new Date(now + 3600e3).toISOString();
+  assert.equal(scoring.heatScore(80, soon, config, now), 80);
+});
+
+// —— computeQuality / resolveThreshold 非有限输入与未知配置的回退 ——
+
+test('computeQuality：维度分非有限值与未知 tier 不崩溃', () => {
+  // 维度分 Infinity → 公式结果无穷大，最终夹到 100
+  const infinity = scoring.computeQuality(
+    { importance: Infinity, novelty: Infinity, credibility: Infinity, impact: Infinity, timeliness: Infinity },
+    { tier: 'T2' }, config);
+  assert.equal(infinity, 100);
+
+  // 未知 tier（含 undefined）乘数回落 1.0：base = Σ(维度分×权重) = 58
+  for (const tier of ['T3', undefined]) {
+    assert.equal(scoring.computeQuality(DIMS, { tier }, config), 58);
+  }
+});
+
+test('resolveThreshold：未配置分类回落 default，偏移钳在 0..100', () => {
+  assert.equal(
+    scoring.resolveThreshold('未配置的分类', config),
+    config.featuredThresholds.default
+  );
+  assert.equal(scoring.resolveThreshold('企业动态', config, { shift: 50 }), 100);
+  assert.equal(scoring.resolveThreshold('企业动态', config, { shift: -100 }), 0);
+});
+
+test('isFeatured 在阈值临界点两侧精确翻转', () => {
+  const threshold = scoring.resolveThreshold('企业动态', config);
+  assert.equal(scoring.isFeatured(threshold, '企业动态', config), true);
+  assert.equal(scoring.isFeatured(threshold - 0.1, '企业动态', config), false);
+});

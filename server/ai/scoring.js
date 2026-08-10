@@ -97,8 +97,23 @@ function isFeatured(quality, category, scoring, options = false) {
   return quality >= resolveThreshold(category, scoring, resolved);
 }
 
-function heatScore(quality, publishedAt, scoring, nowMs = Date.now(), breakthrough = {}) {
-  const t = publishedAt ? new Date(publishedAt).getTime() : nowMs;
+// 发布时间防护（与 server/index.js 的 SQL 侧 HEAT_EXPRESSION 规则一致）：
+//   ① 解析不出有限值（NaN）→ 视为当前时刻，hours=0；
+//   ② 晚于当前时刻超过 48 小时 → 数据错误，改用 fetchedAt（未传则按当前时刻）；
+//   ③ 其余未来时间（48h 内）→ hours 夹取为 0（现状不变）。
+// fetchedAt 放可选末位，旧调用方签名不受影响。
+function resolveHeatAnchor(publishedAt, fetchedAt, nowMs) {
+  let anchor = publishedAt ? new Date(publishedAt).getTime() : nowMs;
+  if (!Number.isFinite(anchor)) anchor = nowMs;
+  else if (anchor - nowMs > 48 * 3600e3) {
+    const fallback = fetchedAt ? new Date(fetchedAt).getTime() : NaN;
+    anchor = Number.isFinite(fallback) ? fallback : nowMs;
+  }
+  return anchor;
+}
+
+function heatScore(quality, publishedAt, scoring, nowMs = Date.now(), breakthrough = {}, fetchedAt = null) {
+  const t = resolveHeatAnchor(publishedAt, fetchedAt, nowMs);
   const hours = Math.max(0, (nowMs - t) / 3600e3);
   const baseHalfLife = Math.max(1, boundedNumber(scoring.heatDecayHalfLifeHours, 36));
   const score = Math.max(0, Math.min(1, boundedNumber(breakthrough.score, 0)));

@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.18.exe`，双击并按向导安装。v0.0.18 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.19.exe`，双击并按向导安装。v0.0.19 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.18.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.19.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -33,6 +33,8 @@ v0.0.14 把情报处理补成完整的八段式管线：结构化、数据清洗
 v0.0.16 只做前端质感深化（设计系统 v5）：卡片悬停浮起领域色渐变压边并叠同色系远光，精选卡底色向旗标色微倾、左缘书签拉通全高；深空主题偶有流星划过；技术突破胶囊配周期性缎面扫光，精选胶囊与五维进度条尽头带余辉；星标回弹、主按钮扫光、标题逐行下划线、热点榜前三渐变数字等微交互全部接入 prefers-reduced-motion。信息架构、功能、数据与设置全部不变。
 
 v0.0.18 完成渲染层模块化与增量渲染：巨型组合脚本拆分为职责清晰的控制器、状态层和纯函数模块；信息流改用模板化卡片与 keyed diff，实时轮询只更新变化节点；新增运行时动效分档、合成层友好动画和窄窗口响应式补全。信息架构、数据格式与既有设置保持兼容。
+
+v0.0.19 集中加固情报处理与本地数据链路：模型请求支持网络错误、限流和服务端故障退避重试，预筛与评分加入反提示注入边界、严格序号校验和失败重判；SQLite 主表与全文索引改为事务双写，启动时可识别并隔离损坏数据库；日报归档增加记录上限与截断提示，存储清理改为后台执行并在完成后刷新。技术突破判定同时补齐失败事件、模糊表述和可信度门槛，减少误加成。
 
 ## 主要功能
 
@@ -225,7 +227,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.18 --artifacts
+npm run verify:version -- --tag v0.0.19 --artifacts
 npm run notices
 ```
 

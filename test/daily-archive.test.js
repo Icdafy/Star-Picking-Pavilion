@@ -264,6 +264,36 @@ test('saveCurrent writes a complete date directory and a verifiable manifest', a
   );
 });
 
+test('a truncated bundle still saves but surfaces a warning in lastResult', async t => {
+  const userDataPath = await makeDirectory(t);
+  const rootDirectory = await makeDirectory(t, 'spp-daily-root-');
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => { warnings.push(args.join(' ')); };
+  t.after(() => { console.warn = originalWarn; });
+  const service = createDailyArchiveService({
+    userDataPath,
+    requestBundle: async date => {
+      const bundle = sampleBundle(date);
+      bundle.manifest.truncated = true;
+      return bundle;
+    },
+    now: () => new Date(2026, 6, 31, 10, 0, 0)
+  });
+  await service.enable(rootDirectory);
+
+  const result = await service.saveCurrent();
+  // 截断不阻断保存：目录照常落盘，manifest 保留 truncated 信号
+  assert.equal(result.status, 'saved');
+  assert.equal(result.warning, 'daily-archive-truncated');
+  const manifest = JSON.parse(await fs.promises.readFile(
+    path.join(result.directory, 'manifest.json'), 'utf8'));
+  assert.equal(manifest.truncated, true);
+  assert.equal(service.getSnapshot().lastResult.warning, 'daily-archive-truncated');
+  assert.equal(service.getSnapshot().lastSuccessfulDate, '2026-07-31');
+  assert.ok(warnings.some(message => message.includes('截断')), '应输出 console.warn 警告');
+});
+
 test('archive files are flushed before the date directory is atomically committed', async t => {
   const userDataPath = await makeDirectory(t);
   const rootDirectory = await makeDirectory(t, 'spp-daily-root-');

@@ -194,6 +194,69 @@ test('deriveEvents backfills a primary event when the model returns none', () =>
   assert.deepEqual(events.deriveEvents('某公司完成首飞', []), []);
 });
 
+// ---------- ⑥ 事件资源限制与类型守卫（L7） ----------
+
+test('events are hard-capped at MAX_EVENTS: 1000 inputs keep exactly the first 4', () => {
+  const many = Array.from({ length: 1000 }, (unused, index) => ({
+    a: `测试公司${index}`, v: '完成首飞'
+  }));
+  const normalized = events.normalizeEvents(many);
+  assert.equal(events.MAX_EVENTS, 4);
+  assert.equal(normalized.length, 4, '再多事件也只保留前 4 条');
+  assert.deepEqual(normalized.map(event => event.actor), [
+    '测试公司0', '测试公司1', '测试公司2', '测试公司3'
+  ]);
+});
+
+test('event fields are truncated to 40 code points, not 40 UTF-16 units', () => {
+  const cjk = events.normalizeEvents([{ a: '甲'.repeat(200), v: '完成首飞' }]);
+  assert.equal([...cjk[0].actor].length, 40, '200 字主体截到 40 码点');
+  // 补充代理对字符（扩展区汉字，一字占两个 UTF-16 单元）：上界仍须成立
+  const astral = events.normalizeEvents([{ a: '𠀀'.repeat(60), v: '完成首飞' }]);
+  assert.equal(astral.length, 1);
+  assert.ok([...astral[0].actor].length <= 40, '含代理对字段不得超出 40 码点');
+});
+
+test('uncategorized actions fall back to a normalized action-text key slice', () => {
+  // 既有行为锁定：动作归不出类时用 entityKey(动作原文).slice(0,24) 做键，
+  // 同一主体同一措辞仍能对齐，不同措辞不会被挤成同一个键
+  const [event] = events.normalizeEvents([{ a: '蓝箭航天', v: '举办发布会' }]);
+  assert.equal(event.actionClass, null);
+  assert.equal(
+    event.key,
+    `${entities.entityKey('蓝箭航天')}|${entities.entityKey('举办发布会').slice(0, 24)}`
+  );
+  const [same] = events.normalizeEvents([{ a: '蓝箭', v: '举办发布会' }]);
+  assert.equal(same.key, event.key, '别名归一后同措辞同键');
+  const [other] = events.normalizeEvents([{ a: '蓝箭航天', v: '参加展览会' }]);
+  assert.notEqual(other.key, event.key, '不同措辞不同键');
+});
+
+test('string-form event elements take the string branch via fallback text', () => {
+  // 模型把事件写成单个字符串时，主体取整串，动作类从 fallback 文本反推
+  const fromString = events.normalizeEvents(['蓝箭航天'], { fallbackText: '朱雀三号发射入轨' });
+  assert.equal(fromString.length, 1);
+  assert.equal(fromString[0].actor, '蓝箭航天');
+  assert.equal(fromString[0].actionClass, 'launch');
+  assert.equal(fromString[0].key, `${entities.entityKey('蓝箭航天')}|launch`);
+  // 没有 fallback 可归类时，纯字符串元素产生不了可用事件
+  assert.deepEqual(events.normalizeEvents(['蓝箭航天']), []);
+});
+
+test('dirty-typed fields are dropped instead of stringified into garbage keys', () => {
+  // L7 类型守卫：非字符串/非有限数字的字段一律丢弃，不走 String() 制造 [object Object] 键
+  assert.deepEqual(events.normalizeEvents([{ a: {}, v: [1] }]), []);
+  assert.deepEqual(events.normalizeEvents([{ a: null, o: { x: 1 } }]), []);
+  assert.deepEqual(events.normalizeEvents([{ a: true, v: '完成首飞' }]), []);
+  assert.deepEqual(events.normalizeEvents([{ a: NaN, v: '完成首飞' }]), []);
+  assert.deepEqual(events.normalizeEvents([{ a: Infinity, v: '完成首飞' }]), []);
+  // 客体与动作是脏类型且归不出动作类时，整条事件丢弃
+  assert.deepEqual(events.normalizeEvents([{ a: '蓝箭航天', o: {}, v: [1, 2] }]), []);
+  // 有限数字主体转字符串保留
+  const [numeric] = events.normalizeEvents([{ a: 42, v: '完成首飞' }]);
+  assert.equal(numeric.actor, '42');
+});
+
 // ---------- ⑧ 语义合并 ----------
 
 function collectPairs(rows, options) {

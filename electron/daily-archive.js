@@ -606,6 +606,12 @@ function createDailyArchiveService({
         ? await chooseConflictDirectory(monthDirectory, date)
         : preferredDirectory;
       const bundle = await requestValidatedBundle(date);
+      // manifest.truncated 是服务端窗口记录触顶的信号：不阻断保存（已取到的
+      // 前 N 条仍是完整可验证的），但必须把警告带进 lastResult 让上层看得见
+      const truncated = bundle.manifest.truncated === true;
+      if (truncated) {
+        console.warn(`[daily-archive] ${date} 简报窗口记录数触顶，归档内容为截断快照`);
+      }
       temporary = path.join(monthDirectory, `.${date}.partial-${process.pid}-${randomToken()}`);
       await fileSystem.mkdir(temporary);
       await writeArchive(temporary, date, bundle);
@@ -617,6 +623,7 @@ function createDailyArchiveService({
         date,
         directory: destination
       };
+      if (truncated) result.warning = 'daily-archive-truncated';
       await markSuccess(date, result);
       return result;
     } catch (error) {

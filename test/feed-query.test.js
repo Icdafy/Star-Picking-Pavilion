@@ -155,16 +155,27 @@ test('the maintenance endpoint reports library size and prunes on demand', async
   assert.equal(before.lastOptimizeAt, null);
   assert.equal(before.lastCompactionAt, null);
 
-  const pruned = JSON.parse((await server.request({
+  // prune 已改为 202 异步：立即返回，后台执行删除，轮询维护快照等待完成
+  const pruneResponse = await server.request({
     pathname: '/api/maintenance/prune', method: 'POST', headers
-  })).body);
+  });
+  assert.equal(pruneResponse.status, 202, '清理触发必须立即 202 返回');
+  const pruned = JSON.parse(pruneResponse.body);
   assert.equal(pruned.ok, true);
-  assert.equal(pruned.removedArticles, 1);
+  assert.equal(pruned.started, true);
+  assert.equal(pruned.removedArticles, undefined, '202 响应不应再携带同步删除计数');
 
-  const after = JSON.parse((await server.request({ pathname: '/api/maintenance', headers })).body);
-  assert.equal(after.articles, 1);
+  let after;
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    after = JSON.parse((await server.request({ pathname: '/api/maintenance', headers })).body);
+    if (after.articles === 1 && after.lastPruneAt) break;
+    if (Date.now() > deadline) {
+      throw new Error(`等待后台清理超时，最后快照: ${JSON.stringify(after)}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   assert.equal(after.expiring, 0);
-  assert.ok(after.lastPruneAt);
   assert.ok(after.lastOptimizeAt);
 
   // 清理必须同时清掉 FTS 影子行，否则检索还能命中已删条目
