@@ -138,29 +138,6 @@ function escapeLikePattern(value) {
   return value.replace(/[\\%_]/g, character => `\\${character}`);
 }
 
-// 热度 = 质量分 × 指数时间衰减。与 scoring.heatScore 同式，放进 SQL 才能只取需要的一页，
-// 否则每次请求都要把上千行读进内存再在 JS 里排序（实时轮询每 18 秒会请求两次）。
-// 时间基准与 scoring.heatScore 的规则完全一致：
-//   published_at 为 NULL/无效 → 视为当前时刻（hours=0）
-//   published_at 晚于当前超过 48 小时 → 数据错误，改用 fetched_at
-//   其余未来时间 → hours 夹取为 0（max(0.0, ...)）
-const HEAT_TIME_BASIS = `CASE
-  WHEN julianday(a.published_at) IS NULL THEN julianday('now')
-  WHEN julianday(a.published_at) > julianday('now') + 2.0
-    THEN COALESCE(julianday(a.fetched_at), julianday('now'))
-  ELSE julianday(a.published_at)
-END`;
-const HEAT_EXPRESSION = `min(
-  100.0,
-  max(0.0, COALESCE(a.quality_score, 0) + COALESCE(a.breakthrough_bonus, 0))
-) * pow(
-  0.5,
-  max(0.0, (julianday('now') - (${HEAT_TIME_BASIS})) * 24.0)
-    / (? + ? * min(1.0, max(0.0, COALESCE(a.breakthrough_score, 0))))
-)`;
-// 半衰期 36 小时下，超出此窗口的条目热度已衰减到千分之一以下，排进热榜没有意义
-const HOT_WINDOW_DAYS = 45;
-
 // 导出一次要覆盖整份收藏夹或整屏筛选结果，不能只给界面翻页用的 30 条
 const FEED_PAGE_SIZE = 30;
 const EXPORT_MAX_ITEMS = 200;
@@ -174,7 +151,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
   const where = [];
   const params = [];
   if (view === 'featured') where.push('a.featured = 1');
-  if (view === 'featured' || view === 'hot') where.push('a.relevant = 1');
+  if (view === 'featured') where.push('a.relevant = 1');
   if (view === 'all') where.push("(a.relevant IS NULL OR a.relevant = 1)");
   // 星标是用户的显式收藏，不受相关性判定影响：被 AI 判为无关但用户仍想留着的条目必须能看到
   if (view === 'starred') where.push('a.starred = 1');
@@ -224,21 +201,6 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
   if (view === 'starred') {
     // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
     rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
-  } else if (view === 'hot') {
-    const halfLife = Number(scoring.heatDecayHalfLifeHours) || 36;
-    const breakthroughExtension = Math.max(0,
-      Number(scoring.breakthroughBoost?.maxHalfLifeExtensionHours) || 0);
-    const windowStart = new Date(nowMs - HOT_WINDOW_DAYS * 86_400_000).toISOString();
-    // 占位符按 SQL 文本位置绑定：先 WHERE 的过滤条件，再时间窗，最后 ORDER BY 里的半衰期
-    rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`,
-      'AND COALESCE(a.published_at, a.fetched_at) >= ?'))
-      .all(...params, windowStart, halfLife, breakthroughExtension);
-    // 窗口内已经取空时退回不限时间的热度榜：既覆盖长期未采集的库，也让「加载更多」能翻到更早的内容。
-    // 热度排序是全局的，因此续翻的偏移量与窗口版一致，不会重复或跳条。
-    if (!rows.length) {
-      rows = db.prepare(buildSql(`${HEAT_EXPRESSION} DESC`, ''))
-        .all(...params, halfLife, breakthroughExtension);
-    }
   } else {
     rows = db.prepare(buildSql('COALESCE(a.published_at, a.fetched_at) DESC', '')).all(...params);
   }
@@ -471,7 +433,7 @@ const server = http.createServer(async (req, res) => {
           });
         }
         const { view, search } = request.feed;
-        const titles = { featured: '精选情报', hot: '热点情报', all: '全部动态', starred: '星标情报' };
+        const titles = { featured: '精选情报', all: '全部动态', starred: '星标情报' };
         // 导出始终从第一条开始，与用户当前翻到第几页无关
         const exportQuery = new URLSearchParams(u.searchParams);
         exportQuery.set('page', '0');

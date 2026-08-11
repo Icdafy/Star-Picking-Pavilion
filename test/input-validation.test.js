@@ -50,9 +50,10 @@ test('source validation bounds metadata and validates enum fields on patches', (
 
 test('feed query validation rejects invalid views, filters and pagination', () => {
   const categories = ['政策法规', '企业动态'];
-  assert.deepEqual(parseFeedQuery(new URLSearchParams('view=hot&page=2&domain=aerospace'), categories), {
-    view: 'hot', domain: 'aerospace', category: '', search: '', page: 2
+  assert.deepEqual(parseFeedQuery(new URLSearchParams('view=all&page=2&domain=aerospace'), categories), {
+    view: 'all', domain: 'aerospace', category: '', search: '', page: 2
   });
+  assert.throws(() => parseFeedQuery(new URLSearchParams('view=hot'), categories), /视图/);
   assert.throws(() => parseFeedQuery(new URLSearchParams('view=everything'), categories), /视图/);
   assert.throws(() => parseFeedQuery(new URLSearchParams('page=NaN'), categories), /页码/);
   assert.throws(() => parseFeedQuery(new URLSearchParams('page=10001'), categories), /页码/);

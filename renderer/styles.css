@@ -23,8 +23,6 @@
      导航指示块在暗色下带光晕；卡片标题悬停长出下划线而不是只变色。
    - 氛围：深空主题偶尔划过一颗流星（约 16 秒一次、转瞬即灭），
      宣纸白主题不出现；所有新动效都被 prefers-reduced-motion 兜住。
-   - 榜单：热点榜前三名改用旗标色渐变数字，热度条尽头的微光
-     让「还在升温」这件事看得见。
 
    字体：中文一律思源黑体（随包内置，见 fonts/source-han-sans-sc/），
          英文与数字一律 Times New Roman。二者靠一条字体栈同时生效——
@@ -394,7 +392,7 @@ body {
 .btn-icon:focus-visible, .btn-primary:focus-visible, .btn-ghost:focus-visible,
 .rt-toggle:focus-visible, .update-pill:focus-visible, .new-flash:focus-visible,
 .card-title:focus-visible, .cluster-toggle:focus-visible, .dims-toggle:focus-visible,
-.hot-item:focus-visible, .daily-item a:focus-visible, .src-actions button:focus-visible,
+.daily-item a:focus-visible, .src-actions button:focus-visible,
 .search-clear:focus-visible, .to-top:focus-visible, .common-links-category:focus-visible,
 .common-links-favorite:focus-visible, .common-links-open:focus-visible,
 .lexicon-toggle:focus-visible, .lex-term:focus-visible, .search-context button:focus-visible {
@@ -563,7 +561,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
   box-shadow: var(--glass-shadow);
   transition: transform var(--dur) var(--spring-medium), box-shadow var(--dur) var(--spring-medium);
 }
-.glass:not(.nav):not(.hot-rail):hover {
+.glass:not(.nav):hover {
   transform: translateY(-2px);
   box-shadow: var(--glass-shadow-lift);
 }
@@ -839,7 +837,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
 .rt-toggle:active, .new-flash:active, .search-context button:active,
 .src-actions button:active, .note-remove:active, .common-links-category:active,
 .common-links-favorite:active, .scale-option:active, .update-pill.ready:active,
-.cluster-toggle:active, .dims-toggle:active, .hot-item:active {
+.cluster-toggle:active, .dims-toggle:active {
   transform: scale(.97);
   /* 按压走独立的短过渡：按下要快而跟手，抬起时回落到基线过渡自然带弹 */
   transition: transform var(--dur-snap) var(--spring-light);
@@ -1034,11 +1032,10 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   .common-links-card-head { flex-direction: column; }
 }
 
-/* ---------- 信息流布局：主流 + 右侧热度栏 ---------- */
-.feed-layout { display: grid; grid-template-columns: minmax(0, 1fr) 19.5rem; gap: var(--sp-5); align-items: start; }
+/* ---------- 信息流布局 ---------- */
+.feed-layout { display: grid; grid-template-columns: 1fr; gap: var(--sp-5); align-items: start; }
 @container app (max-width: 67.5rem) {
   .feed-layout { grid-template-columns: 1fr; }
-  .hot-rail { position: relative; top: auto; max-height: none; }
 }
 
 .feed-banner {
@@ -1433,20 +1430,6 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   font-variant-numeric: tabular-nums;
 }
 
-/* 热点榜排名 */
-.card-rank {
-  font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 800; line-height: 1.1;
-  color: var(--c-fg-faint); min-width: 2.5rem; text-align: center; padding-top: var(--sp-3);
-  font-variant-numeric: tabular-nums;
-}
-/* v5：热点榜前三名从纯色升级为渐变数字，暗色下保留辉光 */
-.card-rank.top {
-  background: linear-gradient(180deg, var(--flag-ink), var(--flag));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-[data-theme="dark"] .card-rank.top { text-shadow: none; filter: drop-shadow(0 0 10px var(--flag-glow)); }
-.rank-row { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 0 .625rem; padding-bottom: var(--sp-3); }
-
 /* —— 卡片底部操作条 —— */
 /* v4 可发现性：星标/复制从幽灵小字改为常态可见的描边按钮，
    并用一条细分隔与上方内容分开——操作区就该一眼可见。 */
@@ -1595,52 +1578,8 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .feed-foot { display: flex; justify-content: center; padding: var(--sp-6) 0 .625rem; }
 .feed-end { font-family: var(--font-display); color: var(--c-fg-faint); letter-spacing: .4em; font-size: var(--t-base); }
 
-/* ---------- 右侧热度栏 ---------- */
-.hot-rail {
-  padding: var(--sp-4) var(--sp-4) var(--sp-3);
-  position: sticky; top: var(--stack-top);
-  max-height: calc(100vh - var(--stack-top) - var(--sp-6));
-  overflow-y: auto; overscroll-behavior: contain;
-}
-.hot-rail-title {
-  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 800; letter-spacing: .06em;
-  display: flex; align-items: center; gap: var(--sp-2); margin-bottom: .375rem; color: var(--c-fg);
-}
-.hot-rail-title svg { width: .9375rem; height: .9375rem; color: var(--flag); }
-.hot-rail-sub { font-size: var(--t-xs); color: var(--c-fg-faint); margin-bottom: var(--sp-3); letter-spacing: .08em; }
-.hot-item {
-  display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: var(--sp-2);
-  padding: var(--sp-2) .375rem; border-radius: var(--radius-sm); text-decoration: none;
-  border-left: 2px solid transparent;
-  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              transform var(--dur-snap) var(--spring-light);
-}
-/* v5：悬停时条目向右轻轻一让，像给指尖让出半个身位 */
-.hot-item:hover { background: var(--hover-bg); border-left-color: var(--flag-line); transform: translateX(2px); }
-/* v6：首次上榜时错峰入场（错峰延时由脚本内联）；后续轮询静默更新，
-   脚本会给条目补 animation:none，不会每 18 秒整列重放一次 */
-.hot-item { animation: flash-in var(--dur-slow) var(--spring-light) backwards; }
-.hot-item .hi-rank {
-  font-family: var(--font-mono); font-size: var(--t-base); font-weight: 700;
-  color: var(--c-fg-faint); text-align: center; padding-top: 1px; font-variant-numeric: tabular-nums;
-}
-.hot-item:nth-child(-n+5) .hi-rank { color: var(--flag); }
-/* v5：前三名用渐变数字，榜上最热的三条一眼跳出版面 */
-.hot-item:nth-child(-n+3) .hi-rank {
-  background: linear-gradient(180deg, var(--flag-ink), var(--flag));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-[data-theme="dark"] .hot-item:nth-child(-n+3) .hi-rank { filter: drop-shadow(0 0 6px var(--flag-glow)); }
-.hot-item .hi-title {
-  font-size: var(--t-base); color: var(--c-fg); line-height: 1.6;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.hot-item:hover .hi-title { color: var(--accent-ink); }
-.hot-item .hi-meta { font-size: var(--t-xs); color: var(--c-fg-faint); margin-top: .125rem; display: flex; gap: var(--sp-2); align-items: center; }
-.hot-item .hi-heat { font-family: var(--font-mono); color: var(--flag); font-weight: 700; }
-
 /* 骨架屏。v6.5：微光从 background-position 改为一条 transform 扫过的高光带，
-   只走合成层；display:block 顺带让热度栏骨架里嵌套的行内 span 真正占位 */
+   只走合成层；display:block 顺带让骨架里嵌套的行内 span 真正占位 */
 .skeleton { pointer-events: none; }
 .skeleton .sk-line, .cluster-items .sk-line {
   display: block; position: relative; overflow: hidden;

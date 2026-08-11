@@ -170,7 +170,7 @@ test('renderCard：星标态 aria-pressed/is-on/文案与五维、事件簇入�
   assert.match(rich.querySelector('.dims').textContent, /重要性/);
 });
 
-// ---------- renderTimeline / renderRanked 分组与行结构 ----------
+// ---------- renderTimeline 分组与行结构 ----------
 
 test('renderTimeline：日期分组头与行结构保持契约', () => {
   const { renderer } = makeRenderer();
@@ -192,20 +192,6 @@ test('renderTimeline：日期分组头与行结构保持契约', () => {
   // 入场延迟随组内序号递增并封顶
   assert.equal(rows[0].querySelector('.card').style.animationDelay, '0ms');
   assert.equal(rows[1].querySelector('.card').style.animationDelay, '35ms');
-});
-
-test('renderRanked：名次编号、前三名 top 类与行结构', () => {
-  const { renderer } = makeRenderer();
-  const frag = renderer.renderRanked([item('x'), item('y'), item('z'), item('w')], 0);
-  const holder = new MiniDocument().createDocumentFragment();
-  holder.appendChild(frag);
-  const rows = holder.querySelectorAll('.rank-row');
-  assert.equal(rows.length, 4);
-  assert.equal(rows[0].querySelector('.card-rank').textContent, '01');
-  assert.ok(rows[0].querySelector('.card-rank').classList.contains('top'));
-  assert.ok(rows[2].querySelector('.card-rank').classList.contains('top'));
-  assert.ok(!rows[3].querySelector('.card-rank').classList.contains('top'));
-  assert.equal(rows[3].querySelector('.card-rank').textContent, '04');
 });
 
 // ---------- keyed diff：reconcile ----------
@@ -238,23 +224,6 @@ test('reconcile：增量只新增缺失项、复用旧节点，多余项被移�
   assert.equal(rowB.parentNode, null, '移除项的行节点应离开列表');
   // 分组计数随调和刷新
   assert.match(list.querySelector('.dh-count').textContent, /3 条/);
-});
-
-test('reconcile：ranked 模式同步行名次与 top 类', () => {
-  const { list, diff } = makeDiffList();
-  diff.reconcile([item('a'), item('b'), item('c'), item('d')], { mode: 'ranked' });
-  const rowC = list.querySelector('.card[data-id="c"]').closest('.rank-row');
-  // 重排后 c 升到第 1：名次文案与 top 类必须同步，节点仍复用
-  const result = diff.reconcile([item('c'), item('a'), item('b'), item('d')], { mode: 'ranked' });
-  assert.equal(result.reused, 4);
-  assert.equal(result.created, 0);
-  assert.equal(list.querySelector('.card[data-id="c"]').closest('.rank-row'), rowC);
-  const rankC = rowC.querySelector('.card-rank');
-  assert.equal(rankC.textContent, '01');
-  assert.ok(rankC.classList.contains('top'));
-  const rankD = list.querySelector('.card[data-id="d"]').closest('.rank-row').querySelector('.card-rank');
-  assert.equal(rankD.textContent, '04');
-  assert.ok(!rankD.classList.contains('top'));
 });
 
 test('reconcile：空数据集清空列表（空态由控制器接手），不回退整表赋值', () => {
@@ -321,13 +290,11 @@ test('prependFresh：跨日期新建分组插到最前，多组按新旧次序�
   );
 });
 
-test('prependFresh：列表无日期分组（空态/骨架/失败态/排行视图）返回 0，退回整表重载', () => {
+test('prependFresh：列表无日期分组（空态/骨架/失败态）返回 0，退回整表重载', () => {
   const { list, diff } = makeDiffList();
   assert.equal(diff.prependFresh([item('n')]), 0, '空列表不可前置');
   list.innerHTML = '<div class="empty-state glass"><p>风 平 浪 静</p></div>';
   assert.equal(diff.prependFresh([item('n')]), 0, '空态不可前置');
-  diff.reconcile([item('r')], { mode: 'ranked' });
-  assert.equal(diff.prependFresh([item('n')]), 0, '排行视图不可前置');
 });
 
 test('prependFresh：新条目分组更旧时不前置，返回 0 交由调用方整表重载', () => {
@@ -358,25 +325,9 @@ test('prependFresh：新条目混有更旧分组时整体回退，不做部分�
   );
 });
 
-// ---------- keyed diff：跨模式调和与复用行内容刷新 ----------
+// ---------- keyed diff：复用行内容刷新 ----------
 
-test('reconcile：跨模式调和（timeline → ranked）全重建，行结构不串模式', () => {
-  const { list, diff } = makeDiffList();
-  diff.reconcile([item('a'), item('b')]);
-  const result = diff.reconcile([item('a'), item('b')], { mode: 'ranked' });
-  assert.equal(result.reused, 0, '异模式行不得复用');
-  assert.equal(result.created, 2);
-  assert.equal(list.querySelectorAll('.rank-row').length, 2);
-  assert.equal(list.querySelectorAll('.tl-row').length, 0);
-  assert.equal(list.querySelectorAll('.date-group').length, 0, 'rank-row 不得挂进 date-group');
-  // 反向调和同样全重建
-  const back = diff.reconcile([item('a'), item('b')]);
-  assert.equal(back.reused, 0);
-  assert.equal(list.querySelectorAll('.tl-row').length, 2);
-  assert.equal(list.querySelectorAll('.rank-row').length, 0);
-});
-
-test('reconcile：同模式复用行的卡片内容随新数据刷新，行壳仍复用', () => {
+test('reconcile：复用行的卡片内容随新数据刷新，行壳仍复用', () => {
   const { list, diff } = makeDiffList();
   diff.reconcile([item('a', { title: '旧标题', summary: '旧摘要' })]);
   const rowA = list.querySelector('.card[data-id="a"]').closest('.tl-row');
@@ -385,14 +336,6 @@ test('reconcile：同模式复用行的卡片内容随新数据刷新，行壳�
   assert.equal(list.querySelector('.card[data-id="a"]').closest('.tl-row'), rowA, '行壳节点仍复用');
   assert.equal(list.querySelector('.card-title').textContent, '新标题', '卡片正文必须随新数据刷新');
   assert.equal(list.querySelector('.card-summary').textContent, '新摘要');
-});
-
-test('reconcile：ranked 模式复用行的卡片内容同样随新数据刷新', () => {
-  const { list, diff } = makeDiffList();
-  diff.reconcile([item('a', { title: '旧标题' })], { mode: 'ranked' });
-  const result = diff.reconcile([item('a', { title: '新标题' })], { mode: 'ranked' });
-  assert.equal(result.reused, 1);
-  assert.equal(list.querySelector('.card-title').textContent, '新标题');
 });
 
 // ---------- 液态玻璃阶段 3：motion 错峰入场（可选增强层） ----------

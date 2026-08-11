@@ -8,7 +8,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { API_TOKEN_HEADER } = require('../server/http-security');
 const { startServer } = require('./helpers/server-child');
 
-test('hot feed pages use one stable heat-ranked candidate set without duplicate articles', async t => {
+test('feed pages use one stable candidate set without duplicate articles', async t => {
   const server = await startServer(t);
   const database = new DatabaseSync(path.join(server.dataDir, 'star-picking-pavilion.db'));
   const sourceId = database.prepare(`INSERT INTO sources (name, type, url, tier, domain)
@@ -24,7 +24,7 @@ test('hot feed pages use one stable heat-ranked candidate set without duplicate 
       const date = rank < 30 ? old : now;
       insert.run(
         sourceId,
-        `热点分页文章 ${rank}`,
+        `分页文章 ${rank}`,
         `https://example.com/article-${Date.now()}-${rank}`,
         date.toISOString(),
         date.toISOString(),
@@ -40,8 +40,8 @@ test('hot feed pages use one stable heat-ranked candidate set without duplicate 
   }
 
   const headers = { [API_TOKEN_HEADER]: server.token };
-  const first = JSON.parse((await server.request({ pathname: '/api/feed?view=hot&page=0', headers })).body);
-  const second = JSON.parse((await server.request({ pathname: '/api/feed?view=hot&page=1', headers })).body);
+  const first = JSON.parse((await server.request({ pathname: '/api/feed?view=all&page=0', headers })).body);
+  const second = JSON.parse((await server.request({ pathname: '/api/feed?view=all&page=1', headers })).body);
   assert.equal(first.items.length, 30);
   assert.equal(second.items.length, 30);
   const firstIds = new Set(first.items.map(item => item.id));

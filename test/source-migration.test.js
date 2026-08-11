@@ -41,11 +41,36 @@ test('v6 将工信部空壳旧栏目迁移到可静态解析的新版新闻发�
   const source = seed.sources.find(item => item.name === '工信部·新闻动态');
   const migration = seed._migrations.find(item => item.from === oldUrl);
 
-  assert.equal(seed._version, 6);
   assert.equal(source.url, newUrl);
   assert.equal(migration.to, newUrl);
   assert.equal(migration.name, source.name);
   assert.deepEqual(migration.selector, source.selector);
+});
+
+test('v7 将 36氪 死链 feed 迁移到 RSSHub 快讯路由，老库行保留统计与启停状态', () => {
+  assert.equal(seed._version, 7);
+  const migration = seed._migrations.find(item => item.from === 'https://36kr.com/feed');
+  const seeded = seed.sources.find(item => item.url === 'rsshub://36kr/newsflashes');
+  assert.ok(migration, '缺少 36氪 迁移步骤');
+  assert.ok(seeded, '种子库缺少迁移目标条目');
+  assert.equal(migration.to, seeded.url);
+  assert.equal(migration.name, seeded.name);
+  // 依赖自建 RSSHub，默认必须停用
+  assert.equal(seeded.enabled, false);
+
+  const id = insertSource({ url: 'https://36kr.com/feed', name: '36氪', type: 'rss' });
+  db.prepare('UPDATE sources SET fetch_count=9, item_count=42, consecutive_errors=3 WHERE id=?').run(id);
+
+  const applied = applySourceMigrations(seed._migrations.filter(s => s.from === 'https://36kr.com/feed'));
+  assert.equal(applied, 1);
+
+  const row = byId(id);
+  assert.equal(row.url, 'rsshub://36kr/newsflashes');
+  assert.equal(row.name, '36氪·快讯');
+  assert.equal(row.type, 'rss', 'relocate 不改类型，rsshub:// 仍走 rss 适配器');
+  assert.equal(row.item_count, 42, '历史统计保留');
+  assert.equal(row.consecutive_errors, 0, '换地址后退避清零');
+  assert.equal(row.next_fetch_at, null);
 });
 
 test('改地址保留原有行：id、采集统计与用户的启停状态都不丢', () => {

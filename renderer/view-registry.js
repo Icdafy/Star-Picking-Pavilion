@@ -47,7 +47,7 @@
       bar.style.setProperty('--ti-o', '1');
     }
 
-    // sticky 日期标题与热度栏的偏移量取决于导航条实际高度（换行时会变）
+    // sticky 日期标题的偏移量取决于导航条实际高度（换行时会变）
     function syncNavHeight() {
       const nav = $('.nav');
       if (!nav) return;

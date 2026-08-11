@@ -14,11 +14,10 @@ const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8');
 // 新模块源码上（契约内容不变，只换落点）
 const formatUtilsSource = fs.readFileSync(path.join(root, 'renderer', 'format-utils.js'), 'utf8');
 const feedCardSource = fs.readFileSync(path.join(root, 'renderer', 'feed-card.js'), 'utf8');
-// 阶段 3 批 2：功能控制器抽离。loadFeed/热度栏/日报/信源/检索/快捷键/
+// 阶段 3 批 2：功能控制器抽离。loadFeed/日报/信源/检索/快捷键/
 // 实时轮询/导出/设置接线分别迁入独立 UMD 模块，被移动的字面断言同批改指
 // 新模块源码，契约内容（文案、API 路径、竞态守卫语义）不变
 const feedControllerSource = fs.readFileSync(path.join(root, 'renderer', 'feed-controller.js'), 'utf8');
-const hotRailSource = fs.readFileSync(path.join(root, 'renderer', 'hot-rail-controller.js'), 'utf8');
 const dailyViewSource = fs.readFileSync(path.join(root, 'renderer', 'daily-view-controller.js'), 'utf8');
 const sourcesControllerSource = fs.readFileSync(path.join(root, 'renderer', 'sources-controller.js'), 'utf8');
 const searchControllerSource = fs.readFileSync(path.join(root, 'renderer', 'search-controller.js'), 'utf8');
@@ -28,7 +27,7 @@ const exportControllerSource = fs.readFileSync(path.join(root, 'renderer', 'expo
 const settingsViewSource = fs.readFileSync(path.join(root, 'renderer', 'settings-view-controller.js'), 'utf8');
 // 阶段 3 批 3：状态层与视图查表调度。switchView 的 if-else 分发改为
 // view-registry 查表，isFeed 计算随之迁出；组合根保留 switchView 透传与
-// 8 视图注册，FEED_VIEWS 常量仍留在 app.js
+// 7 视图注册，FEED_VIEWS 常量仍留在 app.js
 const storeSource = fs.readFileSync(path.join(root, 'renderer', 'store.js'), 'utf8');
 const viewRegistrySource = fs.readFileSync(path.join(root, 'renderer', 'view-registry.js'), 'utf8');
 // 阶段 3 批 4：切片执行函数迁移。renderCommonLinks 与两段接线迁入
@@ -516,7 +515,7 @@ test('常用网址渲染通过共享工具转义文本并限制外链协议', ()
   assert.match(commonLinksControllerSource, /href="\$\{safeUrl\(item\.url\)\}"/);
 });
 
-test('文章、图片、热点、事件簇和日报的远程地址全部通过安全 URL 工具', () => {
+test('文章、图片、事件簇和日报的远程地址全部通过安全 URL 工具', () => {
   assert.match(app, /const safeUrl = value => esc\(DomUtils\.safeHttpUrl\(value\)\);/);
   // 阶段 4：缩略图 src 随卡片模板迁到 renderer/feed-card.js，改经
   // safeHttpUrl 过闸后字段级填充（行为断言见 test/feed-diff.test.js）
@@ -525,10 +524,8 @@ test('文章、图片、热点、事件簇和日报的远程地址全部通过�
   // 批 4：事件簇 i.url 留在 feed-controller，常用网址 item.url 随控制器迁出
   assert.match(feedControllerSource, /href="\$\{safeUrl\(i\.url\)\}"/);
   assert.match(commonLinksControllerSource, /href="\$\{safeUrl\(item\.url\)\}"/);
-  // 批 2：热度栏与日报模板里的 it.url 随控制器迁出，断言改指新模块
-  for (const source of [hotRailSource, dailyViewSource]) {
-    assert.match(source, /href="\$\{safeUrl\(it\.url\)\}"/);
-  }
+  // 批 2：日报模板里的 it.url 随控制器迁出，断言改指新模块
+  assert.match(dailyViewSource, /href="\$\{safeUrl\(it\.url\)\}"/);
 });
 
 test('v4 卡片使用领域色条、异步缩略图与样式表托管的日报间距', () => {
@@ -614,12 +611,6 @@ test('信息流重载以最后一次请求为准，加载途中切换筛选不�
   // 批 1：SKELETON_MIN_MS 迁到 renderer/format-utils.js
   assert.match(formatUtilsSource, /const SKELETON_MIN_MS = \d+;/);
   assert.match(feedControllerSource, /if \(request\.isCurrent\(\)\) state\.loading = false;/);
-});
-
-test('右侧热度栏同样丢弃过期响应', () => {
-  assert.match(app, /const hotRailRequestGuard = Bootstrap\.createLatestRequestGuard\(\);/);
-  // 批 2：loadHotRail 迁入 renderer/hot-rail-controller.js
-  assert.match(hotRailSource, /async function loadHotRail[\s\S]{0,400}?if \(!request\.isCurrent\(\)\) return;/);
 });
 
 test('信源卡片展示失败退避状态并提供立即重试', () => {
@@ -752,12 +743,12 @@ test('v0.0.14 设置页只暴露单一分析模型字段', () => {
 test('星标作为一等信息流视图接入导航、筛选与实时轮询', () => {
   assert.match(html, /data-view="starred"[^>]*aria-controls="viewFeed"/);
   assert.match(html, /id="tabStarredCount"/);
-  assert.match(app, /const FEED_VIEWS = \['featured', 'hot', 'all', 'starred'\];/);
+  assert.match(app, /const FEED_VIEWS = \['featured', 'all', 'starred'\];/);
   // isFeed 必须与轮询、导出共用同一个集合，否则星标视图会拿不到筛选条与增量刷新
   // 批 3：switchView 改查表调度，isFeed 计算随迁入 renderer/view-registry.js
   assert.match(viewRegistrySource, /const isFeed = FEED_VIEWS\.includes\(view\);/);
-  assert.doesNotMatch(app, /\['featured', 'hot', 'all'\]\.includes/);
-  // 批 3：8 个视图全部经注册表接入：循环注册覆盖 FEED_VIEWS 四个信息流视图
+  assert.doesNotMatch(app, /'hot'/);
+  // 批 3：7 个视图全部经注册表接入：循环注册覆盖 FEED_VIEWS 三个信息流视图
   //（共享 #viewFeed），另四个面板逐条注册；组合根的 switchView 退化为注册表
   // 透传（启动序列断言仍可命中）
   assert.equal((app.match(/registerView\(\{ id:/g) || []).length, 5);
@@ -884,7 +875,7 @@ test('快捷键随第八个视图扩展，并新增复制当前视图', () => {
   // 批 2：键盘快捷键迁到 renderer/shortcuts.js
   assert.match(shortcutsSource, /const tabIndex = '12345678'\.indexOf\(event\.key\);/);
   assert.match(shortcutsSource, /if \(letter === 'c'\)/);
-  assert.match(html, /切换第 1–8 个视图/);
+  assert.match(html, /切换第 1–7 个视图/);
   assert.match(html, /<kbd>Alt<\/kbd><kbd>C<\/kbd>/);
 });
 
@@ -962,22 +953,18 @@ test('信息流哨兵自动预取下一页，加载更多保留为键盘可达�
   assert.match(feedControllerSource, /const startIdx = state\.page \* 30;/);
 });
 
-test('实时轮询先比对 stats 信号再探测，热度栏改为逐行节点级更新', () => {
-  // 轮询瘦身：仅当 today/pending 等信号相对上轮变化时才探测 feed 与热栏，
+test('实时轮询先比对 stats 信号再探测，无变化轮次直接跳过', () => {
+  // 轮询瘦身：仅当 today/pending 等信号相对上轮变化时才探测 feed，
   // 无变化轮次直接跳过；stats 拉取失败时宁可多探一次不漏更新
-  // 批 2：轮询迁到 renderer/realtime-poller.js、热栏逐行更新迁到
-  // renderer/hot-rail-controller.js、card-new 高亮迁到 renderer/feed-controller.js
+  // 批 2：轮询迁到 renderer/realtime-poller.js、card-new 高亮迁到 renderer/feed-controller.js
   assert.match(realtimePollerSource, /const stats = await refreshStats\(\);/);
-  // 信号未变轮次只跳过 feed 探测，热度随时间衰减，热栏仍要刷新
-  assert.match(realtimePollerSource, /if \(signals !== null && signals === lastPollSignals\) \{ loadHotRail\(\); return schedule\(\); \}/);
+  // 信号未变轮次直接跳过 feed 探测
+  assert.match(realtimePollerSource, /if \(signals !== null && signals === lastPollSignals\) return schedule\(\);/);
   // 探测失败时回滚信号：本轮信号不得被静默消费，下轮重探不漏更新
   assert.match(realtimePollerSource, /catch \{[\s\S]*?lastPollSignals = null;/);
   assert.match(realtimePollerSource, /\[s\.today, s\.pending, s\.featuredToday, s\.articles, s\.starred\]\.join\('\|'\)/);
   // 18 秒周期不变
   assert.match(realtimePollerSource, /pollTimer = setTimeout\(pollRealtime, 18000\);/);
-  // 热栏复用现有行节点做 textContent/属性更新，不再整段重渲染
-  assert.match(hotRailSource, /function syncHotRailRow\(row, it, i\)/);
-  assert.match(hotRailSource, /row\.querySelector\('\.hi-title'\)\.textContent = it\.title;/);
   // freshIds 新条目高亮路径保持：card-new 类由阶段 1 样式承接
   assert.match(feedControllerSource, /if \(el\) el\.classList\.add\('card-new'\);/);
 });
@@ -1025,7 +1012,6 @@ test('液态玻璃阶段 3：WAAPI 动效引擎、fx-tier 档位与视图切换�
   assert.match(app, /document\.body\.classList\.add\('theme-transition'\);/);
   assert.match(app, /document\.body\.classList\.remove\('theme-transition'\), 320\);/);
   assert.match(css, /body\.theme-transition[\s\S]*?transition: color 260ms/);
-  // 轮询批处理：非关键刷新经注入的 idle/rAF 延迟，主循环 setTimeout 不动
-  assert.match(realtimePollerSource, /function deferNonCritical\(fn\)/);
+  // 轮询主循环 setTimeout 自调度不动
   assert.match(realtimePollerSource, /pollTimer = setTimeout\(pollRealtime, 18000\);/);
 });

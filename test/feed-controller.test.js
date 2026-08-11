@@ -55,18 +55,16 @@ function makeList() {
 // 阶段 4 假 diff：reconcile 整表写 innerHTML、appendPage 走 insertAdjacentHTML，
 // 并把调用记到 calls 上，用于断言「整表重载路径在增量场景不被调用」
 function makeDiff(list, calls) {
-  const rows = (items, mode) => items.map(i => mode === 'ranked'
-    ? `<div class="card ranked" data-id="${i.id}"></div>`
-    : `<div class="card" data-id="${i.id}"></div>`).join('');
+  const rows = items => items.map(i => `<div class="card" data-id="${i.id}"></div>`).join('');
   return {
-    reconcile(items, { mode = 'timeline' } = {}) {
+    reconcile(items) {
       calls.reconcile += 1;
-      list.innerHTML = rows(items, mode);
+      list.innerHTML = rows(items);
       return { reused: 0, created: items.length, removed: 0 };
     },
-    appendPage(items, { mode = 'timeline' } = {}) {
+    appendPage(items) {
       calls.appendPage += 1;
-      list.insertAdjacentHTML('beforeend', rows(items, mode));
+      list.insertAdjacentHTML('beforeend', rows(items));
       return { created: items.length };
     }
   };
@@ -136,12 +134,6 @@ test('reset 加载渲染时间轴并记录 knownIds', async () => {
   assert.deepEqual([...state.knownIds], ['a', 'b']);
   assert.equal(state.listed, 2);
   assert.equal(state.loading, false);
-});
-
-test('hot 视图走 renderRanked 排行模板', async () => {
-  const { ctrl, elements } = createController({ items: [{ id: 'x' }], view: 'hot' });
-  await ctrl.loadFeed();
-  assert.match(elements.list.innerHTML, /ranked/);
 });
 
 test('阶段 4：reset 走 diff.reconcile，分页走 diff.appendPage，整表重载路径不重复触发', async () => {

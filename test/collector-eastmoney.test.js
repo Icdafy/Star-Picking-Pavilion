@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseEastmoneySpec, buildGuard } = require('../server/collectors/api');
+const { parseEastmoneySpec, parseApiSpec, buildGuard } = require('../server/collectors/api');
 const { sanitizeSourceInput } = require('../server/input-validation');
 
 const seed = JSON.parse(
@@ -88,8 +88,9 @@ test('种子库显著扩容，且没有重复地址', () => {
 });
 
 test('每条 api 信源的地址都能被采集器解析', () => {
+  // v7 起 api 信源不再只有 eastmoney，统一走 scheme 分派层的同源解析器
   for (const source of seed.sources.filter(s => s.type === 'api')) {
-    assert.doesNotThrow(() => parseEastmoneySpec(source.url), `${source.name} 地址无法解析`);
+    assert.doesNotThrow(() => parseApiSpec(source.url), `${source.name} 地址无法解析`);
   }
 });
 

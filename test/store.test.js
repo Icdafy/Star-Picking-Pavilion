@@ -52,12 +52,12 @@ test('订阅只在选择器值（Object.is）变化时触发，取消后不再�
   const seen = [];
   const unsubscribe = store.subscribe(s => s.view, value => seen.push(value));
   store.setState({ q: '航天' });          // view 未变，不得通知
-  store.setState({ view: 'hot' });
-  store.setState({ view: 'hot' });        // 同值不得重复通知
-  assert.deepEqual(seen, ['hot']);
+  store.setState({ view: 'starred' });
+  store.setState({ view: 'starred' });        // 同值不得重复通知
+  assert.deepEqual(seen, ['starred']);
   unsubscribe();
   store.setState({ view: 'all' });
-  assert.deepEqual(seen, ['hot']);
+  assert.deepEqual(seen, ['starred']);
   unsubscribe();                          // 重复取消无副作用
 });
 

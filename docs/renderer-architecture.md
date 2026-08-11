@@ -24,7 +24,6 @@ index.html（静态路由，25 条 <script src>，预算已用尽）
     │
     ├── 功能控制器层（一个视图/一条职责链一个工厂）
     │   ├── feed-controller.js          loadFeed/分页/哨兵预取 + 卡片交互委托/toggleStar
-    │   ├── hot-rail-controller.js      热度栏逐行节点级更新
     │   ├── daily-view-controller.js    日报导航/重生成
     │   ├── sources-controller.js       信源增删与软停用
     │   ├── search-controller.js        检索防抖 + 词库面板
@@ -52,12 +51,11 @@ staggerIn 三个 API，matchMedia/document/rAF 经 deps 注入，reduced 偏好
 新建行错峰入场，可选依赖）。fx-tier 运行时档位由组合根 app.js 即席
 推导写 `<html data-fx-tier>`（full/lite/static，不进 store/schema/持久化），
 styles.css 尾部覆盖块只调 `--glass-blur`/`--dur-glide` 令牌值按档降载，
-不新增滤镜声明点与关键帧；realtime-poller 的非关键刷新（热栏）经注入的
-idle/rAF 批处理，主循环 setTimeout 自调度不变。
+不新增滤镜声明点与关键帧；realtime-poller 主循环 setTimeout 自调度不变。
 
 阶段 4 增量 diff 渲染引擎已接管 app.js 中剩余的卡片整卡模板：
 cardInner 迁为 index.html 的 `<template id="cardTemplate">`，
-renderTimeline/renderRanked/publishedTime/starredTime/DIM_NAMES 迁入
+renderTimeline/publishedTime/starredTime/DIM_NAMES 迁入
 renderer/feed-card.js（createCardRenderer + createFeedDiffList），组合根
 只剩 cardRenderer/feedDiffList 的装配与注入。
 

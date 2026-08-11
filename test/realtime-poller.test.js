@@ -4,6 +4,7 @@
 // 覆盖：依赖护栏、开关持久化、信号比对跳过、后台标签页暂停、
 // 新条目高亮（顶部直刷 vs 阅读中横幅）与错误路径。
 // 阶段 4：顶部直刷改走 diff.prependFresh 前置插入，补前置/退回路径测试。
+// 热点移除批次：轮询不再刷新热度栏，无变化/非信息流轮次直接重新排程。
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -40,7 +41,7 @@ test('缺少必需依赖时工厂抛 TypeError', () => {
 
 function makeEnv({ statsSequence = [], feedItems = [], hidden = false, scrollY = 0,
   view = 'featured', q = '', loading = false, realtime = true, reading = false, diff = null } = {}) {
-  const calls = { toast: [], remember: [], loadFeed: 0, loadHotRail: 0, scrollToTop: 0, prependFresh: 0, feedProbe: 0 };
+  const calls = { toast: [], remember: [], loadFeed: 0, scrollToTop: 0, prependFresh: 0, feedProbe: 0 };
   let statsIdx = 0;
   const listeners = {};
   const flashListeners = {};
@@ -54,7 +55,7 @@ function makeEnv({ statsSequence = [], feedItems = [], hidden = false, scrollY =
     },
     state: { view, q, loading, realtime, domain: '', category: '',
       knownIds: new Set(), freshIds: new Set(), listed: 0 },
-    FEED_VIEWS: ['featured', 'hot', 'all', 'starred'],
+    FEED_VIEWS: ['featured', 'all', 'starred'],
     toast: (m, e) => calls.toast.push([m, !!e]),
     preferenceActions: { remember: (k, v) => calls.remember.push([k, v]) },
     refreshStats: async () => {
@@ -62,7 +63,6 @@ function makeEnv({ statsSequence = [], feedItems = [], hidden = false, scrollY =
       return next === 'fail' ? null : next;
     },
     loadFeed: async () => { calls.loadFeed++; },
-    loadHotRail: () => { calls.loadHotRail++; },
     scrollToTop: () => { calls.scrollToTop++; },
     document: {
       hidden,
@@ -108,19 +108,17 @@ test('后台标签页暂停：不拉 stats 也不探测，只重新排程', asyn
   const env = makeEnv({ hidden: true, statsSequence: [{ today: 1 }] });
   const poller = createRealtimePoller(env);
   await poller.pollRealtime();
-  assert.equal(env.calls.loadHotRail, 0);
   assert.equal(env.calls.loadFeed, 0);
+  assert.equal(env.calls.feedProbe, 0);
 });
 
-test('stats 信号与上轮相同则跳过 feed 探测，但热度栏仍刷新', async () => {
+test('stats 信号与上轮相同则整轮跳过，不再探测 feed', async () => {
   const same = { today: 5, pending: 0, featuredToday: 2, articles: 100, starred: 1 };
   const env = makeEnv({ statsSequence: [same, same] });
   const poller = createRealtimePoller(env);
   await poller.pollRealtime();   // 首轮：信号首次记录，探测一次
-  assert.equal(env.calls.loadHotRail, 1);
   assert.equal(env.calls.feedProbe, 1);
-  await poller.pollRealtime();   // 次轮：信号未变，跳过 feed 探测但热栏失鲜不得冻结
-  assert.equal(env.calls.loadHotRail, 2);
+  await poller.pollRealtime();   // 次轮：信号未变，直接重新排程
   assert.equal(env.calls.feedProbe, 1);
   assert.equal(env.calls.loadFeed, 0);
 });
@@ -130,14 +128,14 @@ test('stats 拉取失败时信号记 null，宁可多探一次不漏更新', asy
   const poller = createRealtimePoller(env);
   await poller.pollRealtime();
   await poller.pollRealtime();
-  assert.equal(env.calls.loadHotRail, 2);   // 两轮都探测
+  assert.equal(env.calls.feedProbe, 2);   // 两轮都探测
 });
 
-test('非信息流视图或检索态只刷热栏，不探测 feed', async () => {
+test('非信息流视图或检索态只重新排程，不探测 feed', async () => {
   const env = makeEnv({ view: 'sources', statsSequence: [{ today: 1 }] });
   const poller = createRealtimePoller(env);
   await poller.pollRealtime();
-  assert.equal(env.calls.loadHotRail, 1);
+  assert.equal(env.calls.feedProbe, 0);
   assert.equal(env.lastFeedUrl, undefined);
 });
 
@@ -170,7 +168,6 @@ test('正在阅读时不打断：显示新情报横幅，点击后回顶刷新',
   assert.equal(env.elements.newFlash.hidden, true);
   assert.equal(env.calls.scrollToTop, 1);
   assert.equal(env.calls.loadFeed, 1);
-  assert.equal(env.calls.loadHotRail, 2);   // 轮询一次 + 横幅点击一次
 });
 
 test('feed 探测失败时静默吞掉本轮，不 toast 报错，且回滚信号使下轮重探', async () => {
@@ -214,12 +211,12 @@ test('阶段 4：时间轴视图顶部新条目走 prependFresh，不触发整�
   assert.equal(env.state.freshIds.size, 0);       // 已就地高亮
 });
 
-test('阶段 4：热点榜/星标视图不走前置插入，仍整表重载', async () => {
+test('阶段 4：星标视图不走前置插入，仍整表重载', async () => {
   const diff = makeDiffFake(1);
   const env = makeEnv({
     statsSequence: [{ today: 2 }],
     feedItems: [{ id: 'new-1' }],
-    view: 'hot', scrollY: 0,
+    view: 'starred', scrollY: 0,
     diff
   });
   const poller = createRealtimePoller(env);
@@ -248,66 +245,5 @@ test('回到前台的 visibilitychange 立即触发一轮轮询', async () => {
   const poller = createRealtimePoller(env);
   env.dispatchVisibility();
   await new Promise(resolve => realSetTimeout(resolve, 10));
-  assert.equal(env.calls.loadHotRail, 1);
-});
-
-// ---------- 液态玻璃阶段 3：非关键 DOM 更新的 idle 延迟 + rAF 批处理 ----------
-// 主循环 setTimeout 自调度不动；热栏等非关键刷新经注入的 idle/rAF 延迟，
-// 未注入时同步直执行（上方既有用例已覆盖同构降级）
-
-function makeScheduler() {
-  const idleQueue = [];
-  const frameQueue = [];
-  return {
-    idleQueue,
-    frameQueue,
-    requestIdleCallback: cb => { idleQueue.push(cb); },
-    requestAnimationFrame: cb => { frameQueue.push(cb); },
-    flush() {
-      for (const cb of idleQueue.splice(0)) cb({ timeRemaining: () => 8 });
-      for (const cb of frameQueue.splice(0)) cb(performance.now());
-    }
-  };
-}
-
-test('阶段 3：注入 idle/rAF 后热栏刷新被延迟到空闲帧，主流程不阻塞', async () => {
-  const scheduler = makeScheduler();
-  const same = { today: 5, pending: 0, featuredToday: 2, articles: 100, starred: 1 };
-  const env = makeEnv({ statsSequence: [same, same] });
-  const poller = createRealtimePoller({ ...env, ...scheduler });
-  await poller.pollRealtime();
-  // 轮询已返回，但热栏刷新还没写 DOM：被 idle 扣住
-  assert.equal(env.calls.loadHotRail, 0);
-  assert.equal(scheduler.idleQueue.length, 1);
-  scheduler.flush();                 // 空闲回调 → rAF 批处理 → 写 DOM
-  assert.equal(env.calls.loadHotRail, 1);
-  // 次轮信号未变同样只刷热栏，且仍走 idle 延迟
-  await poller.pollRealtime();
-  assert.equal(env.calls.loadHotRail, 1);
-  scheduler.flush();
-  assert.equal(env.calls.loadHotRail, 2);
-  assert.equal(env.calls.feedProbe, 1, 'feed 探测不受批处理影响');
-});
-
-test('阶段 3：只注入 idle 不注入 rAF 时空闲回调内直接写 DOM', async () => {
-  const idleQueue = [];
-  const env = makeEnv({ statsSequence: [{ today: 1 }] });
-  const poller = createRealtimePoller({
-    ...env,
-    requestIdleCallback: cb => { idleQueue.push(cb); }
-  });
-  await poller.pollRealtime();
-  assert.equal(env.calls.loadHotRail, 0);
-  for (const cb of idleQueue.splice(0)) cb({ timeRemaining: () => 50 });
-  assert.equal(env.calls.loadHotRail, 1);
-});
-
-test('阶段 3：idle 回调抛错时同步兜底执行，不漏刷新', async () => {
-  const env = makeEnv({ statsSequence: [{ today: 1 }] });
-  const poller = createRealtimePoller({
-    ...env,
-    requestIdleCallback: () => { throw new Error('idle unavailable'); }
-  });
-  await poller.pollRealtime();
-  assert.equal(env.calls.loadHotRail, 1);
+  assert.equal(env.calls.feedProbe, 1);
 });

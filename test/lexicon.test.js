@@ -108,3 +108,36 @@ test('检索面板结构保留分组、别名与权重', () => {
   assert.ok(Object.hasOwn(first.terms[0], 'aliases'));
   assert.ok(Object.hasOwn(first.terms[0], 'weight'));
 });
+
+test('C组卫星专题：新增三个 aerospace 分组且 _version 已升级', () => {
+  assert.equal(raw._version, 2);
+  const loaded = lexicon.loadLexicon();
+  for (const id of ['cs-sat-tech', 'cs-sat-app', 'cs-sat-orbit']) {
+    const group = loaded.groups.find(g => g.id === id);
+    assert.ok(group, `缺少新分组 ${id}`);
+    assert.equal(group.domain, 'aerospace', `${id} 必须显式落在 aerospace 域`);
+    assert.ok(group.terms.length >= 10, `${id} 词条数量不足`);
+  }
+  // cs-satco 已扩充国际与国内卫星企业
+  const satco = loaded.groups.find(g => g.id === 'cs-satco');
+  const satcoTerms = satco.terms.map(t => t.term);
+  for (const name of ['Iridium', 'AST SpaceMobile', 'Inmarsat', 'Maxar', '上海瀚讯', '海格通信', '欧比特']) {
+    assert.ok(satcoTerms.includes(name), `cs-satco 缺少 ${name}`);
+  }
+  const globalstar = satco.terms.find(t => t.term === 'Globalstar');
+  assert.ok(!globalstar.aliases.includes('AST SpaceMobile'), '不同卫星运营商不得互作别名');
+});
+
+test('C组卫星专题：新词条参与领域判定且未放宽入库门槛', () => {
+  assert.equal(lexicon.analyze('低轨星座星间链路').domain, 'aerospace');
+  assert.equal(lexicon.analyze('千帆星座批量生产平板式卫星').domain, 'aerospace');
+  assert.equal(lexicon.isRelevantSummary(lexicon.analyze('垣信卫星启动星座组网发射')), true);
+  // 权重纪律：新增条目中不得出现 w>=8 的高权泛词，最高不超过 7
+  const newGroups = raw.groups.filter(g => ['cs-sat-tech', 'cs-sat-app', 'cs-sat-orbit'].includes(g.id));
+  for (const group of newGroups) {
+    for (const term of group.terms) {
+      assert.ok(term.w <= 7, `新组 ${group.id} 的「${term.t}」权重过高`);
+      assert.ok(!['卫星', '发射', '星座', '轨道', '载荷'].includes(term.t), `新组不得收录泛词「${term.t}」`);
+    }
+  }
+});

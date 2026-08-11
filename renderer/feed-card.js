@@ -6,7 +6,7 @@
    与时间格式化一律走依赖注入，工厂体内不出现 window/document 直读。
    阶段 4 接管卡片整卡模板：cardInner 迁为 index.html 中的
    <template id="cardTemplate">，createCardRenderer 提供 cloneNode(true)
-   + 字段级填充；renderTimeline/renderRanked（日期分组头 sticky、分组逻辑）
+   + 字段级填充；renderTimeline（日期分组头 sticky、分组逻辑）
    同批迁入；createFeedDiffList 提供按 data-id 调和的增量渲染器。 */
 
 (function exposeFeedCard(root, factory) {
@@ -284,20 +284,6 @@
       return row;
     }
 
-    // 排行行：名次数字 + 卡片（自 app.js renderRanked 迁入）
-    function rankedRow(item, rank, delayMs) {
-      const row = doc.createElement('div');
-      row.setAttribute('class', 'rank-row');
-      const rankBox = doc.createElement('div');
-      rankBox.setAttribute('class', rank <= 3 ? 'card-rank top' : 'card-rank');
-      rankBox.textContent = String(rank).padStart(2, '0');
-      row.appendChild(rankBox);
-      const card = renderCard(item);
-      card.style.animationDelay = `${delayMs}ms`;
-      row.appendChild(card);
-      return row;
-    }
-
     // 按日期分组（保持原分组逻辑不变）；time 记录该组首条目的原始时间值，
     // 供 prependFresh 在标签不一致时比较新旧关系
     function groupItems(items, timeOf) {
@@ -345,15 +331,6 @@
       return frag;
     }
 
-    // 排行整页片段（热点榜）
-    function renderRanked(items, startIdx) {
-      const frag = doc.createDocumentFragment();
-      items.forEach((item, i) => {
-        frag.appendChild(rankedRow(item, startIdx + i + 1, Math.min(i, 10) * 35));
-      });
-      return frag;
-    }
-
     // 复用行时同步可能漂移的字段：左侧时刻随时间基准走
     function syncTimelineRow(row, item, timeOf) {
       const time = row.querySelector('.tl-time');
@@ -363,11 +340,9 @@
     return Object.freeze({
       renderCard,
       timelineRow,
-      rankedRow,
       groupItems,
       dateGroupShell,
       renderTimeline,
-      renderRanked,
       syncTimelineRow
     });
   }
@@ -379,7 +354,7 @@
   // 列表数据正确性不受影响
   function createFeedDiffList({ list, renderer, motion = null } = {}) {
     if (!list || !renderer || typeof renderer.timelineRow !== 'function'
-      || typeof renderer.rankedRow !== 'function' || typeof renderer.groupItems !== 'function'
+      || typeof renderer.groupItems !== 'function'
       || typeof renderer.dateGroupShell !== 'function' || typeof renderer.renderCard !== 'function') {
       throw new TypeError('feed diff list requires list and renderer dependencies');
     }
@@ -406,26 +381,24 @@
     }
 
     // 按 data-id 收集并摘下现有行，得到可复用池（diff 的键）。
-    // 复用键纳入模式维度：只收与目标 mode 同类的行壳（ranked 收 .rank-row、
-    // timeline 收 .tl-row），跨模式调和时异模式行一律重建，避免 rank-row
-    // 被挂进 date-group 破坏结构
-    function collectRowsById(mode) {
+    // 只收时间轴行壳（.tl-row），无对应行壳的卡片随列表清空后重建
+    function collectRowsById() {
       const rowsById = new Map();
-      const rowSelector = mode === 'ranked' ? '.rank-row' : '.tl-row';
+      const rowSelector = '.tl-row';
       for (const card of Array.from(list.querySelectorAll('.card[data-id]'))) {
         const key = String(card.getAttribute('data-id'));
         if (rowsById.has(key)) continue;
         const row = card.closest(rowSelector);
-        if (!row) continue;   // 异模式行不入池：随列表清空后重建
+        if (!row) continue;   // 无行壳的卡片不入池：随列表清空后重建
         row.parentNode?.removeChild(row);
         rowsById.set(key, row);
       }
       return rowsById;
     }
 
-    // 复用行的卡片正文随新数据刷新：行壳（左侧时刻/名次与节点身份）保留，
+    // 复用行的卡片正文随新数据刷新：行壳（左侧时刻与节点身份）保留，
     // 卡片整张换新。选「换卡不整行重建」而非整行重建，是因为行壳上挂着
-    // tl-left/card-rank 的同步逻辑与行节点复用契约，整行重建会丢掉节点身份、
+    // tl-left 的同步逻辑与行节点复用契约，整行重建会丢掉节点身份、
     // 代价也更高；换卡与新建行共用 renderer.renderCard，字段填充行为必然
     // 一致。代价是复用行上已展开的五维/事件簇交互态会随刷新复位——整表
     // 调和本就是「以服务端最新数据为准」的时刻，复位可接受
@@ -442,42 +415,22 @@
       } else row.appendChild(newCard);
     }
 
-    function syncRankRow(row, rank) {
-      const rankBox = row.querySelector('.card-rank');
-      if (!rankBox) return;
-      rankBox.textContent = String(rank).padStart(2, '0');
-      rankBox.classList.toggle('top', rank <= 3);
-    }
-
-    // 整表调和（loadFeed reset）：同 data-id 且同模式的行壳原样复用，
-    // 只为缺失项建节点；复用行的卡片正文经 refreshRowCard 随新数据刷新，
-    // 分组外壳重建开销可忽略
-    function reconcile(items, { mode = 'timeline', startIdx = 0, timeOf = publishedTime } = {}) {
-      const rowsById = collectRowsById(mode);
+    function reconcile(items, { startIdx = 0, timeOf = publishedTime } = {}) {
+      const rowsById = collectRowsById();
       list.replaceChildren();
       let reused = 0;
       let created = 0;
       const createdRows = [];
-      if (mode === 'ranked') {
-        items.forEach((item, i) => {
+      for (const group of renderer.groupItems(items, timeOf)) {
+        const groupEl = renderer.dateGroupShell(group.label, group.items.length, group.time);
+        list.appendChild(groupEl);
+        group.items.forEach((item, i) => {
           const key = String(item.id);
           let row = rowsById.get(key);
-          if (row) { reused += 1; syncRankRow(row, startIdx + i + 1); refreshRowCard(row, item, Math.min(i, 10) * 35); }
-          else { row = renderer.rankedRow(item, startIdx + i + 1, Math.min(i, 10) * 35); created += 1; createdRows.push(row); }
-          list.appendChild(row);
+          if (row) { reused += 1; renderer.syncTimelineRow?.(row, item, timeOf); refreshRowCard(row, item, Math.min(startIdx + i, 10) * 35); }
+          else { row = renderer.timelineRow(item, timeOf, Math.min(startIdx + i, 10) * 35); created += 1; createdRows.push(row); }
+          groupEl.appendChild(row);
         });
-      } else {
-        for (const group of renderer.groupItems(items, timeOf)) {
-          const groupEl = renderer.dateGroupShell(group.label, group.items.length, group.time);
-          list.appendChild(groupEl);
-          group.items.forEach((item, i) => {
-            const key = String(item.id);
-            let row = rowsById.get(key);
-            if (row) { reused += 1; renderer.syncTimelineRow?.(row, item, timeOf); refreshRowCard(row, item, Math.min(startIdx + i, 10) * 35); }
-            else { row = renderer.timelineRow(item, timeOf, Math.min(startIdx + i, 10) * 35); created += 1; createdRows.push(row); }
-            groupEl.appendChild(row);
-          });
-        }
       }
       staggerCreated(createdRows);
       const removed = rowsById.size - reused;
@@ -486,10 +439,8 @@
 
     // 分页追加：整页片段追加到尾部（每页自带日期分组，与阶段 2 的
     // insertAdjacentHTML 语义等价，只是节点由模板克隆而来）
-    function appendPage(items, { mode = 'timeline', startIdx = 0, timeOf = publishedTime } = {}) {
-      const frag = mode === 'ranked'
-        ? renderer.renderRanked(items, startIdx)
-        : renderer.renderTimeline(items, startIdx, timeOf);
+    function appendPage(items, { startIdx = 0, timeOf = publishedTime } = {}) {
+      const frag = renderer.renderTimeline(items, startIdx, timeOf);
       list.appendChild(frag);
       return { created: items.length };
     }
@@ -510,8 +461,8 @@
     }
 
     // 实时新条目：仅前置插入 + .card-new 高亮（阶段 1 样式承接），替代整表
-    // 重载。返回实际插入条数；列表里没有日期分组（空态/骨架/失败态/排行
-    // 视图）等不适用前置的场景返回 0，由调用方退回整表重载
+    // 重载。返回实际插入条数；列表里没有日期分组（空态/骨架/失败态）
+    // 等不适用前置的场景返回 0，由调用方退回整表重载
     function prependFresh(items, { timeOf = publishedTime } = {}) {
       if (!Array.isArray(items) || !items.length) return 0;
       if (!list.querySelector('.date-group')) return 0;

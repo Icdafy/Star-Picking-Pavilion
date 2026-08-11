@@ -2,12 +2,12 @@
 
 const { HttpError } = require('./http-security');
 // 与采集器共用同一个解析器：信源地址的写法只有一处定义，校验与采集不会各说各话
-const { parseEastmoneySpec } = require('./collectors/api');
+const { parseApiSpec } = require('./collectors/api');
 
 const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api']);
 const SOURCE_TIERS = new Set(['T1', 'T1.5', 'T2']);
 const SOURCE_DOMAINS = new Set(['both', 'lowaltitude', 'aerospace']);
-const FEED_VIEWS = new Set(['featured', 'hot', 'all', 'starred']);
+const FEED_VIEWS = new Set(['featured', 'all', 'starred']);
 const FEED_DOMAINS = new Set(['lowaltitude', 'aerospace']);
 const EXPORT_KINDS = new Set(['daily', 'feed']);
 const EXPORT_FORMATS = new Set(['markdown', 'text']);
@@ -39,14 +39,17 @@ function validateHttpAddress(value) {
 function validateSourceUrl(type, value) {
   const url = boundedString(value, '信源地址', { min: 1, max: 2048 });
   if (type === 'api') {
-    if (!url.startsWith('eastmoney://')) badRequest('API 信源当前仅支持 eastmoney://关键词');
-    // 形如 eastmoney://关键词?pages=2&mode=both&guard=off —— 关键词与可选参数分开校验，
-    // 否则 "?pages=2" 会被当成关键词的一部分混过长度检查
+    // 支持 eastmoney:// / cninfo:// / sse:// / szse:// / cls:// 五种 scheme，
+    // 具体格式交给采集层同源解析器把关，校验层不重复定义
     let spec;
-    try { spec = parseEastmoneySpec(url); } catch (error) {
-      badRequest(error instanceof HttpError ? error.message : 'eastmoney 信源格式无效');
+    try { spec = parseApiSpec(url); } catch (error) {
+      badRequest(error instanceof HttpError
+        ? error.message
+        : 'API 信源地址必须以 eastmoney:// / cninfo:// / sse:// / szse:// / cls:// 开头且格式有效');
     }
-    boundedString(spec.keyword, 'eastmoney 关键词', { min: 1, max: 100 });
+    // eastmoney:// 的关键词必填已由 parseEastmoneySpec 保证；cninfo:// 检索词可空（全量公告流），
+    // 其余 scheme 检索词可选 —— 长度单独校验，避免参数段混进来蒙混过关
+    if (spec.keyword !== undefined) boundedString(spec.keyword, 'API 关键词', { min: 0, max: 100 });
     return url;
   }
   if (type === 'rss' && url.startsWith('rsshub://')) {

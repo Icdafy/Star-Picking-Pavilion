@@ -121,7 +121,7 @@ test('switchView 查表调度：面板显隐、onEnter/onLeave、persist 与全�
   const motion = { fadeSlideIn: (el, opts) => motionCalls.push([el, opts]) };
   const registry = createViewRegistry({
     $: world.$, $$: world.$$, document: world.doc, state,
-    FEED_VIEWS: ['featured', 'hot', 'all', 'starred'],
+    FEED_VIEWS: ['featured', 'all', 'starred'],
     preferenceActions: { remember: (key, value) => remembered.push([key, value]) },
     scrollToTop: () => calls.push('scrollToTop'),
     refreshStats: () => calls.push('refreshStats'),
@@ -175,7 +175,7 @@ test('信息流视图亮筛选条，persist:false 不落盘', () => {
   const remembered = [];
   const registry = createViewRegistry({
     $: world.$, $$: world.$$, document: world.doc, state,
-    FEED_VIEWS: ['featured', 'hot', 'all', 'starred'],
+    FEED_VIEWS: ['featured', 'all', 'starred'],
     preferenceActions: { remember: (key, value) => remembered.push([key, value]) }
   });
   registry.registerView({ id: 'featured', tab: '#viewFeed', isFeed: true });

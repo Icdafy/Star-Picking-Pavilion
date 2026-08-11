@@ -59,10 +59,9 @@
 
 - 返回形状固定为 `{ items, page, hasMore }`；`FEED_PAGE_SIZE = 30`。
 - `hasMore` 用「取 SIZE+1 条、多出即有更多」实现；`items` 最多 30 条。
-- 查询参数（`parseFeedQuery`）：`view`（featured/hot/all/starred）、`domain`、`category`、`q`（检索词）、`page`。
+- 查询参数（`parseFeedQuery`）：`view`（featured/all/starred）、`domain`、`category`、`q`（检索词）、`page`。
 - 视图语义：
   - `featured`：`featured = 1` 且 `relevant = 1`；
-  - `hot`：`relevant = 1`，按热度表达式排序，45 天窗口取空后退回不限时间热度榜；
   - `all`：`relevant IS NULL OR relevant = 1`；
   - `starred`：`starred = 1`，按 `COALESCE(starred_at, fetched_at) DESC` 排序，**不做事件簇折叠**。
 - 其余视图做事件簇折叠：`cluster_id IS NULL OR a.id = c.main_article_id`。
@@ -149,7 +148,7 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
 | 集合 | 值 |
 | --- | --- |
 | `THEMES` | `light`, `dark` |
-| `VIEWS` | `featured`, `hot`, `all`, `starred`, `daily`, `links`, `sources`, `settings` |
+| `VIEWS` | `featured`, `all`, `starred`, `daily`, `links`, `sources`, `settings` |
 | `DOMAINS` | `''`, `lowaltitude`, `aerospace` |
 | `TEXT_SCALES` | `sm`, `md`, `lg`, `xl`（导出为冻结数组，typography 测试 deepEqual） |
 
@@ -216,7 +215,7 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
 9. `storage-maintenance-controller.js`、`daily-archive-controller.js` 两个脚本引用
 10. 阶段 3 批 2 抽离的功能模块脚本（均在 app.js 之前、common-links 序列之后）：
   `format-utils.js`、`feed-card.js`、`stats-controller.js`、`export-controller.js`、
-  `feed-controller.js`、`hot-rail-controller.js`、`daily-view-controller.js`、
+  `feed-controller.js`、`daily-view-controller.js`、
   `sources-controller.js`、`search-controller.js`、`shortcuts.js`、`realtime-poller.js`、
   `update-pill.js`、`settings-view-controller.js`
 11. 阶段 3 批 4 常用网址视图接线脚本（app.js 之前）：`common-links-controller.js`
@@ -299,7 +298,7 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
 阶段 3 批 2 后锚点落点变更：app.js 退化为组合根，下列锚点中标注（→ 模块名）的
 已随职责迁到对应 UMD 模块，测试断言同批改指新模块源码，契约内容不变：
 哨兵/翻页/feed 竞态（→ feed-controller.js）、轮询信号（→ realtime-poller.js）、
-热栏逐行更新（→ hot-rail-controller.js）、日报（→ daily-view-controller.js）、
+日报（→ daily-view-controller.js）、
 信源（→ sources-controller.js）、检索与词库（→ search-controller.js）、
 快捷键（→ shortcuts.js）、导出（→ export-controller.js）、设置接线与备忘
 （→ settings-view-controller.js）、塔台数字（→ stats-controller.js）、
@@ -320,14 +319,14 @@ runTermSearch/safeUrl/timeAgo，不注入则不接线交互层）。test/rendere
 中最后两处切片 + new Function 断言同批改为 require 新模块的行为级断言，
 契约行为（星标视图取消星标整表重载、焦点恢复、持久化补丁）原样保留。
 阶段 4（信息流增量 diff 渲染引擎）：整卡模板 cardInner 迁为 index.html 的
-<template id="cardTemplate">，renderTimeline/renderRanked/publishedTime/starredTime/
+<template id="cardTemplate">，renderTimeline/publishedTime/starredTime/
 DIM_NAMES 迁入 renderer/feed-card.js（新增 createCardRenderer：cloneNode(true) +
 字段级填充；createFeedDiffList：reconcile/appendPage/prependFresh 三路径按 data-id
 调和）。feed-controller 的 diff 为必需依赖：loadFeed 重置走 diff.reconcile、
 分页走 diff.appendPage，整表 innerHTML 赋值点由 4 降为 3（骨架/空态/失败态）；
 realtime-poller 的 diff 为可选依赖：时间轴视图（featured/all）顶部新条目优先
 diff.prependFresh（仅前置插入 + .card-new 高亮，同步 knownIds/listed），不适用
-场景（热点榜/星标/空态/骨架/失败态）由返回 0 退回 loadFeed。焦点归还
+场景（星标/空态/骨架/失败态）由返回 0 退回 loadFeed。焦点归还
 （findFocusKey/restoreFocusByKey）、竞态守卫、freshIds 高亮契约不变；test/perf-guard
 整表赋值上限同批下调 4 → 3 并新增 keyed diff 接入断言。DOM 输出契约不变：
 class/data-*/aria-*/文案/链接结构逐字等价，原字面断言同批改指模板本体与
@@ -336,16 +335,15 @@ class/data-*/aria-*/文案/链接结构逐字等价，原字面断言同批改�
 test/feed-controller.test.js）：date-group 新增 data-group-time 属性记录首条目
 原始时间值，prependFresh 在标签不一致时比较新旧——新分组不晚于既有首组
 （轮询中源站翻出的旧文）返回 0 退回整表重载，时间轴不得倒序；reconcile 的
-复用池按 mode 隔离（ranked 收 .rank-row、timeline 收 .tl-row），跨模式调和
-全重建，复用行的卡片正文经 refreshRowCard 随新数据整卡刷新；loadFeed 失败
+复用池按 .tl-row 行壳收集，复用行的卡片正文经 refreshRowCard 随新数据整卡刷新；loadFeed 失败
 分支同步隐藏 #btnMore/#feedEnd，loadNextFeedPage 另加「列表无卡片静默」
 双保险，失败后哨兵不得翻页。
 
 ### 6.1 状态与初始化
 
 - `view: restoredPreferences.view`（其后须出现 links 相关逻辑）；`textScale: restoredPreferences.textScale`
-- `const FEED_VIEWS = ['featured', 'hot', 'all', 'starred'];`
-- `const isFeed = FEED_VIEWS.includes(view);`；禁止 `['featured', 'hot', 'all'].includes`
+- `const FEED_VIEWS = ['featured', 'all', 'starred'];`
+- `const isFeed = FEED_VIEWS.includes(view);`；禁止硬编码视图列表的 `.includes`
 - `const preferenceActions = Bootstrap.createUiPreferenceActions(`
 - `const storage = Bootstrap.getSafeStorage(window)`；禁止 `storage: localStorage`
 - `StarPickingPavilionBootstrap`、`starPickingPavilion || window.windcatcher`
@@ -374,7 +372,6 @@ test/feed-controller.test.js）：date-group 新增 data-group-time 属性记录
 - `const [data] = await Promise.all([ api('/api/feed?' + params), … ]);` 紧接 `if (!request.isCurrent()) return;`
 - `const SKELETON_MIN_MS = <数字>;`（骨架最短驻留）
 - `if (request.isCurrent()) state.loading = false;`
-- 热度栏同构：`const hotRailRequestGuard = Bootstrap.createLatestRequestGuard();`
 - 日报段：`const request = dailyRequestGuard.begin()`、`if (!request.isCurrent()) return`（正常与 catch 两处）
 
 ### 6.3a 哨兵预取与轮询瘦身（阶段 2 新增）
@@ -389,13 +386,10 @@ test/feed-controller.test.js）：date-group 新增 data-group-time 属性记录
   与 insertAdjacentHTML 语义等价），不新增整表赋值点（perf-guard 上限 3 处）
 - 轮询瘦身（→ realtime-poller.js）：`pollRealtime` 先 `const stats = await refreshStats();`，以
   `[s.today, s.pending, s.featuredToday, s.articles, s.starred].join('|')` 作为信号快照；
-  `if (signals !== null && signals === lastPollSignals) { loadHotRail(); return schedule(); }`
-  无变化轮次只跳过 feed 探测，热度栏仍要刷新（热度随时间衰减，热栏不得冻结）；
+  `if (signals !== null && signals === lastPollSignals) return schedule();`
+  无变化轮次直接跳过并重新排程；
   feed 探测失败时回滚 `lastPollSignals = null`，本轮信号不得被静默消费，
   下轮重探不漏更新；18 秒周期 `pollTimer = setTimeout(pollRealtime, 18000);` 不变
-- 热度栏逐行更新（→ hot-rail-controller.js）：`function syncHotRailRow(row, it, i)` 对现有
-  `.hot-item` 行节点做 textContent/属性级更新；仅首屏与空态→有数据过渡时整段构建
-  （模板 `hotItemTemplate`）
 - 氛围层空闲暂停：`syncIdleState()` 在 visibilitychange/blur/focus 时
   `document.body.classList.toggle('is-idle', document.hidden || !document.hasFocus());`，
   对应 styles.css 的 `body.is-idle .aurora, … { animation-play-state: paused; }`
@@ -510,7 +504,7 @@ test/feed-controller.test.js）：date-group 新增 data-group-time 属性记录
 
 app.js 全部区段注释（顺序固定，是导航也是边界）：
 状态 / 动效与滚动 / 主题 / 界面缩放 / 工具 / 主题化确认 / 剪贴板与文件导出 / 塔台状态 /
-卡片渲染 / 右侧热度栏 / 日报 / 信源 / 设置 / 云幄 · 常用网址 / 视图切换 / 检索 /
+卡片渲染 / 日报 / 信源 / 设置 / 云幄 · 常用网址 / 视图切换 / 检索 /
 核心词库面板 / 键盘快捷键 / 滚动态：导航加重、回到顶部 / 实时更新 /
 自动更新提示（仅桌面壳内生效）/ 启动。
 
@@ -552,8 +546,8 @@ app.js 全部区段注释（顺序固定，是导航也是边界）：
 - 内在尺寸网格：`.common-links-grid`、`.src-list` 必须
   `grid-template-columns: repeat(auto-fit, minmax(min(100%, …`；
   `.settings-grid`、`.storage-breakdown`、`.maintenance-action-grid` 均 `repeat(auto-fit,`
-- 热点区降栏不隐藏：禁止在 @media/@container 里对 `.hot-rail` 写 `display: none`；
-  窄容器下 `.feed-layout { grid-template-columns: 1fr;`
+- `.feed-layout` 单列栅格：`grid-template-columns: 1fr;`，容器查询降列规则
+  保留以兼容窄容器断言；
 - **8 处 flex-wrap 锁定选择器**（`flex-wrap: wrap;` 逐字）：
   `.tower`、`.tower-actions`、`.nav`、`.nav-tabs`、`.nav-filters`、
   `.feed-toolbar`、`.daily-actions`、`.btn-row`
@@ -646,7 +640,7 @@ transform/box-shadow 过渡，曲线取 `--spring-medium`）；`backdrop-filter:
 | 批次 | 选择器 | 口径 |
 | --- | --- | --- |
 | 悬停浮起（卡片级） | `.card`、`.common-links-card` | transform/box-shadow → `--spring-medium` + `--dur` |
-| 悬停浮起（小控件） | `.lex-term`、`.btn-icon`、`.btn-primary`/`.btn-ghost`、`.hot-item`、`.src-card`、`.new-flash`、`.common-links-open`、`.update-pill` 等 | transform → `--spring-light` + `--dur-snap` |
+| 悬停浮起（小控件） | `.lex-term`、`.btn-icon`、`.btn-primary`/`.btn-ghost`、`.src-card`、`.new-flash`、`.common-links-open`、`.update-pill` 等 | transform → `--spring-light` + `--dur-snap` |
 | 按压缩放 | 全站通用 `:active` 组 + `.to-top:active` | `:active` 内独立声明 `transition: transform var(--dur-snap) var(--spring-light)`，抬起回落基线过渡自然带弹 |
 | 弹层进出 | `.toast`、`.to-top`（transition）、`.glass-dialog[open]`、`.lexicon-panel.is-open`（消费 dialog-in） | `--spring-medium`，浮层入场配 `--dur-glide`、常驻浮层配 `--dur` |
 | tab 指示块 | `.tab-indicator` | transform → `--spring-medium` + `--dur`；width/height 保留（见豁免） |
@@ -706,17 +700,10 @@ staggerIn，motion 为可选依赖）。test/view-registry 原对重放手法的
 border-color 的 260ms 短过渡），约 320ms 后由定时器移除；首帧与
 reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
-*轮询批处理*：realtime-poller 新增可选依赖 requestIdleCallback /
-requestAnimationFrame；轮询内的热栏刷新（非用户直接等待）经
-`deferNonCritical` 延迟到空闲帧再经 rAF 批处理写 DOM，未注入时同步
-直执行（与旧行为同构），idle 抛错同步兜底。主循环 setTimeout 自调度
-（18s）不动；横幅点击触发的刷新是关键路径仍同步执行。app.js 注入时
-requestIdleCallback 不可用则 setTimeout 32ms 降级。
-
 **评审修复轮：动效收敛与降级口径登记（新增）**
 
 - `.glass` 悬停上浮限定非 sticky 玻璃浮层：选择器改为
-  `.glass:not(.nav):not(.hot-rail):hover`。`.nav`/`.hot-rail` 是 sticky
+  `.glass:not(.nav):hover`。`.nav` 是 sticky
   容器，悬停不得整体位移（且 .nav 自身 transition 声明会级联覆盖 .glass
   的过渡，造成无过渡瞬时跳变）；悬停浮起语义不变，仍只过渡
   transform/box-shadow。

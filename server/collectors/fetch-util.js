@@ -43,6 +43,11 @@ async function fetchText(url, settings, options = {}) {
   if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0) {
     throw new Error('采集响应大小上限无效');
   }
+  // 请求方法仅允许 GET/POST：POST 服务于公告类 JSON API（巨潮/深交所），
+  // 缺省仍为 GET，既有调用方行为不变
+  const method = options.method || 'GET';
+  if (method !== 'GET' && method !== 'POST') throw new Error('采集请求方法仅支持 GET 或 POST');
+  if (options.body != null && method !== 'POST') throw new Error('仅 POST 请求可以携带请求体');
   const ctrl = new AbortController();
   const requestedTimeout = Number(settings?.collect?.requestTimeoutMs);
   const timeoutMs = Number.isFinite(requestedTimeout)
@@ -51,11 +56,15 @@ async function fetchText(url, settings, options = {}) {
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetchImpl(target, {
+      method,
+      // 默认头保持不变；调用方可按需覆盖/追加（如上交所接口必须携带站内 Referer）
       headers: {
         'User-Agent': settings.collect.userAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        ...(options.headers || {})
       },
+      ...(options.body != null ? { body: options.body } : {}),
       redirect: 'follow',
       signal: ctrl.signal
     });

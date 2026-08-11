@@ -112,7 +112,6 @@
   <div class="nav-tabs" role="tablist">
     <span class="tab-indicator" aria-hidden="true"></span>
     <button class="tab active" data-view="featured" aria-controls="viewFeed" role="tab" aria-selected="true">精选</button>
-    <button class="tab" data-view="hot" aria-controls="viewFeed" role="tab" aria-selected="false">热点</button>
     <button class="tab" data-view="all" aria-controls="viewFeed" role="tab" aria-selected="false">全部动态</button>
     <button class="tab" data-view="starred" aria-controls="viewFeed" role="tab" aria-selected="false">
       星标<span class="tab-count" id="tabStarredCount" hidden></span>
@@ -156,14 +155,6 @@
           <div class="feed-end" id="feedEnd" hidden>— 风已捕尽 —</div>
         </div>
       </div>
-      <aside class="hot-rail glass" id="hotRail" aria-label="当前热点">
-        <div class="hot-rail-title">
-          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1C8 1 3 5.5 3 9.5a5 5 0 0 0 10 0c0-1.8-1-3.5-2-4.7C10.6 6.6 10 7.5 9 7.5 9.6 5.5 8 1 8 1z"/></svg>
-          当前热点
-        </div>
-        <div class="hot-rail-sub">多信源热度 · 随时间消退</div>
-        <div id="hotRailList"></div>
-      </aside>
     </div>
   </section>
 
@@ -435,7 +426,7 @@
         <ul class="shortcut-list">
           <li><span>聚焦检索框</span><kbd>/</kbd><kbd>Ctrl</kbd><kbd>K</kbd></li>
           <li><span>清空检索并退出输入</span><kbd>Esc</kbd></li>
-          <li><span>切换第 1–8 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>8</kbd></li>
+          <li><span>切换第 1–7 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>7</kbd></li>
           <li><span>焦点在导航上时切换相邻视图</span><kbd>←</kbd><kbd>→</kbd></li>
           <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
@@ -459,12 +450,12 @@
     <label class="field"><span>类型</span>
       <select name="type">
         <option value="rss">RSS / Atom 订阅</option>
-        <option value="api">公开 API（eastmoney://关键词）</option>
+        <option value="api">公开 API（eastmoney/cninfo/sse/szse/cls scheme）</option>
         <option value="html">网页爬虫（官方新闻列表页）</option>
         <option value="bing">必应资讯 RSS</option>
       </select>
     </label>
-    <label class="field"><span>地址</span><input name="url" required placeholder="https://… 或 eastmoney://关键词"></label>
+    <label class="field"><span>地址</span><input name="url" required placeholder="https://… 或 eastmoney://关键词、cninfo://检索词?column=szse"></label>
     <div class="field-row">
       <label class="field"><span>等级</span>
         <select name="tier"><option>T2</option><option>T1.5</option><option>T1</option></select>
@@ -562,7 +553,6 @@
 <script src="stats-controller.js"></script>
 <script src="export-controller.js"></script>
 <script src="feed-controller.js"></script>
-<script src="hot-rail-controller.js"></script>
 <script src="daily-view-controller.js"></script>
 <script src="sources-controller.js"></script>
 <script src="search-controller.js"></script>

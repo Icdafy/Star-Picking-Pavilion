@@ -53,26 +53,23 @@ async function feed(server, query) {
   return JSON.parse(response.body);
 }
 
-test('the hot view ranks by decayed heat, not by raw quality score', async t => {
+test('the timeline view ranks by recency while displayed heat decays with age', async t => {
   const server = await startServer(t);
   seed(server, [
     { title: '一周前的高分旧闻', quality: 100, ageHours: 168 },
     { title: '刚刚发生的中分新闻', quality: 62, ageHours: 0 }
   ]);
 
-  const hot = await feed(server, 'view=hot&page=0');
-  assert.deepEqual(hot.items.map(item => item.title), ['刚刚发生的中分新闻', '一周前的高分旧闻']);
-  // 热度必须是随时间衰减后的值：旧闻的展示热度要明显低于它的质量分
-  const stale = hot.items.find(item => item.title === '一周前的高分旧闻');
-  assert.equal(stale.quality, 100);
-  assert.ok(stale.heat < 40, `旧闻热度未衰减：${stale.heat}`);
-
-  // 时间线视图不受热度影响，仍然按时间倒序
+  // 时间线视图按时间倒序，不受热度影响
   const all = await feed(server, 'view=all&page=0');
   assert.deepEqual(all.items.map(item => item.title), ['刚刚发生的中分新闻', '一周前的高分旧闻']);
+  // 展示热度必须是随时间衰减后的值：旧闻的展示热度要明显低于它的质量分
+  const stale = all.items.find(item => item.title === '一周前的高分旧闻');
+  assert.equal(stale.quality, 100);
+  assert.ok(stale.heat < 40, `旧闻热度未衰减：${stale.heat}`);
 });
 
-test('the hot view and displayed heat share the breakthrough-adjusted formula', async t => {
+test('the displayed heat shares the breakthrough-adjusted formula', async t => {
   const server = await startServer(t);
   seed(server, [
     {
@@ -96,22 +93,22 @@ test('the hot view and displayed heat share the breakthrough-adjusted formula', 
     }
   ]);
 
-  const hot = await feed(server, 'view=hot&page=0');
-  assert.deepEqual(hot.items.map(item => item.title), ['可信技术突破', '普通技术进展']);
-  const breakthrough = hot.items[0];
+  const data = await feed(server, 'view=all&page=0');
+  const breakthrough = data.items.find(item => item.title === '可信技术突破');
+  const normal = data.items.find(item => item.title === '普通技术进展');
   assert.equal(breakthrough.breakthroughScore, 0.8);
   assert.equal(breakthrough.breakthroughBonus, 8);
   assert.deepEqual(breakthrough.breakthroughSignals.objects, ['可重复使用火箭']);
-  assert.ok(breakthrough.heat > hot.items[1].heat);
+  assert.ok(breakthrough.heat > normal.heat);
 });
 
-test('articles far outside the heat window still appear when nothing newer exists', async t => {
+test('articles far in the past still appear in the timeline when nothing newer exists', async t => {
   const server = await startServer(t);
   seed(server, [{ title: '半年前的唯一一条情报', quality: 90, ageHours: 24 * 200 }]);
 
-  const hot = await feed(server, 'view=hot&page=0');
-  assert.equal(hot.items.length, 1);
-  assert.equal(hot.items[0].title, '半年前的唯一一条情报');
+  const data = await feed(server, 'view=all&page=0');
+  assert.equal(data.items.length, 1);
+  assert.equal(data.items[0].title, '半年前的唯一一条情报');
 });
 
 test('LIKE wildcards in a short search term are matched literally', async t => {

@@ -49,7 +49,7 @@ function makeEnv({ view = 'featured', lexicon = 'fail' } = {}) {
     },
     state: { view, q: '', listed: 0 },
     esc: s => String(s),
-    FEED_VIEWS: ['featured', 'hot', 'all', 'starred'],
+    FEED_VIEWS: ['featured', 'all', 'starred'],
     loadFeed: () => { calls.loadFeed++; },
     switchView: (v, opts) => calls.switchView.push([v, opts]),
     document: { addEventListener: (t, fn) => { (docListeners[t] ||= []).push(fn); } },

@@ -4,7 +4,7 @@
    职责模块按 UMD + 依赖注入拆分：
      format-utils.js / feed-card.js          —— 纯函数、卡片模板渲染与增量 diff
      stats-controller.js / export-controller.js
-     feed-controller.js / hot-rail-controller.js
+     feed-controller.js
      daily-view-controller.js / sources-controller.js
      search-controller.js / shortcuts.js
      realtime-poller.js / update-pill.js / settings-view-controller.js
@@ -29,7 +29,6 @@ const FeedCard = window.FeedCard;
 const StatsController = window.StatsController;
 const ExportController = window.ExportController;
 const FeedController = window.FeedController;
-const HotRailController = window.HotRailController;
 const DailyViewController = window.DailyViewController;
 const SourcesController = window.SourcesController;
 const SearchController = window.SearchController;
@@ -60,7 +59,7 @@ const restoredPreferences = initialPreferences.preferences;
 const state = {
   theme: restoredPreferences.theme,
   textScale: restoredPreferences.textScale,   // sm | md | lg | xl —— 整套版面的比例尺
-  view: restoredPreferences.view,  // featured | hot | all | daily | links | sources | settings
+  view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,
   linksCategory: restoredPreferences.linksCategory,
@@ -302,10 +301,9 @@ const preferenceActions = Bootstrap.createUiPreferenceActions({
 });
 const dailyRequestGuard = Bootstrap.createLatestRequestGuard();
 const feedRequestGuard = Bootstrap.createLatestRequestGuard();
-const hotRailRequestGuard = Bootstrap.createLatestRequestGuard();
 
-// 共用同一个信息流视图集合：星标要和精选/热点/全部动态一样享有筛选、导出与实时轮询
-const FEED_VIEWS = ['featured', 'hot', 'all', 'starred'];
+// 共用同一个信息流视图集合：星标要和精选/全部动态一样享有筛选、导出与实时轮询
+const FEED_VIEWS = ['featured', 'all', 'starred'];
 
 // ---------- 塔台状态 ----------
 // setStat/refreshStats 拆入 renderer/stats-controller.js（批 2），
@@ -329,7 +327,7 @@ const { refreshStats } = statsController;
 
 // ---------- 卡片渲染 ----------
 // 阶段 4：整卡模板迁为 index.html 的 <template id="cardTemplate">，
-// cardInner/renderTimeline/renderRanked 迁入 renderer/feed-card.js
+// cardInner/renderTimeline 迁入 renderer/feed-card.js
 // （createCardRenderer / createFeedDiffList），组合根只留上方装配。
 
 document.addEventListener('error', event => {
@@ -339,7 +337,7 @@ document.addEventListener('error', event => {
   if (img?.matches?.('img.card-thumb')) img.classList.add('is-broken');
 }, true);
 
-// ---------- 信息流 / 热度栏 / 日报 / 信源 / 设置（批 2 控制器装配） ----------
+// ---------- 信息流 / 日报 / 信源 / 设置（批 2 控制器装配） ----------
 // renderSearchContext 在检索控制器里实现；信息流渲染后需要刷新它，
 // 用延迟闭包打破两个控制器的装配先后依赖
 const feedController = FeedController.createFeedController({
@@ -367,15 +365,6 @@ const feedController = FeedController.createFeedController({
   IntersectionObserver: window.IntersectionObserver
 });
 const { loadFeed, syncFeedToolbar } = feedController;
-
-const hotRailController = HotRailController.createHotRailController({
-  api, state, esc, safeUrl,
-  safeHttpUrl: DomUtils.safeHttpUrl,
-  timeAgo,
-  hotRailRequestGuard,
-  elements: { list: $('#hotRailList') }
-});
-const { loadHotRail } = hotRailController;
 
 // 批 4：toggleStar 与 #feedList 点击委托已随信息流控制器迁出，
 // 组合根只保留 loadFeed/工具条接线
@@ -450,9 +439,9 @@ const viewRegistry = ViewRegistry.createViewRegistry({
 });
 const { syncTabIndicator, syncNavHeight } = viewRegistry;
 
-// 8 个视图全部注册：四个信息流视图共享 #viewFeed，onEnter 各自触发加载
+// 7 个视图全部注册：三个信息流视图共享 #viewFeed，onEnter 各自触发加载
 for (const feedView of FEED_VIEWS) {
-  viewRegistry.registerView({ id: feedView, tab: '#viewFeed', isFeed: true, onEnter: () => { registryDeps.loadFeed(); registryDeps.loadHotRail(); } });
+  viewRegistry.registerView({ id: feedView, tab: '#viewFeed', isFeed: true, onEnter: () => registryDeps.loadFeed() });
 }
 viewRegistry.registerView({ id: 'daily', tab: '#viewDaily', onEnter: () => registryDeps.loadDaily(state.dailyDate) });
 viewRegistry.registerView({ id: 'links', tab: '#viewLinks', onEnter: () => registryDeps.renderCommonLinks() });
@@ -477,7 +466,6 @@ function setDomain(domain, { persist = true, load = true } = {}) {
   if (persist) preferenceActions.remember('domain', domain);
   if (load) {
     loadFeed();
-    loadHotRail();
   }
 }
 
@@ -535,7 +523,7 @@ const { syncSearchBox, clearSearch, setLexiconOpen, runTermSearch } = searchCont
 // 批 3：视图注册表的加载依赖在各控制器全部装配完成后统一接线，
 // 懒解析进 registryDeps 代理（renderCommonLinks 为函数声明，可直接引用）
 Object.assign(registryDeps, {
-  loadFeed, loadHotRail, loadDaily, loadSources, loadSettings, renderCommonLinks, refreshStats
+  loadFeed, loadDaily, loadSources, loadSettings, renderCommonLinks, refreshStats
 });
 
 // 手动采集
@@ -549,7 +537,7 @@ $('#btnRefresh').addEventListener('click', async function () {
       if (s && !s.pipeline?.running && !s.pending) {
         clearInterval(poll);
         this.classList.remove('spinning');
-        if (FEED_VIEWS.includes(state.view)) { loadFeed(); loadHotRail(); }
+        if (FEED_VIEWS.includes(state.view)) { loadFeed(); }
         toast('采集分析完成');
       }
     }, 4000);
@@ -596,18 +584,11 @@ $('#toTop').addEventListener('click', scrollToTop);
 // ---------- 实时更新（批 2 拆入 renderer/realtime-poller.js） ----------
 const realtimePoller = RealtimePoller.createRealtimePoller({
   api, state, FEED_VIEWS, toast, preferenceActions,
-  refreshStats, loadFeed, loadHotRail, scrollToTop,
+  refreshStats, loadFeed, scrollToTop,
   document,
   getScrollY: () => window.scrollY,
   elements: { btnRealtime: $('#btnRealtime'), newFlash: $('#newFlash') },
-  diff: feedDiffList,
-  // 阶段 3（液态玻璃）：非关键 DOM 更新（热栏刷新）经 idle 延迟 + rAF 批处理；
-  // requestIdleCallback 不可用时 setTimeout 32ms 降级。主循环 setTimeout
-  // 自调度不受影响（窗口隐藏时 rAF 会被暂停，关键调度必须维持 setTimeout）
-  requestIdleCallback: typeof window.requestIdleCallback === 'function'
-    ? callback => window.requestIdleCallback(callback, { timeout: 1200 })
-    : callback => setTimeout(callback, 32),
-  requestAnimationFrame: callback => requestAnimationFrame(callback)
+  diff: feedDiffList
 });
 const { setRealtime } = realtimePoller;
 

@@ -55,7 +55,7 @@ function makeEnv(overrides = {}) {
   const env = Object.assign({
     document: makeDocument(overrides.activeElement || null),
     state: Object.assign({ view: 'featured' }, overrides.state || {}),
-    FEED_VIEWS: ['featured', 'hot', 'all', 'starred'],
+    FEED_VIEWS: ['featured', 'all', 'starred'],
     getTabs: () => overrides.tabs || [],
     switchView: (view, opts) => calls.switchView.push([view, opts]),
     toggleTheme: () => { calls.toggleTheme++; },
@@ -95,11 +95,11 @@ test('Esc 在词库面板关闭时清空并失焦检索框', () => {
 });
 
 test('Alt+数字切换对应视图，Alt+T/R/K/C 各自动作', () => {
-  const tabs = [{ dataset: { view: 'featured' } }, { dataset: { view: 'hot' } }];
+  const tabs = [{ dataset: { view: 'featured' } }, { dataset: { view: 'all' } }];
   const { env, calls } = makeEnv({ tabs, state: { view: 'all' } });
   createShortcuts(env);
   env.document.keydown({ key: '2', altKey: true });
-  assert.deepEqual(calls.switchView, [['hot', undefined]]);
+  assert.deepEqual(calls.switchView, [['all', undefined]]);
   env.document.keydown({ key: 't', altKey: true });
   assert.equal(calls.toggleTheme, 1);
   env.document.keydown({ key: 'r', altKey: true });

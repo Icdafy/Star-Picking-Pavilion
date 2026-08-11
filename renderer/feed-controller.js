@@ -15,7 +15,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createFeedControllerModule() {
   // 导出按钮只在真的有内容可导时才可用，避免复制出一份空文档
   const VIEW_EXPORT_LABEL = Object.freeze({
-    featured: '精选', hot: '热点', all: '全部动态', starred: '星标'
+    featured: '精选', all: '全部动态', starred: '星标'
   });
 
   function createFeedController({
@@ -67,8 +67,8 @@
         if (!request.isCurrent()) return;
         const startIdx = state.page * 30;
         // 阶段 4：渲染走 keyed diff 调和——同 data-id 的节点复用、缺失项才新建，
-        // 避免整页卡片全量解析；排行与时间轴由 mode 区分
-        const mode = state.view === 'hot' ? 'ranked' : 'timeline';
+        // 避免整页卡片全量解析
+        const mode = 'timeline';
         const timeOf = state.view === 'starred' ? starredTime : publishedTime;
         if (reset) diff.reconcile(data.items, { mode, startIdx, timeOf });
         else diff.appendPage(data.items, { mode, startIdx, timeOf });

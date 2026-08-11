@@ -97,7 +97,7 @@ function isFeatured(quality, category, scoring, options = false) {
   return quality >= resolveThreshold(category, scoring, resolved);
 }
 
-// 发布时间防护（与 server/index.js 的 SQL 侧 HEAT_EXPRESSION 规则一致）：
+// 发布时间防护：
 //   ① 解析不出有限值（NaN）→ 视为当前时刻，hours=0；
 //   ② 晚于当前时刻超过 48 小时 → 数据错误，改用 fetchedAt（未传则按当前时刻）；
 //   ③ 其余未来时间（48h 内）→ hours 夹取为 0（现状不变）。
