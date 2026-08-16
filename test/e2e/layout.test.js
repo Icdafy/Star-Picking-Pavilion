@@ -182,4 +182,55 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
       `${name} 已滚出视口：top=${measured.top}, expected=${measured.expectedTop}`
     );
   }
+
+  // 主题切换必须同时落到 renderer 与原生窗口。这里在主进程实例上记录
+  // BrowserWindow 调用，避免只验证网页颜色、却漏掉标题栏仍停在旧主题。
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    globalThis.__sppWindowThemeTrace = [];
+    const originalBackground = window.setBackgroundColor.bind(window);
+    const originalOverlay = window.setTitleBarOverlay.bind(window);
+    window.setBackgroundColor = value => {
+      globalThis.__sppWindowThemeTrace.push({ method: 'background', value });
+      return originalBackground(value);
+    };
+    window.setTitleBarOverlay = value => {
+      globalThis.__sppWindowThemeTrace.push({ method: 'overlay', value });
+      return originalOverlay(value);
+    };
+  });
+  await page.locator('.tab[data-view="featured"]').click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('#btnTheme').click();
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  let themeTrace = [];
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    themeTrace = await app.evaluate(() => globalThis.__sppWindowThemeTrace || []);
+    if (themeTrace.length >= 2) break;
+    await page.waitForTimeout(20);
+  }
+  assert.deepEqual(themeTrace.slice(-2), [
+    { method: 'background', value: '#ffffff' },
+    {
+      method: 'overlay',
+      value: { color: 'rgba(0, 0, 0, 0)', symbolColor: '#0f1115' }
+    }
+  ]);
+  assert.deepEqual(await page.evaluate(() => ({
+    bodyDark: document.body.hasAttribute('data-ds-dark-theme'),
+    colorScheme: document.documentElement.style.colorScheme,
+    dshEngine: document.documentElement.dataset.dshEngine,
+    themeColor: document.querySelector('meta[name="theme-color"]')?.content
+  })), {
+    bodyDark: false,
+    colorScheme: 'light',
+    dshEngine: 'plugin-1.1.0',
+    themeColor: '#ffffff'
+  });
+  if (screenshotDir) {
+    await page.screenshot({
+      path: path.join(screenshotDir, '1440x920-md-featured-light.png'),
+      fullPage: true
+    });
+  }
 });

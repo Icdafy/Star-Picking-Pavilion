@@ -74,8 +74,8 @@ function assertAllowedEntries(entries) {
   }
 }
 
-function expectedInstallerName(version) {
-  return `Star-Picking-Pavilion-Setup-${version}.exe`;
+function expectedInstallerName(releaseVersion) {
+  return `Star-Picking-Pavilion-Setup-${releaseVersion}.exe`;
 }
 
 function assertAllowedResourceEntries(entries) {
@@ -147,7 +147,7 @@ function verifyPackage(options = {}) {
   const asar = options.asar || require('@electron/asar');
   const archive = path.join(distDir, 'win-unpacked', 'resources', 'app.asar');
   const resourcesDir = path.dirname(archive);
-  const installer = path.join(distDir, expectedInstallerName(packageJson.version));
+  const installer = path.join(distDir, expectedInstallerName(packageJson.build?.buildVersion));
 
   if (!fs.existsSync(archive)) throw new Error(`Missing ASAR: ${archive}`);
   if (!fs.existsSync(installer)) throw new Error(`Missing installer: ${installer}`);

@@ -5,10 +5,10 @@ const path = require('node:path');
 
 function expectedInstallerName(packageJson) {
   const template = packageJson.build?.win?.artifactName;
-  if (template !== 'Star-Picking-Pavilion-Setup-${version}.${ext}') {
+  if (template !== 'Star-Picking-Pavilion-Setup-${buildVersion}.${ext}') {
     throw new Error(`unexpected installer template: ${template || '(missing)'}`);
   }
-  return template.replace('${version}', packageJson.version).replace('${ext}', 'exe');
+  return template.replace('${buildVersion}', packageJson.build?.buildVersion).replace('${ext}', 'exe');
 }
 
 function readLatestVersion(file) {
@@ -26,8 +26,14 @@ function verifyVersion({
 }) {
   const version = String(packageJson?.version || '');
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`invalid package version: ${version}`);
-  const expectedTag = `v${version}`;
-  if (tag !== expectedTag) throw new Error(`tag ${tag || '(missing)'} does not match package ${version}`);
+  const releaseVersion = String(packageJson?.build?.buildVersion || '');
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(releaseVersion)) {
+    throw new Error(`invalid public release version: ${releaseVersion}`);
+  }
+  const expectedTag = `v${releaseVersion}`;
+  if (tag !== expectedTag) {
+    throw new Error(`tag ${tag || '(missing)'} does not match public release ${releaseVersion}`);
+  }
 
   const installer = expectedInstallerName(packageJson);
   if (requireArtifacts) {
@@ -42,7 +48,7 @@ function verifyVersion({
     }
   }
 
-  return { version, tag: expectedTag, installer };
+  return { version, releaseVersion, tag: expectedTag, installer };
 }
 
 function argumentValue(args, name) {

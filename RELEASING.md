@@ -17,7 +17,7 @@
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.1.0
+npm run verify:version -- --tag v0.1.0.1
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -26,11 +26,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.1.0 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.1.0.exe
+npm run verify:version -- --tag v0.1.0.1 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.1.0.1.exe
 ```
 
-v0.1.0 的签名状态预期为 `NotSigned`。
+v0.1.0.1 的签名状态预期为 `NotSigned`。
 
 **体积不再有上限。** `npm run verify:package` 会打印 ASAR 与安装包的精确字节数供发布记录比对，但不会因为体积失败。
 
@@ -68,22 +68,22 @@ v0.1.0 的签名状态预期为 `NotSigned`。
 
 ## 版本与 tag
 
-版本采用 SemVer。`package.json`、tag、安装包文件名和 `latest.yml` 必须一致。创建 tag 前先运行版本校验：
+自动更新比较版本采用 SemVer；公开发布号、tag、安装包名与 Windows 文件版本使用维护者指定的四段式版本。v0.1.0.1 对应内部 SemVer `0.1.1`：`latest.yml` 写 `0.1.1` 供 electron-updater 正确判断升级，`package.json` 的 `build.buildVersion`、tag 与安装包名写 `0.1.0.1`。创建 tag 前先运行版本校验：
 
 ```powershell
-npm run verify:version -- --tag v0.1.0
-git tag -a v0.1.0 -m "摘星阁 v0.1.0"
-git push origin v0.1.0
+npm run verify:version -- --tag v0.1.0.1
+git tag -a v0.1.0.1 -m "摘星阁 v0.1.0.1"
+git push origin v0.1.0.1
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.1.0 Release 应包含：
+v0.1.0.1 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.1.0.exe`
-- `Star-Picking-Pavilion-Setup-0.1.0.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.1.0.1.exe`
+- `Star-Picking-Pavilion-Setup-0.1.0.1.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`

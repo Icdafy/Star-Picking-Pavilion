@@ -14,3 +14,22 @@ h1 { margin: 10px 0 14px; }
 p { line-height: 1.7; color: #b8c4df; }
 a { display: inline-block; margin-top: 14px; padding: 11px 18px; border-radius: 9px; color: #07101c; background: #5eead4; text-decoration: none; font-weight: 700; }
 a:focus-visible { outline: 3px solid #fca35d; outline-offset: 4px; }
+html {
+  --desktop-titlebar-height: env(titlebar-area-height, 32px);
+}
+
+body {
+  box-sizing: border-box;
+  padding-top: var(--desktop-titlebar-height);
+}
+
+#desktop-titlebar-drag-region {
+  position: fixed;
+  top: env(titlebar-area-y, 0px);
+  left: env(titlebar-area-x, 0px);
+  z-index: 50;
+  width: env(titlebar-area-width, calc(100% - 138px));
+  height: var(--desktop-titlebar-height);
+  -webkit-app-region: drag;
+  user-select: none;
+}

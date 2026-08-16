@@ -4,6 +4,37 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const VENDORED_PACKAGES = Object.freeze([
+  Object.freeze({
+    key: '@deepseek-ai/dsh-client-ui-aqua@1.1.0',
+    license: 'MIT',
+    source: 'https://github.com/WYH66666666/DSH',
+    notice: [
+      'MIT License',
+      '',
+      'Copyright (c) 2026 John Wu',
+      '',
+      'Permission is hereby granted, free of charge, to any person obtaining a copy',
+      'of this software and associated documentation files (the "Software"), to deal',
+      'in the Software without restriction, including without limitation the rights',
+      'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+      'copies of the Software, and to permit persons to whom the Software is',
+      'furnished to do so, subject to the following conditions:',
+      '',
+      'The above copyright notice and this permission notice shall be included in all',
+      'copies or substantial portions of the Software.',
+      '',
+      'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+      'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+      'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+      'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+      'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+      'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+      'SOFTWARE.'
+    ].join('\n')
+  })
+]);
+
 function licenseName(value) {
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (Array.isArray(value)) return value.map(licenseName).filter(Boolean).join(' OR ');
@@ -36,13 +67,14 @@ function collectProductionPackages(projectRoot) {
       source: sourceUrl(manifest)
     });
   }
+  for (const item of VENDORED_PACKAGES) packages.set(item.key, { ...item });
   return [...packages.values()].sort((a, b) => a.key.localeCompare(b.key, 'en'));
 }
 
 function renderNotices(packageJson, packages) {
   const lines = [
     'THIRD-PARTY SOFTWARE NOTICES',
-    `摘星阁 (Star-Picking-Pavilion) ${packageJson.version}`,
+    `摘星阁 (Star-Picking-Pavilion) ${packageJson.build?.buildVersion || packageJson.version}`,
     '',
     'This distribution includes the following production dependencies.',
     'Each package remains subject to its own license terms.',
@@ -51,6 +83,7 @@ function renderNotices(packageJson, packages) {
   for (const item of packages) {
     lines.push(item.key, `License: ${item.license}`);
     if (item.source) lines.push(`Source: ${item.source}`);
+    if (item.notice) lines.push('', item.notice);
     lines.push('');
   }
   return `${lines.join(os.EOL).trimEnd()}${os.EOL}`;

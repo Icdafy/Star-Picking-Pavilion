@@ -31,18 +31,19 @@ test('样式表体积不超过预算，膨胀必须先被护栏拦下', () => {
   );
 });
 
-test('index.html 脚本标签总数受控，不为小功能随意加脚本', () => {
+test('index.html 脚本标签总数受控，Aqua 官方引擎保持单一独立边界', () => {
   // 脚本全部外置（src 属性）已由 renderer-integration 测试锁定，这里只管数量。
   // 阶段 3 模块化拆分（app.js 绞杀者式重构）把单一巨文件拆为职责单一的
   // UMD 模块，每个模块对应一个 <script src>，这是拆分的必然成本：本地静态文件
   // 加载开销可忽略（无网络、无 CDN），后续可加 defer 进一步优化。批 2 抽出
   // 11 个功能控制器后基线为 22 个，上限上调为 25；批 3 新增 store/view-registry、
-  // 批 4 新增 common-links-controller 后为 24 个；Aqua 外壳新增唯一运行时后
-  // 基线到达 25 个，与上限持平——预算已用尽，
+  // 批 4 新增 common-links-controller 后为 24 个；Aqua 外壳为第 25 个；v0.1.0.1
+  // 将 DSH 1.1.0 的 WebGL/鲸鱼引擎从状态控制器中独立为第 26 个脚本，便于逐字审计
+  // 上游实现且不把 29 KiB 图形代码重新塞回控制器。基线到达 26 个，预算已用尽，
   // 后续任何批次都不得再新增脚本标签（只准在既有模块内迁移或合并）。
   // 再超说明模块又在碎片化，应合并职责相近的模块。
   const scriptCount = [...html.matchAll(/<script\b/gi)].length;
-  assert.ok(scriptCount <= 25, `脚本标签已有 ${scriptCount} 个，上限 25 个`);
+  assert.ok(scriptCount <= 26, `脚本标签已有 ${scriptCount} 个，上限 26 个`);
 });
 
 test('样式表动画关键帧数量受控，动效不无限堆叠', () => {

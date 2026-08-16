@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" data-dsh-aqua>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#04060e">
+<meta name="theme-color" content="#151517">
 <!-- 与后端响应头的 CSP 同文（meta 无法承载 frame-ancestors，防嵌入由响应头与
      X-Frame-Options 兜底）：即使静态页脱离本服务被另行托管，内联脚本与外部
      域连接也仍然被禁。 -->
@@ -16,11 +16,12 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="aqua-shell.css">
 </head>
-<body>
+<body data-ds-dark-theme>
+<div id="desktop-titlebar-drag-region" aria-hidden="true"></div>
 <!-- 氛围层：宣纸暖光 / 深空极光 -->
-<div class="atmosphere" aria-hidden="true">
-  <canvas class="aqua-fluid-canvas" id="aquaFluidCanvas"></canvas>
-  <div class="aqua-wallpaper" id="aquaWallpaper"><img id="aquaWallpaperImage" alt=""></div>
+<div class="atmosphere" data-dsh-aqua-ambient data-background="fluid" aria-hidden="true">
+  <canvas class="aqua-fluid-canvas" id="aquaFluidCanvas" data-dsh-aqua-fluid-canvas></canvas>
+  <div class="aqua-wallpaper" id="aquaWallpaper" data-dsh-aqua-wallpaper><img id="aquaWallpaperImage" data-dsh-aqua-wallpaper-img alt=""></div>
   <div class="aurora aurora-a"></div>
   <div class="aurora aurora-b"></div>
   <div class="aurora aurora-c"></div>
@@ -84,7 +85,7 @@
   </div>
 </aside>
 
-<section class="workspace">
+  <section class="workspace" data-phase="active">
 
 <!-- 塔台状态栏 -->
 <header class="tower glass">
@@ -481,16 +482,16 @@
             <small>云母模式强化悬浮层次；兼容模式降低透明度，适合低配设备和高密度阅读。</small>
           </div>
           <label class="appearance-control" for="setAquaBlur">
-            <span class="appearance-label">玻璃模糊度 <output id="outAquaBlur">24px</output></span>
-            <input id="setAquaBlur" type="range" min="0" max="40" step="1" value="24">
+            <span class="appearance-label">玻璃模糊度 <output id="outAquaBlur">2px</output></span>
+            <input id="setAquaBlur" type="range" min="0" max="40" step="1" value="2">
           </label>
           <label class="appearance-control" for="setAquaFrost">
-            <span class="appearance-label">磨砂度 <output id="outAquaFrost">42%</output></span>
-            <input id="setAquaFrost" type="range" min="0" max="100" step="1" value="42">
+            <span class="appearance-label">磨砂度 <output id="outAquaFrost">20%</output></span>
+            <input id="setAquaFrost" type="range" min="0" max="100" step="1" value="20">
           </label>
           <label class="appearance-control" for="setAquaHue">
-            <span class="appearance-label">流体颜色 <output id="outAquaHue">172°</output></span>
-            <input id="setAquaHue" type="range" min="0" max="360" step="1" value="172">
+            <span class="appearance-label">流体颜色 <output id="outAquaHue">316°</output></span>
+            <input id="setAquaHue" type="range" min="0" max="360" step="1" value="316">
           </label>
           <label class="appearance-control" for="setAquaBrightness">
             <span class="appearance-label">背景明暗 <output id="outAquaBrightness">50%</output></span>
@@ -514,12 +515,12 @@
             <small>图片压缩后仅保存在本机，不会上传。建议选择与当前深浅主题相近的图片。</small>
           </div>
           <label class="appearance-control wallpaper-only" for="setAquaWallpaperBlur" hidden>
-            <span class="appearance-label">壁纸模糊 <output id="outAquaWallpaperBlur">4px</output></span>
-            <input id="setAquaWallpaperBlur" type="range" min="0" max="40" step="1" value="4">
+            <span class="appearance-label">壁纸模糊 <output id="outAquaWallpaperBlur">0px</output></span>
+            <input id="setAquaWallpaperBlur" type="range" min="0" max="40" step="1" value="0">
           </label>
           <label class="appearance-control wallpaper-only" for="setAquaWallpaperFrost" hidden>
-            <span class="appearance-label">壁纸磨砂 <output id="outAquaWallpaperFrost">18%</output></span>
-            <input id="setAquaWallpaperFrost" type="range" min="0" max="100" step="1" value="18">
+            <span class="appearance-label">壁纸磨砂 <output id="outAquaWallpaperFrost">0%</output></span>
+            <input id="setAquaWallpaperFrost" type="range" min="0" max="100" step="1" value="0">
           </label>
           <label class="desktop-switch appearance-switch appearance-control-wide">
             <span class="switch-copy">
@@ -688,6 +689,7 @@
 <script src="common-links-controller.js"></script>
 <script src="store.js"></script>
 <script src="view-registry.js"></script>
+<script src="dsh-aqua-engine.js"></script>
 <script src="aqua-shell.js"></script>
 <script src="app.js"></script>
 </body>

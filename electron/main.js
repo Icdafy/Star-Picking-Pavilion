@@ -12,7 +12,8 @@ const {
   dialog,
   session,
   safeStorage,
-  powerMonitor
+  powerMonitor,
+  nativeTheme
 } = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -34,6 +35,7 @@ const { registerStorageMaintenanceIpc } = require('./storage-maintenance-ipc');
 const { createDailyArchiveService } = require('./daily-archive');
 const { createDailyArchiveBundleRequester } = require('./daily-archive-request');
 const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
+const { getWindowTheme } = require('./window-theme');
 const {
   createAppearanceWallpaperStore,
   registerAppearanceWallpaperIpc
@@ -290,16 +292,31 @@ function isAllowedExternalUrl(value) {
   }
 }
 
-async function createWindow(serverPort) {
+function applyWindowTheme(theme) {
+  const resolvedTheme = theme === 'light' ? 'light' : 'dark';
+  nativeTheme.themeSource = resolvedTheme;
+  if (!win || win.isDestroyed()) return resolvedTheme;
+  const windowTheme = getWindowTheme(resolvedTheme);
+  win.setBackgroundColor(windowTheme.backgroundColor);
+  if (process.platform !== 'darwin') win.setTitleBarOverlay(windowTheme.titleBarOverlay);
+  return resolvedTheme;
+}
+
+async function createWindow(serverPort, initialTheme = 'dark') {
   const expectedOrigin = `http://127.0.0.1:${serverPort}`;
   const startHidden = backgroundMode?.shouldStartHidden(process.argv) === true;
+  const windowTheme = getWindowTheme(initialTheme);
   win = new BrowserWindow({
     width: 1440,
     height: 920,
     minWidth: 800,
     minHeight: 600,
-    backgroundColor: '#04060e',
+    backgroundColor: windowTheme.backgroundColor,
     title: '摘星阁 · 低空经济与商业航天情报站',
+    titleBarStyle: 'hidden',
+    ...(process.platform !== 'darwin'
+      ? { titleBarOverlay: windowTheme.titleBarOverlay }
+      : {}),
     autoHideMenuBar: true,
     show: !startHidden,
     webPreferences: {
@@ -311,6 +328,11 @@ async function createWindow(serverPort) {
       allowRunningInsecureContent: false,
       preload: path.join(__dirname, 'preload.js')
     }
+  });
+  applyWindowTheme(initialTheme);
+  win.on('page-title-updated', event => {
+    event.preventDefault();
+    win?.setTitle('摘星阁 · 低空经济与商业航天情报站');
   });
   win.on('close', event => {
     backgroundMode?.handleWindowClose(event);
@@ -389,7 +411,13 @@ function setupAutoUpdate() {
 // 渲染层点击「重启更新」
 ipcMain.handle('update:install', () => { try { autoUpdater && autoUpdater.quitAndInstall(); } catch {} });
 ipcMain.on('app:get-version', event => { event.returnValue = app.getVersion(); });
-registerUiPreferencesIpc({ ipcMain, getStore: () => uiPreferencesStore });
+registerUiPreferencesIpc({
+  ipcMain,
+  getStore: () => uiPreferencesStore,
+  onUpdated: (snapshot, patch) => {
+    if (Object.hasOwn(patch, 'theme')) applyWindowTheme(snapshot.theme);
+  }
+});
 registerDesktopSettingsIpc({
   ipcMain,
   getController: () => backgroundMode
@@ -473,7 +501,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   registerDailyArchivePowerEvents();
   startDailyArchiveClockWatchdog();
   await dailyArchive.start({ backgroundCatchUp: true });
-  await createWindow(serverPort);
+  await createWindow(serverPort, uiPreferencesStore.getSnapshot().theme);
 }).catch(async error => {
   if (!(error instanceof MigrationCancelledError)) {
     console.error('[启动] 失败:', error.message);

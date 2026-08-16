@@ -56,11 +56,11 @@ function item(id, patch = {}) {
 
 // ---------- 模板与渲染器依赖护栏 ----------
 
-test('index.html 必须内置 <template id="cardTemplate"> 且不再新增 script 标签', () => {
+test('index.html 内置卡片模板且仅允许已审计的 26 个脚本边界', () => {
   assert.match(pageHtml, /<template id="cardTemplate">/, '卡片模板必须落在 index.html');
-  // 模板化是「只增不改」：模板只是新增节点，script 预算（25/25）不动
+  // v0.1.0.1 的第 26 个边界是独立、可审计的 DSH Aqua 图形引擎。
   const scriptCount = [...pageHtml.matchAll(/<script\b/gi)].length;
-  assert.ok(scriptCount <= 25, `脚本标签已有 ${scriptCount} 个，上限 25 个`);
+  assert.ok(scriptCount <= 26, `脚本标签已有 ${scriptCount} 个，上限 26 个`);
   const { template } = makeRenderer();
   const card = template.content.firstElementChild;
   assert.equal(card.tagName, 'article');

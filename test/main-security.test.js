@@ -75,7 +75,10 @@ test('daily archive integration keeps folder selection and authenticated export 
     'await dailyArchive.start({ backgroundCatchUp: true })',
     archiveIndex
   );
-  const windowIndex = source.indexOf('await createWindow(serverPort)', startIndex);
+  const windowIndex = source.indexOf(
+    'await createWindow(serverPort, uiPreferencesStore.getSnapshot().theme);',
+    startIndex
+  );
   assert.ok(readyIndex >= 0);
   assert.ok(archiveIndex > readyIndex);
   assert.ok(startIndex > archiveIndex);
@@ -103,7 +106,10 @@ test('Electron brokers encrypted credentials without exposing them to the render
 });
 
 test('Electron registers preference IPC and loads migrated preferences before creating the window', () => {
-  assert.match(source, /registerUiPreferencesIpc\(\{\s*ipcMain,\s*getStore:\s*\(\)\s*=>\s*uiPreferencesStore\s*\}\)/);
+  assert.match(
+    source,
+    /registerUiPreferencesIpc\(\{[\s\S]{0,180}?getStore:\s*\(\)\s*=>\s*uiPreferencesStore,[\s\S]{0,220}?onUpdated:\s*\(snapshot,\s*patch\)[\s\S]*?Object\.hasOwn\(patch,\s*'theme'\)[\s\S]*?applyWindowTheme\(snapshot\.theme\)/
+  );
   const readyIndex = source.indexOf('app.whenReady().then');
   const migrationIndex = source.indexOf('await migrateUserData(', readyIndex);
   const dataDirIndex = source.indexOf('const dataDir = getDataDir();', migrationIndex);
@@ -111,7 +117,10 @@ test('Electron registers preference IPC and loads migrated preferences before cr
     'uiPreferencesStore = await loadUiPreferencesStore({ directory: dataDir });',
     dataDirIndex
   );
-  const createWindowIndex = source.indexOf('await createWindow(serverPort);', loadPreferencesIndex);
+  const createWindowIndex = source.indexOf(
+    'await createWindow(serverPort, uiPreferencesStore.getSnapshot().theme);',
+    loadPreferencesIndex
+  );
 
   assert.ok(readyIndex >= 0);
   assert.ok(migrationIndex > readyIndex);
@@ -134,7 +143,10 @@ test('appearance wallpaper IPC is explicitly registered and constrained to one v
     'appearanceWallpaper = createAppearanceWallpaperStore({ directory: dataDir });',
     dataDirIndex
   );
-  const createWindowIndex = source.indexOf('await createWindow(serverPort);', wallpaperStoreIndex);
+  const createWindowIndex = source.indexOf(
+    'await createWindow(serverPort, uiPreferencesStore.getSnapshot().theme);',
+    wallpaperStoreIndex
+  );
   assert.ok(dataDirIndex >= 0);
   assert.ok(wallpaperStoreIndex > dataDirIndex);
   assert.ok(createWindowIndex > wallpaperStoreIndex);
@@ -204,7 +216,10 @@ test('main process assembles background mode after preferences and before the wi
 
   const loadPreferences = source.indexOf('uiPreferencesStore = await loadUiPreferencesStore');
   const initializeBackground = source.indexOf('await backgroundMode.initialize()', loadPreferences);
-  const createWindow = source.indexOf('await createWindow(serverPort)', initializeBackground);
+  const createWindow = source.indexOf(
+    'await createWindow(serverPort, uiPreferencesStore.getSnapshot().theme);',
+    initializeBackground
+  );
   assert.ok(loadPreferences >= 0);
   assert.ok(initializeBackground > loadPreferences);
   assert.ok(createWindow > initializeBackground);
@@ -226,7 +241,10 @@ test('main process caps cache and initializes storage governance before the wind
   const prepareIndex = source.indexOf("await runBestEffortMaintenance(", readyIndex);
   const migrationIndex = source.indexOf('await migrateUserData(', prepareIndex);
   const residueIndex = source.indexOf('await storageMaintenance.initializeAfterMigration()', migrationIndex);
-  const windowIndex = source.indexOf('await createWindow(serverPort)', residueIndex);
+  const windowIndex = source.indexOf(
+    'await createWindow(serverPort, uiPreferencesStore.getSnapshot().theme);',
+    residueIndex
+  );
   assert.ok(prepareIndex > readyIndex);
   assert.ok(migrationIndex > prepareIndex);
   assert.ok(residueIndex > migrationIndex);

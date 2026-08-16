@@ -46,13 +46,13 @@ const dailyArchiveController = fs.existsSync(path.join(root, 'renderer', 'daily-
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 const AQUA_DEFAULTS = Object.freeze({
   aquaMode: 'mica',
-  aquaBlur: 24,
-  aquaFrost: 42,
-  aquaHue: 172,
+  aquaBlur: 2,
+  aquaFrost: 20,
+  aquaHue: 316,
   aquaBrightness: 50,
   aquaBackground: 'fluid',
-  aquaWallpaperBlur: 4,
-  aquaWallpaperFrost: 18,
+  aquaWallpaperBlur: 0,
+  aquaWallpaperFrost: 0,
   aquaWhale: true,
   aquaCritters: true
 });

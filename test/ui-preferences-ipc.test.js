@@ -66,17 +66,25 @@ test('preferences:update forwards the exact patch and returns the store result',
   const patch = { theme: 'light' };
   const updated = { ...getDefaultUiPreferences(), ...patch };
   let receivedPatch;
+  let updatedCallback;
   const store = {
     update(value) {
       receivedPatch = value;
       return Promise.resolve(updated);
     }
   };
-  registerUiPreferencesIpc({ ipcMain: fake.ipcMain, getStore: () => store });
+  registerUiPreferencesIpc({
+    ipcMain: fake.ipcMain,
+    getStore: () => store,
+    onUpdated(snapshot, exactPatch) {
+      updatedCallback = { snapshot, exactPatch };
+    }
+  });
 
   const result = await fake.handlers.get('preferences:update')({}, patch);
   assert.equal(receivedPatch, patch);
   assert.equal(result, updated);
+  assert.deepEqual(updatedCallback, { snapshot: updated, exactPatch: patch });
 });
 
 test('preferences:update rejects safely before the store is initialized', async () => {

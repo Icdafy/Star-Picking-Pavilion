@@ -2,7 +2,7 @@
 
 const { createUiPreferencesStore, getDefaultUiPreferences } = require('./ui-preferences');
 
-function registerUiPreferencesIpc({ ipcMain, getStore }) {
+function registerUiPreferencesIpc({ ipcMain, getStore, onUpdated = () => {} }) {
   ipcMain.on('preferences:get', event => {
     const store = getStore();
     event.returnValue = {
@@ -14,7 +14,9 @@ function registerUiPreferencesIpc({ ipcMain, getStore }) {
   ipcMain.handle('preferences:update', async (_event, patch) => {
     const store = getStore();
     if (!store) throw new Error('UI preferences are not ready');
-    return store.update(patch);
+    const snapshot = await store.update(patch);
+    await onUpdated(snapshot, patch);
+    return snapshot;
   });
 }
 

@@ -51,10 +51,10 @@ jobs:
       - name: Generate SHA-256 checksum
         shell: pwsh
         run: |
-          $version = node -p "require('./package.json').version"
-          $installer = "dist\Star-Picking-Pavilion-Setup-$version.exe"
+          $releaseVersion = node -p "require('./package.json').build.buildVersion"
+          $installer = "dist\Star-Picking-Pavilion-Setup-$releaseVersion.exe"
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
-          "$hash  Star-Picking-Pavilion-Setup-$version.exe" | Set-Content -Encoding ascii -LiteralPath 'dist\SHA256SUMS.txt'
+          "$hash  Star-Picking-Pavilion-Setup-$releaseVersion.exe" | Set-Content -Encoding ascii -LiteralPath 'dist\SHA256SUMS.txt'
 
       - name: Generate CycloneDX SBOM
         run: npx cyclonedx-npm --omit dev --spec-version 1.6 --output-reproducible --output-file dist/sbom.cdx.json --validate
@@ -64,10 +64,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
-          $version = node -p "require('./package.json').version"
+          $releaseVersion = node -p "require('./package.json').build.buildVersion"
           gh release create $env:GITHUB_REF_NAME `
-            "dist\Star-Picking-Pavilion-Setup-$version.exe" `
-            "dist\Star-Picking-Pavilion-Setup-$version.exe.blockmap" `
+            "dist\Star-Picking-Pavilion-Setup-$releaseVersion.exe" `
+            "dist\Star-Picking-Pavilion-Setup-$releaseVersion.exe.blockmap" `
             "dist\latest.yml" `
             "dist\SHA256SUMS.txt" `
             "dist\sbom.cdx.json" `

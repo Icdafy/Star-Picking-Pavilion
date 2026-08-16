@@ -20,13 +20,13 @@
   const PERSIST_DELAY = 220;
   const DEFAULTS = Object.freeze({
     aquaMode: 'mica',
-    aquaBlur: 24,
-    aquaFrost: 42,
-    aquaHue: 172,
+    aquaBlur: 2,
+    aquaFrost: 20,
+    aquaHue: 316,
     aquaBrightness: 50,
     aquaBackground: 'fluid',
-    aquaWallpaperBlur: 4,
-    aquaWallpaperFrost: 18,
+    aquaWallpaperBlur: 0,
+    aquaWallpaperFrost: 0,
     aquaWhale: true,
     aquaCritters: true
   });
@@ -467,6 +467,110 @@
     });
   }
 
+  /* DSH-Transparent-UI-Plugin 1.1.0 compatibility adapters. The standalone
+     engine is extracted from the plugin's compiled client, so these wrappers
+     only translate 摘星阁's lifecycle API (theme / pause / dispose). */
+  function createDshFluidBackdrop({ canvas, window: win, engine } = {}) {
+    if (!canvas || !win || !engine?.attachFluidShader || !engine?.SITE_FLUID_PARAMS) {
+      return Object.freeze({ stir() {}, setTheme() {}, setPaused() {}, dispose() {} });
+    }
+
+    const palettes = Object.freeze({
+      light: Object.freeze({
+        ...engine.SITE_FLUID_PARAMS,
+        color1: '#5B8DE0',
+        color2: '#A9C6F5',
+        color3: '#FFFFFF',
+        distortion: 24,
+        swirl: 14,
+        offsetY: 40
+      }),
+      dark: Object.freeze({
+        ...engine.SITE_FLUID_PARAMS,
+        color1: '#2D4F8D',
+        color2: '#101E38',
+        color3: '#0B1628',
+        offsetY: 40
+      })
+    });
+    let dark = true;
+    let paused = false;
+    let disposed = false;
+    let handle = engine.attachFluidShader(canvas, palettes.dark);
+    let previous = { x: .5, y: .5 };
+
+    function normalized(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return previous;
+      return {
+        x: Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
+        y: Math.min(1, Math.max(0, 1 - (clientY - rect.top) / rect.height))
+      };
+    }
+
+    return Object.freeze({
+      stir(clientX, clientY, strong = false) {
+        if (disposed || paused) return;
+        const point = normalized(clientX, clientY);
+        const gain = strong ? 1.8 : 1;
+        handle?.stir(
+          point.x,
+          point.y,
+          (point.x - previous.x) * gain,
+          (point.y - previous.y) * gain
+        );
+        previous = point;
+      },
+      setTheme(nextDark) {
+        dark = Boolean(nextDark);
+        handle?.setParams(palettes[dark ? 'dark' : 'light']);
+      },
+      setPaused(nextPaused) {
+        const shouldPause = Boolean(nextPaused);
+        if (paused === shouldPause) return;
+        paused = shouldPause;
+        canvas.toggleAttribute('data-dsh-fluid-paused', paused);
+        handle?.setPaused?.(paused);
+      },
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        handle?.dispose();
+        handle = null;
+      }
+    });
+  }
+
+  function createDshParticleWhale({ host, document: doc, engine } = {}) {
+    if (!host || !doc || !engine?.mountWhale) {
+      return Object.freeze({ setTheme() {}, setPaused() {}, dispose() {} });
+    }
+    let dark = doc.documentElement.dataset.theme !== 'light';
+    let paused = false;
+    let disposed = false;
+    let handle = engine.mountWhale(host, dark);
+    const holder = host.querySelector('[data-dsh-aqua-whale]');
+    return Object.freeze({
+      setTheme(nextDark) {
+        dark = Boolean(nextDark);
+        handle?.setDark(dark);
+      },
+      setPaused(nextPaused) {
+        const shouldPause = Boolean(nextPaused);
+        if (paused === shouldPause) return;
+        paused = shouldPause;
+        if (holder) holder.toggleAttribute('data-dsh-whale-paused', paused);
+        handle?.setPaused?.(paused);
+      },
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        handle?.dispose();
+        handle = null;
+      }
+    });
+  }
+
   function readStorage(storage, key) {
     try {
       return storage?.getItem?.(key) || '';
@@ -555,8 +659,14 @@
     const state = normalizeSettings(deps.preferences);
     const byId = id => doc.getElementById(id);
     const atmosphere = doc.querySelector('.atmosphere');
-    const fluid = createFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win });
-    const whale = createStarWhale({ host: atmosphere, document: doc, window: win });
+    const dshEngine = win.DshAquaEngine;
+    root.dataset.dshEngine = dshEngine ? 'plugin-1.1.0' : 'compatibility';
+    const fluid = dshEngine
+      ? createDshFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win, engine: dshEngine })
+      : createFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win });
+    const whale = dshEngine
+      ? createDshParticleWhale({ host: atmosphere, document: doc, window: win, engine: dshEngine })
+      : createStarWhale({ host: atmosphere, document: doc, window: win });
     const wallpaper = byId('aquaWallpaperImage');
     const wallpaperStatus = byId('aquaWallpaperStatus');
     const wallpaperControls = byId('aquaWallpaperControls');
@@ -602,11 +712,15 @@
 
     function applyBrightness() {
       const value = state.aquaBrightness;
-      // 0–49 始终压暗，51–100 始终提亮；不按主题砍掉半段滑杆行程。
-      const black = Math.max(0, (50 - Math.min(50, value)) / 50) * .72;
-      const white = Math.max(0, (Math.max(50, value) - 50) / 50) * .58;
+      const dark = currentThemeIsDark();
+      // Plugin 1.1.0 contract: the dark palette uses 0–50 as its useful half;
+      // the light palette uses 50–100. Fifty is the unmodified background.
+      const black = dark ? Math.max(0, (50 - value) / 50) : 0;
+      const white = dark ? 0 : Math.max(0, (value - 50) / 50);
       root.style.setProperty('--aqua-user-brightness-black', black.toFixed(3));
       root.style.setProperty('--aqua-user-brightness-white', white.toFixed(3));
+      root.style.setProperty('--dsh-aqua-brightness-black', black.toFixed(3));
+      root.style.setProperty('--dsh-aqua-brightness-white', white.toFixed(3));
     }
 
     function syncControls() {
@@ -650,11 +764,19 @@
         : 'fluid';
       root.dataset.aquaWhale = state.aquaWhale ? 'on' : 'off';
       root.dataset.aquaCritters = state.aquaCritters ? 'on' : 'off';
+      root.toggleAttribute('data-dsh-float', state.aquaMode === 'mica');
+      root.toggleAttribute('data-dsh-compat', state.aquaMode === 'compat');
       root.style.setProperty('--aqua-user-blur', `${state.aquaBlur}px`);
       root.style.setProperty('--aqua-user-frost', String(state.aquaFrost));
       root.style.setProperty('--aqua-user-hue', `${state.aquaHue}deg`);
       root.style.setProperty('--aqua-wallpaper-blur', `${state.aquaWallpaperBlur}px`);
       root.style.setProperty('--aqua-wallpaper-frost', (state.aquaWallpaperFrost / 100).toFixed(3));
+      root.style.setProperty('--dsh-aqua-blur', `${state.aquaBlur}px`);
+      root.style.setProperty('--dsh-aqua-frost', String(Math.min(state.aquaFrost / 50, 1.4)));
+      root.style.setProperty('--dsh-aqua-fluid-hue', `${state.aquaHue}deg`);
+      root.style.setProperty('--dsh-aqua-wallpaper-blur', `${state.aquaWallpaperBlur}px`);
+      root.style.setProperty('--dsh-aqua-wallpaper-frost', (state.aquaWallpaperFrost / 100).toFixed(3));
+      if (atmosphere) atmosphere.dataset.background = root.dataset.aquaBackground;
       applyBrightness();
       if (wallpaper) {
         if (appliedWallpaper !== wallpaperData) {

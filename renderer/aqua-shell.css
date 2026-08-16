@@ -1,75 +1,80 @@
-/* 摘星阁 · Aqua 指挥舱
-   参考 DSH Aqua 的材质与可调氛围，但按摘星阁现有语义令牌、原生 DOM、
-   CSP、性能分档和 800×600 可用性重新实现。此文件只做增强层；脚本或
-   Canvas 不可用时，styles.css 中原有的双主题与极光背景仍可完整工作。 */
+/* 摘星阁 · DSH Aqua 指挥舱
+   桌面骨架沿用摘星阁业务 DOM；流体、鲸鱼、玻璃参数和窗口融合语义对齐
+   DSH-Transparent-UI-Plugin 1.1.0 与官方 DeepSeek Harness 桌面壳。 */
 
 :root {
-  --aqua-user-blur: 24px;
-  --aqua-user-frost: 42;
-  --aqua-user-hue: 172deg;
+  --desktop-titlebar-height: env(titlebar-area-height, 32px);
+  --aqua-user-blur: 2px;
+  --aqua-user-frost: 20;
+  --aqua-user-hue: 316deg;
   --aqua-user-brightness-white: 0;
   --aqua-user-brightness-black: 0;
-  --aqua-wallpaper-blur: 4px;
-  --aqua-wallpaper-frost: .18;
+  --aqua-wallpaper-blur: 0px;
+  --aqua-wallpaper-frost: 0;
+  --dsh-aqua-blur: 2px;
+  --dsh-aqua-frost: .4;
+  --dsh-aqua-fluid-hue: 316deg;
   --aqua-rail-width: 17.5rem;
   --aqua-edge-size: 2rem;
 }
 
+body {
+  box-sizing: border-box;
+  padding-top: var(--desktop-titlebar-height) !important;
+}
+
+#desktop-titlebar-drag-region {
+  position: fixed;
+  top: env(titlebar-area-y, 0px);
+  left: env(titlebar-area-x, 0px);
+  z-index: 150;
+  width: env(titlebar-area-width, calc(100% - 138px));
+  height: var(--desktop-titlebar-height);
+  -webkit-app-region: drag;
+  pointer-events: auto;
+  user-select: none;
+}
+
 /* ---------- 可调材质 ---------- */
 [data-aqua-mode="mica"][data-theme="dark"] {
-  --glass-bg:
-    linear-gradient(154deg,
-      rgb(45 66 91 / calc(18% + var(--aqua-user-frost) * .28%)),
-      rgb(12 31 44 / calc(10% + var(--aqua-user-frost) * .2%)) 46%,
-      rgb(6 24 31 / calc(16% + var(--aqua-user-frost) * .24%))),
-    linear-gradient(304deg, rgb(78 224 211 / 8%), transparent 52%);
-  --glass-bg-deep:
-    linear-gradient(154deg,
-      rgb(38 61 83 / calc(42% + var(--aqua-user-frost) * .28%)),
-      rgb(7 25 35 / calc(56% + var(--aqua-user-frost) * .24%)) 62%,
-      rgb(4 19 26 / calc(62% + var(--aqua-user-frost) * .2%)));
-  --glass-bg-soft:
-    linear-gradient(154deg,
-      rgb(42 68 88 / calc(8% + var(--aqua-user-frost) * .14%)),
-      rgb(6 27 34 / calc(6% + var(--aqua-user-frost) * .1%)));
-  --card-bg:
-    linear-gradient(160deg,
-      rgb(16 35 48 / calc(70% + var(--aqua-user-frost) * .2%)),
-      rgb(7 24 34 / calc(78% + var(--aqua-user-frost) * .16%)) 62%,
-      rgb(4 18 27 / calc(82% + var(--aqua-user-frost) * .14%)));
+  --glass-bg: linear-gradient(180deg,
+    color-mix(in srgb, rgb(42 46 56) calc(50% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(22 25 34) calc(50% * var(--dsh-aqua-frost)), transparent));
+  --glass-bg-deep: linear-gradient(180deg,
+    color-mix(in srgb, rgb(42 46 56) calc(64% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(16 20 28) calc(64% * var(--dsh-aqua-frost)), transparent));
+  --glass-bg-soft: linear-gradient(180deg,
+    color-mix(in srgb, rgb(42 46 56) calc(36% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(16 20 28) calc(30% * var(--dsh-aqua-frost)), transparent));
+  --card-bg: linear-gradient(180deg,
+    color-mix(in srgb, rgb(22 25 34) calc(72% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(10 12 18) calc(68% * var(--dsh-aqua-frost)), transparent));
   --card-bg-featured:
     linear-gradient(160deg,
       rgb(78 48 28 / calc(22% + var(--aqua-user-frost) * .14%)),
       rgb(11 31 39 / calc(76% + var(--aqua-user-frost) * .17%)) 46%,
       rgb(5 20 28 / 92%));
-  --glass-blur: blur(var(--aqua-user-blur)) saturate(172%) brightness(1.05);
+  --glass-blur: blur(var(--dsh-aqua-blur));
 }
 
 [data-aqua-mode="mica"][data-theme="light"] {
-  --glass-bg:
-    linear-gradient(158deg,
-      rgb(255 255 255 / calc(45% + var(--aqua-user-frost) * .4%)),
-      rgb(241 252 253 / calc(34% + var(--aqua-user-frost) * .34%)) 52%,
-      rgb(218 241 242 / calc(30% + var(--aqua-user-frost) * .28%))),
-    linear-gradient(304deg, rgb(18 169 174 / 7%), transparent 52%);
-  --glass-bg-deep:
-    linear-gradient(158deg,
-      rgb(255 255 255 / calc(70% + var(--aqua-user-frost) * .26%)),
-      rgb(238 249 249 / calc(68% + var(--aqua-user-frost) * .25%)));
-  --glass-bg-soft:
-    linear-gradient(158deg,
-      rgb(255 255 255 / calc(28% + var(--aqua-user-frost) * .24%)),
-      rgb(224 245 245 / calc(20% + var(--aqua-user-frost) * .18%)));
-  --card-bg:
-    linear-gradient(160deg,
-      rgb(255 255 255 / calc(62% + var(--aqua-user-frost) * .29%)),
-      rgb(244 252 251 / calc(66% + var(--aqua-user-frost) * .25%)) 60%,
-      rgb(235 246 244 / calc(67% + var(--aqua-user-frost) * .22%)));
+  --glass-bg: linear-gradient(180deg,
+    color-mix(in srgb, white calc(50% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, white calc(35% * var(--dsh-aqua-frost)), transparent));
+  --glass-bg-deep: linear-gradient(180deg,
+    color-mix(in srgb, white calc(70% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, white calc(58% * var(--dsh-aqua-frost)), transparent));
+  --glass-bg-soft: linear-gradient(180deg,
+    color-mix(in srgb, white calc(34% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, white calc(22% * var(--dsh-aqua-frost)), transparent));
+  --card-bg: linear-gradient(180deg,
+    color-mix(in srgb, white calc(76% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, white calc(62% * var(--dsh-aqua-frost)), transparent));
   --card-bg-featured:
     linear-gradient(160deg,
       rgb(255 246 232 / calc(70% + var(--aqua-user-frost) * .22%)),
       rgb(246 252 248 / calc(66% + var(--aqua-user-frost) * .24%)));
-  --glass-blur: blur(var(--aqua-user-blur)) saturate(158%) brightness(1.03);
+  --glass-blur: blur(var(--dsh-aqua-blur));
 }
 
 [data-aqua-mode="compat"][data-theme="dark"] {
@@ -120,7 +125,19 @@
   z-index: 0;
   isolation: isolate;
   pointer-events: none;
-  background: var(--c-bg);
+  background:
+    radial-gradient(760px 420px at 50% -8%, rgb(160 200 255 / 26%), transparent 70%),
+    linear-gradient(rgb(156 193 231 / 22%) 0%, rgb(156 193 231 / 0%) 38%),
+    radial-gradient(900px 420px at 50% 108%, rgb(156 193 231 / 14%), transparent 70%),
+    var(--c-bg);
+}
+
+[data-theme="dark"] .atmosphere {
+  background:
+    radial-gradient(760px 420px at 50% -8%, rgb(110 165 255 / 13%), transparent 70%),
+    linear-gradient(rgb(94 143 224 / 13%) 0%, rgb(94 143 224 / 0%) 46%),
+    radial-gradient(900px 420px at 50% 108%, rgb(94 143 224 / 9%), transparent 70%),
+    var(--c-bg);
 }
 
 .atmosphere::after {
@@ -137,21 +154,34 @@
 .aqua-fluid-canvas,
 .aqua-wallpaper {
   position: absolute;
-  inset: -3%;
-  width: 106%;
-  height: 106%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 
 .aqua-fluid-canvas {
   z-index: -2;
   display: block;
-  /* 画布原生主色约为 172°；滑杆表达绝对色相，默认值因此不应再旋转一圈。 */
-  filter: hue-rotate(calc(var(--aqua-user-hue) - 172deg)) saturate(118%);
-  opacity: .66;
+  filter: hue-rotate(var(--dsh-aqua-fluid-hue));
+  opacity: 1;
   transition: filter var(--dur-glide) var(--ease), opacity var(--dur-slow) var(--ease);
 }
-[data-theme="light"] .aqua-fluid-canvas { opacity: .42; }
+[data-theme="light"] .aqua-fluid-canvas { opacity: 1; }
+
+[data-dsh-aqua-whale] {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: .92;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+[data-dsh-aqua-whale][data-scheme="light"] { mix-blend-mode: multiply; }
+[data-dsh-aqua-whale] canvas { display: block; width: 100%; height: 100%; }
+[data-aqua-whale="off"] [data-dsh-aqua-whale],
+[data-dsh-aqua-whale][data-dsh-whale-paused] { opacity: 0; }
 
 .aqua-wallpaper {
   z-index: -1;
@@ -267,7 +297,7 @@
 .app-stage {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--desktop-titlebar-height));
   display: flex;
   flex-direction: column;
 }
@@ -609,8 +639,8 @@ main { order: 5; width: 100%; }
     position: sticky;
     top: var(--sp-4);
     z-index: 70;
-    height: calc(100vh - 2 * var(--sp-4));
-    min-height: min(32rem, calc(100vh - 2 * var(--sp-4)));
+    height: calc(100vh - var(--desktop-titlebar-height) - 2 * var(--sp-4));
+    min-height: min(32rem, calc(100vh - var(--desktop-titlebar-height) - 2 * var(--sp-4)));
     display: flex;
     flex-direction: column;
     margin: var(--sp-4) 0 var(--sp-4) var(--sp-4);

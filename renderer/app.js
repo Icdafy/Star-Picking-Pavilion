@@ -155,8 +155,9 @@ function applyTheme(theme, { persist = true } = {}) {
   themeAppliedOnce = true;
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+  document.body.toggleAttribute('data-ds-dark-theme', theme === 'dark');
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#04060e' : '#f6f4ee');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#151517' : '#ffffff');
   if (persist) {
     preferenceActions.remember('theme', theme);
   }

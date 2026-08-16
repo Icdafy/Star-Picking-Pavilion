@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.0.exe`，双击并按向导安装。v0.1.0 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.0.1.exe`，双击并按向导安装。v0.1.0.1 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.0.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.0.1.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -40,6 +40,8 @@ v0.0.20 增强卫星专题词库与信源接入：新增卫星制造技术、卫
 
 v0.1.0 完成 Aqua 指挥舱升级与全面安全复审：宽屏采用浮动指挥栏、玻璃塔台和原创流体星云，中窄屏继续完整适配 800×600 与四档界面缩放；设置页可调云母材质、模糊、磨砂、色相、明暗、壁纸、星鲸和星尘。壁纸由渲染层压缩并经主进程签名与 3 MB 上限复核后原子保存在本机，不进入偏好 JSON。服务端同时增加 API 数据钳制、采集 URL 收口、Markdown 导出防注入、同源写请求防护与 `no-store` 响应策略。
 
+v0.1.0.1 以 DeepSeek Harness 官方桌面外壳和 DSH Transparent UI Plugin 1.1.0 为只读参照重建视觉底座：原生 Windows 标题栏改为隐藏叠加并与深浅主题实时同色，页面为标题栏预留可拖拽安全区；流体背景与星鲸改用插件 1.1.0 的原始 WebGL 反馈着色器和粒子引擎，玻璃参数、默认值、深浅色调色板与亮度语义同步插件契约。数据库、HTTP API、用户数据、业务设置及壁纸资产保持兼容。
+
 ## 主要功能
 
 - 精选、全部动态与星标信息流
@@ -56,7 +58,7 @@ v0.1.0 完成 Aqua 指挥舱升级与全面安全复审：宽屏采用浮动指�
 - 实体标签点击即检索，多事件资讯展开为原子事件
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
 - 深色和浅色主题
-- Aqua 指挥舱与外观实验室：云母/兼容材质、流体或本机壁纸、原创星鲸与星尘，并支持低功耗和减少动态效果降级
+- Aqua 指挥舱与外观实验室：云母/兼容材质、流体或本机壁纸、DSH 1.1.0 星鲸与星尘，并支持低功耗和减少动态效果降级
 - 中文思源黑体、英文 Times New Roman，字体随安装包内置，不依赖本机是否装过中文字体
 - 四档界面缩放（小 / 标准 / 大 / 特大，<kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd>），字号、行距、留白、圆角、栏宽等比例同步缩放
 - 自动记住主题、界面缩放档位、最后视图、领域与分类、日报日期、常用网址分类与星标、实时更新开关
@@ -233,7 +235,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.1.0 --artifacts
+npm run verify:version -- --tag v0.1.0.1 --artifacts
 npm run notices
 ```
 
@@ -241,7 +243,7 @@ npm run notices
 
 ## 许可证与致谢
 
-项目以 [MIT License](LICENSE) 发布。生产依赖许可见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+项目以 [MIT License](LICENSE) 发布。生产依赖以及本版本复用的 DSH Transparent UI Plugin 1.1.0 许可见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
 
 内置的思源黑体（Source Han Sans SC，Google Fonts 发行名 Noto Sans SC）遵循 [SIL Open Font License 1.1](renderer/fonts/source-han-sans-sc/LICENSE)，来源与改动说明见 [renderer/fonts/README.md](renderer/fonts/README.md)。英文使用 Windows 自带的 Times New Roman，不随包分发。
 
