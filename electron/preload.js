@@ -62,7 +62,7 @@ const desktopApi = Object.freeze({
   // 主进程推送更新状态：available / downloading / downloaded / error
   onUpdateStatus: cb => ipcRenderer.on('update:status', (_e, payload) => cb(payload)),
   // 渲染层请求「重启并安装更新」
-  installUpdate: () => ipcRenderer.invoke('update:install')
+  installUpdate: () => ipcRenderer.send('update:install')
 });
 contextBridge.exposeInMainWorld('starPickingPavilion', desktopApi);
 contextBridge.exposeInMainWorld('windcatcher', desktopApi);

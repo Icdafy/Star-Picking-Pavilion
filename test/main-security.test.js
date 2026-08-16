@@ -187,6 +187,14 @@ test('auto update starts independently and reports failures to the renderer', ()
   assert.match(source, /checkForUpdatesAndNotify\(\)\.catch\([^)]*sendUpdateStatus\('error'/s);
 });
 
+test('update installation is fire-and-forget and coordinates shutdown before NSIS', () => {
+  assert.match(source, /ipcMain\.on\('update:install'/);
+  assert.match(source, /createUpdateInstallCoordinator\(\{/);
+  assert.match(source, /shutdown:\s*shutdownDesktop/);
+  assert.match(source, /setQuitReady:\s*ready\s*=>\s*\{\s*quitAfterShutdown\s*=\s*ready/);
+  assert.doesNotMatch(source, /ipcMain\.handle\('update:install'/);
+});
+
 test('desktop lifecycle is single-instance and shuts the utility process down cooperatively', () => {
   const lockIndex = source.indexOf('requestSingleInstanceLock()');
   const readyIndex = source.indexOf('app.whenReady()');

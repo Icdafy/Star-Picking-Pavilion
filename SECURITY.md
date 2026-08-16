@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-安全修复只面向最新发布版本。当前支持系列为 `0.0.x`。
+安全修复只面向最新发布版本。当前支持系列为 `0.1.x`。
 
 ## Reporting a vulnerability
 

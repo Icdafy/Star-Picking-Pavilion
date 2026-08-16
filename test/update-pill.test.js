@@ -33,6 +33,7 @@ function makePill() {
   const listeners = {};
   return {
     hidden: true,
+    disabled: false,
     textContent: '',
     title: '',
     classList: {
@@ -77,9 +78,18 @@ test('更新状态逐态改写胶囊文案与类名', () => {
   onStatus({ status: 'downloaded', version: '0.6.0' });
   assert.equal(pill.textContent, '▲ 重启安装 0.6.0');
   assert.equal(pill.classList.has('ready'), true);
+  assert.equal(pill.disabled, false);
 
   pill.dispatch('click');
   assert.equal(desktop.installed, true);
+  assert.equal(ctrl.status, 'installing');
+  assert.equal(pill.textContent, '正在重启安装…');
+  assert.equal(pill.classList.has('ready'), false);
+  assert.equal(pill.disabled, true);
+
+  // 主进程回推公开版本号后补齐完整安装中文案。
+  onStatus({ status: 'installing', version: '0.6.0' });
+  assert.equal(pill.textContent, '正在重启安装 0.6.0…');
 });
 
 test('更新检查失败给出错误态与原因提示', () => {

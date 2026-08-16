@@ -9,12 +9,13 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('package and lockfile versions stay synchronized for v0.1.1', () => {
+test('package and lockfile versions stay synchronized for v0.1.2', () => {
   const packageJson = JSON.parse(read('package.json'));
   const packageLock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(packageJson.version, '0.1.3');
-  assert.equal(packageJson.build.buildVersion, '0.1.1');
+  assert.equal(packageJson.version, '0.1.4');
+  assert.equal(packageJson.shortVersionWindows, '0.1.2');
+  assert.equal(packageJson.build.buildVersion, '0.1.2');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
 });
@@ -32,8 +33,10 @@ test('public release documentation and compliance artifacts are complete', () =>
   ]) assert.equal(fs.existsSync(path.join(root, file)), true, `missing ${file}`);
 
   assert.match(read('LICENSE'), /MIT License[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
-  assert.equal(require('../package.json').version, '0.1.3');
-  assert.equal(require('../package.json').build.buildVersion, '0.1.1');
+  assert.equal(require('../package.json').version, '0.1.4');
+  assert.equal(require('../package.json').shortVersionWindows, '0.1.2');
+  assert.equal(require('../package.json').build.buildVersion, '0.1.2');
+  assert.match(read('CHANGELOG.md'), /\[0\.1\.2\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.1\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.0\.2\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.0\.1\].*2026-08-16/);
@@ -59,13 +62,13 @@ test('public release documentation and compliance artifacts are complete', () =>
   assert.match(read('CHANGELOG.md'), /\[0\.0\.2\].*2026-07-23/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.1\].*2026-07-21/);
   assert.match(read('SECURITY.md'), /Security Advisories/);
-  // 按文档出现顺序断言 v0.1.1 的主线：配色修复、旧偏好迁移与版本信息。
+  // 按文档出现顺序断言 v0.1.2 的主线：更新体验、滚动条与版本信息。
   assert.match(
     read('RELEASE_NOTES.md'),
-    /v0\.1\.1[\s\S]*流体配色[\s\S]*旧偏好迁移[\s\S]*版本与验证/
+    /v0\.1\.2[\s\S]*自动更新修复[\s\S]*滚动条视觉统一[\s\S]*版本与验证/
   );
   assert.match(read('THIRD_PARTY_NOTICES.txt'), /cheerio@1\.2\.0/);
-  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.1\.1/);
+  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.1\.2/);
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
@@ -81,7 +84,7 @@ test('README documents installation, privacy, recovery and security truthfully',
   const readme = read('README.md');
   for (const required of [
     /Windows 10\/11.*x64/,
-    /Star-Picking-Pavilion-Setup-0\.1\.1\.exe/,
+    /Star-Picking-Pavilion-Setup-0\.1\.2\.exe/,
     /SmartScreen/,
     /Get-FileHash/,
     /云幄\s*·\s*常用网址/,
@@ -119,25 +122,33 @@ test('version verifier matches package, tag, installer and latest metadata', asy
   const { verifyVersion } = require('../scripts/verify-version');
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-version-'));
   t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.1.3\n');
-  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.1.1.exe'), 'fixture');
+  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.1.4\n');
+  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.1.2.exe'), 'fixture');
 
   assert.deepEqual(verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.1.1',
+    tag: 'v0.1.2',
     distDir: directory,
     requireArtifacts: true
   }), {
-    version: '0.1.3',
-    releaseVersion: '0.1.1',
-    tag: 'v0.1.1',
-    installer: 'Star-Picking-Pavilion-Setup-0.1.1.exe'
+    version: '0.1.4',
+    releaseVersion: '0.1.2',
+    tag: 'v0.1.2',
+    installer: 'Star-Picking-Pavilion-Setup-0.1.2.exe'
   });
   assert.throws(() => verifyVersion({
     packageJson: require('../package.json'),
     tag: 'v0.0.1',
     distDir: directory
   }), /tag.*public release/i);
+  assert.throws(() => verifyVersion({
+    packageJson: {
+      ...require('../package.json'),
+      shortVersionWindows: '0.1.4'
+    },
+    tag: 'v0.1.2',
+    distDir: directory
+  }), /Windows product version.*public release/i);
 });
 
 test('CI and tag release workflows enforce every gate before publishing', () => {

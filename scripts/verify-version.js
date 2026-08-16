@@ -30,6 +30,12 @@ function verifyVersion({
   if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(releaseVersion)) {
     throw new Error(`invalid public release version: ${releaseVersion}`);
   }
+  if (packageJson?.shortVersionWindows !== releaseVersion) {
+    throw new Error(
+      `Windows product version ${packageJson?.shortVersionWindows || '(missing)'} `
+      + `does not match public release ${releaseVersion}`
+    );
+  }
   const expectedTag = `v${releaseVersion}`;
   if (tag !== expectedTag) {
     throw new Error(`tag ${tag || '(missing)'} does not match public release ${releaseVersion}`);

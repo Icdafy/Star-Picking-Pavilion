@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.1.exe`，双击并按向导安装。v0.1.1 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.2.exe`，双击并按向导安装。v0.1.2 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.1.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.2.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -45,6 +45,8 @@ v0.1.0.1 以 DeepSeek Harness 官方桌面外壳和 DSH Transparent UI Plugin 1.
 v0.1.0.2 修复长信息流滚动时塔台进入原生标题栏安全区的问题，并把“今天 / 昨天”等日期分组从横贯页面的近实色遮罩改为紧凑液态玻璃胶囊。Aqua Glass Lab 新增浅色与深色主题各 6 组流体配色预设，暗色预设单独控制亮度以保持夜航主题的层次；原有色相、明暗滑杆与偏好格式继续兼容。
 
 v0.1.1 修正流体预设把目标色相误当作相对旋转量的问题：星海蓝、墨玉青、深空紫、熔星红等名称、预览色块与实际背景现已一致，浅色主题与其余夜航预设同步校准。界面偏好升级为 v2，旧版命名预设自动迁到正确颜色，自定义色相换算后尽量保持原有视觉结果。
+
+v0.1.2 修复自动更新把内部比较号 `0.1.3` 显示给用户、安装器与仍在退出的应用争用文件而短暂报错的问题：更新提示现在始终显示公开版本，点击安装会先优雅关闭本地服务再启动 NSIS。窗口最右侧滚动条同时改为主题感知的细圆角样式，与深空夜航和宣纸白界面同步。
 
 ## 主要功能
 
@@ -239,7 +241,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.1.1 --artifacts
+npm run verify:version -- --tag v0.1.2 --artifacts
 npm run notices
 ```
 

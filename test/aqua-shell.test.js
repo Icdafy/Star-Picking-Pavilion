@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   DEFAULTS,
@@ -9,6 +11,8 @@ const {
   DSH_FLUID_BASE_HUE,
   fluidHueRotation
 } = require('../renderer/aqua-shell');
+
+const styles = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'styles.css'), 'utf8');
 
 test('流体配色为浅色与深色主题分别提供六组安全预设', () => {
   assert.deepEqual(Object.keys(FLUID_PALETTES), ['light', 'dark']);
@@ -60,4 +64,13 @@ test('命名预设以目标色相驱动 DSH 基础蓝色，不把目标值误作
       极夜冰蓝: 340
     }
   );
+});
+
+test('窗口与内嵌区域的滚动条跟随 Aqua 深浅主题', () => {
+  assert.match(styles, /\[data-theme="dark"\][\s\S]*--scrollbar-thumb:\s*rgba\(125,138,176,\.38\)/);
+  assert.match(styles, /\[data-theme="light"\][\s\S]*--scrollbar-thumb:\s*rgba\(81,92,116,\.3\)/);
+  assert.match(styles, /html\s*\{\s*scrollbar-color:\s*var\(--scrollbar-thumb\) transparent;/);
+  assert.match(styles, /::-webkit-scrollbar\s*\{\s*width:\s*8px;\s*height:\s*8px;/);
+  assert.match(styles, /::-webkit-scrollbar-thumb[\s\S]*border-radius:\s*999px;[\s\S]*background:\s*var\(--scrollbar-thumb\)/);
+  assert.match(styles, /::-webkit-scrollbar-thumb:hover\s*\{\s*background:\s*var\(--scrollbar-thumb-hover\)/);
 });
