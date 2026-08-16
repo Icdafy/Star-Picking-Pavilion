@@ -16,6 +16,17 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   const initialPreferences = {
     version: 1,
     theme: 'dark',
+    textScale: 'md',
+    aquaMode: 'mica',
+    aquaBlur: 24,
+    aquaFrost: 42,
+    aquaHue: 172,
+    aquaBrightness: 50,
+    aquaBackground: 'fluid',
+    aquaWallpaperBlur: 4,
+    aquaWallpaperFrost: 18,
+    aquaWhale: true,
+    aquaCritters: true,
     view: 'featured',
     domain: '',
     category: '',
@@ -38,6 +49,9 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
     pendingDates: [],
     lastResult: null
   };
+  const wallpaperDataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+  const savedWallpaper = { stored: true, mime: 'image/png', bytes: 8 };
+  const clearedWallpaper = { stored: false };
   const electron = {
     contextBridge: {
       exposeInMainWorld(name, value) { exposed.set(name, value); }
@@ -57,6 +71,9 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
       on(channel, listener) { ipcCalls.push(['on', channel]); updateListener = listener; },
       invoke(channel, ...args) {
         ipcCalls.push(['invoke', channel, ...args]);
+        if (channel === 'appearance-wallpaper:get') return Promise.resolve(wallpaperDataUrl);
+        if (channel === 'appearance-wallpaper:save') return Promise.resolve(savedWallpaper);
+        if (channel === 'appearance-wallpaper:clear') return Promise.resolve(clearedWallpaper);
         if (channel === 'desktop-settings:get') return Promise.resolve(desktopSnapshot);
         if (channel === 'desktop-settings:update') {
           return Promise.resolve({
@@ -114,6 +131,25 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   const patch = { theme: 'light', commonLinksFavorites: ['caac'] };
   await api.updatePreferences(patch);
   assert.deepEqual(ipcCalls.at(-1), ['invoke', 'preferences:update', patch]);
+
+  const wallpaper = await api.getAppearanceWallpaper();
+  assert.equal(wallpaper, wallpaperDataUrl);
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'appearance-wallpaper:get']);
+
+  const saved = await api.saveAppearanceWallpaper(wallpaperDataUrl);
+  assert.equal(Object.isFrozen(saved), true);
+  assert.notEqual(saved, savedWallpaper);
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), savedWallpaper);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(ipcCalls.at(-1))),
+    ['invoke', 'appearance-wallpaper:save', { dataUrl: wallpaperDataUrl }]
+  );
+
+  const cleared = await api.clearAppearanceWallpaper();
+  assert.equal(Object.isFrozen(cleared), true);
+  assert.notEqual(cleared, clearedWallpaper);
+  assert.deepEqual(JSON.parse(JSON.stringify(cleared)), clearedWallpaper);
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'appearance-wallpaper:clear']);
 
   const desktopSettings = await api.getDesktopSettings();
   assert.equal(Object.isFrozen(desktopSettings), true);

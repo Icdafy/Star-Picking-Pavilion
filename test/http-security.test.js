@@ -28,6 +28,18 @@ test('tokenless development accepts only absent or exact same-origin requests', 
   assert.equal(authorize({ host, origin: 'https://attacker.example' }, { port: PORT, expectedToken: '' }), false);
 });
 
+test('tokenless development rejects state-changing requests without same-origin Origin', () => {
+  const host = `127.0.0.1:${PORT}`;
+  // 读方法保持宽松（书签/地址栏直访不带 Origin）；写方法必须由同源页面发起
+  assert.equal(authorize({ host, method: 'GET' }, { port: PORT, expectedToken: '' }), true);
+  assert.equal(authorize({ host, method: 'HEAD' }, { port: PORT, expectedToken: '' }), true);
+  assert.equal(authorize({ host, method: 'POST' }, { port: PORT, expectedToken: '' }), false);
+  assert.equal(authorize({ host, method: 'DELETE' }, { port: PORT, expectedToken: '' }), false);
+  assert.equal(authorize({ host, method: 'PATCH' }, { port: PORT, expectedToken: '' }), false);
+  assert.equal(authorize({ host, method: 'POST', origin: `http://${host}` }, { port: PORT, expectedToken: '' }), true);
+  assert.equal(authorize({ host, method: 'POST', origin: 'null' }, { port: PORT, expectedToken: '' }), false);
+});
+
 test('AI base URL is HTTPS except for loopback development services', () => {
   assert.equal(validateAiBaseUrl('http://attacker.example'), false);
   assert.equal(validateAiBaseUrl('https://api.deepseek.com'), true);

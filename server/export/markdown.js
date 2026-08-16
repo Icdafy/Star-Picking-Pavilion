@@ -44,6 +44,14 @@ function safeUrl(value) {
   }
 }
 
+// URL 序列化不会编码圆括号，而 CommonMark 内联链接目标遇到不平衡的 `)` 会提前
+// 截断，把 URL 的其余部分漏成正文。把 `(` `)` 百分号编码后，链接目标就再也
+// 无法被外部 URL 截断，导出内容保持「链接与正文一一对应」的排版契约。
+function markdownLinkTarget(value) {
+  return safeUrl(value).replace(/[()]/g, character =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 function formatStamp(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
@@ -77,7 +85,8 @@ function describeEntry(item) {
 
 function entryLines(item, index, format) {
   const title = flatten(item.title) || '（无标题）';
-  const url = safeUrl(item.url);
+  const url = markdownLinkTarget(item.url);
+  const plainUrl = safeUrl(item.url);
   const meta = describeEntry(item).join(' · ');
   const summary = flatten(
     item.summary || item.ai_summary || item.aiSummary || item.rawSummary
@@ -98,7 +107,7 @@ function entryLines(item, index, format) {
   if (meta) lines.push(`   ${meta}`);
   if (summary) lines.push(`   ${summary}`);
   if (reason) lines.push(`   研判：${reason}`);
-  if (url) lines.push(`   ${url}`);
+  if (plainUrl) lines.push(`   ${plainUrl}`);
   return lines;
 }
 

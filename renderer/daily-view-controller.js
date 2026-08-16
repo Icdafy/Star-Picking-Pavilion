@@ -45,15 +45,21 @@
         body.innerHTML = r.sections.map(sec => `
       <div class="daily-section glass">
         <div class="daily-section-title">${esc(sec.category)}</div>
-        ${sec.items.map(it => `
+        ${sec.items.map(it => {
+          const quality = it.quality ?? it.quality_score;
+          const summary = it.aiSummary || it.ai_summary || '';
+          const source = it.sourceName || it.source_name || '';
+          const tier = it.sourceTier || it.tier || '';
+          return `
           <div class="daily-item">
-            <span class="di-score">${it.quality_score != null && Number.isFinite(Number(it.quality_score)) ? Math.round(it.quality_score) : '—'}</span>
+            <span class="di-score">${quality != null && Number.isFinite(Number(quality)) ? Math.round(quality) : '—'}</span>
             <div>
               <a href="${safeUrl(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-              ${it.ai_summary ? `<div class="di-meta">${esc(it.ai_summary)}</div>` : ''}
-              <div class="di-meta">${esc(it.source_name)} · ${esc(it.tier)} · ${DOMAIN_NAME[it.domain] || ''}</div>
+              ${summary ? `<div class="di-meta">${esc(summary)}</div>` : ''}
+              <div class="di-meta">${esc(source)} · ${esc(tier)} · ${DOMAIN_NAME[it.domain] || ''}</div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>`).join('');
       } catch (e) {
         if (!request.isCurrent()) return;

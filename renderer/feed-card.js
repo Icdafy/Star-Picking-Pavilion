@@ -437,12 +437,40 @@
       return { reused, created, removed };
     }
 
-    // 分页追加：整页片段追加到尾部（每页自带日期分组，与阶段 2 的
-    // insertAdjacentHTML 语义等价，只是节点由模板克隆而来）
+    // 分页追加：与上一页同一天的条目并进既有末组，避免「今天」标题拆成两截
     function appendPage(items, { startIdx = 0, timeOf = publishedTime } = {}) {
-      const frag = renderer.renderTimeline(items, startIdx, timeOf);
-      list.appendChild(frag);
-      return { created: items.length };
+      if (!Array.isArray(items) || !items.length) return { created: 0 };
+      const groups = renderer.groupItems(items, timeOf);
+      const createdRows = [];
+      let created = 0;
+      let delayBase = startIdx;
+      const lastGroup = list.querySelector('.date-group:last-child');
+      let start = 0;
+      if (lastGroup && groups[0] && labelOfGroup(lastGroup) === groups[0].label) {
+        for (const item of groups[0].items) {
+          const row = renderer.timelineRow(item, timeOf, Math.min(delayBase, 10) * 35);
+          lastGroup.appendChild(row);
+          createdRows.push(row);
+          created += 1;
+          delayBase += 1;
+        }
+        syncGroupCount(lastGroup);
+        start = 1;
+      }
+      for (let gi = start; gi < groups.length; gi += 1) {
+        const group = groups[gi];
+        const groupEl = renderer.dateGroupShell(group.label, group.items.length, group.time);
+        for (const item of group.items) {
+          const row = renderer.timelineRow(item, timeOf, Math.min(delayBase, 10) * 35);
+          groupEl.appendChild(row);
+          createdRows.push(row);
+          created += 1;
+          delayBase += 1;
+        }
+        list.appendChild(groupEl);
+      }
+      staggerCreated(createdRows);
+      return { created };
     }
 
     function labelOfGroup(groupEl) {

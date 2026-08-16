@@ -10,6 +10,18 @@ const ALLOWED_FIELDS = new Set([
   'version',
   ...UiPreferenceSchema.UI_PREFERENCE_FIELDS
 ]);
+const AQUA_FIELDS = Object.freeze([
+  'aquaMode',
+  'aquaBlur',
+  'aquaFrost',
+  'aquaHue',
+  'aquaBrightness',
+  'aquaBackground',
+  'aquaWallpaperBlur',
+  'aquaWallpaperFrost',
+  'aquaWhale',
+  'aquaCritters'
+]);
 const schemaDefaults = UiPreferenceSchema.getDefaultUiPreferences(CommonLinks);
 const DEFAULT_UI_PREFERENCES = Object.freeze({
   version: 1,
@@ -72,6 +84,14 @@ function validatePatch(patch, today) {
     )
   ) {
     throw new TypeError('textScale must be sm, md, lg or xl');
+  }
+  for (const field of AQUA_FIELDS) {
+    if (
+      Object.hasOwn(patch, field)
+      && !UiPreferenceSchema.isValidUiPreferenceValue(field, patch[field], CommonLinks, { today })
+    ) {
+      throw new TypeError(`${field} is not a supported appearance value`);
+    }
   }
   if (
     Object.hasOwn(patch, 'view')

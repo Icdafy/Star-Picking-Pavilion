@@ -43,6 +43,12 @@
 
     function setState(patch) {
       if (patch === null || typeof patch !== 'object') return state;
+      // Object.assign 会把 __proto__ 这类自有键解释成原型 setter；虽然当前所有
+      // 补丁都是内部白名单字面量，仍按纵深防御拒绝危险键，杜绝未来误接外部数据。
+      if (Object.keys(patch).some(key =>
+        key === '__proto__' || key === 'constructor' || key === 'prototype')) {
+        return state;
+      }
       Object.assign(state, patch);
       notify();
       return state;

@@ -30,6 +30,7 @@ const settingsViewSource = fs.readFileSync(path.join(root, 'renderer', 'settings
 // 7 视图注册，FEED_VIEWS 常量仍留在 app.js
 const storeSource = fs.readFileSync(path.join(root, 'renderer', 'store.js'), 'utf8');
 const viewRegistrySource = fs.readFileSync(path.join(root, 'renderer', 'view-registry.js'), 'utf8');
+const aquaShellSource = fs.readFileSync(path.join(root, 'renderer', 'aqua-shell.js'), 'utf8');
 // 阶段 3 批 4：切片执行函数迁移。renderCommonLinks 与两段接线迁入
 // common-links-controller.js，toggleStar 与 #feedList 点击委托迁入
 // feed-controller.js；原对 app.js 的切片/new Function 断言同批改为
@@ -43,6 +44,30 @@ const dailyArchiveController = fs.existsSync(path.join(root, 'renderer', 'daily-
   ? fs.readFileSync(path.join(root, 'renderer', 'daily-archive-controller.js'), 'utf8')
   : '';
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
+const AQUA_DEFAULTS = Object.freeze({
+  aquaMode: 'mica',
+  aquaBlur: 24,
+  aquaFrost: 42,
+  aquaHue: 172,
+  aquaBrightness: 50,
+  aquaBackground: 'fluid',
+  aquaWallpaperBlur: 4,
+  aquaWallpaperFrost: 18,
+  aquaWhale: true,
+  aquaCritters: true
+});
+const AQUA_NON_DEFAULTS = Object.freeze({
+  aquaMode: 'compat',
+  aquaBlur: 0,
+  aquaFrost: 100,
+  aquaHue: 360,
+  aquaBrightness: 0,
+  aquaBackground: 'wallpaper',
+  aquaWallpaperBlur: 40,
+  aquaWallpaperFrost: 100,
+  aquaWhale: false,
+  aquaCritters: false
+});
 
 function createStorage(entries = {}) {
   const values = new Map(Object.entries(entries));
@@ -54,11 +79,28 @@ function createStorage(entries = {}) {
 }
 
 test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
-  assert.match(html, /data-view="links"[^>]*>常用网址<\/button>/);
+  assert.match(html, /data-view="links"[^>]*>[\s\S]*?常用网址<\/button>/);
   assert.match(html, /id="viewLinks"[^>]*class="view"[^>]*hidden/);
   assert.match(html, /云幄\s*·\s*常用网址/);
   assert.match(html, /id="commonLinksCategories"[^>]*tabindex="-1"/);
   assert.match(html, /id="commonLinksGrid"[^>]*tabindex="-1"/);
+});
+
+test('宽屏指挥栏保留七视图语义，并为每个导航项提供内联 SVG 图标', () => {
+  assert.match(html, /<aside class="command-rail glass"[^>]*aria-label="摘星阁指挥栏">/);
+  const navStart = html.indexOf('<nav class="nav"');
+  const navEnd = html.indexOf('</nav>', navStart);
+  assert.ok(navStart >= 0 && navEnd > navStart, '缺少独立主导航结构');
+  const navigation = html.slice(navStart, navEnd);
+  const buttons = [...navigation.matchAll(/<button class="tab(?: active)?" data-view="([^"]+)"[\s\S]*?<\/button>/g)];
+  assert.deepEqual(
+    buttons.map(match => match[1]),
+    ['featured', 'all', 'starred', 'daily', 'links', 'sources', 'settings']
+  );
+  for (const [markup, view] of buttons.map(match => [match[0], match[1]])) {
+    assert.match(markup, /<span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20">[\s\S]*?(?:<path|<circle)/, `${view} 缺少可继承主题色的 SVG 图标`);
+  }
+  assert.doesNotMatch(navigation, /<img\b|data:image\//i, '导航图标必须保持内联、无外部资源依赖');
 });
 
 test('领域模块在应用脚本之前加载', () => {
@@ -66,13 +108,17 @@ test('领域模块在应用脚本之前加载', () => {
   const schemaIndex = html.indexOf('<script src="ui-preference-schema.js"></script>');
   const bootstrapIndex = html.indexOf('<script src="bootstrap.js"></script>');
   const styleIndex = html.indexOf('<link rel="stylesheet" href="styles.css">');
+  const aquaStyleIndex = html.indexOf('<link rel="stylesheet" href="aqua-shell.css">');
   const moduleIndex = html.indexOf('<script src="common-links.js"></script>');
+  const aquaIndex = html.indexOf('<script src="aqua-shell.js"></script>');
   const appIndex = html.indexOf('<script src="app.js"></script>');
   assert.ok(schemaIndex >= 0 && schemaIndex < bootstrapIndex);
   assert.ok(bootstrapIndex < styleIndex);
+  assert.ok(aquaStyleIndex > styleIndex, 'Aqua 增强样式必须在基础样式之后覆盖令牌');
   assert.ok(domUtilsIndex >= 0);
   assert.ok(moduleIndex > domUtilsIndex);
   assert.ok(moduleIndex >= 0);
+  assert.ok(aquaIndex > moduleIndex && aquaIndex < appIndex, 'Aqua UMD 必须先于组合根加载');
   assert.ok(appIndex > moduleIndex);
 });
 
@@ -175,6 +221,7 @@ test('desktop stored preference snapshot defensively becomes the complete initia
       preferences: {
         theme: 'light',
         textScale: 'xl',
+        ...AQUA_NON_DEFAULTS,
         view: 'links',
         domain: 'aerospace',
         category: '政策',
@@ -195,6 +242,7 @@ test('desktop stored preference snapshot defensively becomes the complete initia
   assert.deepEqual(result.preferences, {
     theme: 'light',
     textScale: 'xl',
+    ...AQUA_NON_DEFAULTS,
     view: 'links',
     domain: 'aerospace',
     category: '政策',
@@ -226,6 +274,7 @@ test('desktop without stored preferences creates one complete legacy migration p
   assert.deepEqual(result.preferences, {
     theme: 'light',
     textScale: 'md',
+    ...AQUA_DEFAULTS,
     view: 'featured',
     domain: '',
     category: '',
@@ -244,6 +293,7 @@ test('browser preferences restore every meaningful field from one namespaced JSO
   const storedPreferences = {
     theme: 'light',
     textScale: 'lg',
+    ...AQUA_NON_DEFAULTS,
     view: 'daily',
     domain: 'lowaltitude',
     category: '产业',
@@ -285,6 +335,7 @@ test('browser preferences safely fall back to all readable legacy selections aft
   assert.deepEqual(result.preferences, {
     theme: 'light',
     textScale: 'md',
+    ...AQUA_DEFAULTS,
     view: 'featured',
     domain: '',
     category: '',
@@ -297,7 +348,7 @@ test('browser preferences safely fall back to all readable legacy selections aft
   assert.equal(result.migrationPatch, null);
 });
 
-test('production preference actions persist exactly eight minimal patches and ignore invalid or transient input', () => {
+test('production preference actions persist all Aqua values as minimal patches and ignore invalid or transient input', () => {
   const favoriteId = CommonLinks.LINKS[0].id;
   const persisted = [];
   const persistResults = [];
@@ -313,6 +364,16 @@ test('production preference actions persist exactly eight minimal patches and ig
   });
   const cases = [
     ['theme', 'light', { theme: 'light' }],
+    ['aquaMode', 'compat', { aquaMode: 'compat' }],
+    ['aquaBlur', 0, { aquaBlur: 0 }],
+    ['aquaFrost', 100, { aquaFrost: 100 }],
+    ['aquaHue', 360, { aquaHue: 360 }],
+    ['aquaBrightness', 0, { aquaBrightness: 0 }],
+    ['aquaBackground', 'wallpaper', { aquaBackground: 'wallpaper' }],
+    ['aquaWallpaperBlur', 40, { aquaWallpaperBlur: 40 }],
+    ['aquaWallpaperFrost', 100, { aquaWallpaperFrost: 100 }],
+    ['aquaWhale', false, { aquaWhale: false }],
+    ['aquaCritters', false, { aquaCritters: false }],
     ['view', 'daily', { view: 'daily' }],
     ['domain', 'lowaltitude', { domain: 'lowaltitude' }],
     ['category', '政策', { category: '政策' }],
@@ -331,6 +392,16 @@ test('production preference actions persist exactly eight minimal patches and ig
     assert.equal(actions.remember(field, 'transient'), null);
   }
   assert.equal(actions.remember('theme', 'sepia'), null);
+  assert.equal(actions.remember('aquaMode', 'glass'), null);
+  assert.equal(actions.remember('aquaBlur', -Number.EPSILON), null);
+  assert.equal(actions.remember('aquaFrost', 100.000001), null);
+  assert.equal(actions.remember('aquaHue', Number.POSITIVE_INFINITY), null);
+  assert.equal(actions.remember('aquaBrightness', '50'), null);
+  assert.equal(actions.remember('aquaBackground', 'video'), null);
+  assert.equal(actions.remember('aquaWallpaperBlur', Number.NaN), null);
+  assert.equal(actions.remember('aquaWallpaperFrost', -1), null);
+  assert.equal(actions.remember('aquaWhale', 1), null);
+  assert.equal(actions.remember('aquaCritters', 'false'), null);
   assert.equal(actions.remember('dailyDate', '2026-07-24'), null);
   assert.equal(actions.remember('linksCategory', 'missing'), null);
   assert.deepEqual(persisted, cases.map(([, , expected]) => expected));
@@ -394,6 +465,56 @@ test('app wires every selection to a minimal patch, skips search view persistenc
   assert.match(app, /if \(FEED_VIEWS\.includes\(state\.view\)\)\s*\{[\s\S]*await initCategories\(\);[\s\S]*switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\)/);
   assert.match(app, /else\s*\{[\s\S]*switchView\(state\.view,\s*\{\s*persist:\s*false\s*\}\);[\s\S]*initCategories\(\)/);
   assert.match(app, /start\(\)\.catch\(\(\) => toast\('界面初始化失败，请刷新重试', true\)\)/);
+});
+
+test('Aqua 外观实验室完整接入恢复、控件、最小持久化与本机壁纸边界', () => {
+  for (const [id, min, max] of [
+    ['setAquaBlur', 0, 40],
+    ['setAquaFrost', 0, 100],
+    ['setAquaHue', 0, 360],
+    ['setAquaBrightness', 0, 100],
+    ['setAquaWallpaperBlur', 0, 40],
+    ['setAquaWallpaperFrost', 0, 100]
+  ]) {
+    assert.match(
+      html,
+      new RegExp(`id="${id}" type="range" min="${min}" max="${max}" step="1"`),
+      `${id} 缺少与共享 schema 一致的边界`
+    );
+  }
+  assert.match(html, /data-aqua-mode="mica"[^>]*aria-pressed="true"/);
+  assert.match(html, /data-aqua-mode="compat"[^>]*aria-pressed="false"/);
+  assert.match(html, /data-aqua-background="fluid"[^>]*aria-pressed="true"/);
+  assert.match(html, /data-aqua-background="wallpaper"[^>]*aria-pressed="false"/);
+  assert.match(html, /id="setAquaWhale" type="checkbox" role="switch" checked/);
+  assert.match(html, /id="setAquaCritters" type="checkbox" role="switch" checked/);
+  assert.match(html, /class="wallpaper-file-input" id="setAquaWallpaper" type="file" accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.doesNotMatch(html, /id="setAquaWallpaper"[^>]*\bhidden\b/, '壁纸文件控件必须可由键盘聚焦');
+  assert.match(html, /id="btnAquaWallpaperClear"[^>]*type="button"/);
+  assert.match(html, /id="btnAquaReset"[^>]*type="button"/);
+
+  for (const field of Object.keys(AQUA_DEFAULTS)) {
+    assert.match(app, new RegExp(`${field}: restoredPreferences\\.${field}`));
+  }
+  assert.match(app, /const aquaShell = AquaShell\.createAquaShell\(\{[\s\S]*?storage,[\s\S]*?preferences: restoredPreferences,[\s\S]*?persist: persistUiPreferences,[\s\S]*?onChange: patch => store\.setState\(patch\)/);
+  assert.match(app, /pagehide['"], \(\) => aquaShell\.dispose\(\), \{ once: true \}/);
+
+  assert.match(aquaShellSource, /const FIELDS = Object\.freeze\(Object\.keys\(DEFAULTS\)\)/);
+  assert.match(aquaShellSource, /pendingPatch\[field\] = state\[field\]/);
+  assert.match(aquaShellSource, /return Promise\.resolve\(persist\(patch\)\)/);
+  assert.match(aquaShellSource, /const WALLPAPER_KEY = 'star-picking-pavilion\.aqua-wallpaper\.v1'/);
+  assert.match(aquaShellSource, /writeStorage\(storage, WALLPAPER_KEY, dataUrl \|\| ''\)/);
+  assert.match(aquaShellSource, /wallpaperWriteQueue = task\.then\(\(\) => undefined, \(\) => undefined\)/);
+  assert.match(aquaShellSource, /field === 'aquaBackground' && next\.aquaBackground !== 'wallpaper'[\s\S]{0,100}?wallpaperRequest \+= 1/);
+  assert.match(aquaShellSource, /writeWallpaperAsset\(previousWallpaper\)\.catch\(\(\) => \{\}\)/);
+  assert.match(aquaShellSource, /navigation\?\.setAttribute\('aria-orientation', vertical \? 'vertical' : 'horizontal'\)/);
+});
+
+test('Aqua 氛围层位于根画布之上、应用外壳之下，Canvas 不会画在不可见层', () => {
+  const aquaCss = fs.readFileSync(path.join(root, 'renderer', 'aqua-shell.css'), 'utf8');
+  assert.match(aquaCss, /\.atmosphere\s*\{[\s\S]*?z-index:\s*0;[\s\S]*?pointer-events:\s*none;/);
+  assert.match(aquaCss, /\.app-stage\s*\{[\s\S]*?position:\s*relative;[\s\S]*?z-index:\s*1;/);
+  assert.match(aquaCss, /\.aqua-fluid-canvas[\s\S]*?display:\s*block;/);
 });
 
 test('daily loading begins a production request token and guards response and error commits', () => {
@@ -998,6 +1119,7 @@ test('液态玻璃阶段 3：WAAPI 动效引擎、fx-tier 档位与视图切换�
   assert.match(viewRegistrySource, /motion\.fadeSlideIn\(\$\(entry\.tab\), \{ duration: 260 \}\);/);
   // fx-tier 运行时档位：写 <html data-fx-tier>，不进 store/schema、不持久化
   assert.match(app, /document\.documentElement\.dataset\.fxTier = resolveFxTier\(\);/);
+  assert.match(app, /reducedMotionQuery\?\.addEventListener\?\.\('change', syncFxTier\);/);
   assert.match(app, /navigator\.deviceMemory/);
   assert.match(app, /navigator\.hardwareConcurrency/);
   // 覆盖块只改令牌值：lite 降模糊与时长，static 置 none 并关停光斑动画；

@@ -15,6 +15,7 @@
     const {
       $, $$, document: doc, state, FEED_VIEWS = [],
       preferenceActions, scrollToTop, refreshStats,
+      isRailLayout = () => false,
       // 液态玻璃阶段 3（可选）：切换后目标面板的入场动画引擎
       motion
     } = deps;
@@ -47,9 +48,10 @@
       bar.style.setProperty('--ti-o', '1');
     }
 
-    // sticky 日期标题的偏移量取决于导航条实际高度（换行时会变）
+    // sticky 日期标题的偏移量取决于顶端可见的壳层：窄屏是横向导航，
+    // 宽屏导航已进入纵向指挥栏，此时应量塔台而不是把整条侧栏高度写进去。
     function syncNavHeight() {
-      const nav = $('.nav');
+      const nav = isRailLayout() ? $('.tower') : $('.nav');
       if (!nav) return;
       doc.documentElement.style.setProperty(
         '--nav-h', `${Math.round(nav.getBoundingClientRect().height)}px`
@@ -65,6 +67,7 @@
         const on = t.dataset.view === view;
         t.classList.toggle('active', on);
         t.setAttribute('aria-selected', on);
+        t.tabIndex = on ? 0 : -1;
       });
       syncTabIndicator();
       const isFeed = FEED_VIEWS.includes(view);
@@ -97,12 +100,19 @@
       $$('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
       if (!navTabs) return;
       navTabs.addEventListener('keydown', event => {
-        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
         const tabs = $$('.tab');
         const current = tabs.indexOf(doc.activeElement);
         if (current < 0) return;
-        const step = event.key === 'ArrowRight' ? 1 : tabs.length - 1;
-        const next = tabs[(current + step) % tabs.length];
+        const vertical = navTabs.getAttribute('aria-orientation') === 'vertical';
+        const forward = vertical ? 'ArrowDown' : 'ArrowRight';
+        const backward = vertical ? 'ArrowUp' : 'ArrowLeft';
+        let nextIndex;
+        if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = tabs.length - 1;
+        else if (event.key === forward) nextIndex = (current + 1) % tabs.length;
+        else if (event.key === backward) nextIndex = (current + tabs.length - 1) % tabs.length;
+        else return;
+        const next = tabs[nextIndex];
         next.focus();
         switchView(next.dataset.view);
         event.preventDefault();

@@ -97,18 +97,38 @@
       }
     });
 
+    function syncHtmlFields() {
+      const htmlFields = elements.htmlFields;
+      const typeSelect = elements.form?.elements?.type;
+      if (!htmlFields || !typeSelect) return;
+      htmlFields.hidden = typeSelect.value !== 'html';
+    }
+
     if (elements.addButton && elements.dialog) {
-      elements.addButton.addEventListener('click', () => elements.dialog.showModal());
+      elements.addButton.addEventListener('click', () => {
+        syncHtmlFields();
+        elements.dialog.showModal();
+      });
     }
     if (elements.form) {
+      elements.form.elements?.type?.addEventListener('change', syncHtmlFields);
       elements.form.addEventListener('submit', async e => {
         if (e.submitter?.value !== 'ok') return;
         const fd = new FormData(e.target);
         const body = Object.fromEntries(fd.entries());
+        const list = String(body.selectorList || '').trim();
+        const datePattern = String(body.selectorDate || '').trim();
+        delete body.selectorList;
+        delete body.selectorDate;
+        if (body.type === 'html' && list) {
+          body.selector = { list };
+          if (datePattern) body.selector.datePattern = datePattern;
+        }
         try {
           await api('/api/sources', { body });
           toast('信源已提报，下轮采集生效');
           e.target.reset();
+          syncHtmlFields();
           loadSources();
         } catch (err) {
           toast('保存失败：' + err.message, true);

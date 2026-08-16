@@ -21,6 +21,16 @@ const ANALYSIS_MODEL = 'deepseek-v4-flash';
 const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
 const MAX_GRACEFUL_CLOSE_MS = 4_000;
 const EXPECTED_UI_PREFERENCE_KEYS = [
+  'aquaBackground',
+  'aquaBlur',
+  'aquaBrightness',
+  'aquaCritters',
+  'aquaFrost',
+  'aquaHue',
+  'aquaMode',
+  'aquaWallpaperBlur',
+  'aquaWallpaperFrost',
+  'aquaWhale',
   'category',
   'closeToTray',
   'commonLinksFavorites',

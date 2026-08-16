@@ -34,6 +34,10 @@ const { registerStorageMaintenanceIpc } = require('./storage-maintenance-ipc');
 const { createDailyArchiveService } = require('./daily-archive');
 const { createDailyArchiveBundleRequester } = require('./daily-archive-request');
 const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
+const {
+  createAppearanceWallpaperStore,
+  registerAppearanceWallpaperIpc
+} = require('./appearance-wallpaper');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -50,6 +54,7 @@ let uiPreferencesStore = null;
 let backgroundMode = null;
 let storageMaintenance = null;
 let dailyArchive = null;
+let appearanceWallpaper = null;
 let dailyArchivePowerListenersRegistered = false;
 let dailyArchiveClockTimer = null;
 const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
@@ -254,6 +259,27 @@ function installPermissionPolicy() {
   session.defaultSession.setDevicePermissionHandler?.(() => false);
 }
 
+// 装机版换掉默认菜单：默认模板带「切换开发者工具」入口与快捷键。生产环境
+// 不需要 DevTools——渲染层已沙箱化，开发者控制台只会给排查本机数据的人开一扇
+// 后门。只保留编辑（撤销/剪切/复制/粘贴/全选）与窗口（最小化/关闭）两组系统角色，
+// Windows 下 Alt 呼出的菜单也只剩这些。开发期保持默认菜单，调试功能照常可用。
+function installApplicationMenu() {
+  if (!app.isPackaged) return;
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }
+      ]
+    },
+    {
+      label: '窗口',
+      submenu: [{ role: 'minimize' }, { role: 'close' }]
+    }
+  ]));
+}
+
 function isAllowedExternalUrl(value) {
   try {
     const parsed = new URL(value);
@@ -378,6 +404,10 @@ registerDailyArchiveIpc({
   getService: () => dailyArchive,
   getWindow: () => win
 });
+registerAppearanceWallpaperIpc({
+  ipcMain,
+  getStore: () => appearanceWallpaper
+});
 
 async function chooseLegacyDatabase() {
   const result = await dialog.showMessageBox({
@@ -399,6 +429,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     () => storageMaintenance.prepareBeforeReady()
   );
   installPermissionPolicy();
+  installApplicationMenu();
   setupAutoUpdate();
   await migrateUserData({
     isPackaged: testDataDir ? false : app.isPackaged,
@@ -414,6 +445,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     );
   }
   const dataDir = getDataDir();
+  appearanceWallpaper = createAppearanceWallpaperStore({ directory: dataDir });
   uiPreferencesStore = await loadUiPreferencesStore({ directory: dataDir });
   backgroundMode = createBackgroundModeController({
     app,

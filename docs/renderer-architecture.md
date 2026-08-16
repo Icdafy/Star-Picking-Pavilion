@@ -1,4 +1,4 @@
-# 摘星阁 · 渲染层架构（阶段 3 后）
+# 摘星阁 · 渲染层架构（Aqua 外壳升级后）
 
 本文档描述阶段 3「app.js 绞杀者式模块化重构」完成后的 renderer/ 模块边界、
 依赖注入约定与新增视图的准入规范。字面契约（被测试逐字断言的代码行）以
@@ -7,8 +7,8 @@
 ## 1. 分层与模块边界
 
 ```
-index.html（静态路由，25 条 <script src>，预算已用尽）
-└── app.js —— 组合根（643 行，液态玻璃阶段 3 后实测）
+index.html（Aqua 指挥舱静态外壳，25 条 <script src>，预算已用尽）
+└── app.js —— 组合根
     │ 职责只剩三件事：
     │  1. state 声明与 UI 基础设施（api/toast/confirmGlass/主题/缩放）
     │  2. 依赖装配：把 $/$$/document/state/api/toast 等注入各工厂
@@ -21,6 +21,9 @@ index.html（静态路由，25 条 <script src>，预算已用尽）
     ├── 状态与调度层
     │   ├── store.js            createStore：getState/setState/subscribe(selector, cb)
     │   └── view-registry.js    registerView({id, tab, onEnter, onLeave}) 查表调度
+    │
+    ├── 外观与外壳层
+    │   └── aqua-shell.js        材质/背景/星鲸/壁纸/设置控件与生命周期
     │
     ├── 功能控制器层（一个视图/一条职责链一个工厂）
     │   ├── feed-controller.js          loadFeed/分页/哨兵预取 + 卡片交互委托/toggleStar
@@ -42,6 +45,20 @@ index.html（静态路由，25 条 <script src>，预算已用尽）
             / daily-archive-controller.js
 ```
 
+`aqua-shell.css` 只承接指挥栏、塔台、Aqua 材质、背景画布、外观实验室和
+响应式覆盖；业务卡片、语义色、公共令牌仍由 `styles.css` 负责。两份文件不能
+各自复制一套组件规则。页面实际加载的 CSS 性能门禁会连同字体分片索引一起统计。
+
+宽屏（70rem 起）使用纵向 `.command-rail`，中窄屏回落为顶部横向 tablist。
+`view-registry.js` 据布局方向切换 Up/Down 与 Left/Right，并维护 roving tabindex；
+宽屏 sticky top 以 `.tower` 为准，不再把纵向导航整高写进 `--nav-h`。
+
+外观偏好仍走既有原子 UI preferences 存储，但壁纸二进制例外：渲染层先压缩，
+主进程 `appearance-wallpaper.js` 再做 MIME、签名和 3 MB 上限校验，固定写入
+`userData/appearance/wallpaper.asset`。偏好 JSON 只保存 `fluid|wallpaper` 选择。
+上传、清除、恢复默认和切回流体共享“最新请求 + 串行写队列”，旧压缩任务不得
+覆盖用户后续操作。
+
 液态玻璃阶段 3 新增职责（不新建文件，script 预算 25/25 已用尽）：
 dom-utils.js 除转义/安全 URL/焦点工具外，新增 `createMotion(deps)`
 微型运动引擎（WAAPI，只做 transform/opacity）：spring/fadeSlideIn/
@@ -51,7 +68,8 @@ staggerIn 三个 API，matchMedia/document/rAF 经 deps 注入，reduced 偏好
 新建行错峰入场，可选依赖）。fx-tier 运行时档位由组合根 app.js 即席
 推导写 `<html data-fx-tier>`（full/lite/static，不进 store/schema/持久化），
 styles.css 尾部覆盖块只调 `--glass-blur`/`--dur-glide` 令牌值按档降载，
-不新增滤镜声明点与关键帧；realtime-poller 主循环 setTimeout 自调度不变。
+不新增滤镜声明点与关键帧；系统运行期间切换 reduced-motion 会重新推导档位，
+Canvas 和 CSS 同步降到 static。realtime-poller 主循环 setTimeout 自调度不变。
 
 阶段 4 增量 diff 渲染引擎已接管 app.js 中剩余的卡片整卡模板：
 cardInner 迁为 index.html 的 `<template id="cardTemplate">`，
@@ -125,7 +143,7 @@ renderer/feed-card.js（createCardRenderer + createFeedDiffList），组合根
 | 阶段 4 | 卡片模板化（<template id="cardTemplate">）+ keyed diff 渲染引擎（feed-card.js 的 createCardRenderer/createFeedDiffList；feed-controller 走 reconcile/appendPage，realtime-poller 走 prependFresh） | 597 | 647 |
 | 液态玻璃阶段 3 | WAAPI 动效引擎内联 dom-utils.js（createMotion）+ fx-tier 运行时档位 + 视图切换去强制重排 + 信息流错峰入场 + 轮询 idle/rAF 批处理 + 主题平滑过渡 | 643 | 673 |
 
-script 标签：9 → 11 → 22 → 24 → 25（上限 25，预算已用尽，见 perf-guard
+script 标签：9 → 11 → 22 → 24 → 25（Aqua 外壳新增唯一运行时后达到上限，见 perf-guard
 测试注释与契约文档第 8 节的上调说明）；阶段 4 全部新代码放进既有
 feed-card.js / feed-controller.js / realtime-poller.js，未新增脚本。
 app.js 未达「约 300 行」的最终形态，差额主体是组合根理应持有的 UI

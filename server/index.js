@@ -67,7 +67,9 @@ const MIME = {
 function json(res, code, data) {
   res.writeHead(code, {
     ...RESPONSE_SECURITY_HEADERS,
-    'Content-Type': 'application/json; charset=utf-8'
+    'Content-Type': 'application/json; charset=utf-8',
+    // API 载荷含本地情报与配置快照，不应留在任何磁盘缓存里
+    'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(data));
 }
@@ -81,6 +83,71 @@ function parseOptionalJson(value, fallback, predicate) {
   } catch {
     return fallback;
   }
+}
+
+// JSON 列的服务端钳制：渲染层的 esc()/数值收敛是第一道防线，这里是第二道。
+// 老版本遗留数据或管线中途写入都可能让这些列出现脏值；出 API 前统一收口，
+// 前端即使将来漏掉转义，拿到的也已经是形状与长度受控的数据。
+function isJsonObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+const SCORE_KEYS = Object.freeze(['importance', 'novelty', 'credibility', 'impact', 'timeliness']);
+
+function clampScores(value) {
+  if (!isJsonObject(value)) return null;
+  const clamped = {};
+  for (const key of SCORE_KEYS) {
+    const number = Number(value[key]);
+    if (!Number.isFinite(number)) continue;
+    clamped[key] = Math.round(Math.max(0, Math.min(100, number)) * 10) / 10;
+  }
+  return Object.keys(clamped).length ? clamped : null;
+}
+
+function boundedTextArray(value, maxLength, maxItems) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(item => typeof item === 'string' && item.trim())
+    .map(item => item.trim().slice(0, maxLength))
+    .slice(0, maxItems);
+}
+
+function clampEntities(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(item => isJsonObject(item) && typeof item.name === 'string' && item.name.trim())
+    .map(item => ({
+      name: item.name.trim().slice(0, 80),
+      type: typeof item.type === 'string' ? item.type.trim().slice(0, 32) : ''
+    }))
+    .slice(0, 12);
+}
+
+function clampEvents(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(item => isJsonObject(item) && typeof item.actor === 'string' && item.actor.trim())
+    .map(item => ({
+      actor: item.actor.trim().slice(0, 80),
+      action: typeof item.action === 'string' ? item.action.trim().slice(0, 80) : '',
+      actionClass: typeof item.actionClass === 'string' ? item.actionClass.trim().slice(0, 40) : '',
+      object: typeof item.object === 'string' ? item.object.trim().slice(0, 80) : ''
+    }))
+    .slice(0, 12);
+}
+
+function clampBreakthroughSignals(value) {
+  if (!isJsonObject(value)) return null;
+  const clamped = {};
+  const objects = boundedTextArray(value.objects, 60, 8);
+  const actions = boundedTextArray(value.actions, 60, 8);
+  if (objects.length) clamped.objects = objects;
+  if (actions.length) clamped.actions = actions;
+  if (typeof value.credibilityEvidence === 'string' && value.credibilityEvidence.trim()) {
+    clamped.credibilityEvidence = value.credibilityEvidence.trim().slice(0, 60);
+  }
+  return Object.keys(clamped).length ? clamped : null;
 }
 
 function articleRow(r, scoring, nowMs) {
@@ -109,23 +176,23 @@ function articleRow(r, scoring, nowMs) {
       fetchedAt
     ) * 10) / 10 : null,
     featured: !!r.featured,
-    scores: parseOptionalJson(r.scores_json, null, value => value && typeof value === 'object' && !Array.isArray(value)),
-    tags: parseOptionalJson(r.tags_json, [], Array.isArray),
+    scores: clampScores(parseOptionalJson(r.scores_json, null, isJsonObject)),
+    tags: boundedTextArray(parseOptionalJson(r.tags_json, [], Array.isArray), 100, 30),
     source: r.source_name, tier: r.tier,
     clusterId: r.cluster_id, clusterSize: r.cluster_size || null,
     breakthroughScore,
     breakthroughBonus,
-    breakthroughSignals: parseOptionalJson(
+    breakthroughSignals: clampBreakthroughSignals(parseOptionalJson(
       r.breakthrough_signals_json,
       null,
-      value => value && typeof value === 'object' && !Array.isArray(value)
-    ),
+      isJsonObject
+    )),
     scoringVersion: Number(r.scoring_version) || 1,
     // 结构化管线的产物：实体（标注/实体提取）与原子事件（事件分离）。
     // 老数据这几列是 NULL，解析后是空数组，前端按「没有就不渲染」处理。
-    entities: parseOptionalJson(r.entities_json, [], Array.isArray),
-    topics: parseOptionalJson(r.topics_json, [], Array.isArray),
-    events: parseOptionalJson(r.events_json, [], Array.isArray),
+    entities: clampEntities(parseOptionalJson(r.entities_json, [], Array.isArray)),
+    topics: boundedTextArray(parseOptionalJson(r.topics_json, [], Array.isArray), 100, 30),
+    events: clampEvents(parseOptionalJson(r.events_json, [], Array.isArray)),
     eventKey: r.event_key || null,
     starred: !!r.starred,
     starredAt: safeDate(r.starred_at),
@@ -155,7 +222,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
   if (view === 'all') where.push("(a.relevant IS NULL OR a.relevant = 1)");
   // 星标是用户的显式收藏，不受相关性判定影响：被 AI 判为无关但用户仍想留着的条目必须能看到
   if (view === 'starred') where.push('a.starred = 1');
-  if (domain) { where.push('a.domain = ?'); params.push(domain); }
+  if (domain) { where.push('(a.domain = ? OR a.domain = \'both\')'); params.push(domain); }
   if (category) { where.push('a.category = ?'); params.push(category); }
 
   let idFilter = '';
@@ -202,7 +269,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
     // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
     rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
   } else {
-    rows = db.prepare(buildSql('COALESCE(a.published_at, a.fetched_at) DESC', '')).all(...params);
+    rows = db.prepare(buildSql('COALESCE(a.published_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
   }
 
   const items = rows.map(r => articleRow(r, scoring, nowMs));
@@ -349,7 +416,8 @@ const server = http.createServer(async (req, res) => {
       const permitted = authorize({
         host: req.headers.host,
         origin: req.headers.origin,
-        token: req.headers[API_TOKEN_HEADER]
+        token: req.headers[API_TOKEN_HEADER],
+        method: req.method
       }, { port: activePort, expectedToken: API_TOKEN });
       if (!permitted) return json(res, 403, { error: 'forbidden' });
 

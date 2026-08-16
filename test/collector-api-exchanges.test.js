@@ -175,3 +175,44 @@ test('校验层接受全部 5 种 scheme，仍拒绝 http 地址冒充 api 源',
     name: 'x', type: 'api', url: 'cninfo://' + '词'.repeat(101), tier: 'T1', domain: 'both'
   }), /关键词长度/);
 });
+
+test('条目 URL 校验：非 HTTP(S) 被丢弃，附件路径解析后必须留在站内静态域', () => {
+  // sse：javascript: 与内嵌凭据进不了映射结果
+  const sseBad = 'cb(' + JSON.stringify({
+    result: [
+      { TITLE: '脚本链接', URL: 'javascript:alert(1)', SECURITY_CODE: 'x', SSEDATE: '2026-08-11' },
+      { TITLE: '正常链接', URL: 'http://static.sse.com.cn/ok.pdf', SECURITY_CODE: 'x', SSEDATE: '2026-08-11' },
+      { TITLE: '内嵌凭据', URL: 'https://a:b@static.sse.com.cn/x.pdf', SECURITY_CODE: 'x', SSEDATE: '2026-08-11' }
+    ],
+    pageHelp: {}
+  }) + ');';
+  const sseItems = mapSseResponse(sseBad, { keyword: '' });
+  assert.equal(sseItems.length, 1);
+  assert.equal(sseItems[0].url, 'http://static.sse.com.cn/ok.pdf');
+
+  // cninfo：绝对地址与协议相对地址都解析不到站内静态域，整条丢弃
+  const cninfoEvil = JSON.stringify({
+    announcements: [
+      {
+        secCode: 'x', secName: 'x', announcementTitle: '跨域附件公告',
+        announcementTime: 1784160000000, adjunctUrl: 'https://evil.example/x.pdf'
+      },
+      {
+        secCode: 'x', secName: 'x', announcementTitle: '协议相对附件公告',
+        announcementTime: 1784160000000, adjunctUrl: '//evil.example/x.pdf'
+      }
+    ]
+  });
+  assert.equal(mapCninfoResponse(cninfoEvil, { keyword: '' }).length, 0);
+
+  // szse：协议相对 attachPath 同理被拒
+  const szseEvil = JSON.stringify({
+    data: {
+      announce: [{
+        title: '协议相对附件公告', attachPath: '//evil.example/x.pdf',
+        secName: ['x'], publishTime: '2026-08-11'
+      }]
+    }
+  });
+  assert.equal(mapSzseResponse(szseEvil).length, 0);
+});

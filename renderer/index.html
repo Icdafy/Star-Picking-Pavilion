@@ -4,16 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#04060e">
+<!-- 与后端响应头的 CSP 同文（meta 无法承载 frame-ancestors，防嵌入由响应头与
+     X-Frame-Options 兜底）：即使静态页脱离本服务被另行托管，内联脚本与外部
+     域连接也仍然被禁。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self'; connect-src 'self'">
 <title>摘星阁 · 低空经济与商业航天情报站</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <script src="ui-preference-schema.js"></script>
 <script src="bootstrap.js"></script>
 <link rel="stylesheet" href="fonts/source-han-sans-sc/index.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="aqua-shell.css">
 </head>
 <body>
 <!-- 氛围层：宣纸暖光 / 深空极光 -->
 <div class="atmosphere" aria-hidden="true">
+  <canvas class="aqua-fluid-canvas" id="aquaFluidCanvas"></canvas>
+  <div class="aqua-wallpaper" id="aquaWallpaper"><img id="aquaWallpaperImage" alt=""></div>
   <div class="aurora aurora-a"></div>
   <div class="aurora aurora-b"></div>
   <div class="aurora aurora-c"></div>
@@ -24,9 +31,13 @@
   <div class="grain"></div>
 </div>
 
-<!-- 塔台状态栏 -->
-<header class="tower">
-  <div class="brand">
+<div class="aqua-edge-fade aqua-edge-fade-top" aria-hidden="true"></div>
+<div class="aqua-edge-fade aqua-edge-fade-bottom" aria-hidden="true"></div>
+
+<div class="app-stage">
+<!-- 桌面指挥栏：宽屏纵向组织，窄屏由 CSS 还原为品牌 + 顶部导航 -->
+<aside class="command-rail glass" aria-label="摘星阁指挥栏">
+  <div class="brand rail-brand">
     <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
       <circle cx="24" cy="24" r="21" stroke="currentColor" stroke-opacity=".25" stroke-width="1.5"/>
       <circle cx="24" cy="24" r="13" stroke="currentColor" stroke-opacity=".4" stroke-width="1.5"/>
@@ -42,11 +53,41 @@
       </defs>
     </svg>
     <div class="brand-text">
-      <h1>摘星阁</h1>
-      <p>低空经济 × 商业航天 · 情报塔台</p>
+      <div class="brand-title-row">
+        <h1>摘星阁</h1>
+        <span class="brand-badge">INTEL</span>
+      </div>
+      <p>低空经济 × 商业航天</p>
     </div>
   </div>
 
+  <!-- 导航 -->
+  <nav class="nav" aria-label="主导航">
+    <p class="rail-section-label">情报工作区</p>
+    <div class="nav-tabs" role="tablist">
+      <span class="tab-indicator" aria-hidden="true"></span>
+      <button class="tab active" data-view="featured" aria-controls="viewFeed" role="tab" aria-selected="true"><span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m10 2 1.6 5.1L17 9l-5.4 1.9L10 16l-1.6-5.1L3 9l5.4-1.9Z"/></svg></span>精选</button>
+      <button class="tab" data-view="all" aria-controls="viewFeed" role="tab" aria-selected="false"><span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M3.5 4.5h5v5h-5zm8 0h5v5h-5zm-8 8h5v3h-5zm8 0h5v3h-5z"/></svg></span>全部动态</button>
+      <button class="tab" data-view="starred" aria-controls="viewFeed" role="tab" aria-selected="false">
+        <span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m10 2.8 2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7-3.4-3.3 4.7-.7Z"/></svg></span>星标<span class="tab-count" id="tabStarredCount" hidden></span>
+      </button>
+      <button class="tab" data-view="daily" aria-controls="viewDaily" role="tab" aria-selected="false"><span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 2.8v2.4m10-2.4v2.4M3.5 7h13M4 4.5h12v12H4zM7 10h2m2 0h2m-6 3h2m2 0h2"/></svg></span>情报日报</button>
+      <button class="tab" data-view="links" aria-controls="viewLinks" role="tab" aria-selected="false"><span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m8.1 11.9 3.8-3.8m-5.1 6.6-1.1 1.1a3 3 0 0 1-4.2-4.2l3.1-3.1a3 3 0 0 1 4.2 0m2.4 3a3 3 0 0 0 4.2 0l3.1-3.1a3 3 0 0 0-4.2-4.2l-1.1 1.1"/></svg></span>常用网址</button>
+      <button class="tab" data-view="sources" aria-controls="viewSources" role="tab" aria-selected="false"><span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2"/><path d="M5.7 14.3a6.1 6.1 0 0 1 0-8.6m8.6 0a6.1 6.1 0 0 1 0 8.6M3.2 16.8a9.6 9.6 0 0 1 0-13.6m13.6 0a9.6 9.6 0 0 1 0 13.6"/></svg></span>信源</button>
+      <button class="tab" data-view="settings" aria-controls="viewSettings" role="tab" aria-selected="false"><span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.4"/><path d="M8.6 2.7h2.8l.5 2a6 6 0 0 1 1.4.8l2-.6 1.4 2.4-1.5 1.4a6 6 0 0 1 0 1.6l1.5 1.4-1.4 2.4-2-.6a6 6 0 0 1-1.4.8l-.5 2H8.6l-.5-2a6 6 0 0 1-1.4-.8l-2 .6-1.4-2.4 1.5-1.4a6 6 0 0 1 0-1.6L3.3 7.3l1.4-2.4 2 .6a6 6 0 0 1 1.4-.8Z"/></svg></span>设置</button>
+    </div>
+  </nav>
+
+  <div class="rail-footer">
+    <span class="rail-live-dot" aria-hidden="true"></span>
+    <span><strong>本地情报工作区</strong><small>聚合 · 研判 · 归档</small></span>
+  </div>
+</aside>
+
+<section class="workspace">
+
+<!-- 塔台状态栏 -->
+<header class="tower glass">
   <div class="tower-stats" id="towerStats">
     <div class="stat"><span class="stat-num" id="statSources">–</span><span class="stat-label">监控信源</span></div>
     <div class="stat-divider"></div>
@@ -107,33 +148,26 @@
   </div>
 </header>
 
-<!-- 导航 -->
-<nav class="nav glass" aria-label="主导航">
-  <div class="nav-tabs" role="tablist">
-    <span class="tab-indicator" aria-hidden="true"></span>
-    <button class="tab active" data-view="featured" aria-controls="viewFeed" role="tab" aria-selected="true">精选</button>
-    <button class="tab" data-view="all" aria-controls="viewFeed" role="tab" aria-selected="false">全部动态</button>
-    <button class="tab" data-view="starred" aria-controls="viewFeed" role="tab" aria-selected="false">
-      星标<span class="tab-count" id="tabStarredCount" hidden></span>
-    </button>
-    <button class="tab" data-view="daily" aria-controls="viewDaily" role="tab" aria-selected="false">情报日报</button>
-    <button class="tab" data-view="links" aria-controls="viewLinks" role="tab" aria-selected="false">常用网址</button>
-    <button class="tab" data-view="sources" aria-controls="viewSources" role="tab" aria-selected="false">信源</button>
-    <button class="tab" data-view="settings" aria-controls="viewSettings" role="tab" aria-selected="false">设置</button>
+<div class="nav-filters filter-dock glass" id="feedFilters">
+  <div class="domain-pills" role="group" aria-label="领域筛选">
+    <button class="pill active" data-domain="">全部</button>
+    <button class="pill pill-la" data-domain="lowaltitude">低空经济</button>
+    <button class="pill pill-ae" data-domain="aerospace">商业航天</button>
   </div>
-  <div class="nav-filters" id="feedFilters">
-    <div class="domain-pills" role="group" aria-label="领域筛选">
-      <button class="pill active" data-domain="">全部</button>
-      <button class="pill pill-la" data-domain="lowaltitude">低空经济</button>
-      <button class="pill pill-ae" data-domain="aerospace">商业航天</button>
-    </div>
-    <div class="cat-chips" id="catChips" role="group" aria-label="分类筛选"></div>
-  </div>
-</nav>
+  <div class="cat-chips" id="catChips" role="group" aria-label="分类筛选"></div>
+</div>
 
 <!-- 主内容 -->
 <main id="main">
   <section id="viewFeed" class="view" role="tabpanel">
+    <header class="feed-hero">
+      <div>
+        <p class="feed-hero-kicker">ORBITAL INTELLIGENCE · 今日星图</p>
+        <h2 data-aqua-greeting>探索未至之境</h2>
+        <p>把低空与航天的散落信号，收拢成一条可追溯、可研判的情报航线。</p>
+      </div>
+      <div class="feed-hero-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+    </header>
     <div class="search-context" id="searchContext" role="status" aria-live="polite" hidden></div>
     <div class="feed-banner" id="feedBanner" hidden></div>
     <div class="feed-toolbar">
@@ -421,13 +455,98 @@
         <p class="hint">调的是整套版面的比例尺，不只是字号：字号、行距、留白、圆角、栏宽按同一比例一起变，所以放大之后版面不会散架。也可以随时用 <code>Ctrl</code> <code>+</code> / <code>Ctrl</code> <code>-</code> 增减，<code>Ctrl</code> <code>0</code> 回到标准档。</p>
         <p class="hint">正文中文用<b>思源黑体</b>、英文与数字用 <b>Times New Roman</b>，字体随安装包内置，不依赖本机是否装过中文字体。</p>
       </div>
+      <div class="glass card-pad appearance-lab">
+        <div class="appearance-heading">
+          <div>
+            <span class="appearance-kicker">AQUA GLASS LAB</span>
+            <h3>界面氛围 <span class="muted">流体背景 · 云母玻璃</span></h3>
+          </div>
+          <button class="btn-ghost btn-compact" id="btnAquaReset" type="button">恢复默认</button>
+        </div>
+        <div class="appearance-preview" aria-hidden="true">
+          <span class="appearance-preview-orbit"></span>
+          <div class="appearance-preview-card">
+            <small>摘星阁 · 实时情报</small>
+            <strong>探索未至之境</strong>
+            <span></span>
+          </div>
+        </div>
+        <div class="appearance-controls">
+          <div class="appearance-control appearance-control-wide">
+            <span class="appearance-label">玻璃模式</span>
+            <div class="appearance-segments" role="group" aria-label="玻璃模式">
+              <button type="button" data-aqua-mode="mica" aria-pressed="true">云母效果</button>
+              <button type="button" data-aqua-mode="compat" aria-pressed="false">兼容模式</button>
+            </div>
+            <small>云母模式强化悬浮层次；兼容模式降低透明度，适合低配设备和高密度阅读。</small>
+          </div>
+          <label class="appearance-control" for="setAquaBlur">
+            <span class="appearance-label">玻璃模糊度 <output id="outAquaBlur">24px</output></span>
+            <input id="setAquaBlur" type="range" min="0" max="40" step="1" value="24">
+          </label>
+          <label class="appearance-control" for="setAquaFrost">
+            <span class="appearance-label">磨砂度 <output id="outAquaFrost">42%</output></span>
+            <input id="setAquaFrost" type="range" min="0" max="100" step="1" value="42">
+          </label>
+          <label class="appearance-control" for="setAquaHue">
+            <span class="appearance-label">流体颜色 <output id="outAquaHue">172°</output></span>
+            <input id="setAquaHue" type="range" min="0" max="360" step="1" value="172">
+          </label>
+          <label class="appearance-control" for="setAquaBrightness">
+            <span class="appearance-label">背景明暗 <output id="outAquaBrightness">50%</output></span>
+            <input id="setAquaBrightness" type="range" min="0" max="100" step="1" value="50">
+          </label>
+          <div class="appearance-control appearance-control-wide">
+            <span class="appearance-label">背景来源</span>
+            <div class="appearance-segments" role="group" aria-label="背景来源">
+              <button type="button" data-aqua-background="fluid" aria-pressed="true">流体星云</button>
+              <button type="button" data-aqua-background="wallpaper" aria-pressed="false">自选壁纸</button>
+            </div>
+          </div>
+          <div class="appearance-control appearance-control-wide wallpaper-picker" id="aquaWallpaperControls" hidden>
+            <span class="appearance-label">壁纸</span>
+            <div class="btn-row">
+              <input class="wallpaper-file-input" id="setAquaWallpaper" type="file" accept="image/png,image/jpeg,image/webp">
+              <label class="btn-primary btn-compact wallpaper-file-label" for="setAquaWallpaper">选择图片</label>
+              <button class="btn-ghost btn-compact" id="btnAquaWallpaperClear" type="button">移除壁纸</button>
+              <span class="test-result" id="aquaWallpaperStatus" role="status" aria-live="polite"></span>
+            </div>
+            <small>图片压缩后仅保存在本机，不会上传。建议选择与当前深浅主题相近的图片。</small>
+          </div>
+          <label class="appearance-control wallpaper-only" for="setAquaWallpaperBlur" hidden>
+            <span class="appearance-label">壁纸模糊 <output id="outAquaWallpaperBlur">4px</output></span>
+            <input id="setAquaWallpaperBlur" type="range" min="0" max="40" step="1" value="4">
+          </label>
+          <label class="appearance-control wallpaper-only" for="setAquaWallpaperFrost" hidden>
+            <span class="appearance-label">壁纸磨砂 <output id="outAquaWallpaperFrost">18%</output></span>
+            <input id="setAquaWallpaperFrost" type="range" min="0" max="100" step="1" value="18">
+          </label>
+          <label class="desktop-switch appearance-switch appearance-control-wide">
+            <span class="switch-copy">
+              <strong>星鲸粒子</strong>
+              <small>在工作区背景中显示一尾由星点组成、会轻微响应指针的星鲸。</small>
+            </span>
+            <input id="setAquaWhale" type="checkbox" role="switch" checked>
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <label class="desktop-switch appearance-switch appearance-control-wide">
+            <span class="switch-copy">
+              <strong>环境星尘</strong>
+              <small>保留缓慢漂移的星点、气泡与边缘柔化；减少动态偏好会自动静止。</small>
+            </span>
+            <input id="setAquaCritters" type="checkbox" role="switch" checked>
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <p class="hint">氛围参数即时生效并仅保存在本机。系统会按设备能力自动降低帧率与模糊强度；“减少动态效果”偏好优先于这里的设置。</p>
+      </div>
       <div class="glass card-pad">
         <h3>键盘快捷键 <span class="muted">全局生效</span></h3>
         <ul class="shortcut-list">
           <li><span>聚焦检索框</span><kbd>/</kbd><kbd>Ctrl</kbd><kbd>K</kbd></li>
           <li><span>清空检索并退出输入</span><kbd>Esc</kbd></li>
           <li><span>切换第 1–7 个视图</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>7</kbd></li>
-          <li><span>焦点在导航上时切换相邻视图</span><kbd>←</kbd><kbd>→</kbd></li>
+          <li><span>焦点在导航上时切换相邻视图</span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></li>
           <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
           <li><span>复制当前列表为文本</span><kbd>Alt</kbd><kbd>C</kbd></li>
@@ -441,6 +560,8 @@
     </div>
   </section>
 </main>
+</section>
+</div>
 
 <!-- 信源弹窗 -->
 <dialog id="srcDialog" class="glass-dialog">
@@ -456,6 +577,10 @@
       </select>
     </label>
     <label class="field"><span>地址</span><input name="url" required placeholder="https://… 或 eastmoney://关键词、cninfo://检索词?column=szse"></label>
+    <div id="srcHtmlFields" hidden>
+      <label class="field"><span>列表选择器</span><input name="selectorList" placeholder="新闻列表里的 a 或包含 a 的容器，如 ul.news-list a"></label>
+      <label class="field"><span>日期正则（选填）</span><input name="selectorDate" placeholder="如 \\d{4}-\\d{2}-\\d{2}"></label>
+    </div>
     <div class="field-row">
       <label class="field"><span>等级</span>
         <select name="tier"><option>T2</option><option>T1.5</option><option>T1</option></select>
@@ -563,6 +688,7 @@
 <script src="common-links-controller.js"></script>
 <script src="store.js"></script>
 <script src="view-registry.js"></script>
+<script src="aqua-shell.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

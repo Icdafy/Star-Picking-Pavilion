@@ -13,9 +13,21 @@
   // 界面缩放档位。存的是档位名而不是倍率数字：倍率写死在 CSS 的
   // :root[data-ui-scale=…] 里，将来调比例只改样式表，不必迁移用户已存的偏好。
   const TEXT_SCALES = new Set(['sm', 'md', 'lg', 'xl']);
+  const AQUA_MODES = new Set(['mica', 'compat']);
+  const AQUA_BACKGROUNDS = new Set(['fluid', 'wallpaper']);
   const UI_PREFERENCE_FIELDS = Object.freeze([
     'theme',
     'textScale',
+    'aquaMode',
+    'aquaBlur',
+    'aquaFrost',
+    'aquaHue',
+    'aquaBrightness',
+    'aquaBackground',
+    'aquaWallpaperBlur',
+    'aquaWallpaperFrost',
+    'aquaWhale',
+    'aquaCritters',
     'view',
     'domain',
     'category',
@@ -69,6 +81,16 @@
     return {
       theme: 'dark',
       textScale: 'md',
+      aquaMode: 'mica',
+      aquaBlur: 24,
+      aquaFrost: 42,
+      aquaHue: 172,
+      aquaBrightness: 50,
+      aquaBackground: 'fluid',
+      aquaWallpaperBlur: 4,
+      aquaWallpaperFrost: 18,
+      aquaWhale: true,
+      aquaCritters: true,
       view: 'featured',
       domain: '',
       category: '',
@@ -100,6 +122,13 @@
     return defaultValue;
   }
 
+  function isFiniteNumberInRange(value, min, max) {
+    return typeof value === 'number'
+      && Number.isFinite(value)
+      && value >= min
+      && value <= max;
+  }
+
   function normalizeUiPreferences(raw, commonLinks, { today, fallback } = {}) {
     const source = isPlainObject(raw) ? raw : {};
     const secondary = isPlainObject(fallback) ? fallback : {};
@@ -122,6 +151,66 @@
         secondary.textScale,
         value => TEXT_SCALES.has(value),
         defaults.textScale
+      ),
+      aquaMode: chooseValue(
+        source.aquaMode,
+        secondary.aquaMode,
+        value => AQUA_MODES.has(value),
+        defaults.aquaMode
+      ),
+      aquaBlur: chooseValue(
+        source.aquaBlur,
+        secondary.aquaBlur,
+        value => isFiniteNumberInRange(value, 0, 40),
+        defaults.aquaBlur
+      ),
+      aquaFrost: chooseValue(
+        source.aquaFrost,
+        secondary.aquaFrost,
+        value => isFiniteNumberInRange(value, 0, 100),
+        defaults.aquaFrost
+      ),
+      aquaHue: chooseValue(
+        source.aquaHue,
+        secondary.aquaHue,
+        value => isFiniteNumberInRange(value, 0, 360),
+        defaults.aquaHue
+      ),
+      aquaBrightness: chooseValue(
+        source.aquaBrightness,
+        secondary.aquaBrightness,
+        value => isFiniteNumberInRange(value, 0, 100),
+        defaults.aquaBrightness
+      ),
+      aquaBackground: chooseValue(
+        source.aquaBackground,
+        secondary.aquaBackground,
+        value => AQUA_BACKGROUNDS.has(value),
+        defaults.aquaBackground
+      ),
+      aquaWallpaperBlur: chooseValue(
+        source.aquaWallpaperBlur,
+        secondary.aquaWallpaperBlur,
+        value => isFiniteNumberInRange(value, 0, 40),
+        defaults.aquaWallpaperBlur
+      ),
+      aquaWallpaperFrost: chooseValue(
+        source.aquaWallpaperFrost,
+        secondary.aquaWallpaperFrost,
+        value => isFiniteNumberInRange(value, 0, 100),
+        defaults.aquaWallpaperFrost
+      ),
+      aquaWhale: chooseValue(
+        source.aquaWhale,
+        secondary.aquaWhale,
+        value => typeof value === 'boolean',
+        defaults.aquaWhale
+      ),
+      aquaCritters: chooseValue(
+        source.aquaCritters,
+        secondary.aquaCritters,
+        value => typeof value === 'boolean',
+        defaults.aquaCritters
       ),
       view: chooseValue(source.view, secondary.view, value => VIEWS.has(value), defaults.view),
       domain: chooseValue(source.domain, secondary.domain, value => DOMAINS.has(value), defaults.domain),
@@ -162,6 +251,16 @@
   function isValidUiPreferenceValue(field, value, commonLinks, { today } = {}) {
     if (field === 'theme') return THEMES.has(value);
     if (field === 'textScale') return TEXT_SCALES.has(value);
+    if (field === 'aquaMode') return AQUA_MODES.has(value);
+    if (field === 'aquaBlur') return isFiniteNumberInRange(value, 0, 40);
+    if (field === 'aquaFrost') return isFiniteNumberInRange(value, 0, 100);
+    if (field === 'aquaHue') return isFiniteNumberInRange(value, 0, 360);
+    if (field === 'aquaBrightness') return isFiniteNumberInRange(value, 0, 100);
+    if (field === 'aquaBackground') return AQUA_BACKGROUNDS.has(value);
+    if (field === 'aquaWallpaperBlur') return isFiniteNumberInRange(value, 0, 40);
+    if (field === 'aquaWallpaperFrost') return isFiniteNumberInRange(value, 0, 100);
+    if (field === 'aquaWhale') return typeof value === 'boolean';
+    if (field === 'aquaCritters') return typeof value === 'boolean';
     if (field === 'view') return VIEWS.has(value);
     if (field === 'domain') return DOMAINS.has(value);
     if (field === 'category') return isValidCategory(value);

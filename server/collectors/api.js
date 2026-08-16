@@ -18,6 +18,34 @@ const EASTMONEY_SCHEME = 'eastmoney://';
 const PAGE_SIZE = 30;
 const MAX_PAGES = 3;
 
+// 公开接口返回的条目 URL 同样不受信任：入库前统一校验协议与凭据，
+// javascript:/data: 或带内嵌凭据的地址出不了采集层
+function validWebUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+// 附件/公告路径必须解析后仍落在站内静态域：相对路径（带不带前导 /）都放行，
+// 绝对地址与协议相对地址（//evil.com）经同源校验挡下
+function resolveStaticAssetUrl(base, pathValue) {
+  if (typeof pathValue !== 'string' || !pathValue.trim()) return null;
+  const baseUrl = new URL(base);
+  try {
+    const url = new URL(pathValue, baseUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (url.username || url.password || url.origin !== baseUrl.origin) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 // eastmoney://关键词?pages=2&mode=both —— 参数可选，缺省即为默认行为
 function parseEastmoneySpec(url) {
   const raw = url.slice(EASTMONEY_SCHEME.length);
@@ -56,7 +84,7 @@ async function fetchPage(keyword, { sort, pageIndex }, settings) {
   const articles = parsed?.result?.cmsArticleWebOld || [];
   return articles.map(a => ({
     title: String(a.title || '').replace(/<[^>]+>/g, '').trim(),
-    url: a.url,
+    url: validWebUrl(a.url),
     summary: String(a.content || '').replace(/<[^>]+>/g, '').trim(),
     publishedAt: a.date ? new Date(a.date.replace(' ', 'T') + '+08:00').toISOString() : null,
     image: (a.image && /^https?:\/\//.test(a.image)) ? a.image : null
@@ -151,7 +179,7 @@ function mapCninfoResponse(raw, spec) {
   const items = list.map(a => ({
     // isHLtitle=true 时命中词会被 <em> 包裹，入库前剥掉
     title: String(a.announcementTitle || '').replace(/<[^>]+>/g, '').trim(),
-    url: a.adjunctUrl ? 'http://static.cninfo.com.cn/' + a.adjunctUrl : null,
+    url: resolveStaticAssetUrl('http://static.cninfo.com.cn/', a.adjunctUrl),
     summary: a.secName || a.secCode ? `${a.secName || ''}（${a.secCode || ''}）` : '',
     publishedAt: Number.isFinite(a.announcementTime) ? new Date(a.announcementTime).toISOString() : null,
     image: null
@@ -182,7 +210,7 @@ function mapSseResponse(raw, spec) {
   if (!Array.isArray(list)) throw new Error('sse 返回结构异常：缺少 result 数组');
   const items = list.map(b => ({
     title: String(b.TITLE || b.DOC_TITLE || '').trim(),
-    url: b.URL || b.DOC_URL || null,
+    url: validWebUrl(b.URL || b.DOC_URL),
     summary: String(b.SECURITY_CODE || '').trim(),
     publishedAt: parseCnDate(b.SSEDATE || b.POST_DATE || b.CREATE_DATE),
     image: null
@@ -217,7 +245,7 @@ function mapSzseResponse(raw) {
   if (!Array.isArray(list)) throw new Error('szse 返回结构异常：缺少 data.announce 数组');
   return list.map(a => ({
     title: String(a.title || '').trim(),
-    url: a.attachPath ? 'https://disc.static.szse.cn' + a.attachPath : null,
+    url: resolveStaticAssetUrl('https://disc.static.szse.cn/', a.attachPath),
     summary: Array.isArray(a.secName) ? a.secName.join('，') : String(a.secName || '').trim(),
     publishedAt: parseCnDate(a.publishTime),
     image: null

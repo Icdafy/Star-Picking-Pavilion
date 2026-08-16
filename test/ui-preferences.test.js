@@ -16,6 +16,18 @@ const {
 
 const TODAY = '2026-07-23';
 const defaultFavoriteIds = [...CommonLinks.getDefaultFavoriteIds()];
+const defaultAquaPreferences = Object.freeze({
+  aquaMode: 'mica',
+  aquaBlur: 24,
+  aquaFrost: 42,
+  aquaHue: 172,
+  aquaBrightness: 50,
+  aquaBackground: 'fluid',
+  aquaWallpaperBlur: 4,
+  aquaWallpaperFrost: 18,
+  aquaWhale: true,
+  aquaCritters: true
+});
 
 async function makeDirectory(t) {
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-ui-preferences-'));
@@ -36,6 +48,7 @@ test('default preferences have the complete version 1 shape and are deeply isola
     version: 1,
     theme: 'dark',
     textScale: 'md',
+    ...defaultAquaPreferences,
     view: 'featured',
     domain: '',
     category: '',
@@ -62,6 +75,16 @@ test('normalizes every supported field and discards unknown fields', () => {
     version: 999,
     theme: 'light',
     textScale: 'lg',
+    aquaMode: 'compat',
+    aquaBlur: 0,
+    aquaFrost: 100,
+    aquaHue: 360,
+    aquaBrightness: 0,
+    aquaBackground: 'wallpaper',
+    aquaWallpaperBlur: 40,
+    aquaWallpaperFrost: 100,
+    aquaWhale: false,
+    aquaCritters: false,
     view: 'daily',
     domain: 'aerospace',
     category: '商业航天',
@@ -78,6 +101,16 @@ test('normalizes every supported field and discards unknown fields', () => {
     version: 1,
     theme: 'light',
     textScale: 'lg',
+    aquaMode: 'compat',
+    aquaBlur: 0,
+    aquaFrost: 100,
+    aquaHue: 360,
+    aquaBrightness: 0,
+    aquaBackground: 'wallpaper',
+    aquaWallpaperBlur: 40,
+    aquaWallpaperFrost: 100,
+    aquaWhale: false,
+    aquaCritters: false,
     view: 'daily',
     domain: 'aerospace',
     category: '商业航天',
@@ -95,6 +128,16 @@ test('invalid scalar values fall back to defaults', () => {
   const normalized = normalizeUiPreferences({
     theme: 'system',
     textScale: 'huge',
+    aquaMode: 'glass',
+    aquaBlur: -1,
+    aquaFrost: 101,
+    aquaHue: 361,
+    aquaBrightness: Number.NaN,
+    aquaBackground: 'video',
+    aquaWallpaperBlur: Number.POSITIVE_INFINITY,
+    aquaWallpaperFrost: -0.01,
+    aquaWhale: 'yes',
+    aquaCritters: null,
     view: 'archive',
     domain: 'other',
     category: `bad\u0000text`,
@@ -107,6 +150,51 @@ test('invalid scalar values fall back to defaults', () => {
   assert.deepEqual(normalized, getDefaultUiPreferences());
   assert.equal(normalizeUiPreferences({ category: 'x'.repeat(121) }, { today: TODAY }).category, '');
   assert.equal(normalizeUiPreferences({ category: 'x'.repeat(120) }, { today: TODAY }).category.length, 120);
+});
+
+test('Aqua numeric bounds are inclusive and invalid explicit updates are rejected before writing', async t => {
+  const directory = await makeDirectory(t);
+  const store = createStore(directory);
+  await store.load();
+
+  const validBoundaries = {
+    aquaBlur: 40,
+    aquaFrost: 0,
+    aquaHue: 360,
+    aquaBrightness: 100,
+    aquaWallpaperBlur: 0,
+    aquaWallpaperFrost: 100
+  };
+  await store.update(validBoundaries);
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(validBoundaries).map(field => [field, store.getSnapshot()[field]])),
+    validBoundaries
+  );
+
+  for (const [field, value] of [
+    ['aquaBlur', 40.01],
+    ['aquaFrost', -0.01],
+    ['aquaHue', Number.POSITIVE_INFINITY],
+    ['aquaBrightness', '50'],
+    ['aquaWallpaperBlur', Number.NaN],
+    ['aquaWallpaperFrost', 100.01],
+    ['aquaMode', 'glass'],
+    ['aquaBackground', 'video'],
+    ['aquaWhale', 1],
+    ['aquaCritters', 'false']
+  ]) {
+    assert.throws(
+      () => store.update({ [field]: value }),
+      new RegExp(`${field}.*appearance`, 'i'),
+      `${field}=${String(value)}`
+    );
+  }
+
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(validBoundaries).map(field => [field, store.getSnapshot()[field]])),
+    validBoundaries,
+    'rejected patches must not partially mutate the in-memory snapshot'
+  );
 });
 
 test('closeToTray accepts only booleans and persists atomically', async t => {

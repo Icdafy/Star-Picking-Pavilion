@@ -79,7 +79,11 @@
         else data.items.forEach(i => state.knownIds.add(i.id));
         if (state.freshIds.size) {
           for (const id of state.freshIds) {
-            const el = list.querySelector(`.card[data-id="${id}"]`);
+            // 服务端 id 进 CSS 选择器前必须转义引号/反斜杠/控制字符：
+            // 正常 id 是整数不受影响，异常 id 也不会让 querySelector 抛 SyntaxError
+            const key = String(id).replace(/[\0-\x1f"\\]/g, character =>
+              `\\${character.charCodeAt(0).toString(16).padStart(4, '0')} `);
+            const el = list.querySelector(`.card[data-id="${key}"]`);
             if (el) el.classList.add('card-new');
           }
           state.freshIds.clear();

@@ -22,6 +22,13 @@ const desktopApi = Object.freeze({
   preferences: cloneAndFreeze(initialPreferencesState.preferences),
   hasStoredPreferences: initialPreferencesState.hasStoredPreferences === true,
   updatePreferences: patch => ipcRenderer.invoke('preferences:update', patch),
+  getAppearanceWallpaper: () => ipcRenderer.invoke('appearance-wallpaper:get'),
+  saveAppearanceWallpaper: dataUrl => ipcRenderer
+    .invoke('appearance-wallpaper:save', { dataUrl })
+    .then(cloneAndFreeze),
+  clearAppearanceWallpaper: () => ipcRenderer
+    .invoke('appearance-wallpaper:clear')
+    .then(cloneAndFreeze),
   getDesktopSettings: () => ipcRenderer
     .invoke('desktop-settings:get')
     .then(cloneAndFreeze),

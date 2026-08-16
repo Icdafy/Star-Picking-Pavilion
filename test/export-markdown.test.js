@@ -114,6 +114,19 @@ test('非 HTTP(S) 链接不会进入导出内容', () => {
   }
 });
 
+test('markdown 链接目标中的圆括号被百分号编码，链接无法被截断', () => {
+  const suspicious = 'https://example.com/a) 加粗 [点我](javascript:alert(1))';
+  const markdown = renderArticles([{ title: '条目', url: suspicious }], { ...BRAND, format: 'markdown' });
+  // URL 序列化保留 ( )，这里必须再编码：链接在第一个 ) 处就不会被 CommonMark 截断，
+  // 剩余文本也不可能再拼出一个 javascript: 链接
+  assert.match(markdown, /a%29/);
+  assert.match(markdown, /%28javascript:alert%281%29%29/);
+  assert.doesNotMatch(markdown, /\]\(javascript:/);
+  // text 格式保持人类可读的原样 URL，不做 markdown 语义转义
+  const text = renderArticles([{ title: '条目', url: 'https://example.com/a(b)' }], { ...BRAND, format: 'text' });
+  assert.match(text, /https:\/\/example\.com\/a\(b\)/);
+});
+
 test('摘要中的换行与控制字符被压平，一条情报始终占固定行数', () => {
   const output = renderArticles([{
     title: '带\n换行的标题',

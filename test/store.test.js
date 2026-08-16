@@ -47,6 +47,21 @@ test('setState 合并补丁并返回 state；非法补丁静默忽略', () => {
   assert.equal(store.setState('x'), store.getState());
 });
 
+test('setState 拒绝危险键：__proto__/constructor/prototype 不得污染原型', () => {
+  const store = createStore({ a: 1 });
+  const originalPrototype = Object.getPrototypeOf(store.getState());
+  store.setState(JSON.parse('{"__proto__": {"polluted": true}}'));
+  assert.equal(store.getState().a, 1);
+  assert.equal(Object.getPrototypeOf(store.getState()), originalPrototype);
+  assert.equal(Object.prototype.polluted, undefined);
+  store.setState(JSON.parse('{"constructor": {"prototype": {"polluted2": true}}}'));
+  assert.equal(Object.prototype.polluted2, undefined);
+  // 含危险键的补丁整体拒绝（deny-by-default），同批正常字段也不生效
+  store.setState(JSON.parse('{"b": 2, "__proto__": {"polluted3": true}}'));
+  assert.equal(Object.hasOwn(store.getState(), 'b'), false);
+  assert.equal(Object.prototype.polluted3, undefined);
+});
+
 test('订阅只在选择器值（Object.is）变化时触发，取消后不再通知', () => {
   const store = createStore({ view: 'featured', q: '' });
   const seen = [];

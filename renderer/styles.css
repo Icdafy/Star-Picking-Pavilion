@@ -361,7 +361,9 @@ body {
   line-height: 1.75;
   color: var(--c-fg);
   background: var(--c-bg);
-  overflow-x: hidden;
+  /* hidden 会把 body 变成一个并不实际滚动的 sticky 容器，导致宽屏侧栏和
+     塔台随页面滚走；clip 同样截断横向溢出，但不建立滚动容器。 */
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   touch-action: manipulation;

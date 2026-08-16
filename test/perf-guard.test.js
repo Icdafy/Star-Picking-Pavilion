@@ -9,19 +9,25 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
+const stylesheetFiles = [...html.matchAll(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi)]
+  .map(([tag]) => tag.match(/\bhref=["']([^"']+)["']/i)?.[1])
+  .filter(href => href && !/^(?:[a-z]+:|\/\/)/i.test(href))
+  .map(href => path.join(root, 'renderer', ...href.split('/')));
+const stylesheetSources = stylesheetFiles.map(file => fs.readFileSync(file, 'utf8'));
+const css = stylesheetSources.join('\n');
 const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8');
 // 阶段 3 批 2：loadFeed 随信息流控制器迁出 app.js，切片落点同步改为新模块源码
 const feedController = fs.readFileSync(path.join(root, 'renderer', 'feed-controller.js'), 'utf8');
 
 test('样式表体积不超过预算，膨胀必须先被护栏拦下', () => {
-  // 液态玻璃重构后基线约 114 KB（含全部组件样式与容器查询），余量约 16 KB；
-  // 超过 130 KB 说明样式该拆分或清理死代码，而不是放宽预算。
-  const bytes = fs.statSync(path.join(root, 'renderer', 'styles.css')).size;
+  // Aqua 外壳拆分后必须统计页面真实加载的全部本地 CSS，不能只守 styles.css
+  // 而让新增文件绕过预算。当前字体分片声明 + 组件样式 + 外壳约 235.5 KiB，
+  // 预留约 14.5 KiB 给后续必要修补；超过时应先清理重复覆盖和死规则。
+  const bytes = stylesheetFiles.reduce((total, file) => total + fs.statSync(file).size, 0);
   assert.ok(
-    bytes <= 130 * 1024,
-    `styles.css 已达 ${(bytes / 1024).toFixed(1)} KB，超过 130 KB 预算`
+    bytes <= 250 * 1024,
+    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 250 KB 总预算`
   );
 });
 
@@ -31,7 +37,8 @@ test('index.html 脚本标签总数受控，不为小功能随意加脚本', () 
   // UMD 模块，每个模块对应一个 <script src>，这是拆分的必然成本：本地静态文件
   // 加载开销可忽略（无网络、无 CDN），后续可加 defer 进一步优化。批 2 抽出
   // 11 个功能控制器后基线为 22 个，上限上调为 25；批 3 新增 store/view-registry、
-  // 批 4 新增 common-links-controller 后基线到达 25 个，与上限持平——预算已用尽，
+  // 批 4 新增 common-links-controller 后为 24 个；Aqua 外壳新增唯一运行时后
+  // 基线到达 25 个，与上限持平——预算已用尽，
   // 后续任何批次都不得再新增脚本标签（只准在既有模块内迁移或合并）。
   // 再超说明模块又在碎片化，应合并职责相近的模块。
   const scriptCount = [...html.matchAll(/<script\b/gi)].length;
@@ -39,8 +46,8 @@ test('index.html 脚本标签总数受控，不为小功能随意加脚本', () 
 });
 
 test('样式表动画关键帧数量受控，动效不无限堆叠', () => {
-  // 基线 19 组 @keyframes（液态玻璃阶段新增 blob-drift）；动画是合成层开销的
-  // 大头，新增动效前先考虑复用。
+  // 页面全部样式当前共 20 组 @keyframes；动画是合成层开销的大头，
+  // 新增动效前先考虑复用 WAAPI 或既有关键帧。
   const keyframesCount = [...css.matchAll(/@keyframes\b/g)].length;
   assert.ok(keyframesCount <= 20, `@keyframes 已有 ${keyframesCount} 组，上限 20 组`);
 });
@@ -74,7 +81,8 @@ test('信息流渲染路径已接入 keyed diff，不退回字符串模板整表
 });
 
 test('backdrop-filter 使用处受控，毛玻璃不叠加成滤镜风暴', () => {
-  // 基线 9 处；backdrop-filter 每处都是实时滤镜计算，卡片列表里尤其昂贵。
+  // 页面全部样式当前 10 处；backdrop-filter 每处都是实时滤镜计算，
+  // 卡片列表里尤其昂贵。拆出新 CSS 也不得绕过这条护栏。
   const backdropCount = [...css.matchAll(/backdrop-filter/g)].length;
   assert.ok(backdropCount <= 10, `backdrop-filter 已有 ${backdropCount} 处，上限 10 处`);
 });

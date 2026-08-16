@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.0.20.exe`，双击并按向导安装。v0.0.20 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.0.exe`，双击并按向导安装。v0.1.0 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.0.20.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.0.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -38,6 +38,8 @@ v0.0.19 集中加固情报处理与本地数据链路：模型请求支持网络
 
 v0.0.20 增强卫星专题词库与信源接入：新增卫星制造技术、卫星应用与通导遥、发射与轨道三组专题词，并扩充国内外卫星企业；信源种子库升级到 v7，新增 14 类、共 19 条接入位，引入巨潮、上交所、深交所和财联社 API scheme，以及更多 RSSHub、财经社区、研报与公众号入口。前端同时移除独立“热点”视图和右侧 Hot Rail，保留精选、全部动态与星标三类信息流；日报中的“当日热点”和热度衰减计分继续保留。
 
+v0.1.0 完成 Aqua 指挥舱升级与全面安全复审：宽屏采用浮动指挥栏、玻璃塔台和原创流体星云，中窄屏继续完整适配 800×600 与四档界面缩放；设置页可调云母材质、模糊、磨砂、色相、明暗、壁纸、星鲸和星尘。壁纸由渲染层压缩并经主进程签名与 3 MB 上限复核后原子保存在本机，不进入偏好 JSON。服务端同时增加 API 数据钳制、采集 URL 收口、Markdown 导出防注入、同源写请求防护与 `no-store` 响应策略。
+
 ## 主要功能
 
 - 精选、全部动态与星标信息流
@@ -54,6 +56,7 @@ v0.0.20 增强卫星专题词库与信源接入：新增卫星制造技术、卫
 - 实体标签点击即检索，多事件资讯展开为原子事件
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
 - 深色和浅色主题
+- Aqua 指挥舱与外观实验室：云母/兼容材质、流体或本机壁纸、原创星鲸与星尘，并支持低功耗和减少动态效果降级
 - 中文思源黑体、英文 Times New Roman，字体随安装包内置，不依赖本机是否装过中文字体
 - 四档界面缩放（小 / 标准 / 大 / 特大，<kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd>），字号、行距、留白、圆角、栏宽等比例同步缩放
 - 自动记住主题、界面缩放档位、最后视图、领域与分类、日报日期、常用网址分类与星标、实时更新开关
@@ -185,11 +188,12 @@ API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用�
 - `settings.json`：不含 API Key 的普通设置
 - `credentials.v1.json`：由 `safeStorage` 加密的 AI 凭据
 - `ui-preferences.json`：版本化的界面选择，不含 API Key、搜索词或未提交表单
+- `appearance/wallpaper.asset`：可选的自定义界面壁纸，经压缩与格式校验后独立保存
 - `daily-archive.json`：每日研究归档的开关、用户所选目录、已成功日期与待补齐状态，不含新闻正文或秘密
 - `migration-v0.0.1.json`：旧版数据迁移记录，不含秘密
 - `storage-maintenance.json`：缓存清理与数据库维护时间记录，不含情报正文或秘密
 
-备份前请完全退出摘星阁，再复制 `%APPDATA%\摘星阁\star-picking-pavilion.db` 和需要的设置文件；如已开启每日研究归档，还应单独备份所选目录下的 `摘星阁新闻简报`。恢复数据库时也应先退出应用。跨电脑恢复后，建议运行应用确认数据库完整性、重新选择归档目录并重新配置 API Key。
+备份前请完全退出摘星阁，再复制 `%APPDATA%\摘星阁\star-picking-pavilion.db`、需要的设置文件和可选的 `appearance\wallpaper.asset`；如已开启每日研究归档，还应单独备份所选目录下的 `摘星阁新闻简报`。恢复数据库时也应先退出应用。跨电脑恢复后，建议运行应用确认数据库完整性、重新选择归档目录并重新配置 API Key。
 
 超过保留天数的文章会被自动清理，若需要长期归档请提前备份，或把保留天数调高。
 
@@ -229,7 +233,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.0.20 --artifacts
+npm run verify:version -- --tag v0.1.0 --artifacts
 npm run notices
 ```
 

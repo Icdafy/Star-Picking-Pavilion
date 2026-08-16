@@ -82,15 +82,25 @@ function toIso(d) {
 }
 
 // 必应资讯的链接带跳转包装，解出真实地址
+// 解出的地址与原始 link 一样只允许无内嵌凭据的 HTTP(S)：信源内容不受信任，
+// javascript:/data:/file: 等 scheme 必须在这里就出不了采集层，而不是等前端兜底。
 function normalizeUrl(link) {
   if (!link) return null;
+  let candidate = link;
   try {
     const u = new URL(link);
     if (u.hostname.includes('bing.com') && u.searchParams.get('url')) {
-      return decodeURIComponent(u.searchParams.get('url'));
+      candidate = decodeURIComponent(u.searchParams.get('url'));
     }
-    return link;
-  } catch { return link; }
+  } catch { /* 解析失败保留原文，交下方统一校验 */ }
+  try {
+    const parsed = new URL(candidate);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    if (parsed.username || parsed.password) return null;
+    return candidate;
+  } catch {
+    return null;
+  }
 }
 
-module.exports = { fetch, sanitizeXml };
+module.exports = { fetch, sanitizeXml, normalizeUrl };

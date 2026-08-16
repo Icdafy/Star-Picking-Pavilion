@@ -48,12 +48,18 @@ function authorize(request, policy) {
   const expectedToken = String(policy?.expectedToken || '');
   if (expectedToken) return constantTimeEqual(request?.token, expectedToken);
 
-  if (!request?.origin) return true;
-  try {
-    return new URL(request.origin).origin === `http://${expectedHost}`;
-  } catch {
-    return false;
+  // 开发模式（`npm run server`，无令牌）：带 Origin 的请求必须同源；不带 Origin 的
+  // 裸请求（curl、地址栏直访）只放行读方法——会改变状态的方法必须由同源页面发起，
+  // 浏览器跨站 POST 一定带攻击者 Origin，在这里就会被挡下。
+  const method = String(request?.method || 'GET').toUpperCase();
+  if (request?.origin) {
+    try {
+      return new URL(request.origin).origin === `http://${expectedHost}`;
+    } catch {
+      return false;
+    }
   }
+  return method === 'GET' || method === 'HEAD';
 }
 
 async function readJsonBody(req) {

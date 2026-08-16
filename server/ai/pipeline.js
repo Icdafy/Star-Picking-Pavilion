@@ -172,7 +172,7 @@ function heuristicAnalyze(a) {
   const reason = (a.tier === 'T1' ? '官方一手 · ' : '') + (REASON_TPL[category] || '');
   return {
     relevant: true,
-    domain: profile.domain === 'both' ? 'aerospace' : profile.domain,
+    domain: profile.domain,
     result: { scores, category, summary, reason, tags: profile.terms.slice(0, 4) }
   };
 }

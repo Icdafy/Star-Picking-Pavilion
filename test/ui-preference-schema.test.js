@@ -10,6 +10,18 @@ const CommonLinks = require('../renderer/common-links');
 const Bootstrap = require('../renderer/bootstrap');
 const ElectronPreferences = require('../electron/ui-preferences');
 const TODAY = '2026-07-23';
+const AQUA_FIELDS = Object.freeze([
+  'aquaMode',
+  'aquaBlur',
+  'aquaFrost',
+  'aquaHue',
+  'aquaBrightness',
+  'aquaBackground',
+  'aquaWallpaperBlur',
+  'aquaWallpaperFrost',
+  'aquaWhale',
+  'aquaCritters'
+]);
 
 function withoutVersion(preferences) {
   const { version, ...values } = preferences;
@@ -25,6 +37,11 @@ test('shared UI preference schema is browser/CommonJS compatible and used by bot
   );
 
   assert.equal(Object.isFrozen(schema), true);
+  assert.deepEqual(
+    schema.UI_PREFERENCE_FIELDS.filter(field => field.startsWith('aqua')),
+    AQUA_FIELDS,
+    'the shared allowlist must carry every persisted Aqua field in a stable order'
+  );
   assert.match(html, /<script src="ui-preference-schema\.js"><\/script>/);
   assert.match(electronSource, /require\(['"]\.\.\/renderer\/ui-preference-schema['"]\)/);
 });
@@ -34,6 +51,16 @@ test('renderer and Electron normalize normal and damaged snapshots identically',
   const inputs = [
     {
       theme: 'light',
+      aquaMode: 'compat',
+      aquaBlur: 0,
+      aquaFrost: 100,
+      aquaHue: 360,
+      aquaBrightness: 0,
+      aquaBackground: 'wallpaper',
+      aquaWallpaperBlur: 40,
+      aquaWallpaperFrost: 100,
+      aquaWhale: false,
+      aquaCritters: false,
       view: 'daily',
       domain: 'aerospace',
       category: '产业',
@@ -45,6 +72,16 @@ test('renderer and Electron normalize normal and damaged snapshots identically',
     },
     {
       theme: 'sepia',
+      aquaMode: 'glass',
+      aquaBlur: -1,
+      aquaFrost: 101,
+      aquaHue: Number.POSITIVE_INFINITY,
+      aquaBrightness: '50',
+      aquaBackground: 'video',
+      aquaWallpaperBlur: Number.NaN,
+      aquaWallpaperFrost: -0.01,
+      aquaWhale: 'yes',
+      aquaCritters: null,
       view: 'missing',
       domain: 'invalid',
       category: `bad\u0000category`,
@@ -62,6 +99,59 @@ test('renderer and Electron normalize normal and damaged snapshots identically',
       withoutVersion(ElectronPreferences.normalizeUiPreferences(input, { today: TODAY }))
     );
   }
+});
+
+test('every Aqua field produces one minimal patch and rejects invalid enum, type, and numeric edges', () => {
+  const schema = require('../renderer/ui-preference-schema');
+  const validCases = [
+    ['aquaMode', 'compat'],
+    ['aquaBlur', 0],
+    ['aquaFrost', 100],
+    ['aquaHue', 360],
+    ['aquaBrightness', 0],
+    ['aquaBackground', 'wallpaper'],
+    ['aquaWallpaperBlur', 40],
+    ['aquaWallpaperFrost', 100],
+    ['aquaWhale', false],
+    ['aquaCritters', false]
+  ];
+
+  for (const [field, value] of validCases) {
+    assert.equal(schema.isValidUiPreferenceValue(field, value, CommonLinks), true, field);
+    assert.deepEqual(
+      schema.createUiPreferencePatch(field, value, CommonLinks),
+      { [field]: value },
+      `${field} must not drag unrelated appearance settings into its write`
+    );
+  }
+
+  const invalidCases = [
+    ['aquaMode', 'glass'],
+    ['aquaBlur', -Number.EPSILON],
+    ['aquaFrost', 100.000001],
+    ['aquaHue', 361],
+    ['aquaBrightness', Number.NaN],
+    ['aquaBackground', 'video'],
+    ['aquaWallpaperBlur', Number.POSITIVE_INFINITY],
+    ['aquaWallpaperFrost', -1],
+    ['aquaWhale', 0],
+    ['aquaCritters', 'false']
+  ];
+  for (const [field, value] of invalidCases) {
+    assert.equal(schema.isValidUiPreferenceValue(field, value, CommonLinks), false, field);
+    assert.deepEqual(schema.createUiPreferencePatch(field, value, CommonLinks), {}, field);
+  }
+
+  assert.deepEqual(
+    schema.sanitizeUiPreferencesPatch({
+      aquaBlur: 12,
+      aquaHue: 999,
+      aquaWhale: false,
+      unknownAquaField: true
+    }, CommonLinks),
+    { aquaBlur: 12, aquaWhale: false },
+    'batch sanitization keeps valid fields without replacing invalid siblings with defaults'
+  );
 });
 
 test('oversized sparse favorites have identical safe semantics without custom iteration', () => {

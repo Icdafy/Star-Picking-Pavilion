@@ -44,11 +44,41 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getMinimumSize()),
     [800, 600]
   );
+  // Windows 上隐藏的 BrowserWindow 可能只更新 outerWidth，却不立即重排
+  // renderer 内容区；这会让后续所有“宽屏”用例其实仍在 800px 下运行。
+  // showInactive 使内容面真实参与布局，但不抢占用户焦点。
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].showInactive());
 
   for (const size of WINDOWS) {
     await app.evaluate(({ BrowserWindow }, value) => {
-      BrowserWindow.getAllWindows()[0].setSize(value.width, value.height);
+      BrowserWindow.getAllWindows()[0].setContentSize(value.width, value.height);
     }, size);
+    await page.waitForFunction(
+      value => innerWidth === value.width && innerHeight === value.height,
+      size
+    );
+    const expectedWide = size.width >= 70 * 16;
+    await page.waitForFunction(
+      expected => document.querySelector('.nav-tabs')?.getAttribute('aria-orientation') === expected,
+      expectedWide ? 'vertical' : 'horizontal'
+    );
+    const viewport = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+      wide: matchMedia('(min-width: 70rem)').matches,
+      orientation: document.querySelector('.nav-tabs')?.getAttribute('aria-orientation')
+    }));
+    assert.deepEqual(
+      [viewport.width, viewport.height],
+      [size.width, size.height],
+      `${size.width}×${size.height} 未真实应用到 renderer 内容区`
+    );
+    assert.equal(viewport.wide, expectedWide, `${size.width}×${size.height} 宽屏媒体查询异常`);
+    assert.equal(
+      viewport.orientation,
+      expectedWide ? 'vertical' : 'horizontal',
+      `${size.width}×${size.height} 导航方向与外壳布局不一致`
+    );
     for (const scale of SCALES) {
       await page.evaluate(value => {
         document.documentElement.dataset.uiScale = value;
@@ -110,5 +140,46 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
         }
       }
     }
+  }
+
+  // 宽屏外壳必须真正粘在视口上。body 的 overflow-x 若退回 hidden，浏览器会
+  // 把它计算成非滚动 sticky 容器，侧栏与塔台会在长设置页一起滚出屏幕。
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].setContentSize(1440, 920);
+  });
+  await page.waitForFunction(() => innerWidth === 1440 && innerHeight === 920);
+  await page.evaluate(() => {
+    document.documentElement.dataset.uiScale = 'md';
+    window.dispatchEvent(new Event('resize'));
+  });
+  await page.locator('.tab[data-view="settings"]').click();
+  await page.evaluate(() => {
+    document.documentElement.style.scrollBehavior = 'auto';
+    window.scrollTo(0, 2000);
+  });
+  await page.waitForTimeout(80);
+  const sticky = await page.evaluate(() => {
+    const rail = document.querySelector('.command-rail');
+    const tower = document.querySelector('.tower');
+    const measure = element => ({
+      top: element.getBoundingClientRect().top,
+      expectedTop: Number.parseFloat(getComputedStyle(element).top),
+      position: getComputedStyle(element).position
+    });
+    return {
+      scrollY,
+      bodyOverflowX: getComputedStyle(document.body).overflowX,
+      rail: measure(rail),
+      tower: measure(tower)
+    };
+  });
+  assert.ok(sticky.scrollY > 500, '设置页必须足够长，sticky 验证才有意义');
+  assert.equal(sticky.bodyOverflowX, 'clip');
+  for (const [name, measured] of Object.entries({ rail: sticky.rail, tower: sticky.tower })) {
+    assert.equal(measured.position, 'sticky', `${name} 未启用 sticky`);
+    assert.ok(
+      Math.abs(measured.top - measured.expectedTop) <= 2,
+      `${name} 已滚出视口：top=${measured.top}, expected=${measured.expectedTop}`
+    );
   }
 });

@@ -10,6 +10,10 @@ const archiveRequestSource = fs.readFileSync(
   path.join(__dirname, '..', 'electron', 'daily-archive-request.js'),
   'utf8'
 );
+const appearanceWallpaperSource = fs.readFileSync(
+  path.join(__dirname, '..', 'electron', 'appearance-wallpaper.js'),
+  'utf8'
+);
 
 test('Electron launches the service on a random port with secret token and nonce', () => {
   assert.match(source, /crypto\.randomBytes\(/);
@@ -114,6 +118,39 @@ test('Electron registers preference IPC and loads migrated preferences before cr
   assert.ok(dataDirIndex > migrationIndex);
   assert.ok(loadPreferencesIndex > dataDirIndex);
   assert.ok(createWindowIndex > loadPreferencesIndex);
+});
+
+test('appearance wallpaper IPC is explicitly registered and constrained to one validated local asset', () => {
+  assert.match(source, /createAppearanceWallpaperStore/);
+  assert.match(source, /registerAppearanceWallpaperIpc/);
+  assert.match(
+    source,
+    /registerAppearanceWallpaperIpc\(\{\s*ipcMain,\s*getStore:\s*\(\)\s*=>\s*appearanceWallpaper\s*\}\)/
+  );
+  assert.match(source, /appearanceWallpaper = createAppearanceWallpaperStore\(\{ directory: dataDir \}\)/);
+
+  const dataDirIndex = source.indexOf('const dataDir = getDataDir();');
+  const wallpaperStoreIndex = source.indexOf(
+    'appearanceWallpaper = createAppearanceWallpaperStore({ directory: dataDir });',
+    dataDirIndex
+  );
+  const createWindowIndex = source.indexOf('await createWindow(serverPort);', wallpaperStoreIndex);
+  assert.ok(dataDirIndex >= 0);
+  assert.ok(wallpaperStoreIndex > dataDirIndex);
+  assert.ok(createWindowIndex > wallpaperStoreIndex);
+
+  assert.match(appearanceWallpaperSource, /const MAX_BYTES = 3 \* 1024 \* 1024/);
+  assert.match(appearanceWallpaperSource, /new Set\(\['image\/jpeg', 'image\/png', 'image\/webp'\]\)/);
+  assert.match(appearanceWallpaperSource, /hasExpectedSignature\(match\[1\], payload\)/);
+  assert.match(appearanceWallpaperSource, /path\.join\(directory, 'appearance'\)/);
+  assert.match(appearanceWallpaperSource, /await rename\(temporary, file\)/);
+  assert.match(appearanceWallpaperSource, /const prototype = payload && typeof payload === 'object' \? Object\.getPrototypeOf\(payload\) : null/);
+  assert.match(appearanceWallpaperSource, /prototype !== Object\.prototype && prototype !== null/);
+  assert.match(appearanceWallpaperSource, /return store\.save\(payload\.dataUrl\)/);
+  assert.match(appearanceWallpaperSource, /ipcMain\.handle\('appearance-wallpaper:get'/);
+  assert.match(appearanceWallpaperSource, /ipcMain\.handle\('appearance-wallpaper:save'/);
+  assert.match(appearanceWallpaperSource, /ipcMain\.handle\('appearance-wallpaper:clear'/);
+  assert.doesNotMatch(appearanceWallpaperSource, /https?:\/\//i);
 });
 
 test('startup failure page never interpolates exception text into HTML', () => {

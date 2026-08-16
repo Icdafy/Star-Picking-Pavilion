@@ -39,6 +39,7 @@ const SettingsViewController = window.SettingsViewController;
 const Store = window.Store;
 const ViewRegistry = window.ViewRegistry;
 const CommonLinksController = window.CommonLinksController;
+const AquaShell = window.AquaShell;
 // 阶段 3：纯函数与表示层已拆入 renderer/format-utils.js、renderer/feed-card.js，
 // 这里按名解构，保持组合根内调用点不变
 const formatUtils = FormatUtils;
@@ -59,6 +60,16 @@ const restoredPreferences = initialPreferences.preferences;
 const state = {
   theme: restoredPreferences.theme,
   textScale: restoredPreferences.textScale,   // sm | md | lg | xl —— 整套版面的比例尺
+  aquaMode: restoredPreferences.aquaMode,
+  aquaBlur: restoredPreferences.aquaBlur,
+  aquaFrost: restoredPreferences.aquaFrost,
+  aquaHue: restoredPreferences.aquaHue,
+  aquaBrightness: restoredPreferences.aquaBrightness,
+  aquaBackground: restoredPreferences.aquaBackground,
+  aquaWallpaperBlur: restoredPreferences.aquaWallpaperBlur,
+  aquaWallpaperFrost: restoredPreferences.aquaWallpaperFrost,
+  aquaWhale: restoredPreferences.aquaWhale,
+  aquaCritters: restoredPreferences.aquaCritters,
   view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,
@@ -96,7 +107,13 @@ function resolveFxTier() {
     || (Number.isFinite(cores) && cores > 0 && cores <= 4);
   return lowEnd ? 'lite' : 'full';
 }
-document.documentElement.dataset.fxTier = resolveFxTier();
+function syncFxTier() {
+  document.documentElement.dataset.fxTier = resolveFxTier();
+}
+syncFxTier();
+// 系统“减少动态效果”可能在应用运行期间切换；同步根档位后，CSS 与
+// Aqua Canvas 的 MutationObserver 会一起降到 static，而不是继续跑 24 fps。
+reducedMotionQuery?.addEventListener?.('change', syncFxTier);
 
 // 微型运动引擎（dom-utils 阶段 3 新增 createMotion）：matchMedia/document/rAF
 // 经 deps 注入；视图切换入场与信息流错峰入场共用这一套 WAAPI 弹簧
@@ -299,6 +316,25 @@ const preferenceActions = Bootstrap.createUiPreferenceActions({
   persist: persistUiPreferences,
   today: () => localDateString()
 });
+const aquaShell = AquaShell.createAquaShell({
+  document,
+  window,
+  storage,
+  preferences: restoredPreferences,
+  wallpaperStore: Desktop?.isElectron
+    && typeof Desktop.getAppearanceWallpaper === 'function'
+    && typeof Desktop.saveAppearanceWallpaper === 'function'
+    && typeof Desktop.clearAppearanceWallpaper === 'function'
+    ? {
+        load: () => Desktop.getAppearanceWallpaper(),
+        save: dataUrl => Desktop.saveAppearanceWallpaper(dataUrl),
+        clear: () => Desktop.clearAppearanceWallpaper()
+      }
+    : null,
+  persist: persistUiPreferences,
+  onChange: patch => store.setState(patch)
+});
+window.addEventListener('pagehide', () => aquaShell.dispose(), { once: true });
 const dailyRequestGuard = Bootstrap.createLatestRequestGuard();
 const feedRequestGuard = Bootstrap.createLatestRequestGuard();
 
@@ -394,7 +430,8 @@ const sourcesController = SourcesController.createSourcesController({
     list: $('#sourcesList'),
     addButton: $('#btnAddSource'),
     dialog: $('#srcDialog'),
-    form: $('#srcForm')
+    form: $('#srcForm'),
+    htmlFields: $('#srcHtmlFields')
   }
 });
 const { loadSources } = sourcesController;
@@ -433,6 +470,7 @@ const registryDeps = {};
 const viewRegistry = ViewRegistry.createViewRegistry({
   $, $$, document, state, FEED_VIEWS,
   preferenceActions, scrollToTop,
+  isRailLayout: () => window.matchMedia('(min-width: 70rem)').matches,
   // 阶段 3（液态玻璃）：视图切换入场改经 motion 引擎，不再强制重排重放
   motion,
   refreshStats: () => registryDeps.refreshStats && registryDeps.refreshStats()
@@ -606,7 +644,8 @@ async function start() {
   syncNavHeight();
   syncScrollState();
   if (window.ResizeObserver) {
-    new ResizeObserver(() => { syncNavHeight(); syncTabIndicator(); }).observe($('.nav'));
+    const shellObserver = new ResizeObserver(() => { syncNavHeight(); syncTabIndicator(); });
+    [$('.nav'), $('.tower'), $('#feedFilters')].filter(Boolean).forEach(node => shellObserver.observe(node));
   }
   if (document.fonts?.ready) document.fonts.ready.then(syncTabIndicator).catch(() => {});
   if (initialPreferences.migrationPatch) persistUiPreferences(initialPreferences.migrationPatch);

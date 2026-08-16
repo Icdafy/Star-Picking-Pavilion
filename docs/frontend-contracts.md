@@ -1,12 +1,12 @@
-# 摘星阁前端契约登记（v0.0.17 基线）
+# 摘星阁前端契约登记（现行基线）
 
 > 本文档是阶段 0 的契约基线：逐条登记前端与后端之间**被测试字面锁定**的约定。
 > `test/*.test.js` 大量使用对 `renderer/index.html`、`renderer/app.js`、`renderer/styles.css`
 > 源码文本的字面正则断言——后续任何重构阶段都必须把本文档当作检查表，
 > 逐条核对后再动手；任何一条被破坏，`npm test` 会立即报出来。
 >
-> 基线统计时点：v0.0.17，液态玻璃重构（阶段 1-3）完成后口径
-> （styles.css 约 114 KB、app.js 约 27 KB、index.html 约 33 KB）。
+> 当前统计口径：Aqua 外壳升级后，页面实际加载的三份 CSS 合计约 235.5 KiB，
+> app.js 约 27 KiB、index.html 约 41.6 KiB；脚本仍为 25 条且预算已用尽。
 
 ---
 
@@ -63,7 +63,9 @@
 - 视图语义：
   - `featured`：`featured = 1` 且 `relevant = 1`；
   - `all`：`relevant IS NULL OR relevant = 1`；
-  - `starred`：`starred = 1`，按 `COALESCE(starred_at, fetched_at) DESC` 排序，**不做事件簇折叠**。
+  - `starred`：`starred = 1`，按 `COALESCE(starred_at, fetched_at) DESC, a.id DESC` 排序，**不做事件簇折叠**。
+  - 其余视图按 `COALESCE(published_at, fetched_at) DESC, a.id DESC` 排序。
+  - `domain` 筛选同时包含该领域与 `both`（跨领域条目两边都该看见）。
 - 其余视图做事件簇折叠：`cluster_id IS NULL OR a.id = c.main_article_id`。
 - 检索：≥3 字走 FTS5 trigram（LIMIT 500），失败或短词降级 LIKE（`%` `_` `\` 需转义）。
 - 单条形状 `articleRow`：`id, title, url, summary, reason, image, publishedAt, fetchedAt,
@@ -92,11 +94,14 @@
 - `app:get-version` → `version` 字符串
 - `preferences:get` → `{ preferences, hasStoredPreferences }`
 
-### 2.2 invoke 通道（12 个）
+### 2.2 invoke 通道（15 个）
 
 | 前端方法 | 通道 |
 | --- | --- |
 | `updatePreferences(patch)` | `preferences:update` |
+| `getAppearanceWallpaper()` | `appearance-wallpaper:get` |
+| `saveAppearanceWallpaper(dataUrl)` | `appearance-wallpaper:save`（参数 `{ dataUrl }`） |
+| `clearAppearanceWallpaper()` | `appearance-wallpaper:clear` |
 | `getDesktopSettings()` | `desktop-settings:get` |
 | `updateDesktopSettings(patch)` | `desktop-settings:update` |
 | `getStorageSnapshot()` | `storage:get` |
@@ -110,6 +115,10 @@
 | `installUpdate()` | `update:install` |
 
 所有 invoke 返回值都经 `cloneAndFreeze()` 深冻结后交给渲染层。
+
+外观壁纸二进制不进入偏好 JSON：主进程只接受签名匹配的 PNG/JPEG/WebP，
+压缩后 data URL 上限 3 MB，并以原子替换写入 `userData/appearance/wallpaper.asset`。
+IPC payload 只接受 plain object 或 null-prototype object；读取损坏资产时回落为空值。
 
 ### 2.3 on 通道
 
@@ -136,10 +145,12 @@
 测试归属：`test/ui-preference-schema.test.js`、`test/typography.test.js`、
 `test/renderer-integration.test.js`。
 
-### 3.1 UI_PREFERENCE_FIELDS（10 字段，顺序冻结）
+### 3.1 UI_PREFERENCE_FIELDS（20 字段，顺序冻结）
 
 ```
-theme, textScale, view, domain, category, dailyDate,
+theme, textScale, aquaMode, aquaBlur, aquaFrost, aquaHue, aquaBrightness,
+aquaBackground, aquaWallpaperBlur, aquaWallpaperFrost, aquaWhale, aquaCritters,
+view, domain, category, dailyDate,
 linksCategory, commonLinksFavorites, realtime, closeToTray
 ```
 
@@ -151,12 +162,17 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
 | `VIEWS` | `featured`, `all`, `starred`, `daily`, `links`, `sources`, `settings` |
 | `DOMAINS` | `''`, `lowaltitude`, `aerospace` |
 | `TEXT_SCALES` | `sm`, `md`, `lg`, `xl`（导出为冻结数组，typography 测试 deepEqual） |
+| `AQUA_MODES` | `mica`, `compat` |
+| `AQUA_BACKGROUNDS` | `fluid`, `wallpaper` |
 
 ### 3.3 version
 
 - schema 模块本身不带 version；UI 偏好的落盘快照带 `version: 1`，
   由 `electron/ui-preferences.js` 强制（`patch.version !== 1` 直接抛 TypeError）。
-- 默认值（`getDefaultUiPreferences`）：`theme: 'dark', textScale: 'md', view: 'featured',
+- 默认值（`getDefaultUiPreferences`）：`theme: 'dark', textScale: 'md', aquaMode: 'mica',
+  aquaBlur: 24, aquaFrost: 42, aquaHue: 172, aquaBrightness: 50,
+  aquaBackground: 'fluid', aquaWallpaperBlur: 4, aquaWallpaperFrost: 18,
+  aquaWhale: true, aquaCritters: true, view: 'featured',
   domain: '', category: '', dailyDate: null, linksCategory: ALL_CATEGORY,
   commonLinksFavorites: 默认收藏 id 列表, realtime: true, closeToTray: false`。
 - 未知字段（如 `q`、`page`）一律不恢复；`dailyDate` 不允许晚于 today；
@@ -209,7 +225,8 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
 3. `<script src="bootstrap.js"></script>`（在 styles.css 链接之前）
 4. `<link rel="stylesheet" href="fonts/source-han-sans-sc/index.css">`（在 styles.css 之前）
 5. `<link rel="stylesheet" href="styles.css">`
-6. `<script src="common-links.js"></script>`（在 dom-utils 之后）
+6. `<link rel="stylesheet" href="aqua-shell.css">`（在 styles.css 之后）
+7. `<script src="common-links.js"></script>`（在 dom-utils 之后）
 7. `<script src="settings-form-controller.js"></script>`（在 app.js 之前）
 8. `<script src="desktop-settings-controller.js"></script>`
 9. `storage-maintenance-controller.js`、`daily-archive-controller.js` 两个脚本引用
@@ -220,7 +237,8 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
   `update-pill.js`、`settings-view-controller.js`
 11. 阶段 3 批 4 常用网址视图接线脚本（app.js 之前）：`common-links-controller.js`
 12. 阶段 3 批 3 状态层与视图调度脚本（app.js 之前）：`store.js`、`view-registry.js`
-13. `<script src="app.js"></script>` 最后（组合根：state 声明、依赖装配与 start()）
+13. `<script src="aqua-shell.js"></script>`（紧邻 app.js 之前，唯一新增的外观运行时）
+14. `<script src="app.js"></script>` 最后（组合根：state 声明、依赖装配与 start()）
 
 约束：所有 `<script>` 必须外置（带 `src`，无内联）；全文不得出现 ` onXxx=` 内联事件；
 `<link rel="icon" type="image/svg+xml" href="/favicon.svg">` 逐字存在。
@@ -256,6 +274,11 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
   旧字符串模板逐字等价；行为断言见 test/feed-diff.test.js（mini-dom 解析线上模板）
 
 **设置页**
+- Aqua Glass Lab：`setAquaBlur/setAquaFrost/setAquaHue/setAquaBrightness`、
+  `setAquaWallpaper/setAquaWallpaperBlur/setAquaWallpaperFrost`、
+  `setAquaWhale/setAquaCritters`、`btnAquaWallpaperClear/btnAquaReset`；
+  模式和背景分段按钮分别使用 `data-aqua-mode` / `data-aqua-background` 与
+  `aria-pressed`。壁纸 file input 不得用 `hidden`，应保留键盘可聚焦的视觉隐藏实现。
 - `id="btnClearAiKey"`；`id="setModel"` 且 `placeholder="deepseek-v4-flash"`
 - 不得出现 `setPrefilterModel` / `setScoringModel`；不得出现含 `deepseek-v4-pro` 的 placeholder/value
 - 文案：`deepseek-v4-pro 已从本应用移除`、`DeepSeek-V4-Flash-0731`
@@ -738,13 +761,13 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 静态预算，阈值 = 当前值 + 小幅余量；重构阶段不得使这些数字上升：
 
-| 指标 | 基线值（v0.0.17，液态玻璃重构后） | 护栏上限 |
+| 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| styles.css 文件体积 | ≈ 117,037 B（约 114 KB） | ≤ 130 KB |
-| index.html `<script>` 标签总数 | 25（阶段 3 批 4 完成，预算已用尽） | ≤ 25 |
-| styles.css `@keyframes` 数量 | 19（液态玻璃阶段 1 新增 blob-drift 后） | ≤ 20 |
+| 页面实际加载的全部本地 CSS | ≈ 241,115 B（约 235.5 KiB，含字体分片索引） | ≤ 250 KiB |
+| index.html `<script>` 标签总数 | 25（新增 aqua-shell.js 后预算已用尽） | ≤ 25 |
+| 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
-| styles.css `backdrop-filter` 使用处 | 9 | ≤ 10 |
+| 全部已加载 CSS 的 `backdrop-filter` 声明 | 9 | ≤ 10 |
 
 除数字预算外还有定性护栏。其一（阶段 2 新增，液态玻璃阶段 4 登记）：
 transition 过渡属性白名单断言「transition 只过渡合成层
@@ -754,18 +777,19 @@ transition 声明，允许 transform / opacity / visibility 与颜色族，出�
 （尺寸跟随无 transform 等价物，见第 7.4 节豁免清单）。该护栏无数值
 基线，口径以本节与第 7.4 节阶段 2 登记为准。
 其二（液态玻璃阶段 3 新增，fx-tier / motion 定性护栏，见第 7.4 节阶段 3）：
-styles.css 尾部 fx-tier 覆盖块只允许改写 `--glass-blur` / `--dur-glide`
-令牌的值，不得新增滤镜声明点（backdrop-filter 计数维持 9 处）、不得
+styles.css 与 aqua-shell.css 的 fx-tier 覆盖只允许通过令牌降载，
+不得新增滤镜声明点（backdrop-filter 计数维持 9 处）、不得
 新增关键帧组（计数见上表），区段注释避开被全文计数的英文字面词；
 动效引擎（dom-utils.js 的 createMotion）始终是增强层——reduced 偏好或
 `data-fx-tier="static"` 一律直接落终态，`el.animate` 缺席或抛错同样
 优雅降级，不得把动画变成关键路径。
 
-脚本标签预算上调说明（阶段 3，9/10 → 11/20 → 22/25 → 25/25）：模块化拆分必然把单一大文件拆成
+脚本标签预算上调说明（9/10 → 11/20 → 22/25 → 24/25 → 25/25）：模块化拆分必然把单一大文件拆成
 多个职责单一的 UMD 模块，每个模块需要一条 `<script src>` 引用；这些都是本地静态文件，
 加载开销可忽略（无网络、无 CDN，后续还可加 `defer`），换来的是依赖注入可测性与
 绞杀者式演进空间。这是护栏的有意演进，不是绕过；批 4 新增
-common-links-controller 后基线到达 25，与上限持平，预算正式用尽——
+common-links-controller 后基线为 24；Aqua 外壳只新增一个集中式
+`aqua-shell.js` 后到达 25，与上限持平，预算正式用尽——
 后续任何阶段都不得再新增脚本标签（只准在既有模块内迁移或合并）。
 若需要突破 25 说明模块又在碎片化，应合并职责相近的模块，而不是继续放宽预算。
 
