@@ -186,6 +186,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical public release version', () => {
-  assert.equal(expectedInstallerName(packageJson.build.buildVersion), 'Star-Picking-Pavilion-Setup-0.1.1.exe');
+  assert.equal(expectedInstallerName(packageJson.build.buildVersion), 'Star-Picking-Pavilion-Setup-0.1.2.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.build.buildVersion)), '.exe');
 });

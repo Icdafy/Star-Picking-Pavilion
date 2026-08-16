@@ -1,7 +1,8 @@
 {
   "name": "star-picking-pavilion",
   "productName": "摘星阁",
-  "version": "0.1.3",
+  "version": "0.1.4",
+  "shortVersionWindows": "0.1.2",
   "description": "摘星阁（Star-Picking-Pavilion）· 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
   "author": "摘星阁",
   "license": "MIT",
@@ -47,7 +48,7 @@
     "undici": "^8.9.0"
   },
   "build": {
-    "buildVersion": "0.1.1",
+    "buildVersion": "0.1.2",
     "appId": "com.icdafy.star-picking-pavilion",
     "productName": "摘星阁",
     "executableName": "Star-Picking-Pavilion",

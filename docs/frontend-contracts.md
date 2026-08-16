@@ -91,7 +91,7 @@
 
 ### 2.1 sendSync 通道（预加载时同步取值）
 
-- `app:get-version` → `version` 字符串
+- `app:get-version` → 面向用户的公开 `version` 字符串（来自 `build.buildVersion`，不暴露 electron-updater 内部比较号）
 - `preferences:get` → `{ preferences, hasStoredPreferences }`
 
 ### 2.2 invoke 通道（15 个）

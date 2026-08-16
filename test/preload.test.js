@@ -68,6 +68,7 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
         }
         throw new Error(`Unexpected sendSync channel: ${channel}`);
       },
+      send(channel, ...args) { ipcCalls.push(['send', channel, ...args]); },
       on(channel, listener) { ipcCalls.push(['on', channel]); updateListener = listener; },
       invoke(channel, ...args) {
         ipcCalls.push(['invoke', channel, ...args]);
@@ -208,13 +209,13 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   api.onUpdateStatus(value => { payload = value; });
   updateListener({}, { status: 'downloaded' });
   assert.deepEqual(payload, { status: 'downloaded' });
-  await api.installUpdate();
-  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'update:install']);
+  api.installUpdate();
+  assert.deepEqual(ipcCalls.at(-1), ['send', 'update:install']);
 });
 
-test('main process answers synchronous app version IPC from app metadata', () => {
+test('main process answers synchronous app version IPC with the public release version', () => {
   const main = read('electron/main.js');
 
   assert.match(main, /ipcMain\.on\(['"]app:get-version['"]/);
-  assert.match(main, /returnValue\s*=\s*app\.getVersion\(\)/);
+  assert.match(main, /returnValue\s*=\s*publicAppVersion/);
 });

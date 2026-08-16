@@ -40,6 +40,12 @@ const {
   createAppearanceWallpaperStore,
   registerAppearanceWallpaperIpc
 } = require('./appearance-wallpaper');
+const {
+  createUpdateInstallCoordinator,
+  publicVersionFromPackage,
+  publicVersionFromUpdateInfo
+} = require('./update-coordinator');
+const packageMetadata = require('../package.json');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -49,6 +55,7 @@ let win = null;
 let latestUpdateStatus = null;
 let autoUpdateInitialized = false;
 let autoUpdateTimer = null;
+let updateInstallCoordinator = null;
 let backendReady = false;
 let quitAfterShutdown = false;
 let desktopShutdownPromise = null;
@@ -65,6 +72,7 @@ const testDataDir = process.env.STAR_PICKING_PAVILION_TEST_DATA_DIR
 const traceCredentialIpc = createCredentialIpcTracer({
   enabled: Boolean(testDataDir)
 });
+const publicAppVersion = publicVersionFromPackage(packageMetadata, app.getVersion());
 
 if (testDataDir) {
   app.setPath('userData', testDataDir);
@@ -393,9 +401,19 @@ function setupAutoUpdate() {
     || process.env.STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE === '1') return;
   autoUpdateInitialized = true;
   autoUpdater.autoDownload = true;
-  autoUpdater.on('update-available', i => sendUpdateStatus('available', { version: i.version }));
+  updateInstallCoordinator = createUpdateInstallCoordinator({
+    autoUpdater,
+    shutdown: shutdownDesktop,
+    setQuitReady: ready => { quitAfterShutdown = ready; },
+    reportStatus: sendUpdateStatus
+  });
+  autoUpdater.on('update-available', i => sendUpdateStatus('available', {
+    version: publicVersionFromUpdateInfo(i)
+  }));
   autoUpdater.on('download-progress', p => sendUpdateStatus('downloading', { percent: Math.round(p.percent) }));
-  autoUpdater.on('update-downloaded', i => sendUpdateStatus('downloaded', { version: i.version }));
+  autoUpdater.on('update-downloaded', i => sendUpdateStatus('downloaded', {
+    version: publicVersionFromUpdateInfo(i)
+  }));
   autoUpdater.on('error', error => sendUpdateStatus('error', { message: String(error?.message || error) }));
   autoUpdater.checkForUpdatesAndNotify().catch(error => sendUpdateStatus('error', {
     message: String(error?.message || error)
@@ -408,9 +426,12 @@ function setupAutoUpdate() {
   }, 6 * 3600 * 1000);
 }
 
-// 渲染层点击「重启更新」
-ipcMain.handle('update:install', () => { try { autoUpdater && autoUpdater.quitAndInstall(); } catch {} });
-ipcMain.on('app:get-version', event => { event.returnValue = app.getVersion(); });
+// 安装是终止应用的单向操作，使用 send/on 避免窗口销毁让 invoke Promise 误报失败。
+ipcMain.on('update:install', () => {
+  if (latestUpdateStatus?.status !== 'downloaded') return;
+  updateInstallCoordinator?.install(latestUpdateStatus.version);
+});
+ipcMain.on('app:get-version', event => { event.returnValue = publicAppVersion; });
 registerUiPreferencesIpc({
   ipcMain,
   getStore: () => uiPreferencesStore,

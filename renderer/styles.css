@@ -227,6 +227,8 @@
   --hover-bg: rgba(168,190,255,.07);
   --active-bg: rgba(168,190,255,.13);
   --rail-line: rgba(168,190,255,.16);
+  --scrollbar-thumb: rgba(125,138,176,.38);
+  --scrollbar-thumb-hover: rgba(94,234,212,.52);
   --scrim: rgba(2,4,12,.62);
   --sticky-veil: linear-gradient(180deg, rgba(4,6,14,.94) 62%, rgba(4,6,14,0));
 
@@ -312,6 +314,8 @@
   --hover-bg: rgba(70,84,116,.05);
   --active-bg: rgba(70,84,116,.1);
   --rail-line: rgba(70,84,116,.16);
+  --scrollbar-thumb: rgba(81,92,116,.3);
+  --scrollbar-thumb-hover: rgba(13,148,136,.44);
   --scrim: rgba(40,46,66,.38);
   --sticky-veil: linear-gradient(180deg, rgba(246,244,238,.95) 62%, rgba(246,244,238,0));
 
@@ -2275,10 +2279,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
 
 /* ---------- 滚动条 ---------- */
-::-webkit-scrollbar { width: 10px; height: 10px; }
+html { scrollbar-color: var(--scrollbar-thumb) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--rail-line); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
-::-webkit-scrollbar-thumb:hover { background: var(--c-fg-faint); background-clip: content-box; }
+::-webkit-scrollbar-thumb {
+  min-height: 2.5rem;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
 
 /* ---------- 响应式 ---------- */
 @container app (max-width: 77.5rem) {

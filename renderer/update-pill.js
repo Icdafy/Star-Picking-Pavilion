@@ -16,9 +16,15 @@
     desktop.onUpdateStatus(({ status, version, percent, message }) => {
       updState = status;
       pill.classList.toggle('error', status === 'error');
+      pill.disabled = status === 'installing';
       if (status === 'available') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `发现新版本 ${version}…`; }
       else if (status === 'downloading') { pill.hidden = false; pill.classList.remove('ready'); pill.textContent = `下载更新 ${percent}%`; }
       else if (status === 'downloaded') { pill.hidden = false; pill.classList.add('ready'); pill.textContent = `▲ 重启安装 ${version}`; }
+      else if (status === 'installing') {
+        pill.hidden = false;
+        pill.classList.remove('ready');
+        pill.textContent = `正在重启安装 ${version}…`;
+      }
       else if (status === 'error') {
         pill.hidden = false;
         pill.classList.remove('ready');
@@ -26,7 +32,15 @@
         pill.title = message || '稍后将自动重试';
       }
     });
-    pill.addEventListener('click', () => { if (updState === 'downloaded') desktop.installUpdate(); });
+    pill.addEventListener('click', () => {
+      if (updState !== 'downloaded') return;
+      // 先在本地锁住按钮；主进程随后会回推 installing 状态并优雅关闭后端。
+      updState = 'installing';
+      pill.disabled = true;
+      pill.classList.remove('ready');
+      pill.textContent = `正在重启安装…`;
+      desktop.installUpdate();
+    });
     return Object.freeze({
       get status() { return updState; }
     });
