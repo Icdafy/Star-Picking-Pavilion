@@ -227,6 +227,25 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     dshEngine: 'plugin-1.1.0',
     themeColor: '#ffffff'
   });
+  const lightChrome = await page.evaluate(() => {
+    const titlebar = document.querySelector('.desktop-titlebar-liquid-glass');
+    const titlebarStyle = getComputedStyle(titlebar);
+    const rootStyle = getComputedStyle(document.documentElement);
+    return {
+      titlebarHeight: titlebar.getBoundingClientRect().height,
+      titlebarBackdrop: titlebarStyle.backdropFilter,
+      titlebarBackground: titlebarStyle.backgroundImage,
+      titlebarPointerEvents: titlebarStyle.pointerEvents,
+      scrollbarThumb: rootStyle.getPropertyValue('--scrollbar-thumb').trim(),
+      scrollbarTrack: rootStyle.getPropertyValue('--scrollbar-track').trim()
+    };
+  });
+  assert.ok(lightChrome.titlebarHeight >= 28);
+  assert.match(lightChrome.titlebarBackdrop, /blur\(18px\).*saturate\(1\.75\)/);
+  assert.notEqual(lightChrome.titlebarBackground, 'none');
+  assert.equal(lightChrome.titlebarPointerEvents, 'none');
+  assert.match(lightChrome.scrollbarThumb, /13\s*,\s*148\s*,\s*136/);
+  assert.notEqual(lightChrome.scrollbarTrack, 'transparent');
 
   // 配色预设必须随主题换一整套，而不是深浅主题共用一组发灰的颜色；
   // 点击预设同时更新色相、明暗、滑杆和选中态。
@@ -246,6 +265,11 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   });
   await page.locator('#btnTheme').click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  assert.match(
+    await page.evaluate(() => getComputedStyle(document.documentElement)
+      .getPropertyValue('--scrollbar-thumb').trim()),
+    /94\s*,\s*234\s*,\s*212/
+  );
   await page.locator('#aquaPalettePresets [data-aqua-palette="deep-violet"]').click();
   assert.deepEqual(await page.evaluate(() => ({
     theme: document.querySelector('#aquaPalettePresets')?.dataset.paletteTheme,

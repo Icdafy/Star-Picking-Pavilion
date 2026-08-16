@@ -1,8 +1,9 @@
 {
   "name": "star-picking-pavilion",
   "productName": "摘星阁",
-  "version": "0.1.4",
-  "shortVersionWindows": "0.1.2",
+  "version": "0.1.3",
+  "shortVersionWindows": "0.1.3",
+  "legacyUpdaterBridgeVersion": "0.1.5",
   "description": "摘星阁（Star-Picking-Pavilion）· 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
   "author": "摘星阁",
   "license": "MIT",
@@ -27,7 +28,7 @@
     "notices": "node scripts/generate-third-party-notices.js",
     "audit:runtime": "npm audit --omit=dev --audit-level=high",
     "audit:sources": "node scripts/audit-sources.js",
-    "dist": "electron-builder --win --publish never"
+    "dist": "electron-builder --win --publish never && node scripts/prepare-update-metadata.js"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
@@ -48,7 +49,7 @@
     "undici": "^8.9.0"
   },
   "build": {
-    "buildVersion": "0.1.2",
+    "buildVersion": "0.1.3",
     "appId": "com.icdafy.star-picking-pavilion",
     "productName": "摘星阁",
     "executableName": "Star-Picking-Pavilion",

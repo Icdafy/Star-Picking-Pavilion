@@ -9,13 +9,14 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('package and lockfile versions stay synchronized for v0.1.2', () => {
+test('package, installer and lockfile versions stay synchronized for v0.1.3', () => {
   const packageJson = JSON.parse(read('package.json'));
   const packageLock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(packageJson.version, '0.1.4');
-  assert.equal(packageJson.shortVersionWindows, '0.1.2');
-  assert.equal(packageJson.build.buildVersion, '0.1.2');
+  assert.equal(packageJson.version, '0.1.3');
+  assert.equal(packageJson.shortVersionWindows, '0.1.3');
+  assert.equal(packageJson.build.buildVersion, '0.1.3');
+  assert.equal(packageJson.legacyUpdaterBridgeVersion, '0.1.5');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
 });
@@ -33,9 +34,10 @@ test('public release documentation and compliance artifacts are complete', () =>
   ]) assert.equal(fs.existsSync(path.join(root, file)), true, `missing ${file}`);
 
   assert.match(read('LICENSE'), /MIT License[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
-  assert.equal(require('../package.json').version, '0.1.4');
-  assert.equal(require('../package.json').shortVersionWindows, '0.1.2');
-  assert.equal(require('../package.json').build.buildVersion, '0.1.2');
+  assert.equal(require('../package.json').version, '0.1.3');
+  assert.equal(require('../package.json').shortVersionWindows, '0.1.3');
+  assert.equal(require('../package.json').build.buildVersion, '0.1.3');
+  assert.match(read('CHANGELOG.md'), /\[0\.1\.3\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.2\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.1\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.0\.2\].*2026-08-16/);
@@ -62,13 +64,13 @@ test('public release documentation and compliance artifacts are complete', () =>
   assert.match(read('CHANGELOG.md'), /\[0\.0\.2\].*2026-07-23/);
   assert.match(read('CHANGELOG.md'), /\[0\.0\.1\].*2026-07-21/);
   assert.match(read('SECURITY.md'), /Security Advisories/);
-  // 按文档出现顺序断言 v0.1.2 的主线：更新体验、滚动条与版本信息。
+  // 按文档出现顺序断言 v0.1.3 的主线：版本统一、安装、标题栏与滚动条。
   assert.match(
     read('RELEASE_NOTES.md'),
-    /v0\.1\.2[\s\S]*自动更新修复[\s\S]*滚动条视觉统一[\s\S]*版本与验证/
+    /v0\.1\.3[\s\S]*版本统一与自动更新[\s\S]*安装可靠性[\s\S]*液态标题栏与滚动条[\s\S]*版本与验证/
   );
   assert.match(read('THIRD_PARTY_NOTICES.txt'), /cheerio@1\.2\.0/);
-  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.1\.2/);
+  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.1\.3/);
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
@@ -84,7 +86,7 @@ test('README documents installation, privacy, recovery and security truthfully',
   const readme = read('README.md');
   for (const required of [
     /Windows 10\/11.*x64/,
-    /Star-Picking-Pavilion-Setup-0\.1\.2\.exe/,
+    /Star-Picking-Pavilion-Setup-0\.1\.3\.exe/,
     /SmartScreen/,
     /Get-FileHash/,
     /云幄\s*·\s*常用网址/,
@@ -122,19 +124,19 @@ test('version verifier matches package, tag, installer and latest metadata', asy
   const { verifyVersion } = require('../scripts/verify-version');
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-version-'));
   t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.1.4\n');
-  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.1.2.exe'), 'fixture');
+  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.1.5\n');
+  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.1.3.exe'), 'fixture');
 
   assert.deepEqual(verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.1.2',
+    tag: 'v0.1.3',
     distDir: directory,
     requireArtifacts: true
   }), {
-    version: '0.1.4',
-    releaseVersion: '0.1.2',
-    tag: 'v0.1.2',
-    installer: 'Star-Picking-Pavilion-Setup-0.1.2.exe'
+    version: '0.1.3',
+    releaseVersion: '0.1.3',
+    tag: 'v0.1.3',
+    installer: 'Star-Picking-Pavilion-Setup-0.1.3.exe'
   });
   assert.throws(() => verifyVersion({
     packageJson: require('../package.json'),
@@ -146,9 +148,26 @@ test('version verifier matches package, tag, installer and latest metadata', asy
       ...require('../package.json'),
       shortVersionWindows: '0.1.4'
     },
-    tag: 'v0.1.2',
+    tag: 'v0.1.3',
     distDir: directory
   }), /Windows product version.*public release/i);
+});
+
+test('one-time metadata bridge upgrades legacy internal 0.1.4 without changing app identity', () => {
+  const { prepareUpdateMetadata } = require('../scripts/prepare-update-metadata');
+  const packageJson = require('../package.json');
+  const result = prepareUpdateMetadata({
+    packageJson,
+    latestContent: 'version: 0.1.3\npath: Star-Picking-Pavilion-Setup-0.1.3.exe\n'
+  });
+  assert.equal(result.version, '0.1.5');
+  assert.equal(result.bridged, true);
+  assert.match(result.content, /^version: 0\.1\.5$/m);
+  assert.match(result.content, /Setup-0\.1\.3\.exe/);
+  assert.throws(() => prepareUpdateMetadata({
+    packageJson,
+    latestContent: 'version: 0.1.4\n'
+  }), /expected package 0\.1\.3/);
 });
 
 test('CI and tag release workflows enforce every gate before publishing', () => {
@@ -208,6 +227,7 @@ test('package exposes reproducible release maintenance commands', () => {
   assert.equal(pkg.scripts['audit:sources'], 'node scripts/audit-sources.js');
   assert.equal(pkg.scripts['verify:version'], 'node scripts/verify-version.js');
   assert.equal(pkg.scripts.notices, 'node scripts/generate-third-party-notices.js');
+  assert.match(pkg.scripts.dist, /prepare-update-metadata\.js/);
   assert.equal(pkg.devDependencies['@cyclonedx/cyclonedx-npm'], '^6.0.0');
   assert.equal(Object.hasOwn(pkg.scripts, 'release'), false);
 });

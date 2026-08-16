@@ -48,10 +48,14 @@ test('desktop window and every renderer path reserve a draggable overlay title b
     assert.match(css, /env\(titlebar-area-height,\s*32px\)/);
     assert.match(css, /#desktop-titlebar-drag-region\s*\{/);
     assert.match(css, /-webkit-app-region:\s*drag/);
+    assert.match(css, /\.desktop-titlebar-liquid-glass\s*\{/);
+    assert.match(css, /backdrop-filter:\s*blur\(18px\) saturate\(17[05]%\)/);
   }
   for (const html of [index, startupFailure]) {
     assert.match(html, /id="desktop-titlebar-drag-region"/);
+    assert.match(html, /class="desktop-titlebar-liquid-glass"/);
   }
+  assert.match(aqua, /\.desktop-titlebar-liquid-glass::before[\s\S]*animation:\s*blob-drift/);
 });
 
 test('standalone Aqua engine retains the exact DSH 1.1.0 fluid and whale contracts', () => {

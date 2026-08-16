@@ -18,6 +18,10 @@ function readLatestVersion(file) {
   return match[1];
 }
 
+function expectedUpdaterVersion(packageJson) {
+  return String(packageJson?.legacyUpdaterBridgeVersion || packageJson?.version || '');
+}
+
 function verifyVersion({
   packageJson,
   tag,
@@ -36,6 +40,15 @@ function verifyVersion({
       + `does not match public release ${releaseVersion}`
     );
   }
+  if (version !== releaseVersion) {
+    throw new Error(
+      `package version ${version} does not match public release ${releaseVersion}`
+    );
+  }
+  const updaterVersion = expectedUpdaterVersion(packageJson);
+  if (!/^\d+\.\d+\.\d+$/.test(updaterVersion)) {
+    throw new Error(`invalid updater metadata version: ${updaterVersion}`);
+  }
   const expectedTag = `v${releaseVersion}`;
   if (tag !== expectedTag) {
     throw new Error(`tag ${tag || '(missing)'} does not match public release ${releaseVersion}`);
@@ -49,8 +62,10 @@ function verifyVersion({
     if (!fs.existsSync(installerPath)) throw new Error(`missing installer for package version: ${installerPath}`);
     if (!fs.existsSync(latestPath)) throw new Error(`missing latest.yml: ${latestPath}`);
     const latestVersion = readLatestVersion(latestPath);
-    if (latestVersion !== version) {
-      throw new Error(`latest.yml ${latestVersion} does not match package ${version}`);
+    if (latestVersion !== updaterVersion) {
+      throw new Error(
+        `latest.yml ${latestVersion} does not match expected updater metadata ${updaterVersion}`
+      );
     }
   }
 
@@ -79,4 +94,9 @@ if (require.main === module) {
   }
 }
 
-module.exports = { expectedInstallerName, readLatestVersion, verifyVersion };
+module.exports = {
+  expectedInstallerName,
+  expectedUpdaterVersion,
+  readLatestVersion,
+  verifyVersion
+};

@@ -41,6 +41,7 @@ const {
   registerAppearanceWallpaperIpc
 } = require('./appearance-wallpaper');
 const {
+  createPublicUpdateSupport,
   createUpdateInstallCoordinator,
   publicVersionFromPackage,
   publicVersionFromUpdateInfo
@@ -401,6 +402,14 @@ function setupAutoUpdate() {
     || process.env.STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE === '1') return;
   autoUpdateInitialized = true;
   autoUpdater.autoDownload = true;
+  // A downloaded update is installed only after an explicit click. This prevents a
+  // failed launch from appearing to succeed later merely because the user exited.
+  autoUpdater.autoInstallOnAppQuit = false;
+  const defaultUpdateSupport = autoUpdater.isUpdateSupported.bind(autoUpdater);
+  autoUpdater.isUpdateSupported = createPublicUpdateSupport({
+    currentVersion: publicAppVersion,
+    fallback: defaultUpdateSupport
+  });
   updateInstallCoordinator = createUpdateInstallCoordinator({
     autoUpdater,
     shutdown: shutdownDesktop,
@@ -414,7 +423,10 @@ function setupAutoUpdate() {
   autoUpdater.on('update-downloaded', i => sendUpdateStatus('downloaded', {
     version: publicVersionFromUpdateInfo(i)
   }));
-  autoUpdater.on('error', error => sendUpdateStatus('error', { message: String(error?.message || error) }));
+  autoUpdater.on('error', error => {
+    if (updateInstallCoordinator?.reportFailure(error)) return;
+    sendUpdateStatus('error', { message: String(error?.message || error) });
+  });
   autoUpdater.checkForUpdatesAndNotify().catch(error => sendUpdateStatus('error', {
     message: String(error?.message || error)
   }));
