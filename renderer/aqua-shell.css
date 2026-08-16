@@ -560,6 +560,54 @@ main { order: 5; width: 100%; }
 .appearance-label output { color: var(--accent-ink); font-variant-numeric: tabular-nums; }
 .appearance-control small { color: var(--c-fg-faint); font-size: var(--t-xs); line-height: 1.65; }
 
+.fluid-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .55rem;
+}
+.fluid-palette-option {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .52rem .62rem;
+  border: 1px solid var(--glass-border);
+  border-radius: .78rem;
+  color: var(--c-fg-dim);
+  background: var(--input-bg);
+  cursor: pointer;
+  font: 600 var(--t-sm)/1.35 var(--font-ui);
+  text-align: left;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light),
+              box-shadow var(--dur) var(--ease);
+}
+.fluid-palette-option:hover {
+  color: var(--c-fg);
+  border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+}
+.fluid-palette-option[aria-pressed="true"] {
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent-ring), inset 0 1px 0 rgb(255 255 255 / 16%);
+}
+.fluid-palette-swatch {
+  width: 2.1rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  background: var(--palette-swatch);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%), 0 .2rem .65rem rgb(0 0 0 / 14%);
+}
+.fluid-palette-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .appearance-segments {
   display: flex;
   align-items: center;
@@ -628,6 +676,10 @@ main { order: 5; width: 100%; }
 
 /* ---------- 真正的宽屏 Aqua 指挥舱 ---------- */
 @media (min-width: 70rem) {
+  :root {
+    --sticky-top: calc(var(--desktop-titlebar-height) + var(--sp-4));
+  }
+
   .app-stage {
     display: grid;
     grid-template-columns: var(--aqua-rail-width) minmax(0, 1fr);
@@ -637,7 +689,7 @@ main { order: 5; width: 100%; }
   .command-rail {
     grid-column: 1;
     position: sticky;
-    top: var(--sp-4);
+    top: var(--sticky-top);
     z-index: 70;
     height: calc(100vh - var(--desktop-titlebar-height) - 2 * var(--sp-4));
     min-height: min(32rem, calc(100vh - var(--desktop-titlebar-height) - 2 * var(--sp-4)));
@@ -769,7 +821,7 @@ main { order: 5; width: 100%; }
 
   .tower {
     position: sticky;
-    top: var(--sp-4);
+    top: var(--sticky-top);
     z-index: 48;
     width: 100%;
     max-width: var(--shell);
@@ -844,10 +896,15 @@ main { order: 5; width: 100%; }
   .feed-hero > div:first-child > p:last-child { font-size: var(--t-sm); }
   .appearance-controls { grid-template-columns: 1fr; }
   .appearance-control-wide { grid-column: auto; }
+  .fluid-palette-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .appearance-heading { align-items: stretch; flex-direction: column; }
   .appearance-heading .btn-ghost { align-self: flex-start; }
   .appearance-preview { min-height: 8rem; }
   .appearance-preview-card { width: 88%; padding: var(--sp-3) var(--sp-4); }
+}
+
+@media (max-width: 32rem) {
+  .fluid-palette-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -309,11 +309,17 @@
       if (time != null) group.setAttribute('data-group-time', String(time));
       const head = doc.createElement('div');
       head.setAttribute('class', 'date-head');
-      head.appendChild(doc.createTextNode(label));
+      const glass = doc.createElement('span');
+      glass.setAttribute('class', 'date-head-glass');
+      const labelNode = doc.createElement('span');
+      labelNode.setAttribute('class', 'dh-label');
+      labelNode.textContent = label;
+      glass.appendChild(labelNode);
       const counter = doc.createElement('span');
       counter.setAttribute('class', 'dh-count');
       counter.textContent = `${count} 条`;
-      head.appendChild(counter);
+      glass.appendChild(counter);
+      head.appendChild(glass);
       group.appendChild(head);
       return group;
     }
@@ -476,11 +482,8 @@
     function labelOfGroup(groupEl) {
       const head = groupEl.querySelector('.date-head');
       if (!head) return null;
-      let label = '';
-      for (const node of Array.from(head.childNodes)) {
-        if (node.nodeType === 3) label += node.nodeValue;
-      }
-      return label.trim();
+      const label = head.querySelector('.dh-label');
+      return label ? label.textContent.trim() : null;
     }
 
     function syncGroupCount(groupEl) {

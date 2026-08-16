@@ -492,6 +492,10 @@ test('Aqua 外观实验室完整接入恢复、控件、最小持久化与本机
   assert.doesNotMatch(html, /id="setAquaWallpaper"[^>]*\bhidden\b/, '壁纸文件控件必须可由键盘聚焦');
   assert.match(html, /id="btnAquaWallpaperClear"[^>]*type="button"/);
   assert.match(html, /id="btnAquaReset"[^>]*type="button"/);
+  assert.match(html, /id="aquaPalettePresets"[^>]*role="group"[^>]*aria-label="当前主题的流体配色预设"/);
+  assert.match(aquaShellSource, /const FLUID_PALETTES = Object\.freeze\(\{[\s\S]*?light:[\s\S]*?dark:/);
+  assert.match(aquaShellSource, /palettePresets\.replaceChildren\(fragment\)/);
+  assert.match(aquaShellSource, /listen\(palettePresets, 'click',[\s\S]*?update\('aquaHue', hue\);[\s\S]*?update\('aquaBrightness', brightness\);[\s\S]*?flushPersist\(\)/);
 
   for (const field of Object.keys(AQUA_DEFAULTS)) {
     assert.match(app, new RegExp(`${field}: restoredPreferences\\.${field}`));
@@ -683,9 +687,12 @@ test('sticky 日期分组头在 .card 之外，不受卡片 content-visibility �
   assert.match(dateHeadRule[0], /position:\s*sticky/);
   assert.doesNotMatch(dateHeadRule[0], /content-visibility/);
   assert.doesNotMatch(css, /\.date-group\s*\{[^}]*content-visibility/s);
+  assert.match(css, /\.date-head-glass\s*\{[^}]*background:\s*var\(--glass-bg-soft\);[^}]*backdrop-filter:/s);
+  assert.match(css, /--sticky-top:\s*calc\(var\(--desktop-titlebar-height, 32px\)/);
   // 分组外壳在 feed-card.js 里生成：date-group > date-head，卡片另行挂载
   assert.match(feedCardSource, /group\.setAttribute\('class', 'date-group'\)/);
   assert.match(feedCardSource, /head\.setAttribute\('class', 'date-head'\)/);
+  assert.match(feedCardSource, /glass\.setAttribute\('class', 'date-head-glass'\)/);
 });
 
 test('信源移除操作明确说明为保留记录的软停用', () => {

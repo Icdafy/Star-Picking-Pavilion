@@ -227,7 +227,94 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     dshEngine: 'plugin-1.1.0',
     themeColor: '#ffffff'
   });
+
+  // 配色预设必须随主题换一整套，而不是深浅主题共用一组发灰的颜色；
+  // 点击预设同时更新色相、明暗、滑杆和选中态。
+  await page.locator('.tab[data-view="settings"]').click();
+  await page.locator('#aquaPalettePresets [data-aqua-palette="rain-jade"]').click();
+  assert.deepEqual(await page.evaluate(() => ({
+    theme: document.querySelector('#aquaPalettePresets')?.dataset.paletteTheme,
+    count: document.querySelectorAll('#aquaPalettePresets [data-aqua-palette]').length,
+    hue: document.querySelector('#setAquaHue')?.value,
+    brightness: document.querySelector('#setAquaBrightness')?.value,
+    selected: document.querySelector('#aquaPalettePresets [aria-pressed="true"]')?.dataset.aquaPalette,
+    fluidHue: document.documentElement.style.getPropertyValue('--dsh-aqua-fluid-hue'),
+    white: document.documentElement.style.getPropertyValue('--dsh-aqua-brightness-white')
+  })), {
+    theme: 'light', count: 6, hue: '132', brightness: '62', selected: 'rain-jade',
+    fluidHue: '132deg', white: '0.240'
+  });
+  await page.locator('#btnTheme').click();
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.locator('#aquaPalettePresets [data-aqua-palette="deep-violet"]').click();
+  assert.deepEqual(await page.evaluate(() => ({
+    theme: document.querySelector('#aquaPalettePresets')?.dataset.paletteTheme,
+    count: document.querySelectorAll('#aquaPalettePresets [data-aqua-palette]').length,
+    hue: document.querySelector('#setAquaHue')?.value,
+    brightness: document.querySelector('#setAquaBrightness')?.value,
+    selected: document.querySelector('#aquaPalettePresets [aria-pressed="true"]')?.dataset.aquaPalette,
+    fluidHue: document.documentElement.style.getPropertyValue('--dsh-aqua-fluid-hue'),
+    black: document.documentElement.style.getPropertyValue('--dsh-aqua-brightness-black')
+  })), {
+    theme: 'dark', count: 6, hue: '260', brightness: '38', selected: 'deep-violet',
+    fluidHue: '260deg', black: '0.240'
+  });
+
+  // 复现用户截图的长列表滚动状态：塔台不得钻入原生标题栏，日期标题应在
+  // 塔台之后吸附，并且日期内容只是紧凑的液态玻璃胶囊而非整条实色块。
+  await page.locator('.tab[data-view="featured"]').click();
+  await page.evaluate(() => {
+    const list = document.querySelector('#feedList');
+    const group = document.createElement('div');
+    group.className = 'date-group';
+    const head = document.createElement('div');
+    head.className = 'date-head';
+    head.innerHTML = '<span class="date-head-glass"><span class="dh-label">今天</span><span class="dh-count">12 条</span></span>';
+    const runway = document.createElement('div');
+    runway.style.height = '2200px';
+    group.append(head, runway);
+    list.replaceChildren(group);
+    document.documentElement.style.scrollBehavior = 'auto';
+    window.scrollTo(0, group.offsetTop + 180);
+  });
+  await page.waitForTimeout(80);
+  const overlap = await page.evaluate(() => {
+    const tower = document.querySelector('.tower');
+    const head = document.querySelector('.date-head');
+    const glass = document.querySelector('.date-head-glass');
+    const towerRect = tower.getBoundingClientRect();
+    const headRect = head.getBoundingClientRect();
+    const glassRect = glass.getBoundingClientRect();
+    const glassStyle = getComputedStyle(glass);
+    return {
+      titlebarHeight: Number.parseFloat(getComputedStyle(document.body).paddingTop),
+      towerTop: towerRect.top,
+      towerBottom: towerRect.bottom,
+      headTop: headRect.top,
+      headWidth: headRect.width,
+      glassWidth: glassRect.width,
+      glassBackground: glassStyle.backgroundImage,
+      glassBackdrop: glassStyle.backdropFilter,
+      glassRadius: Number.parseFloat(glassStyle.borderTopLeftRadius)
+    };
+  });
+  assert.ok(overlap.towerTop >= overlap.titlebarHeight + 8, `塔台侵入标题栏：${JSON.stringify(overlap)}`);
+  assert.ok(overlap.headTop >= overlap.towerBottom + 4, `日期标题侵入塔台：${JSON.stringify(overlap)}`);
+  assert.ok(overlap.glassWidth < overlap.headWidth * .4, `日期标题仍是整条色块：${JSON.stringify(overlap)}`);
+  assert.notEqual(overlap.glassBackground, 'none');
+  assert.match(overlap.glassBackdrop, /blur\(/);
+  assert.ok(overlap.glassRadius >= 20);
   if (screenshotDir) {
+    await page.screenshot({
+      path: path.join(screenshotDir, '1440x920-md-date-scroll-dark.png'),
+      fullPage: false
+    });
+    await page.locator('#btnTheme').click();
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+    await page.screenshot({
+      path: path.join(screenshotDir, '1440x920-md-date-scroll-light.png'),
+      fullPage: false
+    });
     await page.screenshot({
       path: path.join(screenshotDir, '1440x920-md-featured-light.png'),
       fullPage: true

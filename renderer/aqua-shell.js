@@ -31,6 +31,24 @@
     aquaCritters: true
   });
   const FIELDS = Object.freeze(Object.keys(DEFAULTS));
+  const FLUID_PALETTES = Object.freeze({
+    light: Object.freeze([
+      Object.freeze({ id: 'clear-sky', name: '晴空蓝', hue: 316, brightness: 50, swatch: 'linear-gradient(125deg, #bdeaff, #8aa9ff 52%, #f3c8ff)' }),
+      Object.freeze({ id: 'rain-jade', name: '雨后青', hue: 132, brightness: 62, swatch: 'linear-gradient(125deg, #c9fff0, #72d6c1 52%, #bde8ff)' }),
+      Object.freeze({ id: 'dawn-violet', name: '晨曦紫', hue: 260, brightness: 60, swatch: 'linear-gradient(125deg, #edd7ff, #b79aff 52%, #ffd1e5)' }),
+      Object.freeze({ id: 'coral-haze', name: '珊瑚霞', hue: 12, brightness: 64, swatch: 'linear-gradient(125deg, #ffe0d0, #ff9e9d 52%, #f7c6ec)' }),
+      Object.freeze({ id: 'sunlit-gold', name: '日光金', hue: 48, brightness: 66, swatch: 'linear-gradient(125deg, #fff2bd, #f4c66f 52%, #ffd9b8)' }),
+      Object.freeze({ id: 'glacier-blue', name: '冰川蓝', hue: 198, brightness: 60, swatch: 'linear-gradient(125deg, #d8f7ff, #79cdeb 52%, #b9d7ff)' })
+    ]),
+    dark: Object.freeze([
+      Object.freeze({ id: 'star-ocean', name: '星海蓝', hue: 316, brightness: 50, swatch: 'linear-gradient(125deg, #14385f, #3158a2 52%, #503a85)' }),
+      Object.freeze({ id: 'ink-jade', name: '墨玉青', hue: 126, brightness: 40, swatch: 'linear-gradient(125deg, #071d1b, #0d5549 52%, #173c50)' }),
+      Object.freeze({ id: 'deep-violet', name: '深空紫', hue: 260, brightness: 38, swatch: 'linear-gradient(125deg, #140d2d, #38226f 52%, #511f58)' }),
+      Object.freeze({ id: 'ember-red', name: '熔星红', hue: 12, brightness: 40, swatch: 'linear-gradient(125deg, #281015, #6b2029 52%, #51223f)' }),
+      Object.freeze({ id: 'amber-night', name: '琥珀夜', hue: 48, brightness: 42, swatch: 'linear-gradient(125deg, #241b08, #67501b 52%, #4b2f20)' }),
+      Object.freeze({ id: 'polar-night', name: '极夜冰蓝', hue: 198, brightness: 44, swatch: 'linear-gradient(125deg, #071723, #174b68 52%, #203a6b)' })
+    ])
+  });
 
   function clampNumber(value, min, max, fallback) {
     if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -670,6 +688,7 @@
     const wallpaper = byId('aquaWallpaperImage');
     const wallpaperStatus = byId('aquaWallpaperStatus');
     const wallpaperControls = byId('aquaWallpaperControls');
+    const palettePresets = byId('aquaPalettePresets');
     const wallpaperOnly = [...doc.querySelectorAll('.wallpaper-only')];
     const legacyWallpaper = readStorage(storage, WALLPAPER_KEY);
     let wallpaperData = wallpaperStore
@@ -723,6 +742,40 @@
       root.style.setProperty('--dsh-aqua-brightness-white', white.toFixed(3));
     }
 
+    function syncPalettePresets() {
+      if (!palettePresets) return;
+      const theme = currentThemeIsDark() ? 'dark' : 'light';
+      if (palettePresets.dataset.paletteTheme !== theme) {
+        const fragment = doc.createDocumentFragment();
+        for (const preset of FLUID_PALETTES[theme]) {
+          const button = doc.createElement('button');
+          button.type = 'button';
+          button.className = 'fluid-palette-option';
+          button.dataset.aquaPalette = preset.id;
+          button.dataset.aquaHue = String(preset.hue);
+          button.dataset.aquaBrightness = String(preset.brightness);
+          button.setAttribute('aria-pressed', 'false');
+          button.setAttribute('title', `${preset.name} · 色相 ${preset.hue}° · 明暗 ${preset.brightness}%`);
+          const swatch = doc.createElement('span');
+          swatch.className = 'fluid-palette-swatch';
+          swatch.setAttribute('aria-hidden', 'true');
+          swatch.style.setProperty('--palette-swatch', preset.swatch);
+          const name = doc.createElement('span');
+          name.className = 'fluid-palette-name';
+          name.textContent = preset.name;
+          button.append(swatch, name);
+          fragment.appendChild(button);
+        }
+        palettePresets.replaceChildren(fragment);
+        palettePresets.dataset.paletteTheme = theme;
+      }
+      for (const button of palettePresets.querySelectorAll('[data-aqua-palette]')) {
+        const active = Number(button.dataset.aquaHue) === state.aquaHue
+          && Number(button.dataset.aquaBrightness) === state.aquaBrightness;
+        button.setAttribute('aria-pressed', String(active));
+      }
+    }
+
     function syncControls() {
       for (const button of doc.querySelectorAll('[data-aqua-mode]')) {
         button.setAttribute('aria-pressed', String(button.dataset.aquaMode === state.aquaMode));
@@ -755,6 +808,7 @@
       const showWallpaper = state.aquaBackground === 'wallpaper';
       if (wallpaperControls) wallpaperControls.hidden = !showWallpaper;
       wallpaperOnly.forEach(node => { node.hidden = !showWallpaper; });
+      syncPalettePresets();
     }
 
     function apply() {
@@ -861,6 +915,15 @@
         { immediate: true }
       ));
     }
+    listen(palettePresets, 'click', event => {
+      const button = event.target.closest('[data-aqua-palette]');
+      if (!button || !palettePresets.contains(button)) return;
+      const hue = Number(button.dataset.aquaHue);
+      const brightness = Number(button.dataset.aquaBrightness);
+      update('aquaHue', hue);
+      update('aquaBrightness', brightness);
+      flushPersist();
+    });
 
     const ranges = [
       ['setAquaBlur', 'aquaBlur'],
@@ -1044,6 +1107,7 @@
   return Object.freeze({
     DEFAULTS,
     FIELDS,
+    FLUID_PALETTES,
     WALLPAPER_KEY,
     normalizeSettings,
     createFluidBackdrop,

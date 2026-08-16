@@ -129,7 +129,9 @@
   /* —— 布局（rem：栏宽随字号走，行长与字号的比例才是恒定的）—— */
   --shell: 85rem;
   --gutter: 1rem;
-  --sticky-top: .625rem;
+  /* Electron 的隐藏标题栏覆盖在页面最上方；所有 sticky 壳层必须从它的
+     安全区之后开始，否则向下滚动时会钻进窗口按钮/拖拽区。 */
+  --sticky-top: calc(var(--desktop-titlebar-height, 32px) + .625rem);
   --nav-h: 3.75rem;                                /* 由脚本按实际高度回写（px） */
   --stack-top: calc(var(--sticky-top) + var(--nav-h) + var(--sp-2));
 
@@ -1124,18 +1126,47 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* —— 日期分组 + 时间轴 —— */
 .date-group { margin-bottom: var(--sp-2); }
 .date-head {
-  font-family: var(--font-display); font-size: var(--t-xl); font-weight: 800; letter-spacing: .06em;
-  color: var(--c-fg); padding: var(--sp-3) var(--sp-2) .625rem;
-  margin: 0 calc(var(--sp-2) * -1);
+  color: var(--c-fg); padding: .45rem 0 .6rem;
+  margin: 0;
   display: flex; align-items: center; gap: var(--sp-3);
   position: sticky; top: var(--stack-top); z-index: 10;
-  /* 透明的 sticky 标题会与下方滚动的卡片叠字，用同色薄纱遮住 */
-  background: var(--sticky-veil);
-  backdrop-filter: var(--veil-blur);
-  -webkit-backdrop-filter: var(--veil-blur);
+  /* 日期本身用紧凑玻璃胶囊承载，不再以整条近实色遮罩横切流体背景。 */
+  background: transparent;
 }
 .date-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--rail-line), transparent); }
+.date-head-glass {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: .42rem .9rem;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-bg-soft);
+  backdrop-filter: var(--veil-blur) saturate(145%);
+  -webkit-backdrop-filter: var(--veil-blur) saturate(145%);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 18%);
+}
+.date-head-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(112deg, rgb(255 255 255 / 16%), transparent 38%, rgb(94 234 212 / 5%));
+}
+.dh-label {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 800;
+  letter-spacing: .06em;
+}
 .date-head .dh-count {
+  position: relative; z-index: 1;
   font-family: var(--font-ui); font-size: var(--t-sm); color: var(--c-fg-faint);
   letter-spacing: .08em; font-weight: 400;
 }
