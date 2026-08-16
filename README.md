@@ -7,12 +7,12 @@
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.2.exe`，双击并按向导安装。v0.1.2 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.1.3.exe`，双击并按向导安装。v0.1.3 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.2.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.1.3.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -47,6 +47,8 @@ v0.1.0.2 修复长信息流滚动时塔台进入原生标题栏安全区的问�
 v0.1.1 修正流体预设把目标色相误当作相对旋转量的问题：星海蓝、墨玉青、深空紫、熔星红等名称、预览色块与实际背景现已一致，浅色主题与其余夜航预设同步校准。界面偏好升级为 v2，旧版命名预设自动迁到正确颜色，自定义色相换算后尽量保持原有视觉结果。
 
 v0.1.2 修复自动更新把内部比较号 `0.1.3` 显示给用户、安装器与仍在退出的应用争用文件而短暂报错的问题：更新提示现在始终显示公开版本，点击安装会先优雅关闭本地服务再启动 NSIS。窗口最右侧滚动条同时改为主题感知的细圆角样式，与深空夜航和宣纸白界面同步。
+
+v0.1.3 将 npm/Electron、安装器、Windows 文件属性、tag、Release 和安装包名全部统一为公开版本 `0.1.3`，并用一次性更新桥兼容已安装成内部 `0.1.4` 的 v0.1.2。安装只在明确点击后以静默 NSIS 执行，不再在失败后借普通退出悄悄完成。窗口顶部新增会折射流体背景的全宽液态玻璃层，最右侧与内嵌滚动条也直接使用 Aqua 深浅主题强调色。
 
 ## 主要功能
 
@@ -241,7 +243,7 @@ npm run pipeline            # 手动采集、分析、聚类
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.1.2 --artifacts
+npm run verify:version -- --tag v0.1.3 --artifacts
 npm run notices
 ```
 

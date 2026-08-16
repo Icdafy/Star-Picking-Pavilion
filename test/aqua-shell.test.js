@@ -67,10 +67,11 @@ test('命名预设以目标色相驱动 DSH 基础蓝色，不把目标值误作
 });
 
 test('窗口与内嵌区域的滚动条跟随 Aqua 深浅主题', () => {
-  assert.match(styles, /\[data-theme="dark"\][\s\S]*--scrollbar-thumb:\s*rgba\(125,138,176,\.38\)/);
-  assert.match(styles, /\[data-theme="light"\][\s\S]*--scrollbar-thumb:\s*rgba\(81,92,116,\.3\)/);
-  assert.match(styles, /html\s*\{\s*scrollbar-color:\s*var\(--scrollbar-thumb\) transparent;/);
+  assert.match(styles, /\[data-theme="dark"\][\s\S]*--scrollbar-thumb:\s*rgba\(94,234,212,\.34\)/);
+  assert.match(styles, /\[data-theme="light"\][\s\S]*--scrollbar-thumb:\s*rgba\(13,148,136,\.3\)/);
+  assert.match(styles, /html\s*\{\s*scrollbar-color:\s*var\(--scrollbar-thumb\) var\(--scrollbar-track\);/);
   assert.match(styles, /::-webkit-scrollbar\s*\{\s*width:\s*8px;\s*height:\s*8px;/);
+  assert.match(styles, /::-webkit-scrollbar-track\s*\{\s*background:\s*var\(--scrollbar-track\)/);
   assert.match(styles, /::-webkit-scrollbar-thumb[\s\S]*border-radius:\s*999px;[\s\S]*background:\s*var\(--scrollbar-thumb\)/);
   assert.match(styles, /::-webkit-scrollbar-thumb:hover\s*\{\s*background:\s*var\(--scrollbar-thumb-hover\)/);
 });

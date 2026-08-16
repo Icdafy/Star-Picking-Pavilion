@@ -8,6 +8,20 @@ body {
   color: #eaf0fd;
   background: radial-gradient(circle at 50% 15%, #18254a, #04060e 60%);
 }
+
+.desktop-titlebar-liquid-glass {
+  position: fixed;
+  inset: env(titlebar-area-y, 0px) 0 auto;
+  z-index: 49;
+  height: var(--desktop-titlebar-height);
+  pointer-events: none;
+  border-bottom: 1px solid rgba(94, 234, 212, .28);
+  background:
+    linear-gradient(110deg, rgba(94, 234, 212, .18), rgba(139, 156, 249, .13) 56%, transparent),
+    rgba(4, 6, 14, .34);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .12), 0 8px 24px -18px #5eead4;
+}
 main { width: min(560px, calc(100% - 48px)); padding: 40px; border: 1px solid #52658d; border-radius: 18px; background: #0b1226; }
 .eyebrow { color: #5eead4; letter-spacing: .18em; font-size: 12px; }
 h1 { margin: 10px 0 14px; }
