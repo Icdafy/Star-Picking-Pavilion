@@ -20,7 +20,7 @@ const defaultAquaPreferences = Object.freeze({
   aquaMode: 'mica',
   aquaBlur: 2,
   aquaFrost: 20,
-  aquaHue: 316,
+  aquaHue: 220,
   aquaBrightness: 50,
   aquaBackground: 'fluid',
   aquaWallpaperBlur: 0,
@@ -43,9 +43,9 @@ function createStore(directory, overrides = {}) {
   });
 }
 
-test('default preferences have the complete version 1 shape and are deeply isolated', () => {
+test('default preferences have the complete version 2 shape and are deeply isolated', () => {
   assert.deepEqual(DEFAULT_UI_PREFERENCES, {
-    version: 1,
+    version: 2,
     theme: 'dark',
     textScale: 'md',
     ...defaultAquaPreferences,
@@ -98,7 +98,7 @@ test('normalizes every supported field and discards unknown fields', () => {
   }, { today: TODAY });
 
   assert.deepEqual(normalized, {
-    version: 1,
+    version: 2,
     theme: 'light',
     textScale: 'lg',
     aquaMode: 'compat',
@@ -348,6 +348,24 @@ test('valid JSON files are normalized and marked as stored', async t => {
   assert.equal(Object.hasOwn(loaded, 'unknown'), false);
 });
 
+test('version 1 named color presets load as corrected version 2 target hues', async t => {
+  const directory = await makeDirectory(t);
+  const store = createStore(directory);
+  await fs.promises.writeFile(store.file, JSON.stringify({
+    version: 1,
+    theme: 'dark',
+    aquaHue: 126,
+    aquaBrightness: 40
+  }), 'utf8');
+
+  const loaded = await store.load();
+
+  assert.equal(loaded.version, 2);
+  assert.equal(loaded.aquaHue, 170);
+  assert.equal(loaded.aquaBrightness, 40);
+  assert.equal(store.hasStoredPreferences(), true);
+});
+
 test('snapshots cannot mutate store state', async t => {
   const directory = await makeDirectory(t);
   const store = createStore(directory);
@@ -371,7 +389,7 @@ test('update rejects non-plain patches, unknown fields, and invalid explicit val
   assert.throws(() => store.update({ apiKey: 'sk-secret' }), /unknown|不支持.*apiKey/i);
   assert.throws(() => store.update({ [Symbol('secret')]: true }), /unknown|不支持/i);
   assert.throws(() => store.update({ theme: 'system' }), /theme/i);
-  assert.throws(() => store.update({ version: 2 }), /version/i);
+  assert.throws(() => store.update({ version: 1 }), /version/i);
   assert.throws(() => store.update({ dailyDate: '2026-07-24' }), /dailyDate/i);
   assert.throws(() => store.update({ commonLinksFavorites: 'broken' }), /commonLinksFavorites/i);
   assert.throws(() => store.update({ closeToTray: 'yes' }), /closeToTray.*boolean/i);
@@ -405,7 +423,7 @@ test('rapid updates merge immediately in memory and serialize complete snapshots
   const saved = JSON.parse(await fs.promises.readFile(store.file, 'utf8'));
   assert.equal(saved.theme, 'light');
   assert.equal(saved.view, 'all');
-  assert.equal(saved.version, 1);
+  assert.equal(saved.version, 2);
   assert.equal(store.hasStoredPreferences(), true);
   assert.deepEqual(await fs.promises.readdir(directory), ['ui-preferences.json']);
   assert.deepEqual(observedModes, [0o600, 0o600]);

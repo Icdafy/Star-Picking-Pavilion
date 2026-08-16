@@ -48,7 +48,7 @@ const AQUA_DEFAULTS = Object.freeze({
   aquaMode: 'mica',
   aquaBlur: 2,
   aquaFrost: 20,
-  aquaHue: 316,
+  aquaHue: 220,
   aquaBrightness: 50,
   aquaBackground: 'fluid',
   aquaWallpaperBlur: 0,
@@ -291,6 +291,7 @@ test('desktop without stored preferences creates one complete legacy migration p
 test('browser preferences restore every meaningful field from one namespaced JSON value', () => {
   const favoriteId = CommonLinks.LINKS[0].id;
   const storedPreferences = {
+    version: 2,
     theme: 'light',
     textScale: 'lg',
     ...AQUA_NON_DEFAULTS,
@@ -311,9 +312,10 @@ test('browser preferences restore every meaningful field from one namespaced JSO
     commonLinks: CommonLinks,
     today: '2026-07-23'
   });
+  const { version: _version, ...expectedPreferences } = storedPreferences;
 
   assert.deepEqual(result, {
-    preferences: storedPreferences,
+    preferences: expectedPreferences,
     migrationPatch: null
   });
 });

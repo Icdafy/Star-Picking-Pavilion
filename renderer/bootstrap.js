@@ -54,7 +54,7 @@
   function readBrowserUiPreferences(storage) {
     try {
       const parsed = JSON.parse(storage.getItem(STORAGE_KEYS.uiPreferences));
-      return Schema.isPlainObject(parsed) ? parsed : {};
+      return Schema.migrateStoredUiPreferences(parsed);
     } catch {
       return {};
     }
@@ -160,7 +160,10 @@
     const sanitized = Schema.sanitizeUiPreferencesPatch(patch, commonLinks, options);
     const next = { ...current, ...sanitized };
     if (storage && typeof storage.setItem === 'function') {
-      storage.setItem(STORAGE_KEYS.uiPreferences, JSON.stringify(next));
+      storage.setItem(STORAGE_KEYS.uiPreferences, JSON.stringify({
+        version: Schema.UI_PREFERENCES_VERSION,
+        ...next
+      }));
     }
     return next;
   }

@@ -238,11 +238,11 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     hue: document.querySelector('#setAquaHue')?.value,
     brightness: document.querySelector('#setAquaBrightness')?.value,
     selected: document.querySelector('#aquaPalettePresets [aria-pressed="true"]')?.dataset.aquaPalette,
-    fluidHue: document.documentElement.style.getPropertyValue('--dsh-aqua-fluid-hue'),
+    fluidHueRotation: document.documentElement.style.getPropertyValue('--dsh-aqua-fluid-hue-rotation'),
     white: document.documentElement.style.getPropertyValue('--dsh-aqua-brightness-white')
   })), {
-    theme: 'light', count: 6, hue: '132', brightness: '62', selected: 'rain-jade',
-    fluidHue: '132deg', white: '0.240'
+    theme: 'light', count: 6, hue: '170', brightness: '62', selected: 'rain-jade',
+    fluidHueRotation: '310deg', white: '0.240'
   });
   await page.locator('#btnTheme').click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
@@ -253,11 +253,11 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     hue: document.querySelector('#setAquaHue')?.value,
     brightness: document.querySelector('#setAquaBrightness')?.value,
     selected: document.querySelector('#aquaPalettePresets [aria-pressed="true"]')?.dataset.aquaPalette,
-    fluidHue: document.documentElement.style.getPropertyValue('--dsh-aqua-fluid-hue'),
+    fluidHueRotation: document.documentElement.style.getPropertyValue('--dsh-aqua-fluid-hue-rotation'),
     black: document.documentElement.style.getPropertyValue('--dsh-aqua-brightness-black')
   })), {
     theme: 'dark', count: 6, hue: '260', brightness: '38', selected: 'deep-violet',
-    fluidHue: '260deg', black: '0.240'
+    fluidHueRotation: '40deg', black: '0.240'
   });
 
   // 复现用户截图的长列表滚动状态：塔台不得钻入原生标题栏，日期标题应在

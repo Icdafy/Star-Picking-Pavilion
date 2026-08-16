@@ -24,7 +24,7 @@ const AQUA_FIELDS = Object.freeze([
 ]);
 const schemaDefaults = UiPreferenceSchema.getDefaultUiPreferences(CommonLinks);
 const DEFAULT_UI_PREFERENCES = Object.freeze({
-  version: 1,
+  version: UiPreferenceSchema.UI_PREFERENCES_VERSION,
   ...schemaDefaults,
   commonLinksFavorites: Object.freeze([...schemaDefaults.commonLinksFavorites])
 });
@@ -49,7 +49,7 @@ function formatLocalDate(value) {
 
 function normalizeUiPreferences(raw, { today } = {}) {
   return {
-    version: 1,
+    version: UiPreferenceSchema.UI_PREFERENCES_VERSION,
     ...UiPreferenceSchema.normalizeUiPreferences(raw, CommonLinks, { today })
   };
 }
@@ -65,8 +65,11 @@ function validatePatch(patch, today) {
     }
   }
 
-  if (Object.hasOwn(patch, 'version') && patch.version !== 1) {
-    throw new TypeError('version must be 1');
+  if (
+    Object.hasOwn(patch, 'version')
+    && patch.version !== UiPreferenceSchema.UI_PREFERENCES_VERSION
+  ) {
+    throw new TypeError(`version must be ${UiPreferenceSchema.UI_PREFERENCES_VERSION}`);
   }
   if (
     Object.hasOwn(patch, 'theme')
@@ -209,7 +212,10 @@ function createUiPreferencesStore({
       return clonePreferences(preferences);
     }
 
-    preferences = normalizeUiPreferences(parsed, { today: today() });
+    preferences = normalizeUiPreferences(
+      UiPreferenceSchema.migrateStoredUiPreferences(parsed),
+      { today: today() }
+    );
     storedPreferences = true;
     return clonePreferences(preferences);
   }

@@ -37,6 +37,7 @@ test('shared UI preference schema is browser/CommonJS compatible and used by bot
   );
 
   assert.equal(Object.isFrozen(schema), true);
+  assert.equal(schema.UI_PREFERENCES_VERSION, 2);
   assert.deepEqual(
     schema.UI_PREFERENCE_FIELDS.filter(field => field.startsWith('aqua')),
     AQUA_FIELDS,
@@ -44,6 +45,27 @@ test('shared UI preference schema is browser/CommonJS compatible and used by bot
   );
   assert.match(html, /<script src="ui-preference-schema\.js"><\/script>/);
   assert.match(electronSource, /require\(['"]\.\.\/renderer\/ui-preference-schema['"]\)/);
+});
+
+test('version 1 hue rotation snapshots migrate to named target hues without mixing colors', () => {
+  const schema = require('../renderer/ui-preference-schema');
+  for (const [theme, hue, brightness, expected] of [
+    ['dark', 316, 50, 220],
+    ['dark', 126, 40, 170],
+    ['dark', 260, 38, 260],
+    ['dark', 12, 40, 0],
+    ['light', 132, 62, 170]
+  ]) {
+    assert.equal(
+      schema.migrateStoredUiPreferences({ version: 1, theme, aquaHue: hue, aquaBrightness: brightness }).aquaHue,
+      expected
+    );
+  }
+  assert.equal(
+    schema.migrateStoredUiPreferences({ version: 1, theme: 'dark', aquaHue: 20, aquaBrightness: 41 }).aquaHue,
+    240,
+    'custom v1 rotations preserve their previous visual hue'
+  );
 });
 
 test('renderer and Electron normalize normal and damaged snapshots identically', () => {

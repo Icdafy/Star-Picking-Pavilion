@@ -27,7 +27,7 @@ function verifyVersion({
   const version = String(packageJson?.version || '');
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`invalid package version: ${version}`);
   const releaseVersion = String(packageJson?.build?.buildVersion || '');
-  if (!/^\d+\.\d+\.\d+\.\d+$/.test(releaseVersion)) {
+  if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(releaseVersion)) {
     throw new Error(`invalid public release version: ${releaseVersion}`);
   }
   const expectedTag = `v${releaseVersion}`;

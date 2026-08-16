@@ -5,6 +5,8 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.StarPickingPavilionUiPreferenceSchema = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createUiPreferenceSchema() {
+  const UI_PREFERENCES_VERSION = 2;
+  const DSH_FLUID_BASE_HUE = 220;
   const THEMES = new Set(['light', 'dark']);
   const VIEWS = new Set([
     'featured', 'all', 'starred', 'daily', 'links', 'sources', 'settings'
@@ -84,7 +86,7 @@
       aquaMode: 'mica',
       aquaBlur: 2,
       aquaFrost: 20,
-      aquaHue: 316,
+      aquaHue: 220,
       aquaBrightness: 50,
       aquaBackground: 'fluid',
       aquaWallpaperBlur: 0,
@@ -127,6 +129,42 @@
       && Number.isFinite(value)
       && value >= min
       && value <= max;
+  }
+
+  function normalizeHue(value) {
+    return ((value % 360) + 360) % 360;
+  }
+
+  function migrateStoredUiPreferences(raw) {
+    if (!isPlainObject(raw)) return {};
+    if (raw.version === UI_PREFERENCES_VERSION) return { ...raw };
+    if (raw.version !== 1 && Object.hasOwn(raw, 'version')) return { ...raw };
+
+    const migrated = { ...raw, version: UI_PREFERENCES_VERSION };
+    if (!isFiniteNumberInRange(raw.aquaHue, 0, 360)) return migrated;
+
+    // v1 把“目标色相”错误地作为 hue-rotate() 的旋转量使用。对旧版预设按
+    // 用户所选名称迁到正确目标色相；自定义值则换算成同等视觉色相，避免跳色。
+    const theme = raw.theme === 'light' ? 'light' : 'dark';
+    const presetKey = `${theme}:${raw.aquaHue}:${raw.aquaBrightness}`;
+    const correctedPresetHues = {
+      'light:316:50': 220,
+      'light:132:62': 170,
+      'light:260:60': 260,
+      'light:12:64': 0,
+      'light:48:66': 40,
+      'light:198:60': 200,
+      'dark:316:50': 220,
+      'dark:126:40': 170,
+      'dark:260:38': 260,
+      'dark:12:40': 0,
+      'dark:48:42': 40,
+      'dark:198:44': 200
+    };
+    migrated.aquaHue = Object.hasOwn(correctedPresetHues, presetKey)
+      ? correctedPresetHues[presetKey]
+      : normalizeHue(raw.aquaHue + DSH_FLUID_BASE_HUE);
+    return migrated;
   }
 
   function normalizeUiPreferences(raw, commonLinks, { today, fallback } = {}) {
@@ -302,12 +340,14 @@
   }
 
   return Object.freeze({
+    UI_PREFERENCES_VERSION,
     UI_PREFERENCE_FIELDS,
     TEXT_SCALES: Object.freeze([...TEXT_SCALES]),
     isPlainObject,
     isRealDateString,
     formatLocalDate,
     getDefaultUiPreferences,
+    migrateStoredUiPreferences,
     normalizeFavoriteCandidate,
     normalizeUiPreferences,
     isValidUiPreferenceValue,

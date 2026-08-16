@@ -353,7 +353,7 @@ async function assertPersistedFiles(dataDir, expected) {
 
   const preferences = JSON.parse(preferencesRaw);
   assert.deepEqual(Object.keys(preferences).sort(), EXPECTED_UI_PREFERENCE_KEYS);
-  assert.equal(preferences.version, 1);
+  assert.equal(preferences.version, 2);
   if (expected.preferences) {
     for (const [key, value] of Object.entries(expected.preferences)) {
       assert.deepEqual(preferences[key], value);

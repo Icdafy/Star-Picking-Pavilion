@@ -6,14 +6,14 @@
   --desktop-titlebar-height: env(titlebar-area-height, 32px);
   --aqua-user-blur: 2px;
   --aqua-user-frost: 20;
-  --aqua-user-hue: 316deg;
+  --aqua-user-hue: 220deg;
   --aqua-user-brightness-white: 0;
   --aqua-user-brightness-black: 0;
   --aqua-wallpaper-blur: 0px;
   --aqua-wallpaper-frost: 0;
   --dsh-aqua-blur: 2px;
   --dsh-aqua-frost: .4;
-  --dsh-aqua-fluid-hue: 316deg;
+  --dsh-aqua-fluid-hue-rotation: 0deg;
   --aqua-rail-width: 17.5rem;
   --aqua-edge-size: 2rem;
 }
@@ -163,7 +163,7 @@ body {
 .aqua-fluid-canvas {
   z-index: -2;
   display: block;
-  filter: hue-rotate(var(--dsh-aqua-fluid-hue));
+  filter: hue-rotate(var(--dsh-aqua-fluid-hue-rotation));
   opacity: 1;
   transition: filter var(--dur-glide) var(--ease), opacity var(--dur-slow) var(--ease);
 }

@@ -18,11 +18,14 @@
   const MAX_WALLPAPER_BYTES = 12 * 1024 * 1024;
   const MAX_WALLPAPER_EDGE = 1920;
   const PERSIST_DELAY = 220;
+  // DSH 的第一主色 #8AA3D6 本身约为 220°。CSS hue-rotate() 接受的是
+  // “旋转量”而设置面板展示的是“目标色相”，两者必须先换算，不能直传。
+  const DSH_FLUID_BASE_HUE = 220;
   const DEFAULTS = Object.freeze({
     aquaMode: 'mica',
     aquaBlur: 2,
     aquaFrost: 20,
-    aquaHue: 316,
+    aquaHue: 220,
     aquaBrightness: 50,
     aquaBackground: 'fluid',
     aquaWallpaperBlur: 0,
@@ -33,22 +36,26 @@
   const FIELDS = Object.freeze(Object.keys(DEFAULTS));
   const FLUID_PALETTES = Object.freeze({
     light: Object.freeze([
-      Object.freeze({ id: 'clear-sky', name: '晴空蓝', hue: 316, brightness: 50, swatch: 'linear-gradient(125deg, #bdeaff, #8aa9ff 52%, #f3c8ff)' }),
-      Object.freeze({ id: 'rain-jade', name: '雨后青', hue: 132, brightness: 62, swatch: 'linear-gradient(125deg, #c9fff0, #72d6c1 52%, #bde8ff)' }),
+      Object.freeze({ id: 'clear-sky', name: '晴空蓝', hue: 220, brightness: 50, swatch: 'linear-gradient(125deg, #bdeaff, #8aa9ff 52%, #f3c8ff)' }),
+      Object.freeze({ id: 'rain-jade', name: '雨后青', hue: 170, brightness: 62, swatch: 'linear-gradient(125deg, #c9fff0, #72d6c1 52%, #bde8ff)' }),
       Object.freeze({ id: 'dawn-violet', name: '晨曦紫', hue: 260, brightness: 60, swatch: 'linear-gradient(125deg, #edd7ff, #b79aff 52%, #ffd1e5)' }),
-      Object.freeze({ id: 'coral-haze', name: '珊瑚霞', hue: 12, brightness: 64, swatch: 'linear-gradient(125deg, #ffe0d0, #ff9e9d 52%, #f7c6ec)' }),
-      Object.freeze({ id: 'sunlit-gold', name: '日光金', hue: 48, brightness: 66, swatch: 'linear-gradient(125deg, #fff2bd, #f4c66f 52%, #ffd9b8)' }),
-      Object.freeze({ id: 'glacier-blue', name: '冰川蓝', hue: 198, brightness: 60, swatch: 'linear-gradient(125deg, #d8f7ff, #79cdeb 52%, #b9d7ff)' })
+      Object.freeze({ id: 'coral-haze', name: '珊瑚霞', hue: 0, brightness: 64, swatch: 'linear-gradient(125deg, #ffe0d0, #ff9e9d 52%, #f7c6ec)' }),
+      Object.freeze({ id: 'sunlit-gold', name: '日光金', hue: 40, brightness: 66, swatch: 'linear-gradient(125deg, #fff2bd, #f4c66f 52%, #ffd9b8)' }),
+      Object.freeze({ id: 'glacier-blue', name: '冰川蓝', hue: 200, brightness: 60, swatch: 'linear-gradient(125deg, #d8f7ff, #79cdeb 52%, #b9d7ff)' })
     ]),
     dark: Object.freeze([
-      Object.freeze({ id: 'star-ocean', name: '星海蓝', hue: 316, brightness: 50, swatch: 'linear-gradient(125deg, #14385f, #3158a2 52%, #503a85)' }),
-      Object.freeze({ id: 'ink-jade', name: '墨玉青', hue: 126, brightness: 40, swatch: 'linear-gradient(125deg, #071d1b, #0d5549 52%, #173c50)' }),
+      Object.freeze({ id: 'star-ocean', name: '星海蓝', hue: 220, brightness: 50, swatch: 'linear-gradient(125deg, #14385f, #3158a2 52%, #503a85)' }),
+      Object.freeze({ id: 'ink-jade', name: '墨玉青', hue: 170, brightness: 40, swatch: 'linear-gradient(125deg, #071d1b, #0d5549 52%, #173c50)' }),
       Object.freeze({ id: 'deep-violet', name: '深空紫', hue: 260, brightness: 38, swatch: 'linear-gradient(125deg, #140d2d, #38226f 52%, #511f58)' }),
-      Object.freeze({ id: 'ember-red', name: '熔星红', hue: 12, brightness: 40, swatch: 'linear-gradient(125deg, #281015, #6b2029 52%, #51223f)' }),
-      Object.freeze({ id: 'amber-night', name: '琥珀夜', hue: 48, brightness: 42, swatch: 'linear-gradient(125deg, #241b08, #67501b 52%, #4b2f20)' }),
-      Object.freeze({ id: 'polar-night', name: '极夜冰蓝', hue: 198, brightness: 44, swatch: 'linear-gradient(125deg, #071723, #174b68 52%, #203a6b)' })
+      Object.freeze({ id: 'ember-red', name: '熔星红', hue: 0, brightness: 40, swatch: 'linear-gradient(125deg, #281015, #6b2029 52%, #51223f)' }),
+      Object.freeze({ id: 'amber-night', name: '琥珀夜', hue: 40, brightness: 42, swatch: 'linear-gradient(125deg, #241b08, #67501b 52%, #4b2f20)' }),
+      Object.freeze({ id: 'polar-night', name: '极夜冰蓝', hue: 200, brightness: 44, swatch: 'linear-gradient(125deg, #071723, #174b68 52%, #203a6b)' })
     ])
   });
+
+  function fluidHueRotation(targetHue) {
+    return ((targetHue - DSH_FLUID_BASE_HUE) % 360 + 360) % 360;
+  }
 
   function clampNumber(value, min, max, fallback) {
     if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -827,7 +834,10 @@
       root.style.setProperty('--aqua-wallpaper-frost', (state.aquaWallpaperFrost / 100).toFixed(3));
       root.style.setProperty('--dsh-aqua-blur', `${state.aquaBlur}px`);
       root.style.setProperty('--dsh-aqua-frost', String(Math.min(state.aquaFrost / 50, 1.4)));
-      root.style.setProperty('--dsh-aqua-fluid-hue', `${state.aquaHue}deg`);
+      root.style.setProperty(
+        '--dsh-aqua-fluid-hue-rotation',
+        `${fluidHueRotation(state.aquaHue)}deg`
+      );
       root.style.setProperty('--dsh-aqua-wallpaper-blur', `${state.aquaWallpaperBlur}px`);
       root.style.setProperty('--dsh-aqua-wallpaper-frost', (state.aquaWallpaperFrost / 100).toFixed(3));
       if (atmosphere) atmosphere.dataset.background = root.dataset.aquaBackground;
@@ -1108,7 +1118,9 @@
     DEFAULTS,
     FIELDS,
     FLUID_PALETTES,
+    DSH_FLUID_BASE_HUE,
     WALLPAPER_KEY,
+    fluidHueRotation,
     normalizeSettings,
     createFluidBackdrop,
     createStarWhale,
