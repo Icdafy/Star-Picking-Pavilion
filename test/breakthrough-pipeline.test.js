@@ -96,14 +96,14 @@ test('heuristic analysis persists breakthrough evidence and cluster rescore refr
   const result = JSON.parse(child.stdout);
   assert.ok(result.first.breakthrough_score > 0);
   assert.ok(result.first.breakthrough_bonus > 0);
-  assert.equal(result.first.scoring_version, 1);
+  assert.equal(result.first.scoring_version, 2);
   assert.equal(JSON.parse(result.first.breakthrough_signals_json).rejectedReason, null);
   assert.ok(result.second.breakthrough_score >= result.first.breakthrough_score);
   assert.ok(result.second.breakthrough_bonus >= result.first.breakthrough_bonus);
   assert.equal(result.rescore.rescored, 1);
 });
 
-test('cluster rescore counts distinct source ids instead of duplicate reports', async t => {
+test('cluster rescore does not use source counts as credibility evidence', async t => {
   const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-breakthrough-sources-'));
   t.after(async () => fs.promises.rm(dataDir, { recursive: true, force: true }));
   const dbPath = path.join(root, 'server', 'db.js');
@@ -169,5 +169,5 @@ test('cluster rescore counts distinct source ids instead of duplicate reports', 
   assert.equal(child.status, 0, child.stderr);
   const result = JSON.parse(child.stdout);
   assert.equal(result.sameSource, 0);
-  assert.ok(result.distinctSources > 0);
+  assert.equal(result.distinctSources, result.sameSource);
 });

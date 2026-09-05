@@ -22,7 +22,7 @@
   // 归类之后才好在卡片上给出一致的措辞。
   const EVENT_CLASS_NAMES = Object.freeze({
     launch: '发射入轨', recovery: '回收复用', 'flight-test': '试飞验证',
-    certification: '适航取证', funding: '融资', listing: '上市',
+    certification: '适航取证', ownership: '股权变更', funding: '融资', listing: '上市',
     order: '订单中标', delivery: '交付量产', partnership: '合作签约',
     policy: '政策发布', facility: '场站基建', research: '研制试验',
     personnel: '人事组织', incident: '异常与延期'
@@ -84,8 +84,6 @@
       const evidenceNames = {
         'tier-t1': '官方一手信源',
         'tier-t1.5-model': '官方信源与模型可信度',
-        'corroborated-model': '多信源交叉验证',
-        'corroborated-no-model': '多信源一致报道'
       };
       const evidence = evidenceNames[signals.credibilityEvidence] || '可信信源验证';
       const details = [
@@ -117,7 +115,7 @@
       const list = Array.isArray(item.events) ? item.events.filter(e => e?.actor) : [];
       if (!list.length || (list.length < 2 && !list[0].date && !list[0].evidence)) return '';
       const rows = list.map(event => {
-        const action = EVENT_CLASS_NAMES[event.actionClass] || event.action || '相关动作';
+        const action = event.action || EVENT_CLASS_NAMES[event.actionClass] || '相关动作';
         const object = event.object ? ` · ${esc(event.object)}` : '';
         const state = ({completed:'已发生',planned:'计划',failed:'失败',unknown:'状态待核'})[event.status] || '';
         return `<li title="${esc(event.evidence || '')}"><b>${esc(event.actor)}</b><span>${esc(action)}</span>${object}<small>${esc(event.date || '时间待核')} · ${state}</small></li>`;
@@ -205,17 +203,19 @@
       const breakthrough = breakthroughPresentation(item);
       q('.card-score-group').innerHTML =
         (breakthrough ? breakthroughBadgeHtml(breakthrough) : '') + scorePill(item);
-      const verification = item.verification || {};
-      const status = ({official:'官方一手确认',corroborated:'独立多源确认',conflict:'时间证据冲突',pending:'待交叉核实'})[verification.status] || '待交叉核实';
-      const delay = Number.isFinite(item.reportDelayDays) ? (item.reportDelayDays === 0 ? '当日报道' : `迟报 ${item.reportDelayDays} 天`) : '时差待核';
-      q('.card-score-group').insertAdjacentHTML('beforeend', `<span class="event-time-badge" role="note" title="${esc(status)}；事件日期：${esc(item.eventDate || '未知')}；报道时间：${esc(item.reportedAt || item.publishedAt || '未知')}；按北京时间自然日估算">${esc(delay)} · ${esc(status)}</span>`);
+      const status = ({dated:'原文日期',planned:'计划事件',unknown:'原文未明确事件日期'})[item.timingStatus] || '原文未明确事件日期';
+      const delay = Number.isFinite(item.reportDelayDays) ? (item.reportDelayDays === 0 ? '当日报道' : `迟报 ${item.reportDelayDays} 天`) : item.timingStatus === 'planned' ? '计划事件' : '时差未知';
+      q('.card-score-group').insertAdjacentHTML('beforeend', `<span class="event-time-badge" role="note" title="${esc(status)}；事件日期：${esc(item.eventDate || '未知')}；报道时间：${esc(item.reportedAt || item.publishedAt || '未知')}；按北京时间自然日估算">${esc(delay)}</span>`);
       const title = q('.card-title');
       title.setAttribute('href', safeHttpUrl(item.url));
       title.textContent = item.title ?? '';
-      const thumbSrc = safeHttpUrl(item.image);
+      const usefulImage = (Array.isArray(item.images) ? item.images : []).find(i => i && safeHttpUrl(i.url) !== '#');
+      const thumbSrc = safeHttpUrl(usefulImage?.url || item.image);
       const thumb = q('.card-thumb');
       if (thumbSrc !== '#') {
         thumb.setAttribute('src', thumbSrc);
+        thumb.setAttribute('alt', usefulImage?.caption || '新闻配图');
+        thumb.setAttribute('title', usefulImage ? `${usefulImage.kind || '配图'} · ${usefulImage.caption || ''}（AI 图片解读）` : '新闻配图');
         q('.card-content').classList.add('has-thumb');
       } else thumb.remove();
       const summary = q('.card-summary');
@@ -229,10 +229,6 @@
       if (entities) q('.card-text').insertAdjacentHTML('beforeend', entities);
       const events = atomicEventsHtml(item);
       if (events) q('.card-content').insertAdjacentHTML('afterend', events);
-      const usefulImages = (Array.isArray(item.images) ? item.images : []).filter(i => i && typeof i.caption === 'string' && safeHttpUrl(i.url) !== '#').slice(0,4);
-      if (usefulImages.length) q('.card-content').insertAdjacentHTML('afterend', `<div class="card-image-evidence">${usefulImages.map(i => `<figure><a href="${esc(safeHttpUrl(i.sourceUrl || item.url))}" target="_blank" rel="noopener noreferrer"><img src="${esc(safeHttpUrl(i.url))}" loading="lazy" referrerpolicy="no-referrer" alt="${esc(i.caption || '')}"></a><figcaption>${esc(i.kind || '图片')} · ${esc(i.caption || '')}（AI 图片解读，点击查原文）</figcaption></figure>`).join('')}</div>`);
-      const evidenceSources = Array.isArray(verification.sources) ? verification.sources.filter(e => e && typeof e === 'object').slice(0,8) : [];
-      if (evidenceSources.length) q('.card-content').insertAdjacentHTML('afterend', `<details class="event-verification"><summary>核验依据 · ${esc(status)}</summary>${evidenceSources.map(e => `<p><a href="${esc(safeHttpUrl(e.url))}" target="_blank" rel="noopener noreferrer">${esc(e.name || '原文')}</a> · ${esc(e.date || '')}<br>${esc(e.evidence || '')}</p>`).join('')}</details>`);
       const reason = q('.card-reason');
       if (item.reason) q('.cr-text').textContent = item.reason;
       else reason.remove();

@@ -159,21 +159,20 @@ test('multi-event articles are split into distinct atomic events', () => {
 
 test('different wording for the same event lands on the same key', () => {
   const [a] = events.normalizeEvents([{ a: '蓝箭航天', v: '发射入轨', o: '朱雀三号' }]);
-  const [b] = events.normalizeEvents([{ a: '蓝箭', v: '成功送入预定轨道', o: '朱雀二号' }]);
-  // 主体别名归一 + 动作归类 + 客体别名归一，三者一致即同一件事
+  const [b] = events.normalizeEvents([{ a: '蓝箭', v: '成功送入预定轨道', o: '朱雀三号' }]);
+  // 同一主体、动作和具体型号对齐，不能把朱雀二号与三号混为一件事。
   assert.equal(a.key, b.key);
   // 动作类不同就不是同一件事
   const [c] = events.normalizeEvents([{ a: '蓝箭航天', v: '签署战略合作协议', o: '朱雀三号' }]);
   assert.notEqual(a.key, c.key);
 });
 
-test('客体在别名归一后塌回主体时被丢掉', () => {
-  // 词库把 AE200 登记成了沃飞长空的别名，归一后主客体同名，
-  // 留着只会得到「沃飞长空 试飞验证 · 沃飞长空」和一段重复的事件键
+test('具体产品客体不能塌回厂商主体', () => {
+  // 产品名称必须保留，不沿用把型号映射成厂商的实体别名。
   const [event] = events.normalizeEvents([{ a: '沃飞长空', v: '完成首飞', o: 'AE200' }]);
   assert.equal(event.actor, '沃飞长空');
-  assert.equal(event.object, '');
-  assert.equal(event.key, `${entities.entityKey('沃飞长空')}|flight-test`);
+  assert.equal(event.object, 'AE200');
+  assert.equal(event.key, `${entities.entityKey('沃飞长空')}|flight-test|ae200`);
 });
 
 test('atomic events without an actor or an action are dropped', () => {
@@ -196,15 +195,15 @@ test('deriveEvents backfills a primary event when the model returns none', () =>
 
 // ---------- ⑥ 事件资源限制与类型守卫（L7） ----------
 
-test('events are hard-capped at MAX_EVENTS: 1000 inputs keep exactly the first 4', () => {
+test('events are hard-capped at MAX_EVENTS: 1000 inputs keep exactly the first 6', () => {
   const many = Array.from({ length: 1000 }, (unused, index) => ({
     a: `测试公司${index}`, v: '完成首飞'
   }));
   const normalized = events.normalizeEvents(many);
-  assert.equal(events.MAX_EVENTS, 4);
-  assert.equal(normalized.length, 4, '再多事件也只保留前 4 条');
+  assert.equal(events.MAX_EVENTS, 6);
+  assert.equal(normalized.length, 6, '再多事件也只保留前 6 条');
   assert.deepEqual(normalized.map(event => event.actor), [
-    '测试公司0', '测试公司1', '测试公司2', '测试公司3'
+    '测试公司0', '测试公司1', '测试公司2', '测试公司3', '测试公司4', '测试公司5'
   ]);
 });
 

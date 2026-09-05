@@ -1,22 +1,19 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveEventDate, eventTiming, verifyEvent, publisher, timingFields } = require('../server/ai/event-time');
+const { resolveEventDate, eventTiming, timingFields } = require('../server/ai/event-time');
 const { normalizeEvents } = require('../server/ai/events');
-const { modelFor, needsReasoning, VISION_MODEL, PRO_MODEL } = require('../server/ai/model-policy');
+const { modelFor, VISION_MODEL } = require('../server/ai/model-policy');
 const { analyzeImages } = require('../server/ai/vision');
 const { extractContent } = require('../server/collectors/article-content');
 const { publicUrl, publicFetch, robotsAllowed, isPublicAddress } = require('../server/collectors/public-web');
 const wechat = require('../server/collectors/wechat');
 
 const settings = { ai: { baseUrl: 'https://api.deepseek.com', model: VISION_MODEL } };
-test('official provider routes routine/image work to Vision and complex judgments to Pro', () => {
+test('all providers and tasks use Flash Vision', () => {
   assert.equal(modelFor(settings), VISION_MODEL);
-  assert.equal(modelFor(settings, 'reasoning'), PRO_MODEL);
-  assert.equal(needsReasoning({title:'某型号获颁适航证'}), true);
-  assert.equal(needsReasoning({title:'某公司常规进展'}, {events:[{},{}]}), true);
-  assert.equal(needsReasoning({title:'某公司例行动态'}), false);
-  assert.equal(modelFor({ai:{baseUrl:'https://custom.example',model:'custom'}}, 'reasoning'), 'custom');
+  assert.equal(modelFor(settings, 'reasoning'), VISION_MODEL);
+  assert.equal(modelFor({ai:{baseUrl:'https://custom.example',model:'custom'}}, 'reasoning'), VISION_MODEL);
 });
 test('event dates resolve against publication including New Year, never collection', () => {
   assert.equal(resolveEventDate('昨日','2026-01-01T04:00:00Z'),'2025-12-31');
@@ -47,32 +44,19 @@ test('atomic event keys distinguish recurring dates and plans from completed act
   const launched=normalizeEvents([{a:'蓝箭航天',v:'发射入轨',w:'2026-08-01',status:'completed',evidence:completedQuote}],{article:{...article,summary_raw:completedQuote}})[0];
   assert.equal(launched.status,'completed','将 as an object marker must not turn a completed launch into a plan');
 });
-const report=(url, extra={})=>({url,source_url:url,source_name:url,tier:'T2',date:'2026-08-01',evidence:quote,...extra});
-test('single media, same domain, aggregate duplicates and attributed reprints cannot confirm', () => {
-  assert.equal(verifyEvent([report('https://one.example/a')]).status,'pending');
-  assert.equal(verifyEvent([report('https://one.example/a'),report('https://news.one.example/b')]).status,'pending');
-  assert.equal(verifyEvent([report('https://finance.eastmoney.com/a'),report('https://finance.eastmoney.com/b')]).status,'pending');
-  const syndicated={summary_raw:'来源：新华社'};
-  assert.equal(verifyEvent([report('https://one.example/a',syndicated),report('https://two.example/a',syndicated)]).status,'pending');
-  assert.equal(publisher(report('https://mp.weixin.qq.com/s/a')),null);
-});
-test('official origin or two independent publishers can confirm, conflicting dates cannot', () => {
-  assert.equal(verifyEvent([report('https://agency.gov.cn/a',{tier:'T1'})]).status,'official');
-  assert.equal(verifyEvent([report('https://media.example/a',{tier:'T1',source_url:'https://agency.gov.cn/'})]).status,'pending');
-  assert.equal(verifyEvent([report('https://one.example/a'),report('https://two.example/b')]).status,'corroborated');
-  assert.equal(verifyEvent([report('https://one.example/a'),report('https://two.example/b',{date:'2026-08-02'})]).status,'conflict');
-});
-test('late reporting displays 35 days, unknown dates stay unknown', () => {
-  const fields=timingFields({event_date:'2026-08-01',published_at:article.published_at,verification_json:'{"status":"corroborated"}'});
+test('single report provides delay without cross-source approval', () => {
+  const events=normalizeEvents([{a:'蓝箭航天',v:'完成首飞',o:'朱雀三号',w:'2026-08-01',evidence:quote}],{article});
+  const fields=timingFields({...article,events_json:JSON.stringify(events)});
   assert.equal(fields.reportDelayDays,35);
-  assert.equal(timingFields({event_date:'2026-08-01',published_at:article.published_at}).reportDelayDays,null);
+  assert.equal(fields.timingStatus,'dated');
+  assert.equal(timingFields({...article,event_date:'2026-08-01'}).reportDelayDays,null);
 });
 test('article parser captures lazy-loaded engineering images and discards tracking/QR assets', () => {
   const content=extractContent('<article>卫星制造图纸<img data-src="/part.png" alt="零部件图纸"><img src="/qr.png" alt="二维码"><img src="/pixel.png" width="1"></article>', 'https://news.example/article');
   assert.equal(content.images.length,1);
   assert.equal(content.images[0].url,'https://news.example/part.png');
 });
-test('vision uses bounded locally verified image bytes, filters output and never sends images to Pro', async () => {
+test('vision uses bounded verified image bytes and filters output', async () => {
   let payload;
   const result=await analyzeImages({title:'卫星零部件',url:'https://news.example/a'},[{url:'https://news.example/p.png'}],settings,{
     fetchImage:async()=>({body:Buffer.from([137,80,78,71,13,10,26,10])}),
@@ -81,7 +65,7 @@ test('vision uses bounded locally verified image bytes, filters output and never
   assert.equal(payload.options.model,VISION_MODEL);
   assert.match(payload.messages[0].content[1].image_url.url,/^data:image\/png;base64,/);
   assert.equal(result.images.length,1);
-  assert.equal((await analyzeImages({},[],{ai:{baseUrl:'https://custom.example',model:'text-only'}})).status,'unsupported');
+  assert.equal((await analyzeImages({},[],{ai:{baseUrl:'https://custom.example',model:'text-only'}})).status,'unavailable');
 });
 test('public crawler rejects private addresses, alternate numeric IPs and redirect SSRF', async () => {
   for(const url of ['http://127.0.0.1','http://2130706433','http://169.254.169.254','http://[::1]','http://10.1.1.1','http://name:pass@example.com','http://example.com:9000']) assert.throws(()=>publicUrl(url));

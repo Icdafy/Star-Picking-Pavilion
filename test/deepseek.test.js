@@ -9,6 +9,16 @@ function settings(baseUrl = 'https://models.example/v1') {
   return { ai: { apiKey: 'sk-test-only', baseUrl, requestTimeoutMs: 1000 } };
 }
 
+test('every request uses Flash Vision even with a stale Pro override', async () => {
+  let payload;
+  await chat([{role:'user',content:'test'}], {
+    settings: {...settings(), ai: {...settings().ai, model:'deepseek-v4-pro'}},
+    model: 'deepseek-v4-pro',
+    fetchImpl: async (url, options) => { payload=JSON.parse(options.body); return response(); }
+  });
+  assert.equal(payload.model,'deepseek-v4-flash-vision-exp');
+});
+
 function response({ contentLength, chunks = ['{"choices":[{"message":{"content":"ok"}}]}'] } = {}) {
   return {
     ok: true,

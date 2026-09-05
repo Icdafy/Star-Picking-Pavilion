@@ -17,7 +17,7 @@
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.1.4
+npm run verify:version -- --tag v0.1.5
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -26,11 +26,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.1.4 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.1.4.exe
+npm run verify:version -- --tag v0.1.5 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.1.5.exe
 ```
 
-v0.1.4 的签名状态预期为 `NotSigned`。
+v0.1.5 的签名状态预期为 `NotSigned`。
 
 **体积不再有上限。** `npm run verify:package` 会打印 ASAR 与安装包的精确字节数供发布记录比对，但不会因为体积失败。
 
@@ -73,19 +73,19 @@ v0.1.4 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.1.4
-git tag -a v0.1.4 -m "摘星阁 v0.1.4"
-git push origin v0.1.4
+npm run verify:version -- --tag v0.1.5
+git tag -a v0.1.5 -m "摘星阁 v0.1.5"
+git push origin v0.1.5
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.1.4 Release 应包含：
+v0.1.5 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.1.4.exe`
-- `Star-Picking-Pavilion-Setup-0.1.4.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.1.5.exe`
+- `Star-Picking-Pavilion-Setup-0.1.5.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`

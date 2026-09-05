@@ -107,10 +107,7 @@ test('editable settings reject invalid numeric, URL, and model values', () => {
     () => applySettingsPatch(current, { ai: { model: 'deepseek-v4-flash' } }),
     /已从本应用移除/
   );
-  assert.equal(
-    applySettingsPatch(current, { ai: { model: ' deepseek-v4-pro ' } }).settings.ai.model,
-    'deepseek-v4-pro'
-  );
+  assert.throws(() => applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }), /已从本应用移除/);
 
   const valid = applySettingsPatch(current, {
     collect: { intervalMinutes: 30, rsshubBase: 'https://rsshub.example/' }

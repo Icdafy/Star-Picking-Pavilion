@@ -137,7 +137,7 @@ test('rescore: 脏 scores_json 不抛异常且保持原值，tags_json=null 走�
   const out = runScenario('rescore-dirty');
   assert.equal(out.dirty.scoresJson, '{{bad', '解析失败的行跳过更新，原值保持');
   assert.equal(out.dirty.quality, 55, '脏行质量分不被覆写');
-  assert.equal(out.stale.scoringVersion, 1, '合法行（tags_json=null）被正常重算并刷新版本');
+  assert.equal(out.stale.scoringVersion, 2, '合法行（tags_json=null）被正常重算并刷新版本');
   assert.ok(out.firstChanged >= 1, '第一轮至少更新了合法行');
 });
 
@@ -169,18 +169,15 @@ test('状态机: 预筛调用失败保持 analyzed=0，可被下一轮重判', (
 
 // ---------- H5：事件键投毒定性测试 ----------
 
-test('H5: 伪造相同事件键的无关内容当前会被并簇并获得多源印证（现状定性）', () => {
+test('H5: 旧事件键被重新生成，伪造关联报道不能获得加成', () => {
   const out = runScenario('event-key-poisoning');
   // 聚类前基线：T2 单源，可信门槛拦下，加成为 0
   assert.equal(out.before.t2.bonus, 0);
   assert.equal(out.before.t2.rejectedReason, 'credibility-gate');
-  // 现状记录：事件键通道不校验锚点实体重叠，手工伪造的相同事件键
-  // 足以把两条毫不相干的内容并进同一簇，T2 因此白拿多源印证加成。
-  // 【未来翻转点】merge 层为事件键通道加上锚点约束后，本用例应改为断言：
-  //   sameCluster === false 且 after.t2.bonus === 0（rejectedReason 回到 credibility-gate）
-  assert.equal(out.sameCluster, true, '当前实现：仅凭事件键相同即并簇');
-  assert.ok(out.after.t2.bonus > 0, '当前实现：投毒条目获得不应有的多源印证加成');
-  assert.equal(out.after.t2.rejectedReason, null);
+  // 升级后的原子事件重新生成键；关联报道没有可信度加成。
+  assert.equal(out.sameCluster, false, '升级迁移重新生成事件键，丢弃伪造键');
+  assert.equal(out.after.t2.bonus, 0, '关联报道不再绕过可信门槛');
+  assert.equal(out.after.t2.rejectedReason, 'credibility-gate');
 });
 
 // ---------- H1：注入桩测试 ----------

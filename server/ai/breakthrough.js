@@ -141,18 +141,14 @@ function rejected(config, signals, reason) {
 
 function credibilityGate(article, config) {
   const tier = String(article?.tier || '');
-  const sourceCount = Math.max(1, Number(article?.sourceCount) || 1);
   const credibility = Number(article?.scores?.credibility);
   const hasModelCredibility = Number.isFinite(credibility);
   const minimums = config?.minimumScores || {};
 
   if (tier === 'T1') {
-    // T1 不再无条件 accepted：要求模型可信度 >= 40 或多源印证 >= 2
-    //（无模型分时只看多源）。不达标不拒绝，降为 corroborated 同档强度。
+    // T1 依据自身可信度确定强度，关联报道数量不参与判断。
     const floor = Number(minimums.tier1Credibility) || 40;
-    const meetsFloor = hasModelCredibility
-      ? credibility >= floor || sourceCount >= 2
-      : sourceCount >= 2;
+    const meetsFloor = hasModelCredibility && credibility >= floor;
     return meetsFloor
       ? { accepted: true, evidence: 'tier-t1', strength: 0.95 }
       : { accepted: true, evidence: 'tier-t1-downgraded', strength: 0.76 };
@@ -160,14 +156,6 @@ function credibilityGate(article, config) {
   if (tier === 'T1.5' && hasModelCredibility
     && credibility >= (Number(minimums.tier15Credibility) || 70)) {
     return { accepted: true, evidence: 'tier-t1.5-model', strength: 0.82 };
-  }
-  if (sourceCount >= 2 && (
-    !hasModelCredibility
-    || credibility >= (Number(minimums.corroboratedCredibility) || 60)
-  )) {
-    return { accepted: true, evidence: hasModelCredibility
-      ? 'corroborated-model'
-      : 'corroborated-no-model', strength: 0.76 };
   }
   return { accepted: false, evidence: null, strength: 0 };
 }
@@ -272,17 +260,13 @@ function analyzeBreakthrough(article, config = {}) {
   const modelCredibility = scoreDimension(scores, 'credibility', modelCredibilityFallback);
   const actionStrength = Math.min(1, 0.5 + (baseSignals.actions.length - 1) * 0.2);
   const objectStrength = Math.min(1, 0.5 + (baseSignals.objects.length - 1) * 0.15);
-  const corroboration = Math.min(1,
-    Math.max(0, (Number(article?.sourceCount) || 1) - 1) / 2);
-
   const score = clamp(
     novelty * 0.2
       + importance * 0.18
       + modelCredibility * 0.2
       + actionStrength * 0.15
       + objectStrength * 0.1
-      + credibility.strength * 0.12
-      + corroboration * 0.05,
+      + credibility.strength * 0.17,
     0,
     1
   );

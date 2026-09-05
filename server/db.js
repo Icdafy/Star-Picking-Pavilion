@@ -176,8 +176,9 @@ function migrate() {
   const cols = new Set(db.prepare('PRAGMA table_info(articles)').all().map(c => c.name));
   const addCol = (name, def) => { if (!cols.has(name)) db.exec(`ALTER TABLE articles ADD COLUMN ${name} ${def}`); };
   addCol('analysis_version', 'INTEGER NOT NULL DEFAULT 0');
+  addCol('event_schema_version', 'INTEGER NOT NULL DEFAULT 0');
   addCol('ai_reason', 'TEXT');   // 情报研判（推荐理由 / 编者按）
-  for (const name of ['content_text','images_json','vision_json','content_status','publisher_id','event_date','verification_json']) addCol(name, 'TEXT');
+  for (const name of ['content_text','images_json','vision_json','content_status','publisher_id','event_date']) addCol(name, 'TEXT');
   addCol('image_url', 'TEXT');   // 文章缩略图
   // 星标留存：用户显式收起来的情报。starred_at 既是「星标」视图的排序依据，
   // 也让保留清理能识别并永久跳过这些条目（见 retention.selectExpiredIds）
@@ -198,6 +199,9 @@ function migrate() {
   addCol('topics_json', 'TEXT');
   addCol('events_json', 'TEXT');
   addCol('event_key', 'TEXT');
+  if (cols.has('verification_json')) {
+    db.exec('ALTER TABLE articles DROP COLUMN verification_json');
+  }
   addCol('clean_version', 'INTEGER NOT NULL DEFAULT 0');
   db.exec('CREATE INDEX IF NOT EXISTS idx_articles_starred ON articles(starred, starred_at DESC)');
   // 入库去重每条都要查一次 canonical_url；主事件键则是聚类精确通道的分桶依据
@@ -310,3 +314,5 @@ module.exports = {
   checkpointWal, databaseFileBytes, closeDatabase, withTransaction, DATA_DIR, DATABASE_PATH,
   DELETE_BATCH_SIZE
 };
+
+require('./ai/event-timing-migration').refreshEventTiming(db);

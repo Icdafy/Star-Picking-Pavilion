@@ -646,7 +646,7 @@ test('文章、图片、事件簇和日报的远程地址全部通过安全 URL 
   assert.match(app, /const safeUrl = value => esc\(DomUtils\.safeHttpUrl\(value\)\);/);
   // 阶段 4：缩略图 src 随卡片模板迁到 renderer/feed-card.js，改经
   // safeHttpUrl 过闸后字段级填充（行为断言见 test/feed-diff.test.js）
-  assert.match(feedCardSource, /const thumbSrc = safeHttpUrl\(item\.image\);/);
+  assert.match(feedCardSource, /const thumbSrc = safeHttpUrl\(usefulImage\?\.url \|\| item\.image\);/);
   assert.match(feedCardSource, /thumb\.setAttribute\('src', thumbSrc\);/);
   // 批 4：事件簇 i.url 留在 feed-controller，常用网址 item.url 随控制器迁出
   assert.match(feedControllerSource, /href="\$\{safeUrl\(i\.url\)\}"/);
@@ -862,8 +862,8 @@ test('v0.0.14 设置页只暴露单一分析模型字段', () => {
   assert.doesNotMatch(html, /setPrefilterModel|setScoringModel/);
   // v4-pro 只能作为「已移除」的说明出现，不能再是任何输入框的候选值
   assert.doesNotMatch(html, /(?:placeholder|value)="[^"]*deepseek-v4-pro/);
-  assert.match(html, /deepseek-v4-pro/);
-  assert.match(html, /思考模式/);
+  assert.doesNotMatch(html, /deepseek-v4-pro/);
+  assert.match(html, /id="setModel"[^>]*readonly/);
   // 批 2：设置表单装配迁到 renderer/settings-view-controller.js，字段表落点改指新模块
   assert.match(settingsViewSource, /model: \$\('#setModel'\)/);
   assert.doesNotMatch(app, /prefilterModel|scoringModel/);

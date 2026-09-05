@@ -178,7 +178,7 @@ test('feed JSON columns are clamped server-side so dirty values cannot reach the
     { name: 'y'.repeat(80), type: '' }
   ]);
   // 原子事件只保留 actor 字符串且补齐 shape
-  assert.deepEqual(item.events, [{ actor: '<b>a</b>', action: 'launch', actionClass: '', object: '', date: null, status: 'unknown', evidence: '', verification: null }]);
+  assert.deepEqual(item.events, [{ actor: '<b>a</b>', action: 'launch', actionClass: '', object: '', date: null, status: 'unknown', evidence: '' }]);
   // 突破信号白名单字段，未知键与非法值被丢弃
   assert.deepEqual(item.breakthroughSignals, {
     objects: ['ok'],

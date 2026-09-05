@@ -279,9 +279,11 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
   `setAquaWhale/setAquaCritters`、`btnAquaWallpaperClear/btnAquaReset`；
   模式和背景分段按钮分别使用 `data-aqua-mode` / `data-aqua-background` 与
   `aria-pressed`。壁纸 file input 不得用 `hidden`，应保留键盘可聚焦的视觉隐藏实现。
-- `id="btnClearAiKey"`；`id="setModel"` 且 `placeholder="deepseek-v4-flash"`
+- `id="btnClearAiKey"`；`id="setModel"` 为只读，`placeholder="deepseek-v4-flash-vision-exp"`
 - 不得出现 `setPrefilterModel` / `setScoringModel`；不得出现含 `deepseek-v4-pro` 的 placeholder/value
-- 文案：`deepseek-v4-pro 已从本应用移除`、`DeepSeek-V4-Flash-0731`
+- 预筛、图文、原子事件和日报统一使用 `deepseek-v4-flash-vision-exp`，保存配置及请求层均限制为此模型。
+- 新闻右上角 `.event-time-badge` 显示北京时间自然日时差；API 提供 `eventDate`、`reportedAt`、`reportDelayDays`、`timingStatus`（`dated/planned/unknown`），不再提供交叉验证状态。
+- 每张新闻只展示一个 `.card-thumb` 右侧缩略图，优先使用视觉筛选结果；不再有下方图片证据区。
 - `id="setCloseToTray"`、`id="setLaunchAtLogin"`：`type="checkbox"` 且 `role="switch"`
 - `id="desktopSettingsResult"` 带 `role="status"`、`aria-live="polite"`
 - `id="setRetentionDays"`（type=number min=7 max=3650）、`id="setIrrelevantRetentionDays"`（min=1 max=3650）

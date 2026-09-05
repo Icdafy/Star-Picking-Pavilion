@@ -1,12 +1,11 @@
 {
   "_说明": "技术突破热度规则。只有行业、分类、技术对象、完成动作与可信门槛同时满足时才加分；计划、传闻和低可信单点声明不加分。",
-  "version": 1,
+  "version": 2,
   "maxBonus": 10,
   "maxHalfLifeExtensionHours": 18,
   "minimumScores": {
     "tier1Credibility": 40,
-    "tier15Credibility": 70,
-    "corroboratedCredibility": 60
+    "tier15Credibility": 70
   },
   "eligibleCategories": [
     "技术研发",

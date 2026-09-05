@@ -83,7 +83,7 @@ test('低空经济适航取证可由可信 T1.5 信源通过模型可信度门�
   assert.ok(result.signals.actions.includes('适航取证'));
 });
 
-test('多源印证可让达到较低可信门槛的 T2 技术事件获得加成', () => {
+test('关联报道不能让低可信 T2 技术事件获得加成', () => {
   const result = analyzeBreakthrough(article({
     tier: 'T2',
     clusterSize: 3,
@@ -91,11 +91,11 @@ test('多源印证可让达到较低可信门槛的 T2 技术事件获得加成'
     scores: { novelty: 80, importance: 75, credibility: 66 }
   }), config);
 
-  assert.ok(result.score > 0);
-  assert.equal(result.signals.credibilityEvidence, 'corroborated-model');
+  assert.equal(result.score, 0);
+  assert.equal(result.signals.credibilityEvidence, null);
 });
 
-test('没有模型分数时只接受 T1 或多源印证', () => {
+test('没有模型分数时只接受降档 T1', () => {
   const official = analyzeBreakthrough(article({ scores: null, tier: 'T1' }), config);
   const corroborated = analyzeBreakthrough(article({
     scores: null,
@@ -110,7 +110,7 @@ test('没有模型分数时只接受 T1 或多源印证', () => {
   }), config);
 
   assert.ok(official.score > 0);
-  assert.ok(corroborated.score > 0);
+  assert.equal(corroborated.score, 0);
   assert.equal(unsupported.score, 0);
   assert.equal(unsupported.signals.rejectedReason, 'credibility-gate');
 });
@@ -332,7 +332,7 @@ test('H6：超长与含分隔符的 tags 不抛异常且分数有界', () => {
 
 // —— H7：可信度门槛临界值 ——
 
-test('H7：T1.5 可信度 70 通过、69 拒绝，多源印证可救回', () => {
+test('H7：T1.5 可信度 70 通过、69 拒绝，关联报道不能绕过门槛', () => {
   const pass = analyzeBreakthrough(article({
     tier: 'T1.5',
     scores: { novelty: 80, importance: 75, credibility: 70 }
@@ -353,19 +353,19 @@ test('H7：T1.5 可信度 70 通过、69 拒绝，多源印证可救回', () => 
     clusterSize: 2,
     scores: { novelty: 80, importance: 75, credibility: 69 }
   }), config);
-  assert.equal(multiSource.signals.credibilityEvidence, 'corroborated-model');
-  assert.ok(multiSource.score > 0);
+  assert.equal(multiSource.signals.credibilityEvidence, null);
+  assert.equal(multiSource.score, 0);
 });
 
-test('H7：多源 T2 可信度 60 通过、59 拒绝', () => {
+test('H7：T2 可信度 60 或 59 均不能通过关联报道绕过门槛', () => {
   const pass = analyzeBreakthrough(article({
     tier: 'T2',
     sourceCount: 2,
     clusterSize: 2,
     scores: { novelty: 80, importance: 75, credibility: 60 }
   }), config);
-  assert.equal(pass.signals.credibilityEvidence, 'corroborated-model');
-  assert.ok(pass.score > 0);
+  assert.equal(pass.signals.credibilityEvidence, null);
+  assert.equal(pass.score, 0);
 
   const fail = analyzeBreakthrough(article({
     tier: 'T2',
@@ -379,7 +379,7 @@ test('H7：多源 T2 可信度 60 通过、59 拒绝', () => {
 
 // —— M6：T1 低可信降档而非拒绝 ——
 
-test('M6：T1 可信度不达标降为 corroborated 同档强度 0.76，达标则正常 tier-t1', () => {
+test('M6：T1 可信度不达标降档为 0.76，达标则正常 tier-t1', () => {
   const downgraded = analyzeBreakthrough(article({
     scores: { novelty: 88, importance: 82, credibility: 10 }
   }), config);
@@ -388,7 +388,7 @@ test('M6：T1 可信度不达标降为 corroborated 同档强度 0.76，达标�
   // 计分公式逐项复算：0.76 的降档强度替换了 T1 的 0.95
   const expectedDowngraded = Math.round(
     (0.88 * 0.2 + 0.82 * 0.18 + 0.10 * 0.2
-      + 0.5 * 0.15 + 0.5 * 0.1 + 0.76 * 0.12) * 1000) / 1000;
+      + 0.5 * 0.15 + 0.5 * 0.1 + 0.76 * 0.17) * 1000) / 1000;
   assert.equal(downgraded.score, expectedDowngraded);
 
   const normal = analyzeBreakthrough(article({
@@ -397,17 +397,18 @@ test('M6：T1 可信度不达标降为 corroborated 同档强度 0.76，达标�
   assert.equal(normal.signals.credibilityEvidence, 'tier-t1');
   const expectedNormal = Math.round(
     (0.88 * 0.2 + 0.82 * 0.18 + 0.50 * 0.2
-      + 0.5 * 0.15 + 0.5 * 0.1 + 0.95 * 0.12) * 1000) / 1000;
+      + 0.5 * 0.15 + 0.5 * 0.1 + 0.95 * 0.17) * 1000) / 1000;
   assert.equal(normal.score, expectedNormal);
 });
 
-test('M6：T1 无模型分时只看多源——单源降档、双源正常通过', () => {
+test('M6：T1 无模型分时均降档，关联报道不改变强度', () => {
   const alone = analyzeBreakthrough(article({ scores: null, sourceCount: 1 }), config);
   assert.equal(alone.signals.credibilityEvidence, 'tier-t1-downgraded');
   assert.ok(alone.score > 0);
 
   const multi = analyzeBreakthrough(article({ scores: null, sourceCount: 2, clusterSize: 2 }), config);
-  assert.equal(multi.signals.credibilityEvidence, 'tier-t1');
+  assert.equal(multi.signals.credibilityEvidence, 'tier-t1-downgraded');
+  assert.equal(multi.score, alone.score);
   assert.ok(multi.score > 0);
 });
 
@@ -464,15 +465,15 @@ test('tier 大小写与空白为严格相等：t1、" T1" 现状被拒（定性�
   }
 });
 
-test('T1.5 无模型分走多源印证并标记 corroborated-no-model', () => {
+test('T1.5 无模型分时不因关联报道获得可信证据', () => {
   const result = analyzeBreakthrough(article({
     tier: 'T1.5',
     scores: null,
     sourceCount: 2,
     clusterSize: 2
   }), config);
-  assert.equal(result.signals.credibilityEvidence, 'corroborated-no-model');
-  assert.ok(result.score > 0);
+  assert.equal(result.signals.credibilityEvidence, null);
+  assert.equal(result.score, 0);
 });
 
 // —— matches 空词防护 ——

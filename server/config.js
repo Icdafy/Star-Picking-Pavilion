@@ -10,17 +10,16 @@ const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
 const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
-// Routine multimodal analysis uses Vision; complex reasoning uses Pro.
+// All analysis uses the single Flash Vision model.
 const { VISION_MODEL: DEEPSEEK_MODEL } = require('./ai/model-policy');
 const DEEPSEEK_MODEL_RELEASE = 'DeepSeek V4 Flash Vision Experimental';
-const RETIRED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner']);
 
 const DEFAULT_SETTINGS = {
   // —— AI 分析层（DeepSeek，OpenAI 兼容协议；留好接口，可换任意兼容服务）——
   ai: {
     apiKey: '',
     baseUrl: 'https://api.deepseek.com',
-    model: DEEPSEEK_MODEL,             // 常规模型；官方端点自动按任务路由
+    model: DEEPSEEK_MODEL,             // 唯一分析模型
     maxBatchPrefilter: 20,             // 预筛单次批量
     requestTimeoutMs: 60000
   },
@@ -61,18 +60,8 @@ function normalizedRsshubBase(value) {
   }
 }
 
-// 旧库里的 `prefilterModel` / `scoringModel` 收敛成单一 `model`。
-// deepMerge 只认默认值里存在的键，旧字段合并不进来，所以必须直接读原始对象。
-// 取值顺序：新字段 → 预筛模型 → 评分模型，第一个「非退役、非空」的值胜出；
-// 常规模型从 model 或旧 prefilterModel 迁移；旧 scoringModel 不影响常规路由。
-function resolveModel(raw) {
-  for (const candidate of [raw?.ai?.model, raw?.ai?.prefilterModel]) {
-    const model = typeof candidate === 'string' ? candidate.trim() : '';
-    if (!model || RETIRED_MODELS.has(model.toLowerCase())) continue;
-    return model;
-  }
-  return DEEPSEEK_MODEL;
-}
+// Every saved model, including legacy per-task choices, migrates to Flash Vision.
+function resolveModel() { return DEEPSEEK_MODEL; }
 
 function normalizeSettings(raw) {
   const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
@@ -184,7 +173,7 @@ function applySettingsPatch(currentSettings, patch) {
       if (!model || model.length > 120 || /\p{Cc}/u.test(model)) {
         throw new HttpError(400, '模型名称必须是 1 到 120 个字符的文本');
       }
-      if (RETIRED_MODELS.has(model.toLowerCase())) {
+      if (model !== DEEPSEEK_MODEL) {
         throw new HttpError(400, `${model} 已从本应用移除，请使用 ${DEEPSEEK_MODEL}（${DEEPSEEK_MODEL_RELEASE}）`);
       }
       settings.ai.model = model;
@@ -255,7 +244,7 @@ const FALLBACK_BREAKTHROUGHS = {
   version: 1,
   maxBonus: 0,
   maxHalfLifeExtensionHours: 0,
-  minimumScores: { tier1Credibility: 40, tier15Credibility: 70, corroboratedCredibility: 60 },
+  minimumScores: { tier1Credibility: 40, tier15Credibility: 70 },
   eligibleCategories: ['技术研发', '发射与任务'],
   completionActions: ['首飞', '试飞成功', '入轨', '回收', '交付'],
   uncertaintyMarkers: ['拟', '计划', '有望', '传闻'],
@@ -289,7 +278,7 @@ function parseBreakthroughs(raw) {
     }
   }
   const minimumScores = raw.minimumScores || {};
-  for (const field of ['tier1Credibility', 'tier15Credibility', 'corroboratedCredibility']) {
+  for (const field of ['tier1Credibility', 'tier15Credibility']) {
     const value = Number(minimumScores[field]);
     // tier1Credibility 允许缺席（代码内有 40 的内置底线），另外两个必须齐备
     if (field === 'tier1Credibility' && minimumScores[field] === undefined) continue;
@@ -434,6 +423,5 @@ module.exports = {
   SETTINGS_PATH,
   BREAKTHROUGHS_PATH,
   DEEPSEEK_MODEL,
-  DEEPSEEK_MODEL_RELEASE,
-  RETIRED_MODELS
+  DEEPSEEK_MODEL_RELEASE
 };

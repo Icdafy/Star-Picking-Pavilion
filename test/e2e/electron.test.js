@@ -564,7 +564,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   try {
     await firstPage.locator('#setBaseUrl').fill(mockBaseUrl);
     await firstPage.locator('#setApiKey').fill(DUMMY_API_KEY);
-    await firstPage.locator('#setModel').fill(ANALYSIS_MODEL);
+    assert.equal(await firstPage.locator('#setModel').getAttribute('readonly'), '');
     await firstPage.locator('#setInterval').fill('45');
     await firstPage.locator('#setRsshub').fill(`${mockBaseUrl}/rsshub`);
 

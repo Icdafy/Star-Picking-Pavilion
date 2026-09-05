@@ -335,7 +335,7 @@ async function scenarioConcurrency() {
   for (const row of db.prepare('SELECT scoring_version, breakthrough_signals_json FROM articles WHERE relevant=1').all()) {
     try {
       JSON.parse(row.breakthrough_signals_json);
-      if (row.scoring_version !== 1) inconsistentRows++;
+      if (row.scoring_version !== 2) inconsistentRows++;
     } catch {
       inconsistentRows++;
     }

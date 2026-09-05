@@ -3,11 +3,10 @@
 //
 // v0.0.7 之前只有：质量分 = Σ(维度权重 × 维度分) × 信源等级系数。
 // 模型给的五维分是「这条新闻本身怎么样」，但一条情报值不值得占用注意力，
-// 还取决于三件模型看不到、代码却能便宜地算出来的事：
+// 还取决于两件模型看不到、代码却能便宜地算出来的事：
 //   ① 领域贴合度 —— 命中核心词库的分量（「朱雀三号首飞」和「某公司提了一句航天」不是一回事）
-//   ② 多源印证 —— 同一事件被几家信源同时报道（聚类簇越大，越可能是真的大事）
-//   ③ 噪声特征 —— 股评软文、涨停快讯这类形态，五维分往往不低，但对读者是纯干扰
-// 于是质量分变成：等级加权的维度分 + 词库加成 + 印证加成 − 噪声惩罚。
+//   ② 噪声特征 —— 股评软文、涨停快讯这类形态，五维分往往不低，但对读者是纯干扰
+// 于是质量分变成：等级加权的维度分 + 词库加成 − 噪声惩罚。
 //
 // 精选判定同步从「固定阈值」升级为「固定阈值 + 自适应偏移」：信息量丰枯不均时，
 // 固定阈值会让精选页忽而空荡忽而泛滥；偏移把整体精选率钉在目标值附近（见 calibration.js）。
@@ -35,17 +34,6 @@ function lexiconBonus(lexiconSummary, scoring) {
   return maxBonus * saturate(weightSum / saturationWeight);
 }
 
-// 多源印证加成：簇内除自己以外还有几个信源在说同一件事。
-// 单条报道 clusterSize=1 → 0 分，恰好是「没有印证」的正确取值。
-function corroborationBonus(clusterSize, scoring) {
-  const config = scoring.corroborationBoost || {};
-  const maxBonus = boundedNumber(config.maxBonus, 0);
-  if (maxBonus <= 0) return 0;
-  const saturationSources = Math.max(1, boundedNumber(config.saturationSources, 2));
-  const others = Math.max(0, boundedNumber(clusterSize, 1) - 1);
-  return maxBonus * saturate(others / saturationSources);
-}
-
 // 噪声惩罚：命中的形态特征越多扣得越狠，但有上限——
 // 扣分是为了把它压出精选，不是为了把它打成负数。
 function noisePenalty(noiseHits, scoring) {
@@ -69,7 +57,6 @@ function computeQuality(scores, context, scoring) {
   const multiplier = scoring.tierMultiplier[resolved.tier] ?? 1.0;
   const adjusted = base * multiplier
     + lexiconBonus(resolved.lexicon, scoring)
-    + corroborationBonus(resolved.clusterSize, scoring)
     - noisePenalty(resolved.noiseHits, scoring);
 
   return Math.round(Math.max(0, Math.min(100, adjusted)) * 10) / 10;
@@ -135,6 +122,5 @@ module.exports = {
   heatScore,
   saturate,
   lexiconBonus,
-  corroborationBonus,
   noisePenalty
 };

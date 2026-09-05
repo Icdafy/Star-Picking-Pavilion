@@ -5,6 +5,8 @@ const { validateAiBaseUrl } = require('../http-security');
 const { readBoundedBody } = require('../collectors/fetch-util');
 const { fetch: undiciFetch } = require('undici');
 
+const { VISION_MODEL } = require('./model-policy');
+
 const MAX_AI_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 // M2：429/5xx 与网络错误做指数退避重试；400 对参数类错误（或无法识别的报错）删参重发一次，
@@ -54,7 +56,7 @@ async function chat(messages, {
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const payload = {
-      model,
+      model: VISION_MODEL,
       messages,
       temperature,
       max_tokens: maxTokens,

@@ -2,14 +2,14 @@
 // 管线第 6 段：原子事件分离。
 //
 // 一条新闻常常打包了好几件事：「某公司完成 B 轮融资，同期其 X 型号完成首飞」。
-// 按整篇做聚类，这条既进不了「融资」簇也进不了「首飞」簇，多源印证就漏了。
+// 按整篇做聚类，这条既进不了「融资」簇也进不了「首飞」簇，关联报道就漏了。
 // 拆成原子事件（主体 · 动作 · 客体）之后，同一件事无论被哪家怎么改写标题，
 // 都会落到同一个事件键上，聚类与语义合并才有一个精确通道可用。
 //
 // 动作先归到「动作类」再进键：模型会写「成功入轨」「送入预定轨道」「发射升空」，
 // 都是同一件事；不归类的话每家媒体的措辞都会产生一个新键，等于没拆。
 const { eventTiming } = require('./event-time');
-const { canonicalizeName, entityKey } = require('./entities');
+const { canonicalizeName, entityKey, analyzeEntities } = require('./entities');
 
 // 动作类。顺序即优先级：一句话里同时出现「发射成功」和「试验」时按前者归类，
 // 所以把语义更强、更具体的类放在前面。
@@ -20,6 +20,7 @@ const ACTION_CLASSES = Object.freeze([
   ['recovery', /(回收|复用|垂直返回|着陆回收|海上回收|recovery|reflight)/i],
   ['flight-test', /(首飞|试飞|验证飞行|悬停试验|转换飞行|飞行测试|maiden flight|test flight)/i],
   ['certification', /(适航|取证|型号合格证|生产许可|运行合格|适航审定|获批|颁证|许可证|certification|type certificate)/i],
+  ['ownership', /(股东|股权|持股|入股|收购|并购|增持|减持|股权转让|stake|acquisition)/i],
   ['funding', /(融资|轮融|募资|增资|领投|注资|估值达|pre-[ab]|[ABCD]\s*轮|funding|raise)/i],
   ['listing', /(上市|IPO|挂牌|过会|招股|敲钟|listing)/i],
   ['order', /(订单|中标|采购|订购|意向书|签署采购|order|contract award)/i],
@@ -32,11 +33,12 @@ const ACTION_CLASSES = Object.freeze([
   ['incident', /(失败|故障|事故|失联|推迟|延期|取消|中止|坠毁|异常|召回|anomaly|failure)/i]
 ]);
 
-const MAX_EVENTS = 4;
+const MAX_EVENTS = 6;
 const MAX_FIELD_LENGTH = 40;
 
 function classifyAction(text) {
-  const haystack = String(text || '');
+  const haystack = String(text || '').replace(/可回收|可复用|可重复使用/g, '');
+  if (ACTION_CLASSES.some(([name]) => name === haystack)) return haystack;
   if (!haystack.trim()) return null;
   for (const [name, pattern] of ACTION_CLASSES) {
     if (pattern.test(haystack)) return name;
@@ -63,13 +65,11 @@ function normalizeEvent(raw, { fallbackText = '', article = {} } = {}) {
   if (!actorName) return null;
   const objectName = shortField(raw?.o ?? raw?.object);
   const actionText = shortField(raw?.v ?? raw?.action);
-  const actionClass = classifyAction(`${actionText} ${objectName}`) || classifyAction(fallbackText);
+  const actionClass = classifyAction(actionText) || (!actionText ? classifyAction(fallbackText) : null);
   const actor = canonicalizeName(actorName);
   if (!actor) return null;
-  let object = objectName ? canonicalizeName(objectName) : null;
-  // 别名归一之后客体可能塌回主体自己：词库把机型登记成了厂商的别名
-  // （AE200 → 沃飞长空），于是「沃飞长空 试飞验证 · 沃飞长空」既读着结巴，
-  // 事件键里也多了一段没有信息量的重复。丢掉即可。
+  let object = objectName ? { name: objectName, key: entityKey(objectName) } : null;
+  // Keep concrete product names; remove only a literal repeated actor.
   if (object && object.key === actor.key) object = null;
 
   // 动作类归不出来时退回动作原文做键。这样至少「同一主体同一措辞」还能对齐，
@@ -79,12 +79,16 @@ function normalizeEvent(raw, { fallbackText = '', article = {} } = {}) {
   const objectSlot = object ? object.key : '';
   const timing = eventTiming(raw, article);
   // A date elsewhere in a multi-event article is not evidence for this event.
-  if (timing.date && ((!timing.evidence.includes(actorName) && !(objectName && timing.evidence.includes(objectName)))
+  const actorInQuote = timing.evidence.includes(actorName)
+    || (timing.date && analyzeEntities(timing.evidence).entities.some(entity => entity.key === actor.key));
+  if (timing.date && ((!actorInQuote && !(objectName && timing.evidence.includes(objectName)))
     || (actionClass && classifyAction(timing.evidence) !== actionClass))) timing.date = null;
   const statusText = actionText + ' ' + timing.evidence;
-  const status = /失败|故障|事故|失联|取消|坠毁|failure|anomaly/i.test(statusText) ? 'failed'
-    : /计划|拟于|拟在|拟开展|拟进行|拟发射|拟建|预计|有望|传闻|或将|将于|将会|即将|将发射|将首飞|plan|expect/i.test(statusText) ? 'planned'
-    : ['completed', 'planned', 'failed'].includes(raw?.status) ? raw.status : 'unknown';
+  const status = /失败|未成功|未能|故障|事故|失联|取消|坠毁|failure|failed|anomaly/i.test(statusText) ? 'failed'
+    : /计划|拟于|拟在|拟开展|拟进行|拟发射|拟建|预计|有望|传闻|或将|将于|将会|即将|将发射|将首飞|推迟|延期|暂停|尚未|尚无|未完成|plan|expect|scheduled|postpon/i.test(statusText) ? 'planned'
+    : /完成|成功|已发射|已入轨|已获|获颁|获批|签署|宣布|发布|交付|入股|成为.{0,8}股东|completed|success|launched|awarded|signed/i.test(timing.evidence) ? 'completed'
+    : timing.evidence && ['completed', 'planned', 'failed'].includes(raw?.status) ? raw.status : 'unknown';
+  if (!['completed', 'failed'].includes(status)) timing.date = null;
   return {
     actor: actor.name,
     action: actionText || actionClass || '',

@@ -11,12 +11,12 @@ const calibration = require('../server/ai/calibration');
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'scoring.json'), 'utf8'));
 const DIMS = { importance: 60, novelty: 55, credibility: 60, impact: 55, timeliness: 60 };
 
-test('计分参数齐备，三个新信号都可调', () => {
-  for (const key of ['lexiconBoost', 'corroborationBoost', 'noisePenalty', 'adaptiveFeatured']) {
+test('计分参数齐备，移除关联报道加成配置', () => {
+  for (const key of ['lexiconBoost', 'noisePenalty', 'adaptiveFeatured']) {
     assert.ok(config[key] && typeof config[key] === 'object', `缺少 ${key}`);
   }
   assert.ok(config.lexiconBoost.maxBonus > 0);
-  assert.ok(config.corroborationBoost.maxBonus > 0);
+  assert.equal(config.corroborationBoost, undefined);
   assert.ok(config.noisePenalty.perHit > 0);
   assert.ok(config.clusterMaxSize >= 2);
   assert.ok(config.clusterMinSharedGrams >= 1);
@@ -47,16 +47,16 @@ test('词库贴合度按权重和加成，且有上限', () => {
   assert.ok(heavy - base <= config.lexiconBoost.maxBonus + 1e-6, '加成不得超过 maxBonus');
 });
 
-test('多源印证：单条报道不加分，簇越大加得越多但封顶', () => {
+test('关联报道数量不影响质量分', () => {
   const alone = scoring.computeQuality(DIMS, { tier: 'T2', clusterSize: 1 }, config);
   const base = scoring.computeQuality(DIMS, { tier: 'T2' }, config);
   assert.equal(alone, base, '簇大小 1 等于没有印证，不能加分');
 
   const three = scoring.computeQuality(DIMS, { tier: 'T2', clusterSize: 3 }, config);
   const twelve = scoring.computeQuality(DIMS, { tier: 'T2', clusterSize: 12 }, config);
-  assert.ok(three > alone);
-  assert.ok(twelve > three);
-  assert.ok(twelve - alone <= config.corroborationBoost.maxBonus + 1e-6);
+  assert.equal(three, alone);
+  assert.equal(twelve, three);
+
 });
 
 test('噪声惩罚随命中数加深并封顶，分数不会掉成负数', () => {

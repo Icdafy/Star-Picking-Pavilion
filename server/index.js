@@ -135,8 +135,7 @@ function clampEvents(value) {
       object: typeof item.object === 'string' ? item.object.trim().slice(0, 80) : '',
       date: typeof item.date === 'string' ? item.date.slice(0, 10) : null,
       status: typeof item.status === 'string' ? item.status.slice(0, 20) : 'unknown',
-      evidence: typeof item.evidence === 'string' ? item.evidence.slice(0, 300) : '',
-      verification: isJsonObject(item.verification) ? item.verification : null
+      evidence: typeof item.evidence === 'string' ? item.evidence.slice(0, 300) : ''
     }))
     .slice(0, 12);
 }

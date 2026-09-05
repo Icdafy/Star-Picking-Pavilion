@@ -11,7 +11,7 @@ const DAILY_RECORD_HARD_LIMIT = 20_000;
 // 只取 mapRecord 真正消费的列，不再 a.* 把整行拖进内存
 const DAILY_RECORD_COLUMNS = `
   a.id, a.source_id, a.title, a.url, a.summary_raw, a.ai_summary, a.ai_reason,
-  a.event_date, a.verification_json, a.events_json, a.vision_json, a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
+  a.event_date, a.events_json, a.vision_json, a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
   a.scores_json, a.quality_score, a.featured, a.tags_json, a.cluster_id, a.starred,
   a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json, a.scoring_version`;
 const DAILY_RECORD_WINDOW_WHERE = `
