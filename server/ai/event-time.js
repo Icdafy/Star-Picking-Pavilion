@@ -12,6 +12,12 @@ function resolveEventDate(value, publishedAt) {
   const text = String(value || '').trim();
   const full = text.match(/(20\d{2})[-/年](\d{1,2})[-/月](\d{1,2})/);
   if (full) return dateOnly(`${full[1]}-${full[2].padStart(2, '0')}-${full[3].padStart(2, '0')}`);
+  const english = text.match(/\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?[,]?\s+(20\d{2})\b/)
+    || (() => { const m = text.match(/\b(\d{1,2})\s+([A-Za-z]+)\s+(20\d{2})\b/); return m && [m[0],m[2],m[1],m[3]]; })();
+  if (english) {
+    const month = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(english[1].slice(0,3).toLowerCase())+1;
+    if (month) return dateOnly(`${english[3]}-${String(month).padStart(2,'0')}-${english[2].padStart(2,'0')}`);
+  }
   if (!publishedAt || !Number.isFinite(Date.parse(publishedAt))) return null;
   const anchor = new Date(Date.parse(publishedAt) + 8 * 3600000);
   const relative = { '今天': 0, '当日': 0, '昨日': 1, '昨天': 1, '前天': 2 }[text];
@@ -29,7 +35,7 @@ function eventTiming(raw, article) {
   const text = `${article.title || ''} ${article.summary_raw || ''} ${article.content_text || ''}`;
   const quotePresent = evidence.length >= 6 && text.includes(evidence);
   const resolved = resolveEventDate(raw?.w ?? raw?.time, article.published_at);
-  const evidenceDates = (evidence.match(/20\d{2}[-/年]\d{1,2}[-/月]\d{1,2}|\d{1,2}月\d{1,2}日?|今天|当日|昨日|昨天|前天/g) || [])
+  const evidenceDates = (evidence.match(/20\d{2}[-/年]\d{1,2}[-/月]\d{1,2}|\d{1,2}月\d{1,2}日?|[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?[,]?\s+20\d{2}|\d{1,2}\s+[A-Za-z]+\s+20\d{2}|今天|当日|昨日|昨天|前天/g) || [])
     .map(date => resolveEventDate(date, article.published_at));
   const past = resolved && Date.parse(resolved) <= Date.now() + DAY
     && (!article.published_at || Date.parse(resolved) <= Date.parse(article.published_at) + DAY);

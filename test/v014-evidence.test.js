@@ -24,6 +24,8 @@ test('event dates resolve against publication including New Year, never collecti
   assert.equal(resolveEventDate('近日','2026-09-05T00:00:00Z'),null);
   assert.equal(resolveEventDate('2026-02-30',null),null);
   assert.equal(resolveEventDate('8月2日',null),null);
+  assert.equal(resolveEventDate('August 1, 2026',null),'2026-08-01');
+  assert.equal(resolveEventDate('1 August 2026',null),'2026-08-01');
 });
 const quote='2026年8月1日，蓝箭航天完成朱雀三号首飞。';
 const article={title:'蓝箭航天首飞回顾',summary_raw:quote,published_at:'2026-09-05T00:00:00Z'};
@@ -41,6 +43,9 @@ test('atomic event keys distinguish recurring dates and plans from completed act
   assert.match(actual.key,/2026-08-01/);
   const quote2=quote.replace('8月1日','8月2日');
   assert.notEqual(actual.key,normalizeEvents([{...base,w:'2026-08-02',evidence:quote2}],{article:{...article,summary_raw:quote2}})[0].key);
+  const completedQuote='2026年8月1日，蓝箭航天成功将卫星送入预定轨道。';
+  const launched=normalizeEvents([{a:'蓝箭航天',v:'发射入轨',w:'2026-08-01',status:'completed',evidence:completedQuote}],{article:{...article,summary_raw:completedQuote}})[0];
+  assert.equal(launched.status,'completed','将 as an object marker must not turn a completed launch into a plan');
 });
 const report=(url, extra={})=>({url,source_url:url,source_name:url,tier:'T2',date:'2026-08-01',evidence:quote,...extra});
 test('single media, same domain, aggregate duplicates and attributed reprints cannot confirm', () => {

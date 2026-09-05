@@ -83,7 +83,7 @@ function normalizeEvent(raw, { fallbackText = '', article = {} } = {}) {
     || (actionClass && classifyAction(timing.evidence) !== actionClass))) timing.date = null;
   const statusText = actionText + ' ' + timing.evidence;
   const status = /失败|故障|事故|失联|取消|坠毁|failure|anomaly/i.test(statusText) ? 'failed'
-    : /计划|拟|将|预计|有望|传闻|或将|plan|expect/i.test(statusText) ? 'planned'
+    : /计划|拟于|拟在|拟开展|拟进行|拟发射|拟建|预计|有望|传闻|或将|将于|将会|即将|将发射|将首飞|plan|expect/i.test(statusText) ? 'planned'
     : ['completed', 'planned', 'failed'].includes(raw?.status) ? raw.status : 'unknown';
   return {
     actor: actor.name,
