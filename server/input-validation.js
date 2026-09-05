@@ -4,7 +4,7 @@ const { HttpError } = require('./http-security');
 // 与采集器共用同一个解析器：信源地址的写法只有一处定义，校验与采集不会各说各话
 const { parseApiSpec } = require('./collectors/api');
 
-const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api']);
+const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api', 'wechat']);
 const SOURCE_TIERS = new Set(['T1', 'T1.5', 'T2']);
 const SOURCE_DOMAINS = new Set(['both', 'lowaltitude', 'aerospace']);
 const FEED_VIEWS = new Set(['featured', 'all', 'starred']);
@@ -52,7 +52,7 @@ function validateSourceUrl(type, value) {
     if (spec.keyword !== undefined) boundedString(spec.keyword, 'API 关键词', { min: 0, max: 100 });
     return url;
   }
-  if (type === 'rss' && url.startsWith('rsshub://')) {
+  if (['rss', 'wechat'].includes(type) && url.startsWith('rsshub://')) {
     boundedString(url.slice('rsshub://'.length), 'RSSHub 路由', { min: 1, max: 500 });
     return url;
   }

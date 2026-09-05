@@ -11,7 +11,7 @@ const DAILY_RECORD_HARD_LIMIT = 20_000;
 // 只取 mapRecord 真正消费的列，不再 a.* 把整行拖进内存
 const DAILY_RECORD_COLUMNS = `
   a.id, a.source_id, a.title, a.url, a.summary_raw, a.ai_summary, a.ai_reason,
-  a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
+  a.event_date, a.verification_json, a.events_json, a.vision_json, a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
   a.scores_json, a.quality_score, a.featured, a.tags_json, a.cluster_id, a.starred,
   a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json, a.scoring_version`;
 const DAILY_RECORD_WINDOW_WHERE = `
@@ -95,6 +95,8 @@ function mapRecord(row, { date, window, scoring }) {
   const quality = finiteOrNull(row.quality_score, 0, 100);
   const breakthroughScore = finiteOrNull(row.breakthrough_score, 0, 1) || 0;
   const breakthroughBonus = finiteOrNull(row.breakthrough_bonus, 0, 100) || 0;
+  const timing = require('../ai/event-time').timingFields(row);
+  const vision = parseJson(row.vision_json, {}, value => value && typeof value === 'object');
   const publishedAt = safeDate(row.published_at);
   const fetchedAt = safeDate(row.fetched_at);
   const text = [
@@ -108,7 +110,7 @@ function mapRecord(row, { date, window, scoring }) {
   // 第 6 参传条目自身 fetchedAt（publishedAt 无效→按截止时刻，晚于截止超 48h→回落 fetchedAt）
   const heatAtCutoff = quality == null ? null : Math.round(heatScore(
     quality,
-    publishedAt,
+    timing.eventDate ? timing.eventDate + 'T00:00:00+08:00' : publishedAt,
     scoring,
     Date.parse(window.end),
     { score: breakthroughScore, bonus: breakthroughBonus },
@@ -130,7 +132,9 @@ function mapRecord(row, { date, window, scoring }) {
     aiSummary: row.ai_summary == null ? null : String(row.ai_summary),
     aiReason: row.ai_reason == null ? null : String(row.ai_reason),
     publishedAt,
-    fetchedAt,
+    fetchedAt, ...timing,
+    events: parseJson(row.events_json, [], Array.isArray),
+    images: Array.isArray(vision.images) ? vision.images : [],
     domain: row.domain || null,
     category: row.category || null,
     relevant,

@@ -104,12 +104,12 @@ test('editable settings reject invalid numeric, URL, and model values', () => {
   assert.throws(() => applySettingsPatch(current, { ai: { scoringModel: 'x' } }), /设置字段/);
   // v4-pro 已从本应用移除：设置层直接挡住，避免有人把它填回去
   assert.throws(
-    () => applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }),
+    () => applySettingsPatch(current, { ai: { model: 'deepseek-v4-flash' } }),
     /已从本应用移除/
   );
   assert.equal(
-    applySettingsPatch(current, { ai: { model: ' deepseek-v4-flash ' } }).settings.ai.model,
-    'deepseek-v4-flash'
+    applySettingsPatch(current, { ai: { model: ' deepseek-v4-pro ' } }).settings.ai.model,
+    'deepseek-v4-pro'
   );
 
   const valid = applySettingsPatch(current, {
@@ -141,7 +141,7 @@ test('loading a malformed legacy settings file normalizes scheduler and request 
   assert.equal(loaded.ai.maxBatchPrefilter, 20);
   // 旧库的两段式模型字段被收敛：prefilterModel 是空串、scoringModel 是已退役的 v4-pro，
   // 两个都不可用，于是回落到默认模型而不是把 pro 带进新版本
-  assert.equal(loaded.ai.model, 'deepseek-v4-flash');
+  assert.equal(loaded.ai.model, 'deepseek-v4-flash-vision-exp');
   assert.equal(Object.hasOwn(loaded.ai, 'prefilterModel'), false);
   assert.equal(Object.hasOwn(loaded.ai, 'scoringModel'), false);
   assert.equal(loaded.collect.intervalMinutes, 10);

@@ -48,7 +48,7 @@ test('v6 将工信部空壳旧栏目迁移到可静态解析的新版新闻发�
 });
 
 test('v7 将 36氪 死链 feed 迁移到 RSSHub 快讯路由，老库行保留统计与启停状态', () => {
-  assert.equal(seed._version, 7);
+  assert.equal(seed._version, 8);
   const migration = seed._migrations.find(item => item.from === 'https://36kr.com/feed');
   const seeded = seed.sources.find(item => item.url === 'rsshub://36kr/newsflashes');
   assert.ok(migration, '缺少 36氪 迁移步骤');

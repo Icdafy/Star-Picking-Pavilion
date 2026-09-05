@@ -48,6 +48,9 @@ jobs:
       - name: Verify built artifact versions
         run: npm run verify:version -- --tag $env:GITHUB_REF_NAME --artifacts
 
+      - name: Install, launch and uninstall on disposable Windows runner
+        run: node scripts/smoke-installer.js
+
       - name: Generate SHA-256 checksum
         shell: pwsh
         run: |

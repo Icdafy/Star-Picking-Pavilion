@@ -2,6 +2,7 @@
 // RSS 适配器（标准 RSS / Atom / 必应资讯 RSS / RSSHub 通用）
 const Parser = require('rss-parser');
 const { fetchText } = require('./fetch-util');
+const { extractContent } = require('./article-content');
 
 const parser = new Parser({
   customFields: {
@@ -32,7 +33,8 @@ async function fetch(source, settings) {
     url: normalizeUrl(it.link),
     summary: cleanText(it.contentSnippet || it.description || it.content || ''),
     publishedAt: toIso(it.isoDate || it.pubDate),
-    image: extractImage(it)
+    image: extractImage(it),
+    images: extractContent(it['content:encoded'] || it.content || it.description || '', it.link).images
   }));
 }
 
@@ -103,4 +105,4 @@ function normalizeUrl(link) {
   }
 }
 
-module.exports = { fetch, sanitizeXml, normalizeUrl };
+module.exports = { fetch, resolveUrl, sanitizeXml, normalizeUrl };

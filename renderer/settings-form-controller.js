@@ -5,7 +5,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.SettingsFormController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createSettingsFormModule() {
-  const DEFAULT_MODEL = 'deepseek-v4-flash';
+  const DEFAULT_MODEL = 'deepseek-v4-flash-vision-exp';
   const FIELD_NAMES = Object.freeze([
     'apiKey',
     'baseUrl',

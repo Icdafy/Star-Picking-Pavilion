@@ -70,7 +70,7 @@ test('种子库只锁定低空经济与商业航天两个领域', () => {
   for (const source of seed.sources) {
     assert.ok(['lowaltitude', 'aerospace', 'both'].includes(source.domain),
       `${source.name} 的领域越界：${source.domain}`);
-    assert.ok(['rss', 'api', 'html', 'bing'].includes(source.type), `${source.name} 类型未知`);
+    assert.ok(['rss', 'api', 'html', 'bing', 'wechat'].includes(source.type), `${source.name} 类型未知`);
     assert.ok(['T1', 'T1.5', 'T2'].includes(source.tier), `${source.name} 等级未知`);
   }
 });

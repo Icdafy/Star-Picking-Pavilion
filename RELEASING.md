@@ -17,7 +17,7 @@
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.1.3
+npm run verify:version -- --tag v0.1.4
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -26,11 +26,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.1.3 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.1.3.exe
+npm run verify:version -- --tag v0.1.4 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.1.4.exe
 ```
 
-v0.1.3 的签名状态预期为 `NotSigned`。
+v0.1.4 的签名状态预期为 `NotSigned`。
 
 **体积不再有上限。** `npm run verify:package` 会打印 ASAR 与安装包的精确字节数供发布记录比对，但不会因为体积失败。
 
@@ -68,24 +68,24 @@ v0.1.3 的签名状态预期为 `NotSigned`。
 
 ## 版本与 tag
 
-从 v0.1.3 起，`package.json.version`、`build.buildVersion`、`shortVersionWindows`、tag、Release 标题、安装器品牌、安装包名与应用界面必须使用同一个公开版本。版本校验会拒绝产品版本分叉。
+从 v0.1.4 起，`package.json.version`、`build.buildVersion`、`shortVersionWindows`、tag、Release 标题、安装器品牌、安装包名与应用界面必须使用同一个公开版本。版本校验会拒绝产品版本分叉。
 
-v0.1.2 已公开安装包曾把 npm/Electron 版本写成 `0.1.4`。为了让该客户端仍能自动发现数值较低的公开 v0.1.3，本版本仅在 `latest.yml` 使用一次性 `legacyUpdaterBridgeVersion: 0.1.5`。这只是旧客户端的传输比较标记，不得进入安装器、Windows 属性或 UI；v0.1.3 客户端会按 GitHub tag 拦截同版本桥，避免循环更新。发布 v0.1.4 前必须移除 `legacyUpdaterBridgeVersion`，此后更新元数据恢复与公开号完全一致。创建 tag 前先运行：
+v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.1.3
-git tag -a v0.1.3 -m "摘星阁 v0.1.3"
-git push origin v0.1.3
+npm run verify:version -- --tag v0.1.4
+git tag -a v0.1.4 -m "摘星阁 v0.1.4"
+git push origin v0.1.4
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.1.3 Release 应包含：
+v0.1.4 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.1.3.exe`
-- `Star-Picking-Pavilion-Setup-0.1.3.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.1.4.exe`
+- `Star-Picking-Pavilion-Setup-0.1.4.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`

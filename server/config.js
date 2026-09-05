@@ -10,21 +10,17 @@ const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
 const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
-// v0.0.14 起全站只调用一个模型。`deepseek-v4-flash` 是 DeepSeek 官方的滚动别名，
-// 当前指向 DeepSeek-V4-Flash-0731（2026-07-31 发布，模型结构与尺寸不变、仅重做后训练），
-// 调用方式不变，所以这里固定写别名即可自动吃到最新版本，不要写死日期后缀。
-const DEEPSEEK_MODEL = 'deepseek-v4-flash';
-const DEEPSEEK_MODEL_RELEASE = 'DeepSeek-V4-Flash-0731';
-// 已退役 / 已下线的模型名。旧设置里残留这些值时一律回落到默认模型，
-// 否则用户升级后仍然会按 pro 的价格打到 pro 上。
-const RETIRED_MODELS = new Set(['deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner']);
+// Routine multimodal analysis uses Vision; complex reasoning uses Pro.
+const { VISION_MODEL: DEEPSEEK_MODEL } = require('./ai/model-policy');
+const DEEPSEEK_MODEL_RELEASE = 'DeepSeek V4 Flash Vision Experimental';
+const RETIRED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner']);
 
 const DEFAULT_SETTINGS = {
   // —— AI 分析层（DeepSeek，OpenAI 兼容协议；留好接口，可换任意兼容服务）——
   ai: {
     apiKey: '',
     baseUrl: 'https://api.deepseek.com',
-    model: DEEPSEEK_MODEL,             // 唯一模型：预筛与研判共用（DeepSeek-V4-Flash-0731）
+    model: DEEPSEEK_MODEL,             // 常规模型；官方端点自动按任务路由
     maxBatchPrefilter: 20,             // 预筛单次批量
     requestTimeoutMs: 60000
   },
@@ -68,9 +64,9 @@ function normalizedRsshubBase(value) {
 // 旧库里的 `prefilterModel` / `scoringModel` 收敛成单一 `model`。
 // deepMerge 只认默认值里存在的键，旧字段合并不进来，所以必须直接读原始对象。
 // 取值顺序：新字段 → 预筛模型 → 评分模型，第一个「非退役、非空」的值胜出；
-// 三个都不可用（典型情况：旧库只写过 scoringModel=deepseek-v4-pro）就回默认。
+// 常规模型从 model 或旧 prefilterModel 迁移；旧 scoringModel 不影响常规路由。
 function resolveModel(raw) {
-  for (const candidate of [raw?.ai?.model, raw?.ai?.prefilterModel, raw?.ai?.scoringModel]) {
+  for (const candidate of [raw?.ai?.model, raw?.ai?.prefilterModel]) {
     const model = typeof candidate === 'string' ? candidate.trim() : '';
     if (!model || RETIRED_MODELS.has(model.toLowerCase())) continue;
     return model;
@@ -188,8 +184,6 @@ function applySettingsPatch(currentSettings, patch) {
       if (!model || model.length > 120 || /\p{Cc}/u.test(model)) {
         throw new HttpError(400, '模型名称必须是 1 到 120 个字符的文本');
       }
-      // 已退役的模型名不接受写入：deepseek-v4-pro 仍然可以计费调用，
-      // 把它挡在设置层，才不会有人「顺手填回去」把成本翻三倍。
       if (RETIRED_MODELS.has(model.toLowerCase())) {
         throw new HttpError(400, `${model} 已从本应用移除，请使用 ${DEEPSEEK_MODEL}（${DEEPSEEK_MODEL_RELEASE}）`);
       }

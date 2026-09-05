@@ -115,11 +115,12 @@
     // 再列一遍只是噪声；而「这条其实讲了两件事」本身就是读者需要知道的信息。
     function atomicEventsHtml(item) {
       const list = Array.isArray(item.events) ? item.events.filter(e => e?.actor) : [];
-      if (list.length < 2) return '';
+      if (!list.length || (list.length < 2 && !list[0].date && !list[0].evidence)) return '';
       const rows = list.map(event => {
         const action = EVENT_CLASS_NAMES[event.actionClass] || event.action || '相关动作';
         const object = event.object ? ` · ${esc(event.object)}` : '';
-        return `<li><b>${esc(event.actor)}</b><span>${esc(action)}</span>${object}</li>`;
+        const state = ({completed:'已发生',planned:'计划',failed:'失败',unknown:'状态待核'})[event.status] || '';
+        return `<li title="${esc(event.evidence || '')}"><b>${esc(event.actor)}</b><span>${esc(action)}</span>${object}<small>${esc(event.date || '时间待核')} · ${state}</small></li>`;
       }).join('');
       return `<div class="card-events" role="note">
       <span class="ce-label">原子事件 ${list.length}</span>
@@ -140,7 +141,7 @@
   // 时间轴的时间基准：星标视图按收藏时间排序，分组标题就必须同样用收藏时间，
   // 否则日期分组会随发布时间来回跳，出现「今天 / 3月2日 / 今天」这样的乱序标题。
   //（自 app.js 迁入）
-  const publishedTime = item => item.publishedAt || item.fetchedAt;
+  const publishedTime = item => item.eventDate ? item.eventDate + 'T00:00:00+08:00' : item.publishedAt || item.fetchedAt;
   const starredTime = item => item.starredAt || item.fetchedAt;
 
   // 五维研判维度名（自 app.js 迁入，仅卡片五维分解使用）
@@ -204,6 +205,10 @@
       const breakthrough = breakthroughPresentation(item);
       q('.card-score-group').innerHTML =
         (breakthrough ? breakthroughBadgeHtml(breakthrough) : '') + scorePill(item);
+      const verification = item.verification || {};
+      const status = ({official:'官方一手确认',corroborated:'独立多源确认',conflict:'时间证据冲突',pending:'待交叉核实'})[verification.status] || '待交叉核实';
+      const delay = Number.isFinite(item.reportDelayDays) ? (item.reportDelayDays === 0 ? '当日报道' : `迟报 ${item.reportDelayDays} 天`) : '时差待核';
+      q('.card-score-group').insertAdjacentHTML('beforeend', `<span class="event-time-badge" role="note" title="${esc(status)}；事件日期：${esc(item.eventDate || '未知')}；报道时间：${esc(item.reportedAt || item.publishedAt || '未知')}；按北京时间自然日估算">${esc(delay)} · ${esc(status)}</span>`);
       const title = q('.card-title');
       title.setAttribute('href', safeHttpUrl(item.url));
       title.textContent = item.title ?? '';
@@ -224,6 +229,10 @@
       if (entities) q('.card-text').insertAdjacentHTML('beforeend', entities);
       const events = atomicEventsHtml(item);
       if (events) q('.card-content').insertAdjacentHTML('afterend', events);
+      const usefulImages = (Array.isArray(item.images) ? item.images : []).filter(i => i && typeof i.caption === 'string' && safeHttpUrl(i.url) !== '#').slice(0,4);
+      if (usefulImages.length) q('.card-content').insertAdjacentHTML('afterend', `<div class="card-image-evidence">${usefulImages.map(i => `<figure><a href="${esc(safeHttpUrl(i.sourceUrl || item.url))}" target="_blank" rel="noopener noreferrer"><img src="${esc(safeHttpUrl(i.url))}" loading="lazy" referrerpolicy="no-referrer" alt="${esc(i.caption || '')}"></a><figcaption>${esc(i.kind || '图片')} · ${esc(i.caption || '')}（AI 图片解读，点击查原文）</figcaption></figure>`).join('')}</div>`);
+      const evidenceSources = Array.isArray(verification.sources) ? verification.sources.filter(e => e && typeof e === 'object').slice(0,8) : [];
+      if (evidenceSources.length) q('.card-content').insertAdjacentHTML('afterend', `<details class="event-verification"><summary>核验依据 · ${esc(status)}</summary>${evidenceSources.map(e => `<p><a href="${esc(safeHttpUrl(e.url))}" target="_blank" rel="noopener noreferrer">${esc(e.name || '原文')}</a> · ${esc(e.date || '')}<br>${esc(e.evidence || '')}</p>`).join('')}</details>`);
       const reason = q('.card-reason');
       if (item.reason) q('.cr-text').textContent = item.reason;
       else reason.remove();

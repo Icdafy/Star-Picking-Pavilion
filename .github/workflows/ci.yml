@@ -39,3 +39,6 @@ jobs:
 
       - name: Verify package boundary
         run: npm run verify:package
+
+      - name: Install, launch and uninstall on disposable Windows runner
+        run: node scripts/smoke-installer.js

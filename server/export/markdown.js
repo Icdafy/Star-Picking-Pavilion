@@ -7,7 +7,7 @@
 //   text     —— 纯文本，链接单独成行，适合贴进微信群与邮件
 
 const DOMAIN_NAMES = { lowaltitude: '低空经济', aerospace: '商业航天' };
-const EXPORT_VERSION = '0.0.16';
+const EXPORT_VERSION = require('../../package.json').version;
 const FORMATS = new Set(['markdown', 'text']);
 // 只转义行内有语义的字符：标题里出现 [] 或 * 时不转义会把链接和强调撑破，
 // 而 # - . 之类只在行首有语义，本模块每一行都自带前缀（`# `/`> `/`N. `/`   - `），
@@ -80,6 +80,11 @@ function describeEntry(item) {
   if (Number.isFinite(breakthroughBonus) && breakthroughBonus > 0) {
     parts.push(`技术突破 +${Math.round(breakthroughBonus * 10) / 10}`);
   }
+  if (item.verification) {
+    const state = ({official:'官方一手确认',corroborated:'独立多源确认',conflict:'证据冲突'})[item.verification.status] || '待交叉核实';
+    parts.push(state, '事件日期 ' + (item.eventDate || '待核'));
+    if (Number.isFinite(item.reportDelayDays)) parts.push('报道时差 ' + item.reportDelayDays + ' 天');
+  }
   return parts;
 }
 
@@ -100,6 +105,14 @@ function entryLines(item, index, format) {
     if (meta) lines.push(`   - ${escapeMarkdown(meta)}`);
     if (summary) lines.push(`   - ${escapeMarkdown(summary)}`);
     if (reason) lines.push(`   - 研判：${escapeMarkdown(reason)}`);
+    for (const image of (Array.isArray(item.images) ? item.images : []).slice(0,4)) {
+      const target = markdownLinkTarget(image?.url);
+      if (target) lines.push('   - ![' + escapeMarkdown(image.caption || '图片证据') + '](' + target + ')');
+    }
+    for (const source of (Array.isArray(item.verification?.sources) ? item.verification.sources : []).slice(0,8)) {
+      const target = markdownLinkTarget(source?.url);
+      if (target) lines.push('   - 核验：[' + escapeMarkdown(source.name) + '](' + target + ') ' + escapeMarkdown(source.evidence));
+    }
     return lines;
   }
 

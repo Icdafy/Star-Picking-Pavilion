@@ -13,6 +13,7 @@ const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
 
 const ADAPTERS = {
+  wechat: require('./wechat'),
   rss: rssAdapter,
   bing: rssAdapter, // 必应资讯本质也是 RSS，复用解析器（注：大陆网络环境下必应常返回空结果）
   html: htmlAdapter,
@@ -50,7 +51,7 @@ function applySourceMigrations(migrations) {
       continue;
     }
 
-    db.prepare(`UPDATE sources SET url=?, name=?, tier=?, selector_json=?, note=?,
+    db.prepare(`UPDATE sources SET url=?, name=?, tier=?, selector_json=?, note=?, type=?,
         consecutive_errors=0, next_fetch_at=NULL, last_status=NULL WHERE id=?`)
       .run(
         step.to || current.url,
@@ -58,6 +59,7 @@ function applySourceMigrations(migrations) {
         step.tier || current.tier,
         step.selector ? JSON.stringify(step.selector) : current.selector_json,
         step.note || current.note,
+        step.type || current.type,
         current.id
       );
     applied++;

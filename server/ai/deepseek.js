@@ -37,6 +37,7 @@ async function chat(messages, {
   settings,
   model,
   temperature = 0.2,
+  reasoning = false,
   maxTokens = 4000,
   fetchImpl = undiciFetch,
   maxResponseBytes = MAX_AI_RESPONSE_BYTES
@@ -58,9 +59,8 @@ async function chat(messages, {
       temperature,
       max_tokens: maxTokens,
       response_format: { type: 'json_object' },
-      // DeepSeek V4 系列默认开启思考模式，会把 token 花在 reasoning_content 上；
-      // 本系统的任务（预筛/结构化研判）不需要长思考，显式关闭以省钱提速
-      thinking: { type: 'disabled' }
+      thinking: { type: reasoning ? 'enabled' : 'disabled' },
+      ...(reasoning ? { reasoning_effort: 'high' } : {})
     };
     const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
     const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
@@ -96,6 +96,7 @@ async function chat(messages, {
           // thinking 字样，兼容兜底确保它们永不静默退化为启发式
           thinkingDropped = true;
           delete payload.thinking;
+          delete payload.reasoning_effort;
           continue;
         }
         throw new Error(`DeepSeek HTTP 400: ${raw400.slice(0, 200)}`);

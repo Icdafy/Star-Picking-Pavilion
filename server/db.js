@@ -175,7 +175,9 @@ CREATE TABLE IF NOT EXISTS meta (
 function migrate() {
   const cols = new Set(db.prepare('PRAGMA table_info(articles)').all().map(c => c.name));
   const addCol = (name, def) => { if (!cols.has(name)) db.exec(`ALTER TABLE articles ADD COLUMN ${name} ${def}`); };
+  addCol('analysis_version', 'INTEGER NOT NULL DEFAULT 0');
   addCol('ai_reason', 'TEXT');   // 情报研判（推荐理由 / 编者按）
+  for (const name of ['content_text','images_json','vision_json','content_status','publisher_id','event_date','verification_json']) addCol(name, 'TEXT');
   addCol('image_url', 'TEXT');   // 文章缩略图
   // 星标留存：用户显式收起来的情报。starred_at 既是「星标」视图的排序依据，
   // 也让保留清理能识别并永久跳过这些条目（见 retention.selectExpiredIds）
@@ -239,11 +241,11 @@ function insertArticle(a) {
   }
   return withTransaction(() => {
     const stmt = db.prepare(`INSERT OR IGNORE INTO articles
-      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
       a.publishedAt || null, now(), a.domain || null, a.image || null,
-      Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0);
+      Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0, JSON.stringify(a.images || []), a.contentText || null, a.publisherId || null);
     if (r.changes > 0) {
       db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
         .run(r.lastInsertRowid, a.title, a.summaryRaw || '');

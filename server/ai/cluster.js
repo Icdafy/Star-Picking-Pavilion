@@ -120,7 +120,7 @@ function clusterRecent() {
 
   const rows = db.prepare(`
     SELECT a.id, a.title, a.ai_summary, a.domain, a.cluster_id, a.quality_score,
-           a.entities_json, a.events_json, a.event_key, s.tier
+           a.entities_json, a.events_json, a.event_key, a.published_at, s.tier
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.relevant = 1 AND julianday(a.fetched_at) > julianday('now', ?)
     ORDER BY a.id`).all(`-${windowH} hours`);
@@ -131,7 +131,10 @@ function clusterRecent() {
     r.grams = bigrams(r.title + ' ' + (r.ai_summary || ''));
     r.anchorKeys = anchorKeys(parseJsonArray(r.entities_json));
     r.primaryEventKey = r.event_key || null;
-    r.actionClass = parseJsonArray(r.events_json)[0]?.actionClass || null;
+    const event = parseJsonArray(r.events_json)[0];
+    r.actionClass = event?.actionClass || null;
+    r.eventDate = event?.date || null;
+    r.eventStatus = event?.status || 'unknown';
   }
 
   // 并查集（带簇容量上限）。真实事件在 72 小时窗口里被十几家报道已是顶格，
@@ -139,10 +142,17 @@ function clusterRecent() {
   const parent = new Map(rows.map(r => [r.id, r.id]));
   const size = new Map(rows.map(r => [r.id, 1]));
   const find = id => { let p = parent.get(id); while (p !== parent.get(p)) p = parent.get(p); parent.set(id, p); return p; };
+  const membersByRoot = new Map(rows.map(r => [r.id, [r]]));
+  const compatible = (a, b) => !(a.eventDate && b.eventDate && a.eventDate !== b.eventDate)
+    && !(a.eventStatus !== 'unknown' && b.eventStatus !== 'unknown' && a.eventStatus !== b.eventStatus);
   const union = (a, b) => {
     const ra = find(a), rb = find(b);
     if (ra === rb) return;
     if (size.get(ra) + size.get(rb) > maxSize) return;
+    const left = membersByRoot.get(ra), right = membersByRoot.get(rb);
+    if (left.some(a => right.some(b => !compatible(a, b)))) return;
+    membersByRoot.set(rb, [...left, ...right]);
+    membersByRoot.delete(ra);
     parent.set(ra, rb);
     size.set(rb, size.get(ra) + size.get(rb));
   };

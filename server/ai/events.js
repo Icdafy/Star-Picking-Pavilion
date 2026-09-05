@@ -8,6 +8,7 @@
 //
 // 动作先归到「动作类」再进键：模型会写「成功入轨」「送入预定轨道」「发射升空」，
 // 都是同一件事；不归类的话每家媒体的措辞都会产生一个新键，等于没拆。
+const { eventTiming } = require('./event-time');
 const { canonicalizeName, entityKey } = require('./entities');
 
 // 动作类。顺序即优先级：一句话里同时出现「发射成功」和「试验」时按前者归类，
@@ -57,7 +58,7 @@ function shortField(value) {
 
 // 归一化一个事件三元组。actor 必填 —— 没有主体的「完成首飞」无法与任何东西对齐，
 // 留着只会在语义合并里制造假阳性。
-function normalizeEvent(raw, { fallbackText = '' } = {}) {
+function normalizeEvent(raw, { fallbackText = '', article = {} } = {}) {
   const actorName = shortField(typeof raw === 'string' ? raw : raw?.a ?? raw?.actor);
   if (!actorName) return null;
   const objectName = shortField(raw?.o ?? raw?.object);
@@ -76,22 +77,31 @@ function normalizeEvent(raw, { fallbackText = '' } = {}) {
   const actionSlot = actionClass || entityKey(actionText).slice(0, 24);
   if (!actionSlot) return null;
   const objectSlot = object ? object.key : '';
+  const timing = eventTiming(raw, article);
+  // A date elsewhere in a multi-event article is not evidence for this event.
+  if (timing.date && ((!timing.evidence.includes(actorName) && !(objectName && timing.evidence.includes(objectName)))
+    || (actionClass && classifyAction(timing.evidence) !== actionClass))) timing.date = null;
+  const statusText = actionText + ' ' + timing.evidence;
+  const status = /失败|故障|事故|失联|取消|坠毁|failure|anomaly/i.test(statusText) ? 'failed'
+    : /计划|拟|将|预计|有望|传闻|或将|plan|expect/i.test(statusText) ? 'planned'
+    : ['completed', 'planned', 'failed'].includes(raw?.status) ? raw.status : 'unknown';
   return {
     actor: actor.name,
     action: actionText || actionClass || '',
     actionClass,
     object: object ? object.name : '',
     time: shortField(raw?.w ?? raw?.time),
-    key: `${actor.key}|${actionSlot}${objectSlot ? `|${objectSlot}` : ''}`
+    date: timing.date, evidence: timing.evidence, status,
+    key: `${actor.key}|${actionSlot}${objectSlot ? `|${objectSlot}` : ''}${timing.date ? `|${timing.date}|${status}` : status !== 'unknown' ? `|${status}` : ''}`
   };
 }
 
 // 模型输出 → 原子事件列表。按键去重并截断，主事件（第一条）排在最前。
-function normalizeEvents(raw, { fallbackText = '' } = {}) {
+function normalizeEvents(raw, { fallbackText = '', article = {} } = {}) {
   const seen = new Set();
   const events = [];
   for (const item of Array.isArray(raw) ? raw : []) {
-    const event = normalizeEvent(item, { fallbackText });
+    const event = normalizeEvent(item, { fallbackText, article });
     if (!event || seen.has(event.key)) continue;
     seen.add(event.key);
     events.push(event);

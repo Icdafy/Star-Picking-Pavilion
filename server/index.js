@@ -132,7 +132,11 @@ function clampEvents(value) {
       actor: item.actor.trim().slice(0, 80),
       action: typeof item.action === 'string' ? item.action.trim().slice(0, 80) : '',
       actionClass: typeof item.actionClass === 'string' ? item.actionClass.trim().slice(0, 40) : '',
-      object: typeof item.object === 'string' ? item.object.trim().slice(0, 80) : ''
+      object: typeof item.object === 'string' ? item.object.trim().slice(0, 80) : '',
+      date: typeof item.date === 'string' ? item.date.slice(0, 10) : null,
+      status: typeof item.status === 'string' ? item.status.slice(0, 20) : 'unknown',
+      evidence: typeof item.evidence === 'string' ? item.evidence.slice(0, 300) : '',
+      verification: isJsonObject(item.verification) ? item.verification : null
     }))
     .slice(0, 12);
 }
@@ -151,6 +155,8 @@ function clampBreakthroughSignals(value) {
 }
 
 function articleRow(r, scoring, nowMs) {
+  const timing = require('./ai/event-time').timingFields(r);
+  const vision = parseOptionalJson(r.vision_json, {}, isJsonObject);
   const rawQuality = Number(r.quality_score);
   const quality = Number.isFinite(rawQuality) ? Math.max(0, Math.min(100, rawQuality)) : null;
   const safeDate = value => value && Number.isFinite(new Date(value).getTime()) ? value : null;
@@ -164,12 +170,14 @@ function articleRow(r, scoring, nowMs) {
     summary: r.ai_summary || (r.summary_raw || '').slice(0, 120),
     reason: r.ai_reason || null,
     image: r.image_url || null,
-    publishedAt, fetchedAt,
+    publishedAt, fetchedAt, ...timing,
+    images: Array.isArray(vision.images) ? vision.images.filter(i => i && typeof i.url === 'string' && typeof i.caption === 'string').slice(0, 4).map(i => ({url: i.url.slice(0,8192), caption:i.caption.slice(0,150), kind:String(i.kind || '').slice(0,20), sourceUrl:String(i.sourceUrl || r.url).slice(0,8192)})) : [],
+    visionStatus: vision.status || null,
     domain: r.domain, category: r.category,
     quality,
     heat: quality != null ? Math.round(heatScore(
       quality,
-      publishedAt,
+      timing.eventDate ? timing.eventDate + 'T00:00:00+08:00' : publishedAt,
       scoring,
       nowMs,
       { score: breakthroughScore, bonus: breakthroughBonus },
@@ -269,7 +277,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
     // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
     rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
   } else {
-    rows = db.prepare(buildSql('COALESCE(a.published_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
+    rows = db.prepare(buildSql('COALESCE(a.event_date, a.published_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
   }
 
   const items = rows.map(r => articleRow(r, scoring, nowMs));

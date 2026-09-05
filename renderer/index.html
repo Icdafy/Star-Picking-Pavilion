@@ -251,7 +251,7 @@
           <input id="setBaseUrl" type="text" placeholder="https://api.deepseek.com">
         </label>
         <label class="field"><span>分析模型</span>
-          <input id="setModel" type="text" placeholder="deepseek-v4-flash">
+          <input id="setModel" type="text" placeholder="deepseek-v4-flash-vision-exp">
         </label>
         <div class="btn-row">
           <button class="btn-primary" id="btnSaveAi">保存</button>
@@ -259,7 +259,7 @@
           <button class="btn-ghost" id="btnClearAiKey" disabled>清除已保存密钥</button>
           <span id="aiTestResult" class="test-result" role="status"></span>
         </div>
-        <p class="hint">全站只调用 <code>deepseek-v4-flash</code>（当前指向 DeepSeek-V4-Flash-0731）：批量预筛相关性 → 同一次调用产出五维分、摘要、研判、实体与原子事件 → 结构化、清洗、聚类、语义合并与最终质量分全部由本地代码完成（config/scoring.json 可调权重与阈值）。已自动关闭思考模式以省钱提速；deepseek-v4-pro 已从本应用移除。</p>
+        <p class="hint">常规预筛、图片理解与结构化使用 <code>deepseek-v4-flash-vision-exp</code>；重大事件、多事件拆分及复杂研判使用 <code>deepseek-v4-pro</code> 思考模式。视觉结果作为 Pro 的文字证据，图片仅交给视觉模型；本地完成计分、去重与交叉验证。自定义兼容服务保留所填模型。</p>
       </div>
       <div class="glass card-pad">
         <h3>采集调度</h3>
@@ -578,6 +578,7 @@
     <label class="field"><span>类型</span>
       <select name="type">
         <option value="rss">RSS / Atom 订阅</option>
+        <option value="wechat">公众号安全采集（公开文章或订阅源）</option>
         <option value="api">公开 API（eastmoney/cninfo/sse/szse/cls scheme）</option>
         <option value="html">网页爬虫（官方新闻列表页）</option>
         <option value="bing">必应资讯 RSS</option>

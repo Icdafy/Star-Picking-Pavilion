@@ -846,7 +846,7 @@ test('v0.0.14 卡片呈现实体标签与原子事件，实体点击即检索', 
   assert.match(feedCardSource, /class="card-events"/);
   assert.match(feedCardSource, /原子事件 \$\{list\.length\}/);
   // 原子事件只在真的拆出多件事时展示，单事件卡片不加这一块噪声
-  assert.match(feedCardSource, /if \(list\.length < 2\) return '';/);
+  assert.match(feedCardSource, /list\[0\]\.date/);
   // 词库面板与实体标签共用同一条检索路径，两处不会各写一份
   // 批 2：runTermSearch 随检索控制器迁到 renderer/search-controller.js；
   // 批 4：实体标签点击委托随卡片交互层迁到 renderer/feed-controller.js
@@ -858,12 +858,12 @@ test('v0.0.14 卡片呈现实体标签与原子事件，实体点击即检索', 
 });
 
 test('v0.0.14 设置页只暴露单一分析模型字段', () => {
-  assert.match(html, /id="setModel"[^>]*placeholder="deepseek-v4-flash"/);
+  assert.match(html, /id="setModel"[^>]*placeholder="deepseek-v4-flash-vision-exp"/);
   assert.doesNotMatch(html, /setPrefilterModel|setScoringModel/);
   // v4-pro 只能作为「已移除」的说明出现，不能再是任何输入框的候选值
   assert.doesNotMatch(html, /(?:placeholder|value)="[^"]*deepseek-v4-pro/);
-  assert.match(html, /deepseek-v4-pro 已从本应用移除/);
-  assert.match(html, /DeepSeek-V4-Flash-0731/);
+  assert.match(html, /deepseek-v4-pro/);
+  assert.match(html, /思考模式/);
   // 批 2：设置表单装配迁到 renderer/settings-view-controller.js，字段表落点改指新模块
   assert.match(settingsViewSource, /model: \$\('#setModel'\)/);
   assert.doesNotMatch(app, /prefilterModel|scoringModel/);
