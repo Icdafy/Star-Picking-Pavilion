@@ -531,7 +531,25 @@ async function scenarioInjection() {
   return out;
 }
 
+async function scenarioHistoricalTiming() {
+  const evidence='2026年9月1日，蓝箭航天朱雀三号发射成功。';
+  const stub=await startStub(()=>ok({events:[{a:'蓝箭航天',v:'发射成功',o:'朱雀三号',evidence}]}));
+  writeSettings(stub.baseUrl);
+  const {db,closeDatabase}=require(serverModule('db'));
+  const {analyzePending}=require(serverModule('ai','pipeline'));
+  const source=insertSource(db,'历史信源','T1');
+  const id=insertArticle(db,source,'蓝箭航天朱雀三号发射成功',evidence);
+  db.prepare(`UPDATE articles SET analyzed=1,relevant=1,starred=1,featured=1,quality_score=88,
+    ai_summary='保留历史摘要',content_text=?,content_status='ok',published_at='2026-09-05T00:00:00Z' WHERE id=?`).run(evidence,id);
+  const result=await analyzePending(null,10);
+  await analyzePending(null,10);
+  const row=articleRow(db,id);
+  const out={result,row,calls:stub.requests.length,system:stub.requests[0]?.payload.messages[0].content};
+  closeDatabase();await stopStub(stub);return out;
+}
+
 const SCENARIOS = {
+  'historical-timing': scenarioHistoricalTiming,
   'full-happy': scenarioFullHappy,
   'prefilter-invalid-json': scenarioPrefilterInvalidJson,
   'scoring-failure': scenarioScoringFailure,

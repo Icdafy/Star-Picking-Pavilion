@@ -4,7 +4,7 @@ const { publicUrl, fetchPage } = require('./public-web');
 
 function extractContent(html, url) {
   const $ = cheerio.load(html);
-  const root = $('#js_content, article, .article-content, .article_content, .TRS_Editor, #content, .news-content').first();
+  const root = $('#js_content, #ContentBody, article, .article-content, .article_content, .TRS_Editor, #content, .news-content').first();
   const content = root.length ? root : $('body');
   content.find('script,style,nav,header,footer,aside,form').remove();
   const images = [];
@@ -19,7 +19,8 @@ function extractContent(html, url) {
       if (!images.some(i => i.url === u) && images.length < 6) images.push({ url: u, caption: alt });
     } catch {}
   });
-  const text = content.text().replace(/\s+/g, ' ').trim().slice(0, 12000);
+  content.find('p,div,section,li,br').each((_, el) => { $(el).append('\n'); });
+  const text = content.text().replace(/[^\S\n]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 12000);
   const published = $('meta[property="article:published_time"]').attr('content')
     || $('meta[name="publishdate"]').attr('content') || $('time[datetime]').first().attr('datetime');
   const ct = html.match(/\b(?:ct|publish_time)\s*[:=]\s*["']?(\d{10})/);
@@ -32,10 +33,19 @@ function extractContent(html, url) {
 
 async function enrichArticle(article) {
   try {
-    const page = new URL(article.url).hostname === 'mp.weixin.qq.com' ? require('./wechat').pacedPage : fetchPage;
-    const html = await page(article.url);
-    if (/环境异常|访问过于频繁|请完成验证|captcha|登录后查看/i.test(html)) throw new Error('访问验证，停止正文抓取');
-    return { ...extractContent(html, article.url), status: 'ok' };
+    const page = new URL(article.url).hostname === 'mp.weixin.qq.com'
+      ? { html: await require('./wechat').pacedPage(article.url), url: article.url }
+      : await fetchPage(article.url, { withUrl: true });
+    const { html } = page;
+    if (isAccessChallenge(html)) throw new Error('访问验证，停止正文抓取');
+    const content = extractContent(html, page.url);
+    return { ...content, status: content.text ? 'ok' : '正文为空' };
   } catch (error) { return { text: '', images: [], status: String(error.message).slice(0, 180) }; }
 }
-module.exports = { extractContent, enrichArticle };
+function isAccessChallenge(html) {
+  const $ = cheerio.load(html);
+  $('script,style,noscript').remove();
+  // A comment widget's captcha script is not a challenge blocking the article.
+  return /环境异常|访问过于频繁|请完成验证|captcha|登录后查看|verify (?:that )?you are human|checking your browser/i.test($('title').text() + ' ' + $('body').text());
+}
+module.exports = { extractContent, enrichArticle, isAccessChallenge };

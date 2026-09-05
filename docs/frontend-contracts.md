@@ -282,7 +282,7 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
 - `id="btnClearAiKey"`；`id="setModel"` 为只读，`placeholder="deepseek-v4-flash-vision-exp"`
 - 不得出现 `setPrefilterModel` / `setScoringModel`；不得出现含 `deepseek-v4-pro` 的 placeholder/value
 - 预筛、图文、原子事件和日报统一使用 `deepseek-v4-flash-vision-exp`，保存配置及请求层均限制为此模型。
-- 新闻右上角 `.event-time-badge` 显示北京时间自然日时差；API 提供 `eventDate`、`reportedAt`、`reportDelayDays`、`timingStatus`（`dated/planned/unknown`），不再提供交叉验证状态。
+- 新闻右上角 `.event-time-badge` 显示“当日报道／事后 N 天报道／计划事件／延期／暂停／事件日期待确认／报道日期待确认”。API 提供 `eventDate`、`reportedAt`、`reportDelayDays`、`timingStatus`（`dated/planned/postponed/unknown`）、独立的 `eventStatus` 和 `timingReason`；悬停解释证据缺失原因。卡片 `.meta-time` 使用报道发布时间，未知时明确提示；时间轴分组仍跟随事件日期优先的排序口径。
 - 每张新闻只展示一个 `.card-thumb` 右侧缩略图，优先使用视觉筛选结果；不再有下方图片证据区。
 - `id="setCloseToTray"`、`id="setLaunchAtLogin"`：`type="checkbox"` 且 `role="switch"`
 - `id="desktopSettingsResult"` 带 `role="status"`、`aria-live="polite"`

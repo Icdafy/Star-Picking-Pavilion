@@ -177,6 +177,10 @@ function migrate() {
   const addCol = (name, def) => { if (!cols.has(name)) db.exec(`ALTER TABLE articles ADD COLUMN ${name} ${def}`); };
   addCol('analysis_version', 'INTEGER NOT NULL DEFAULT 0');
   addCol('event_schema_version', 'INTEGER NOT NULL DEFAULT 0');
+  addCol('timing_repair_version', 'INTEGER NOT NULL DEFAULT 0');
+  addCol('timing_repair_attempts', 'INTEGER NOT NULL DEFAULT 0');
+  addCol('timing_repair_at', 'TEXT');
+  addCol('timing_repair_error', 'TEXT');
   addCol('ai_reason', 'TEXT');   // 情报研判（推荐理由 / 编者按）
   for (const name of ['content_text','images_json','vision_json','content_status','publisher_id','event_date']) addCol(name, 'TEXT');
   addCol('image_url', 'TEXT');   // 文章缩略图

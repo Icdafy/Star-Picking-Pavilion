@@ -41,7 +41,8 @@ async function publicFetch(value, { maxBytes = 2 * 1024 * 1024, fetchImpl = fetc
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
       const next = publicUrl(new URL(response.headers.get('location'), url).href);
-      if (allowRedirect && !allowRedirect(next)) throw new Error('正文跳转违反站点抓取规则');
+      if (!response.headers.get('location')) throw new Error('公开网页跳转缺少目标地址');
+      if (allowRedirect && !await allowRedirect(next)) throw new Error('正文跳转违反站点抓取规则');
       url = next;
       continue;
     }
@@ -73,20 +74,22 @@ function robotsAllowed(text, pathname) {
   }
   return allowed;
 }
-async function fetchPage(value) {
-  const url = publicUrl(value);
-  let cached = robotsCache.get(url.origin);
-  if (!cached || Date.now() - cached.at > 3600000) {
-    try { cached = { at: Date.now(), text: (await publicFetch(`${url.origin}/robots.txt`, { maxBytes: 128000 })).body.toString('utf8') }; }
-    catch (error) { if (!/HTTP 404\b/.test(error.message)) throw error; cached = { at: Date.now(), text: '' }; }
-    if (robotsCache.size > 200) robotsCache.clear();
-    robotsCache.set(url.origin, cached);
+async function fetchPage(value, { fetchImpl = fetch, cache = robotsCache, withUrl = false } = {}) {
+  async function allowed(url) {
+    let cached = cache.get(url.origin);
+    if (!cached || Date.now() - cached.at > 3600000) {
+      try { cached = { at: Date.now(), text: (await publicFetch(`${url.origin}/robots.txt`, { maxBytes: 128000, fetchImpl })).body.toString('utf8') }; }
+      catch (error) { if (!/HTTP 404\b/.test(error.message)) throw error; cached = { at: Date.now(), text: '' }; }
+      if (cache.size > 200) cache.clear();
+      cache.set(url.origin, cached);
+    }
+    return robotsAllowed(cached.text, url.pathname + url.search);
   }
-  if (!robotsAllowed(cached.text, url.pathname + url.search)) throw new Error('站点 robots.txt 禁止采集此路径');
-  const result = await publicFetch(url.href, { allowRedirect: next => next.origin === url.origin
-    && robotsAllowed(cached.text, next.pathname + next.search) });
-  // Redirected pages must not bypass the destination's crawling policy.
-  if (new URL(result.url).origin !== url.origin) throw new Error('正文跨站跳转已停止');
-  return result.body.toString('utf8');
+  const url = publicUrl(value);
+  if (!await allowed(url)) throw new Error('站点 robots.txt 禁止采集此路径');
+  // Every destination gets its own robots check before any article request.
+  const result = await publicFetch(url.href, { fetchImpl, allowRedirect: allowed });
+  const html = result.body.toString('utf8');
+  return withUrl ? { html, url: result.url } : html;
 }
 module.exports = { isPublicAddress, publicUrl, publicFetch, robotsAllowed, fetchPage };

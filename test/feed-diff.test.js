@@ -91,7 +91,7 @@ test('renderCard：featured 卡的 class/data-id/data-domain 与 meta 行', () =
   assert.ok(tier.classList.contains('tier-chip') && tier.classList.contains('tier-t1'));
   assert.equal(tier.textContent, 't1');
   assert.equal(card.querySelector('.cat-tag').textContent, '发射');
-  assert.equal(card.querySelector('.meta-time').textContent, `T:${day1}`);
+  assert.equal(card.querySelector('.meta-time').textContent, `T:${day1}发布`);
   // 标题链接经 safeHttpUrl 过闸，target/rel 保持契约
   const title = card.querySelector('.card-title');
   assert.equal(title.getAttribute('href'), 'https://example.com/7');
@@ -116,6 +116,25 @@ test('renderCard：无图不出缩略图，带图时 card-content 加 has-thumb'
   // javascript: 等危险协议一律被 safeHttpUrl 拦成 #，等价于无图
   const badImg = renderer.renderCard(item(3, { image: 'javascript:alert(1)' }));
   assert.equal(badImg.querySelector('.card-thumb'), null);
+});
+
+test('publication age is independent of event date and unknown timing explains its cause', () => {
+  const { renderer } = makeRenderer();
+  const dated = renderer.renderCard(item(1, {eventDate:'2026-07-01',reportDelayDays:31,eventStatus:'completed'}));
+  assert.equal(dated.querySelector('.meta-time').textContent, `T:${day1}发布`);
+  assert.equal(dated.querySelector('.event-time-badge').textContent,'事后 31 天报道');
+  const missing = renderer.renderCard(item(2, {timingStatus:'unknown',eventStatus:'completed',timingReason:'content-unavailable'}));
+  assert.equal(missing.querySelector('.event-time-badge').textContent,'事件日期待确认');
+  assert.match(missing.querySelector('.event-time-badge').getAttribute('title'),/已确认事件发生.*正文未获取/);
+  const postponed = renderer.renderCard(item(3, {timingStatus:'postponed',eventStatus:'postponed'}));
+  assert.equal(postponed.querySelector('.event-time-badge').textContent,'延期／暂停');
+  const noPublication = renderer.renderCard(item(4, {publishedAt:null,eventDate:'2026-07-01',timingReason:'missing-publication'}));
+  assert.equal(noPublication.querySelector('.meta-time').textContent,'发布时间待确认');
+  assert.equal(noPublication.querySelector('.event-time-badge').textContent,'报道日期待确认');
+  const planned=renderer.renderCard(item(5,{timingStatus:'planned',eventStatus:'planned'}));
+  assert.equal(planned.querySelector('.event-time-badge').textContent,'计划事件');
+  const sameDay=renderer.renderCard(item(6,{reportDelayDays:0}));
+  assert.equal(sameDay.querySelector('.event-time-badge').textContent,'当日报道');
 });
 
 test('renderCard：实体 chips 落位 card-text，原子事件 ≥2 才渲染', () => {

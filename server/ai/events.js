@@ -8,7 +8,7 @@
 //
 // 动作先归到「动作类」再进键：模型会写「成功入轨」「送入预定轨道」「发射升空」，
 // 都是同一件事；不归类的话每家媒体的措辞都会产生一个新键，等于没拆。
-const { eventTiming } = require('./event-time');
+const { eventTiming, datesIn } = require('./event-time');
 const { canonicalizeName, entityKey, analyzeEntities } = require('./entities');
 
 // 动作类。顺序即优先级：一句话里同时出现「发射成功」和「试验」时按前者归类，
@@ -82,12 +82,27 @@ function normalizeEvent(raw, { fallbackText = '', article = {} } = {}) {
   const actorInQuote = timing.evidence.includes(actorName)
     || (timing.date && analyzeEntities(timing.evidence).entities.some(entity => entity.key === actor.key));
   if (timing.date && ((!actorInQuote && !(objectName && timing.evidence.includes(objectName)))
-    || (actionClass && classifyAction(timing.evidence) !== actionClass))) timing.date = null;
+    || (actionClass && classifyAction(timing.evidence) !== actionClass))) {
+    timing.date = null; timing.reason = 'event-mismatch';
+  }
+  // Across sentences, accept a date-only lead-in or a dated sentence naming this
+  // event. A background action in the previous sentence cannot lend its date.
+  if (timing.date) {
+    const sentences = timing.evidence.split(/[。！？!?；;\n]|\.(?:\s|$)/).filter(s => s.trim());
+    const dated = sentences.filter(s => datesIn(s, article.published_at).includes(timing.date));
+    if (sentences.length > 1 && !dated.some(s => {
+      const dateOnlyLead = /^(?:\s*)(?:20\d{2}[-/年])?\d{1,2}[-/月]\d{1,2}日?[\s，,:：]*$/.test(s);
+      const namesEvent = objectName ? s.includes(objectName) : s.includes(actorName)
+        || analyzeEntities(s).entities.some(entity => entity.key === actor.key);
+      return dateOnlyLead || (namesEvent && (actionClass ? classifyAction(s) === actionClass : s.includes(actionText)));
+    })) { timing.date = null; timing.reason = 'event-mismatch'; }
+  }
   const statusText = actionText + ' ' + timing.evidence;
   const status = /失败|未成功|未能|故障|事故|失联|取消|坠毁|failure|failed|anomaly/i.test(statusText) ? 'failed'
-    : /计划|拟于|拟在|拟开展|拟进行|拟发射|拟建|预计|有望|传闻|或将|将于|将会|即将|将发射|将首飞|推迟|延期|暂停|尚未|尚无|未完成|plan|expect|scheduled|postpon/i.test(statusText) ? 'planned'
+    : /推迟|延期|暂停|postpon|suspend|delayed/i.test(statusText) ? 'postponed'
+    : /计划|拟于|拟在|拟开展|拟进行|拟发射|拟建|预计|有望|传闻|或将|将于|将会|即将|将发射|将首飞|尚未|尚无|未完成|plan|expect|scheduled/i.test(statusText) ? 'planned'
     : /完成|成功|已发射|已入轨|已获|获颁|获批|签署|宣布|发布|交付|入股|成为.{0,8}股东|completed|success|launched|awarded|signed/i.test(timing.evidence) ? 'completed'
-    : timing.evidence && ['completed', 'planned', 'failed'].includes(raw?.status) ? raw.status : 'unknown';
+    : timing.evidence && ['completed', 'planned', 'postponed', 'failed'].includes(raw?.status) ? raw.status : 'unknown';
   if (!['completed', 'failed'].includes(status)) timing.date = null;
   return {
     actor: actor.name,
@@ -95,7 +110,7 @@ function normalizeEvent(raw, { fallbackText = '', article = {} } = {}) {
     actionClass,
     object: object ? object.name : '',
     time: shortField(raw?.w ?? raw?.time),
-    date: timing.date, evidence: timing.evidence, status,
+    date: timing.date, evidence: timing.evidence, status, timingReason: timing.date ? null : timing.reason || 'unknown-status',
     key: `${actor.key}|${actionSlot}${objectSlot ? `|${objectSlot}` : ''}${timing.date ? `|${timing.date}|${status}` : status !== 'unknown' ? `|${status}` : ''}`
   };
 }

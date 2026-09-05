@@ -23,7 +23,7 @@ test('single-source delay and a single right thumbnail render at narrow and wide
   database.close();
   await page.reload();
   await page.waitForSelector('.event-time-badge');
-  assert.match(await page.locator('.event-time-badge').first().textContent(),/迟报 35 天/);
+  assert.match(await page.locator('.event-time-badge').first().textContent(),/事后 35 天报道/);
   assert.equal(await page.locator('.event-verification').count(),0);
   assert.equal(await page.locator('.card img').count(),1);
   assert.equal(await page.locator('.card-image-evidence').count(),0);
@@ -34,6 +34,30 @@ test('single-source delay and a single right thumbnail render at narrow and wide
     await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,900),width);
     await page.waitForFunction(width=>innerWidth===width,width);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'evidence must not cause horizontal overflow');
-    await page.locator('.card[data-id]').first().screenshot({path:path.join(__dirname,`../../build/v015-evidence-${width}.png`)});
+    await page.locator('.card[data-id]').first().screenshot({path:path.join(__dirname,`../../build/v016-evidence-${width}.png`)});
+  }
+  const db=new DatabaseSync(path.join(dataDir,'star-picking-pavilion.db'));
+  const insert=db.prepare(`INSERT INTO articles(source_id,title,url,fetched_at,published_at,relevant,featured,analyzed,events_json,content_status)
+    VALUES(?,?,?,?,'2026-09-05T00:00:00Z',1,1,1,?,?)`);
+  const cases=[
+    {status:'completed',title:'完成首飞，日期待确认',badge:'事件日期待确认',content:'正文未获取',reason:/已确认事件发生.*正文未获取/},
+    {status:'planned',title:'计划开展首飞',badge:'计划事件',content:'ok',reason:/计划/},
+    {status:'postponed',title:'首飞延期',badge:'延期／暂停',content:'ok',reason:/延期/}
+  ];
+  for(const c of cases) c.id=insert.run(source,c.title,`https://fixture.example/${c.status}`,new Date().toISOString(),JSON.stringify([{actor:'测试火箭',action:c.title,status:c.status,date:null,evidence:c.title}]),c.content).lastInsertRowid;
+  db.close();
+  await page.reload();
+  for(const c of cases) {
+    const card=page.locator(`.card[data-id="${c.id}"]`);
+    await card.waitFor();
+    assert.equal(await card.locator('.event-time-badge').textContent(),c.badge);
+    assert.match(await card.locator('.event-time-badge').getAttribute('title'),c.reason);
+    assert.match(await card.locator('.meta-time').textContent(),/发布$/);
+  }
+  for(const width of [800,1440]) {
+    await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,900),width);
+    await page.waitForFunction(width=>innerWidth===width,width);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.screenshot({path:path.join(__dirname,`../../build/v016-timing-${width}.png`)});
   }
 });

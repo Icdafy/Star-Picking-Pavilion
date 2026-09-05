@@ -43,6 +43,20 @@ function spawnScenario(scenario, { withKey = false } = {}) {
 
 // ---------- H4：有 Key 完整流水线桩测试 ----------
 
+test('historical upgrade repairs events without rerunning relevance or replacing judgments', () => {
+  const out=runScenario('historical-timing',{withKey:true});
+  assert.equal(out.calls,1);
+  assert.match(out.system,/原子事件提取器/);
+  assert.equal(out.result.analyzed,0);
+  assert.equal(out.result.timingRepair.repaired,1);
+  assert.equal(out.row.event_date,'2026-09-01');
+  assert.equal(out.row.analyzed,1);
+  assert.equal(out.row.starred,1);
+  assert.equal(out.row.featured,1);
+  assert.equal(out.row.quality_score,88);
+  assert.equal(out.row.ai_summary,'保留历史摘要');
+});
+
 test('H4a: 预筛正常 JSON 时模型结果全字段落库，请求带反注入声明与 item 包裹', () => {
   const out = runScenario('full-happy', { withKey: true });
   assert.equal(out.mode, 'full');

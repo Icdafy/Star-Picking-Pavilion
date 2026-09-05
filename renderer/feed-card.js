@@ -117,7 +117,7 @@
       const rows = list.map(event => {
         const action = event.action || EVENT_CLASS_NAMES[event.actionClass] || '相关动作';
         const object = event.object ? ` · ${esc(event.object)}` : '';
-        const state = ({completed:'已发生',planned:'计划',failed:'失败',unknown:'状态待核'})[event.status] || '';
+        const state = ({completed:'已发生',planned:'计划',postponed:'延期／暂停',failed:'失败／取消',unknown:'状态待核'})[event.status] || '';
         return `<li title="${esc(event.evidence || '')}"><b>${esc(event.actor)}</b><span>${esc(action)}</span>${object}<small>${esc(event.date || '时间待核')} · ${state}</small></li>`;
       }).join('');
       return `<div class="card-events" role="note">
@@ -199,13 +199,35 @@
       const catTag = q('.cat-tag');
       if (item.category) catTag.textContent = item.category;
       else catTag.remove();
-      q('.meta-time').textContent = timeAgo(publishedTime(item));
+      const publication = item.publishedAt || item.reportedAt;
+      q('.meta-time').textContent = publication ? `${timeAgo(publication)}发布` : '发布时间待确认';
+      q('.meta-time').setAttribute('title', publication ? `报道发布时间：${publication}` : `发布时间未知；收录时间：${item.fetchedAt || '未知'}`);
       const breakthrough = breakthroughPresentation(item);
       q('.card-score-group').innerHTML =
         (breakthrough ? breakthroughBadgeHtml(breakthrough) : '') + scorePill(item);
-      const status = ({dated:'原文日期',planned:'计划事件',unknown:'原文未明确事件日期'})[item.timingStatus] || '原文未明确事件日期';
-      const delay = Number.isFinite(item.reportDelayDays) ? (item.reportDelayDays === 0 ? '当日报道' : `迟报 ${item.reportDelayDays} 天`) : item.timingStatus === 'planned' ? '计划事件' : '时差未知';
-      q('.card-score-group').insertAdjacentHTML('beforeend', `<span class="event-time-badge" role="note" title="${esc(status)}；事件日期：${esc(item.eventDate || '未知')}；报道时间：${esc(item.reportedAt || item.publishedAt || '未知')}；按北京时间自然日估算">${esc(delay)}</span>`);
+      const state = ({completed:'已确认事件发生',failed:'事件失败或取消',planned:'计划事件',postponed:'事件延期或暂停',unknown:'事件状态待确认'})[item.eventStatus] || '事件状态待确认';
+      const reasons = {
+        'missing-publication':'已有事件日期，但缺少有效报道发布时间',
+        'content-unavailable':'正文未获取，现有标题和摘要不足以确认事件日期',
+        'missing-event':'尚未取得有效主事件', 'missing-evidence':'主事件缺少有效原文证据',
+        'unknown-status':'有原文证据，但事件状态尚未确认',
+        'imprecise-date':'原文仅使用近日、近期等不精确时间',
+        'missing-date':'现有原文证据没有可确认的事件日期',
+        'ambiguous-date':'证据中存在多个日期，无法确定主事件发生日',
+        'date-mismatch':'提取日期与原文日期不一致', 'event-mismatch':'日期无法与主事件的主体及动作对应',
+        'future-date':'日期晚于报道日或当前日期，不能作为实际发生日',
+        planned:'计划不代表已经发生，具体日期可能尚未确定', postponed:'延期或暂停不代表原计划已经完成'
+      };
+      const delay = Number.isFinite(item.reportDelayDays) ? (item.reportDelayDays === 0 ? '当日报道' : `事后 ${item.reportDelayDays} 天报道`)
+        : item.timingStatus === 'planned' ? '计划事件' : item.timingStatus === 'postponed' ? '延期／暂停'
+        : item.eventDate ? '报道日期待确认' : '事件日期待确认';
+      const explanation = reasons[item.timingReason] || (Number.isFinite(item.reportDelayDays) ? '原文事件日期与报道日期的间隔，不代表报道是否过时' : reasons['missing-date']);
+      const timingBadge = doc.createElement('span');
+      timingBadge.setAttribute('class', 'event-time-badge');
+      timingBadge.setAttribute('role', 'note');
+      timingBadge.setAttribute('title', `${state}；${explanation}；事件日期：${item.eventDate || '未知'}；报道时间：${item.reportedAt || item.publishedAt || '未知'}；按北京时间自然日计算`);
+      timingBadge.textContent = delay;
+      q('.card-score-group').appendChild(timingBadge);
       const title = q('.card-title');
       title.setAttribute('href', safeHttpUrl(item.url));
       title.textContent = item.title ?? '';
