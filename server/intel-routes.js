@@ -91,6 +91,13 @@ async function handleIntelRoute({ req, res, url, json, readJsonBody, queryFeed }
     return true;
   }
 
+  if (p === '/api/capital/activity' && method === 'GET') {
+    const text = (q.get('q') || '').trim();
+    if (text.length > 40) throw new HttpError(400, '检索词不得超过 40 个字符');
+    json(res, 200, { items: companies.activityFeed({ q: text, domain: domainParam(q.get('domain')),
+      watchedOnly: q.get('watched') === '1', days: intParam(q.get('days'),90,1,3650,'天数') }) });
+    return true;
+  }
   if (p === '/api/companies' && method === 'GET') {
     const watch = q.get('watch') || '';
     if (watch && !['watched', 'portfolio'].includes(watch)) throw new HttpError(400, '不支持的关注筛选');
@@ -100,7 +107,9 @@ async function handleIntelRoute({ req, res, url, json, readJsonBody, queryFeed }
     return true;
   }
   if (p === '/api/companies/heat' && method === 'GET') {
+    if ((q.get('q') || '').length > 40) throw new HttpError(400, '检索词不得超过 40 个字符');
     json(res, 200, companies.companyHeat({
+      q: (q.get('q') || '').trim(),
       domain: domainParam(q.get('domain')),
       watchedOnly: q.get('watched') === '1',
       limit: intParam(q.get('limit'), 30, 1, 200, '条数')
@@ -151,11 +160,14 @@ async function handleIntelRoute({ req, res, url, json, readJsonBody, queryFeed }
   if (p === '/api/deals' && method === 'GET') {
     const days = intParam(q.get('days'), 90, 1, 3650, '天数');
     const domain = domainParam(q.get('domain'));
+    const text = (q.get('q') || '').trim();
+    if (text.length > 40) throw new HttpError(400, '检索词不得超过 40 个字符');
+    const filters = { days, domain, q: text, watchedOnly: q.get('watched') === '1' };
     json(res, 200, {
       days,
-      deals: deals.listDeals({ days, domain, watchedOnly: q.get('watched') === '1', limit: intParam(q.get('limit'), 120, 1, 500, '条数') }),
-      investors: deals.investorBoard({ days, domain }),
-      discovered: deals.discoveredCompanies({ days: Math.max(days, 90) })
+      deals: deals.listDeals({ ...filters, limit: intParam(q.get('limit'), 120, 1, 500, '条数') }),
+      investors: deals.investorBoard(filters),
+      discovered: deals.discoveredCompanies(filters)
     });
     return true;
   }

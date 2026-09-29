@@ -1,23 +1,24 @@
 'use strict';
 const Parser = require('rss-parser');
 const { fetchPage, publicUrl } = require('./public-web');
-const { extractContent } = require('./article-content');
+const { extractContent, isAccessChallenge } = require('./article-content');
 const { relevanceOf } = require('../ai/keywords');
 const { resolveUrl } = require('./rss');
 
 const parser = new Parser();
 let nextRequestAt = 0;
-let pauseUntil = 0;
+const pauseUntil = new Map();
 async function pacedPage(url, fetchImpl = fetchPage) {
-  if (Date.now() < pauseUntil) throw new Error('公众号访问异常，暂停一小时后重试');
+  const origin = new URL(url).origin;
+  if (Date.now() < (pauseUntil.get(origin) || 0)) throw new Error('公众号访问异常，暂停一小时后重试');
   const slot = Math.max(Date.now(), nextRequestAt);
   nextRequestAt = slot + 3000;
   await new Promise(resolve => setTimeout(resolve, Math.max(0, slot - Date.now())));
   try {
     const html = await fetchImpl(url);
-    if (/环境异常|访问过于频繁|请完成验证|captcha|登录后查看/i.test(html)) throw new Error('公众号访问验证，已停止');
+    if (isAccessChallenge(html)) throw new Error('公众号访问验证，已停止');
     return html;
-  } catch (error) { pauseUntil = Date.now() + 3600000; throw error; }
+  } catch (error) { pauseUntil.set(origin, Date.now() + 3600000); throw error; }
 }
 function isArticleUrl(value) {
   try { const u = publicUrl(value); return u.hostname === 'mp.weixin.qq.com' && /^\/s(?:\/|$)/.test(u.pathname); }
@@ -37,7 +38,9 @@ async function fetch(source, settings, { page = pacedPage } = {}) {
   const items = [];
   for (const candidate of candidates) {
     const html = await page(candidate.link);
+    if (isAccessChallenge(html)) throw new Error('公众号访问验证，未取得文章正文');
     const article = extractContent(html, candidate.link);
+    if (!article.text || !article.title) throw new Error('公众号正文或标题为空');
     const title = article.title || candidate.title || '';
     const summary = article.text || candidate.contentSnippet || '';
     const profile = relevanceOf(`${title} ${summary}`);

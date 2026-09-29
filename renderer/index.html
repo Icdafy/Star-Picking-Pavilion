@@ -241,6 +241,7 @@
     <div class="intel-toolbar glass">
       <div class="intel-tabs" id="capitalTabs" role="tablist" aria-label="一级市场分区">
         <button class="chip active" type="button" role="tab" aria-selected="true" data-capital-tab="deals">融资动态</button>
+        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="activity">企业动态</button>
         <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="heat">公司热度</button>
         <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="companies">公司库</button>
         <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="investors">活跃机构</button>
@@ -255,7 +256,7 @@
           <select id="capitalDays"><option value="30">近 30 天</option><option value="90" selected>近 90 天</option><option value="180">近 180 天</option><option value="365">近一年</option></select>
         </label>
         <label class="intel-check"><input id="capitalWatched" type="checkbox"> 只看关注与被投</label>
-        <input id="capitalSearch" class="intel-search" type="search" placeholder="检索公司、型号或赛道…" aria-label="检索公司库" maxlength="40" hidden>
+        <input id="capitalSearch" class="intel-search" type="search" placeholder="搜索企业名称、别名或型号…" aria-label="搜索一级市场企业" maxlength="40">
       </div>
     </div>
     <div id="capitalBody" aria-live="polite"></div>
@@ -540,7 +541,7 @@
             <span class="appearance-kicker">AQUA GLASS LAB</span>
             <h3>界面氛围 <span class="muted">流体背景 · 云母玻璃</span></h3>
           </div>
-          <button class="btn-ghost btn-compact" id="btnAquaReset" type="button">恢复默认</button>
+          <div class="btn-row"><button class="btn-ghost btn-compact" id="setAquaEnabled" type="button" aria-pressed="true">氛围：开启</button><button class="btn-ghost btn-compact" id="btnAquaReset" type="button">恢复默认</button></div>
         </div>
         <div class="appearance-preview" aria-hidden="true">
           <span class="appearance-preview-orbit"></span>

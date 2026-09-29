@@ -2,6 +2,10 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
+## v0.2.1 · 一级市场与界面优化
+
+新增企业搜索与企业动态、公司别名及历史融资合并、细分轮次与日期修复、深浅下拉选项适配，以及“恢复默认”左侧的界面氛围开关。扩展投中网、36氪空天、航投基金和产业链检索。详见 [发布说明](RELEASE_NOTES.md)、[AIHOT 整合审计](docs/aihot-integration-audit.md) 和 [信源实测](docs/v021-sources.md)。AIHOT 核心流程已移植，但不是上游所有云端功能的整仓移植；商业航天发展公众号当前受微信验证限制，尚不能自动取得正文。
+
 ## v0.2.0 · AIHOT 内核重构：热点站 + 一级市场雷达
 
 v0.2.0 以开源的 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT）为底层逻辑，把摘星阁从“文章评分器”整体改造成“热点站”。改动覆盖采集、判断、归组、热度、出刊与界面，详见 [docs/intel-engine.md](docs/intel-engine.md)。
@@ -23,12 +27,12 @@ v0.2.0 以开源的 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT）为底�
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.0.exe`，双击并按向导安装。v0.2.0 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.1.exe`，双击并按向导安装。v0.2.1 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.0.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.1.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -73,7 +77,7 @@ v0.1.3 将 npm/Electron、安装器、Windows 文件属性、tag、Release 和�
 - 事件归组与事件热度：独立信源计数、24 小时半衰期、爆 / 新 / 升 / 突破标记、小时热度走势与事件综述
 - 一级市场雷达：融资事件抽取与合并、公司热度、公司库与公司档案、关注 / 被投标记、活跃机构、新发现公司
 - 低空经济、商业航天领域和分类筛选；卡片上的主体公司一键直达公司档案
-- 188 个内置信源：官方一手、央媒与科技媒体、交易所公告、一级市场媒体、关键词与公司检索线、公众号与外媒接入位
+- 199 个内置信源：官方一手、央媒与科技媒体、交易所公告、一级市场媒体、关键词与公司检索线、公众号与外媒接入位
 - 268 个词条的核心词库，带库内命中条数，点词即检索
 - SQLite FTS5 全文检索（含中文标题、实体与主体公司）
 - 日报、周报、月报，实时增量提示与可选的 08:00 自动保存研究归档

@@ -170,6 +170,9 @@ body {
 }
 
 /* ---------- 背景舞台 ---------- */
+:root[data-aqua-enabled="off"] .atmosphere { display: none; }
+:root[data-aqua-enabled="off"] .atmosphere * { animation-play-state: paused !important; }
+
 .atmosphere {
   z-index: 0;
   isolation: isolate;

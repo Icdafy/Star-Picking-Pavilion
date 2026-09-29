@@ -31,6 +31,7 @@
     aquaWallpaperBlur: 0,
     aquaWallpaperFrost: 0,
     aquaWhale: true,
+    aquaEnabled: true,
     aquaCritters: true
   });
   const FIELDS = Object.freeze(Object.keys(DEFAULTS));
@@ -84,6 +85,7 @@
         DEFAULTS.aquaWallpaperFrost
       ),
       aquaWhale: typeof value.aquaWhale === 'boolean' ? value.aquaWhale : DEFAULTS.aquaWhale,
+      aquaEnabled: typeof value.aquaEnabled === 'boolean' ? value.aquaEnabled : DEFAULTS.aquaEnabled,
       aquaCritters: typeof value.aquaCritters === 'boolean'
         ? value.aquaCritters
         : DEFAULTS.aquaCritters
@@ -809,6 +811,8 @@
         if (output) output.textContent = `${value}${unit}`;
       }
       const whaleSwitch = byId('setAquaWhale');
+      const enabledSwitch = byId('setAquaEnabled');
+      if (enabledSwitch) { enabledSwitch.setAttribute('aria-pressed', String(state.aquaEnabled)); enabledSwitch.textContent = state.aquaEnabled ? '氛围：开启' : '氛围：关闭'; }
       const critterSwitch = byId('setAquaCritters');
       if (whaleSwitch) whaleSwitch.checked = state.aquaWhale;
       if (critterSwitch) critterSwitch.checked = state.aquaCritters;
@@ -819,6 +823,7 @@
     }
 
     function apply() {
+      root.dataset.aquaEnabled = state.aquaEnabled ? 'on' : 'off';
       root.dataset.aquaMode = state.aquaMode;
       root.dataset.aquaBackground = state.aquaBackground === 'wallpaper' && wallpaperData
         ? 'wallpaper'
@@ -949,6 +954,7 @@
       listen(input, 'change', () => schedulePersist(field, true));
     }
 
+    listen(byId('setAquaEnabled'), 'click', () => update('aquaEnabled', !state.aquaEnabled, { immediate: true }));
     listen(byId('setAquaWhale'), 'change', event => update(
       'aquaWhale',
       Boolean(event.currentTarget.checked),
@@ -1028,7 +1034,7 @@
     });
 
     function syncPlayback() {
-      const idle = doc.hidden || (typeof doc.hasFocus === 'function' && !doc.hasFocus());
+      const idle = !state.aquaEnabled || doc.hidden || (typeof doc.hasFocus === 'function' && !doc.hasFocus());
       const fluidVisible = state.aquaBackground !== 'wallpaper' || !wallpaperData;
       fluid.setPaused(idle || !fluidVisible);
       whale.setPaused(idle || !state.aquaWhale);

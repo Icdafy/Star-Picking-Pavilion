@@ -183,8 +183,8 @@ test('adding a custom company links historical reports by its names', () => {
 // ---------- 融资事件 ----------
 
 test('rounds and amounts are normalized without inventing precision', () => {
-  assert.equal(deals.normalizeRound('Pre A+轮'), 'Pre-A轮');
-  assert.equal(deals.normalizeRound('b1轮'), 'B轮');
+  assert.equal(deals.normalizeRound('Pre A+轮'), 'Pre-A+轮');
+  assert.equal(deals.normalizeRound('b1轮'), 'B1轮');
   assert.equal(deals.normalizeRound('A+轮'), 'A+轮');
   assert.equal(deals.normalizeRound('新一轮'), '未披露');
   assert.equal(deals.normalizeRound('上市辅导备案'), '上市辅导');

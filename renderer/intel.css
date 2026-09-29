@@ -3,6 +3,11 @@
    窄窗口（800px 起）全部降为单列，不出现横向滚动。 */
 
 /* ---------- 视图头 ---------- */
+select, select option, select optgroup { color: var(--c-fg); background-color: var(--c-bg); }
+select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.intel-filters select, .intel-search { min-height: 2.25rem; border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: .375rem .625rem; color: var(--c-fg); background: var(--c-bg); font: inherit; }
+.intel-search { flex: 1 1 16rem; max-width: 28rem; }
+.deal-row > * { min-width: 0; overflow-wrap: anywhere; }
 .intel-hero {
   display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-5);
   padding: var(--sp-6) var(--sp-7); margin-bottom: var(--sp-4); flex-wrap: wrap;
@@ -250,7 +255,8 @@ button.deal-company:hover { color: var(--accent-ink); }
 @media (max-width: 70rem) {
   .deal-row { grid-template-columns: 6rem minmax(8rem, 1fr) 6.5rem 7rem minmax(0, 1.4fr); }
   .deal-list.compact .deal-row { grid-template-columns: 6rem 6.5rem 7rem minmax(0, 1.4fr); }
-  .deal-row .dc-source { display: none; }
+  .deal-row .dc-source { grid-column: 2 / -1; }
+  .deal-head .dc-source { display: none; }
 }
 @media (max-width: 56rem) {
   .hot-item { grid-template-columns: 2rem minmax(0, 1fr); }
@@ -260,7 +266,8 @@ button.deal-company:hover { color: var(--accent-ink); }
   .ch-side { grid-column: 2; flex-direction: row; align-items: center; flex-wrap: wrap; }
   .deal-row { grid-template-columns: 5.5rem minmax(0, 1fr) 5.5rem 6rem; }
   .deal-list.compact .deal-row { grid-template-columns: 5.5rem 5.5rem minmax(0, 1fr); }
-  .deal-row .dc-investors { display: none; }
+  .deal-row .dc-investors { grid-column: 2 / -1; }
+  .deal-head .dc-investors { display: none; }
   .intel-search { min-width: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {

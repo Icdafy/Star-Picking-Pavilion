@@ -72,6 +72,7 @@ const state = {
   aquaWallpaperBlur: restoredPreferences.aquaWallpaperBlur,
   aquaWallpaperFrost: restoredPreferences.aquaWallpaperFrost,
   aquaWhale: restoredPreferences.aquaWhale,
+  aquaEnabled: restoredPreferences.aquaEnabled,
   aquaCritters: restoredPreferences.aquaCritters,
   view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,

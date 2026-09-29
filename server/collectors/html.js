@@ -37,7 +37,8 @@ async function fetch(source, settings) {
 
     // 日期：在链接附近的文本里找
     const ctx = $a.closest('li,tr,div').text() || '';
-    const m = ctx.match(dateRe);
+    const urlDate = url.match(/(?:\D)(20\d{2})(\d{2})(\d{2})(?:\D)/);
+    const m = ctx.match(dateRe) || (urlDate ? [`${urlDate[1]}-${urlDate[2]}-${urlDate[3]}`] : null);
     let publishedAt = null;
     if (m) {
       const norm = m[0].replace(/[年月]/g, '-').replace(/日/g, '');

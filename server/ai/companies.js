@@ -58,7 +58,9 @@ function syncCompanySeed({ force = false } = {}) {
   let changed = 0;
   const stamp = now();
   for (const c of seed.companies) {
-    changed += upsert.run(c.id, c.name.trim(), JSON.stringify(stringList(c.aliases)), JSON.stringify(stringList(c.products)),
+    const prior = db.prepare('SELECT aliases_json, products_json FROM companies WHERE id=?').get(c.id);
+    changed += upsert.run(c.id, c.name.trim(), JSON.stringify([...new Set([...parseList(prior?.aliases_json), ...stringList(c.aliases)])]),
+      JSON.stringify([...new Set([...parseList(prior?.products_json), ...stringList(c.products)])]),
       DOMAIN_VALUES.has(c.domain) ? c.domain : null, typeof c.segment === 'string' ? c.segment.slice(0, 40) : null,
       c.region === 'intl' ? 'intl' : 'cn', STATUS_VALUES.has(c.status) ? c.status : 'unknown',
       typeof c.note === 'string' ? c.note.slice(0, 200) : null, stamp, stamp).changes;
@@ -163,13 +165,19 @@ function matchText(text) {
 function resolveName(name) {
   const text = String(name || '').trim();
   if (!text) return null;
-  const hits = [...matchText(text).values()];
-  if (!hits.length) return null;
-  const best = hits.sort((a, b) => b.count - a.count || a.first - b.first)[0];
-  const longest = Math.max(...[...best.surfaces].map(s => s.length));
-  // 名字比命中面长太多（多出一个完整的公司后缀以外的内容）说明是另一家
-  const residue = text.replace(/(股份)?有限(责任)?公司|集团|科技|航空|航天|技术|（.*?）|\(.*?\)/g, '');
-  return longest >= Math.min(residue.length, text.length) * 0.6 ? best : null;
+  const key = identityKey(text);
+  const matches = index().surfaces.filter(s => s.kind !== 'product' && identityKey(s.text) === key);
+  const ids = [...new Set(matches.map(s => s.id))];
+  if (ids.length !== 1) return null; // 歧义名称不能自动归属
+  const best = matches[0];
+  return { id: best.id, name: best.name };
+}
+
+// 仅去掉法律形式和末尾“科技”；不删航空/航天、不做包含或相似度猜测。
+function identityKey(name) {
+  let key = String(name || '').normalize('NFKC').toLowerCase().replace(/\s+/g, '').replace(/(?:股份有限公司|有限责任公司|有限公司)$/, '');
+  if (/\p{Script=Han}/u.test(key) && key.endsWith('科技') && key.length > 4) key = key.slice(0, -2);
+  return key;
 }
 
 function cleanSubjectName(name) {
@@ -317,7 +325,7 @@ function addCompany(input) {
   const name = cleanSubjectName(input?.name);
   if (!name || [...name].length < 2) throw Object.assign(new Error('公司名称需为 2–40 个字符'), { status: 400 });
   const existing = resolveName(name);
-  if (existing && existing.name === name) throw Object.assign(new Error(`公司库已有「${existing.name}」`), { status: 409 });
+  if (existing) throw Object.assign(new Error(`公司库已有「${existing.name}」，请在其档案中补充别名`), { status: 409 });
   const id = customId(name);
   const stamp = now();
   db.prepare(`INSERT INTO companies (id, name, aliases_json, products_json, domain, segment, region, status, note, custom, watch, enabled, created_at, updated_at)
@@ -344,6 +352,7 @@ function updateCompany(id, patch) {
   db.prepare('UPDATE companies SET aliases_json = ?, products_json = ?, enabled = ?, updated_at = ? WHERE id = ?')
     .run(JSON.stringify(aliases), JSON.stringify(products), enabled, now(), company.id);
   const linked = rematchCompany(company.id);
+  require('./deals').relinkDeals();
   return { company: getCompany(company.id), linked };
 }
 
@@ -371,7 +380,7 @@ function observedAt(row) {
 
 // 公司热度：窗口内以该公司为主体的报道，每个独立参与者只算一次（取最近一次），按半衰期衰减。
 // 与事件热度同一套哲学：一家媒体发十篇只算一次，有很多人在说才是真的热。
-function companyHeat({ nowMs = Date.now(), domain = null, watchedOnly = false, limit = 30 } = {}) {
+function companyHeat({ nowMs = Date.now(), domain = null, watchedOnly = false, limit = 30, q = '' } = {}) {
   syncCompanySeed();
   const { heatWindowDays, halfLifeHours } = loadSelection().companies;
   const windowMs = heatWindowDays * 86400e3;
@@ -424,7 +433,27 @@ function companyHeat({ nowMs = Date.now(), domain = null, watchedOnly = false, l
       };
     })
     .sort((a, b) => b.heat - a.heat || b.reports - a.reports);
-  return { windowDays: heatWindowDays, halfLifeHours, entries: ranked.slice(0, Math.max(1, Math.min(200, limit))) };
+  const matching = q ? new Set(listCompanies({ q }).map(c => c.id)) : null;
+  return { windowDays: heatWindowDays, halfLifeHours, entries: ranked.filter(e => !matching || matching.has(e.company.id)).slice(0, Math.max(1, Math.min(200, limit))) };
+}
+
+function activityFeed({ days = 90, domain = null, q = '', watchedOnly = false, limit = 120 } = {}) {
+  syncCompanySeed();
+  const since = new Date(Date.now() - days * 86400e3).toISOString();
+  const pattern = `%${q.replace(/[\\%_]/g, ch => `\\${ch}`)}%`;
+  const rows = db.prepare(`SELECT a.id, a.cluster_id, a.title, a.title_zh, a.url, a.ai_summary, a.category,
+      a.published_at, a.fetched_at, a.featured, a.attention_score, s.name AS source
+    FROM articles a JOIN sources s ON s.id=a.source_id
+    WHERE a.relevant=1 AND COALESCE(a.published_at,a.fetched_at)>=? AND (? IS NULL OR a.domain=?)
+      AND EXISTS (SELECT 1 FROM article_companies ac JOIN companies c ON c.id=ac.company_id
+        WHERE ac.article_id=a.id AND ac.role='primary' AND c.enabled=1 AND c.status IN ('private','unknown')
+          AND (?=0 OR c.watch>0) AND (c.name LIKE ? ESCAPE '\\' OR c.aliases_json LIKE ? ESCAPE '\\' OR c.products_json LIKE ? ESCAPE '\\'))
+    ORDER BY COALESCE(a.published_at,a.fetched_at) DESC, a.id DESC LIMIT 1000`)
+    .all(since,domain,domain,watchedOnly?1:0,pattern,pattern,pattern);
+  const seen = new Set();
+  return rows.filter(row=>{ const key=row.cluster_id ? `story:${row.cluster_id}` : `article:${row.id}`; if(seen.has(key)) return false; seen.add(key); return true; })
+    .slice(0,limit).map(row=>({id:row.id,title:row.title,titleZh:row.title_zh,url:row.url,summary:row.ai_summary,category:row.category,
+      publishedAt:row.published_at,fetchedAt:row.fetched_at,featured:Boolean(row.featured),quality:row.attention_score,source:row.source}));
 }
 
 function listCompanies({ domain = null, watch = null, q = '' } = {}) {
@@ -469,5 +498,7 @@ module.exports = {
   removeCompany,
   companyHeat,
   listCompanies,
-  observedAt
+  observedAt,
+  identityKey,
+  activityFeed
 };

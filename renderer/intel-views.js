@@ -140,7 +140,7 @@
         ? `<button type="button" class="deal-company" data-company="${esc(deal.companyId)}">${esc(deal.companyName)}${deal.company?.watch === 2 ? '<i>被投</i>' : deal.company?.watch === 1 ? '<i>关注</i>' : ''}</button>`
         : `<span class="deal-company unregistered" title="不在公司库中，可在“新发现公司”一键收录">${esc(deal.companyName)}</span>`;
       return `<div class="deal-row" role="row">
-      <span class="deal-date dc-date" role="cell">${esc(deal.date || String(deal.firstSeenAt || '').slice(0, 10))}</span>
+      <span class="deal-date dc-date" role="cell" title="${deal.dateBasis === 'published' ? '报道日期，实际融资日期未披露' : deal.dateBasis === 'discovered' ? '采集日期，原文未披露日期' : '原文披露的事件日期'}">${esc(deal.date || String(deal.firstSeenAt || '').slice(0, 10))}${deal.dateBasis === 'published' ? '<small>报道</small>' : deal.dateBasis === 'discovered' ? '<small>发现</small>' : ''}</span>
       ${showCompany ? `<span class="dc-company" role="cell">${company}${domainChip(deal.domain)}</span>` : ''}
       <span class="dc-round" role="cell"><span class="deal-round">${esc(deal.round)}</span><small class="deal-status ${esc(deal.status)}">${DEAL_STATUS[deal.status] || ''}</small></span>
       <span class="deal-amount dc-amount" role="cell">${esc(amountOf(deal))}</span>
@@ -415,7 +415,7 @@
      关注 / 被投标记写回本机库；标记关注时服务端会为该公司补一条检索线。
      依赖全部注入，工厂体不直读 window/document。 */
   const CapitalViewController = (function createCapitalViewControllerModule() {
-    const TABS = Object.freeze(['deals', 'heat', 'companies', 'investors']);
+    const TABS = Object.freeze(['deals', 'activity', 'heat', 'companies', 'investors']);
     const WATCH_TEXT = Object.freeze({ 0: '已取消标记', 1: '已标记为关注', 2: '已标记为被投' });
 
     function splitNames(value) {
@@ -445,8 +445,8 @@
           tab.classList.toggle('active', on);
           tab.setAttribute('aria-selected', String(on));
         }
-        if (elements.search) elements.search.hidden = view.tab !== 'companies';
-        if (elements.days) elements.days.disabled = !['deals', 'investors'].includes(view.tab);
+        if (elements.search) elements.search.hidden = Boolean(view.companyId);
+        if (elements.days) elements.days.disabled = !['deals', 'activity', 'investors'].includes(view.tab);
       }
 
       async function show(loader) {
@@ -471,13 +471,19 @@
         }
         if (view.tab === 'deals') {
           return show(async () => {
-            const data = await api('/api/deals' + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '' }));
+            const data = await api('/api/deals' + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q }));
             return render.dealList(data.deals) + render.discoveredList(data.discovered);
+          });
+        }
+        if (view.tab === 'activity') {
+          return show(async () => {
+            const data = await api('/api/capital/activity' + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q }));
+            return '<p class="intel-note">未上市及状态待核公司的融资、订单、取证与试验进展，同一事件仅展示最近报道。最多展示 120 条。</p>' + (data.items.length ? render.articleList(data.items) : render.empty('暂 无 动 态', '当前筛选条件下暂无企业动态，可调整时间窗或企业名称。'));
           });
         }
         if (view.tab === 'heat') {
           return show(async () => {
-            const data = await api('/api/companies/heat' + query({ domain: view.domain, watched: view.watched ? 1 : '' }));
+            const data = await api('/api/companies/heat' + query({ domain: view.domain, watched: view.watched ? 1 : '', q: view.q }));
             return `<p class="intel-note">近 ${esc(data.windowDays)} 天以公司为主体的报道，每个独立出版方只算一次，${esc(data.halfLifeHours)} 小时减半。</p>${render.companyHeat(data.entries)}`;
           });
         }
@@ -486,7 +492,7 @@
             + query({ domain: view.domain, watch: view.watched ? 'watched' : '', q: view.q }))));
         }
         return show(async () => {
-          const data = await api('/api/deals' + query({ days: view.days, domain: view.domain }));
+          const data = await api('/api/deals' + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q }));
           return render.investorTable(data.investors);
         });
       }

@@ -18,6 +18,7 @@ const TODAY = '2026-07-23';
 const defaultFavoriteIds = [...CommonLinks.getDefaultFavoriteIds()];
 const defaultAquaPreferences = Object.freeze({
   aquaMode: 'mica',
+  aquaEnabled: true,
   aquaBlur: 2,
   aquaFrost: 20,
   aquaHue: 220,
@@ -76,6 +77,7 @@ test('normalizes every supported field and discards unknown fields', () => {
     theme: 'light',
     textScale: 'lg',
     aquaMode: 'compat',
+  aquaEnabled: true,
     aquaBlur: 0,
     aquaFrost: 100,
     aquaHue: 360,
@@ -102,6 +104,7 @@ test('normalizes every supported field and discards unknown fields', () => {
     theme: 'light',
     textScale: 'lg',
     aquaMode: 'compat',
+  aquaEnabled: true,
     aquaBlur: 0,
     aquaFrost: 100,
     aquaHue: 360,

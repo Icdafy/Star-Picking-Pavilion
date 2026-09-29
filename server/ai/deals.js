@@ -37,19 +37,17 @@ function normalizeRound(raw, rounds = loadTaxonomy().rounds) {
   let value = text(raw, 20).replace(/＋/g, '+').replace(/\s+/g, '').replace(/^pre[-_]?/i, 'Pre-');
   if (!value) return '未披露';
   value = value.replace(/融资$/, '').replace(/^新一?轮$/, '未披露');
+  if (/^Pre-?IPO轮?$/i.test(value)) return 'Pre-IPO';
   if (/IPO|首次公开发行|上市申请|递表|招股/i.test(value)) return rounds.includes('IPO') ? 'IPO' : value;
   if (/辅导/.test(value)) return '上市辅导';
   if (/并购|收购/.test(value)) return '并购';
   if (/战略/.test(value)) return '战略融资';
   if (/种子/.test(value)) return '种子轮';
-  if (/天使/.test(value)) return '天使轮';
+  if (/^天使\+*轮?$/.test(value)) return value.replace(/轮?$/, '轮');
   if (/Pre-?IPO/i.test(value)) return 'Pre-IPO';
-  const match = value.match(/^(Pre-)?([A-F])(\d|\+{1,2})?轮?$/i);
+  const match = value.match(/^(Pre-)?([A-F])(\d{1,2}|\+{1,6})?轮?$/i);
   if (match) {
-    const canonical = `${match[1] ? 'Pre-' : ''}${match[2].toUpperCase()}${match[3] && match[3].startsWith('+') ? '+' : ''}轮`;
-    if (rounds.includes(canonical)) return canonical;
-    const base = `${match[1] ? 'Pre-' : ''}${match[2].toUpperCase()}轮`;
-    return rounds.includes(base) ? base : canonical;
+    return `${match[1] ? 'Pre-' : ''}${match[2].toUpperCase()}${match[3] || ''}轮`;
   }
   return rounds.includes(value) ? value : '未披露';
 }
@@ -80,12 +78,11 @@ function normalizeDeal(raw) {
   const company = text(raw.company, 40);
   if (!company || [...company].length < 2) return null;
   const amountText = text(raw.amount, 30);
-  const explicit = Number(raw.amountCny);
   return {
     company,
     round: normalizeRound(raw.round),
     amountText,
-    amountCny: Number.isFinite(explicit) && explicit > 0 && explicit < 1e13 ? explicit : parseAmountCny(amountText),
+    amountCny: parseAmountCny(amountText),
     investors: list(raw.investors),
     leadInvestors: list(raw.leadInvestors, 5),
     date: normalizeDate(raw.date),
@@ -94,7 +91,7 @@ function normalizeDeal(raw) {
 }
 
 // ---------- 无 Key 兜底：标题规则 ----------
-const ROUND_PATTERN = '(种子轮|天使\\+?轮|Pre-?A\\+?轮|Pre-?B\\+?轮|Pre-?C轮|Pre-?IPO轮?|[A-F][+＋]{0,2}\\d?轮|战略融资|战略投资|新一轮融资)';
+const ROUND_PATTERN = '(种子轮|天使\\+{0,6}轮|Pre-?A\\+?轮|Pre-?B\\+?轮|Pre-?C轮|Pre-?IPO轮?|[A-F][+＋]{0,6}\\d?轮|战略融资|战略投资|新一轮融资)';
 const AMOUNT_PATTERN = '((?:近|超|逾|数)?[\\d.]*(?:十|百|千)?(?:万|亿)(?:元|美元|人民币)?|数[十百千]?[万亿](?:元|美元)?)';
 const DEAL_TITLE = new RegExp(`(?:完成|获得?|宣布完成|斩获|拿下|获投)(?:了)?(?:新一轮)?${AMOUNT_PATTERN}?(?:的)?${ROUND_PATTERN}`);
 const RUMOR = /据悉|传闻|知情人士|消息人士|或将|洽谈/;
@@ -109,9 +106,11 @@ function splitInvestors(fragment) {
 
 function heuristicDeal({ title = '', summary = '', subjects = [] } = {}) {
   const head = String(title || '');
-  const match = head.match(DEAL_TITLE);
+  // 多轮合计不得误记到某一轮；交给模型按原文保留未披露金额。
+  if (/连续完成|两轮|三轮|多轮|[A-F]\+*、[A-F]\+*轮/.test(head)) return null;
+  const match = head.match(DEAL_TITLE) || head.match(new RegExp(`(?:完成|获得?|获投)${AMOUNT_PATTERN}(融资)`));
   if (!match) return null;
-  const primary = (subjects || []).find(s => s.role === 'primary' && s.id) || null;
+  const primary = [...companies.matchText(head.slice(0, match.index)).values()].sort((a,b)=>b.first-a.first)[0] || null;
   let company = primary?.name || null;
   if (!company) {
     const before = head.slice(0, match.index).replace(/^.*[：:，,|｜!！?？]/, '').trim();
@@ -171,17 +170,21 @@ function recordDeal(article, deal, { origin = 'model', domain = null } = {}) {
   const hit = companies.resolveName(deal.company);
   const companyId = hit?.id || null;
   const companyName = hit?.name || deal.company;
-  const companyKey = companyId || `name:${companyName.replace(/(股份)?有限(责任)?公司$/, '')}`;
+  const companyKey = companyId || `name:${companies.identityKey(companyName)}`;
   const stamp = now();
-  const key = dealKey(companyKey, deal.round, deal.date, stamp);
+  const articleTime = db.prepare('SELECT published_at, fetched_at FROM articles WHERE id = ?').get(article.id);
+  const observed = articleTime?.published_at || articleTime?.fetched_at || stamp;
+  const key = dealKey(companyKey, deal.round, deal.date, observed);
   let existing = db.prepare('SELECT * FROM deals WHERE deal_key = ?').get(key);
   // “某公司完成新一轮融资”常与写明轮次的报道说的是同一笔：45 天内同一公司已有记录的，
   // 未披露轮次挂到那条上；反过来，先到的“未披露”记录在写明轮次的报道到来时补上轮次。
   if (!existing) {
-    const since = new Date(Date.parse(stamp) - 45 * 86400e3).toISOString();
-    const recent = db.prepare(`SELECT * FROM deals WHERE (deal_key LIKE ? ESCAPE '\\') AND first_seen_at >= ?
+    const since = new Date(Date.parse(deal.date || observed) - 45 * 86400e3).toISOString().slice(0, 10);
+    const until = new Date(Date.parse(deal.date || observed) + 45 * 86400e3).toISOString().slice(0, 10);
+    const recent = db.prepare(`SELECT d.* FROM deals d LEFT JOIN articles a ON a.id = d.first_article_id WHERE (deal_key LIKE ? ESCAPE '\\')
+      AND substr(COALESCE(deal_date, a.published_at, first_seen_at),1,10) BETWEEN ? AND ?
       AND round NOT IN ('并购', '股权转让', 'IPO', '上市辅导') ORDER BY first_seen_at DESC`)
-      .all(`${companyKey.replace(/[\\%_]/g, ch => `\\${ch}`)}|%`, since);
+      .all(`${companyKey.replace(/[\\%_]/g, ch => `\\${ch}`)}|%`, since, until);
     if (deal.round === '未披露') {
       existing = recent.find(row => row.round !== '未披露') || null;
     } else if (!['并购', '股权转让', 'IPO', '上市辅导', '战略融资'].includes(deal.round)) {
@@ -232,7 +235,8 @@ function dealRow(row) {
     investors: parseNames(row.investors_json),
     leadInvestors: parseNames(row.lead_investors_json),
     status: row.status,
-    date: row.deal_date,
+    date: row.deal_date || (row.article_published_at || row.first_seen_at || '').slice(0, 10),
+    dateBasis: row.deal_date ? 'event' : row.article_published_at ? 'published' : 'discovered',
     firstSeenAt: row.first_seen_at,
     updatedAt: row.updated_at,
     sourceCount: row.source_count,
@@ -241,31 +245,36 @@ function dealRow(row) {
   };
 }
 
-function listDeals({ days = 90, domain = null, companyId = null, watchedOnly = false, limit = 100, since = null, until = null } = {}) {
+function listDeals({ days = 90, domain = null, companyId = null, watchedOnly = false, limit = 100, since = null, until = null, q = '' } = {}) {
   const where = [];
   const params = [];
   const from = since || new Date(Date.now() - days * 86400e3).toISOString();
-  where.push('COALESCE(d.deal_date, substr(d.first_seen_at, 1, 10)) >= ?');
+  where.push('substr(COALESCE(d.deal_date, a.published_at, d.first_seen_at), 1, 10) >= ?');
   params.push(from.slice(0, 10));
   if (until) { where.push('d.first_seen_at < ?'); params.push(until); }
   if (domain) { where.push('d.domain = ?'); params.push(domain); }
   if (companyId) { where.push('d.company_id = ?'); params.push(companyId); }
   if (watchedOnly) where.push('c.watch > 0');
+  if (q) {
+    const pattern = `%${q.replace(/[\\%_]/g, ch => `\\${ch}`)}%`;
+    where.push("(d.company_name LIKE ? ESCAPE '\\' OR c.aliases_json LIKE ? ESCAPE '\\' OR c.products_json LIKE ? ESCAPE '\\')");
+    params.push(pattern, pattern, pattern);
+  }
   const rows = db.prepare(`SELECT d.*, c.watch, c.status AS company_status, c.segment,
-      a.id AS article_id, a.title AS article_title, a.title_zh AS article_title_zh, a.url AS article_url, s.name AS source_name
+      a.id AS article_id, a.title AS article_title, a.title_zh AS article_title_zh, a.url AS article_url, a.published_at AS article_published_at, s.name AS source_name
     FROM deals d
     LEFT JOIN companies c ON c.id = d.company_id
     LEFT JOIN articles a ON a.id = d.first_article_id
     LEFT JOIN sources s ON s.id = a.source_id
     WHERE ${where.join(' AND ')}
-    ORDER BY COALESCE(d.deal_date, substr(d.first_seen_at, 1, 10)) DESC, d.id DESC
+    ORDER BY substr(COALESCE(d.deal_date, a.published_at, d.first_seen_at), 1, 10) DESC, d.id DESC
     LIMIT ?`).all(...params, Math.max(1, Math.min(500, limit)));
   return rows.map(dealRow);
 }
 
 // 活跃机构：窗口内出现在融资事件里的投资方，领投单独计数
-function investorBoard({ days = 90, domain = null, limit = 20 } = {}) {
-  const deals = listDeals({ days, domain, limit: 500 });
+function investorBoard({ days = 90, domain = null, limit = 20, q = '', watchedOnly = false } = {}) {
+  const deals = listDeals({ days, domain, q, watchedOnly, limit: 500 });
   const board = new Map();
   for (const deal of deals) {
     for (const name of deal.investors) {
@@ -283,13 +292,22 @@ function investorBoard({ days = 90, domain = null, limit = 20 } = {}) {
 }
 
 // 融资主体不在公司库里的：“新发现公司”，供用户一键收录进关注
-function discoveredCompanies({ days = 180, limit = 30 } = {}) {
+function discoveredCompanies({ days = 180, limit = 30, domain = null, q = '', watchedOnly = false } = {}) {
+  if (watchedOnly) return [];
   const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
-  return db.prepare(`SELECT company_name AS name, domain, COUNT(*) AS deals, MAX(COALESCE(deal_date, substr(first_seen_at,1,10))) AS last,
+  const rows = db.prepare(`SELECT company_name AS name, d.domain, COUNT(*) AS deals, MAX(substr(COALESCE(deal_date,a.published_at,first_seen_at),1,10)) AS last,
       GROUP_CONCAT(round, '、') AS rounds
-    FROM deals WHERE company_id IS NULL AND COALESCE(deal_date, substr(first_seen_at,1,10)) >= ?
-    GROUP BY company_name ORDER BY last DESC LIMIT ?`).all(since, limit)
+    FROM deals d LEFT JOIN articles a ON a.id=d.first_article_id WHERE company_id IS NULL AND substr(COALESCE(deal_date,a.published_at,first_seen_at),1,10) >= ?
+      AND (? IS NULL OR d.domain = ?) AND company_name LIKE ? ESCAPE '\\'
+    GROUP BY company_name ORDER BY last DESC LIMIT ?`).all(since, domain, domain, `%${q.replace(/[\\%_]/g, ch => `\\${ch}`)}%`, 500)
     .map(row => ({ name: row.name, domain: row.domain, deals: row.deals, last: row.last, rounds: [...new Set(String(row.rounds || '').split('、'))].slice(0, 4) }));
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = companies.identityKey(row.name), existing = grouped.get(key);
+    if (!existing) grouped.set(key,row);
+    else { existing.deals += row.deals; existing.rounds = [...new Set([...existing.rounds,...row.rounds])].slice(0,4); }
+  }
+  return [...grouped.values()].slice(0,limit);
 }
 
 // 升级前已判相关的资本市场资料：按标题规则补抽一次融资事件（纯代码）。
@@ -319,17 +337,11 @@ function backfillHistory(limit = 500) {
 
 // 新收录一家公司后，把名字对得上的历史融资事件挂上 company_id
 function relinkDeals() {
-  const rows = db.prepare('SELECT id, company_name FROM deals WHERE company_id IS NULL').all();
-  let linked = 0;
-  for (const row of rows) {
-    const hit = companies.resolveName(row.company_name);
-    if (!hit) continue;
-    try {
-      db.prepare('UPDATE deals SET company_id = ?, company_name = ? WHERE id = ?').run(hit.id, hit.name, row.id);
-      linked++;
-    } catch {}
-  }
-  return linked;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    require('./capital-migration').reconcileDeals();
+    db.exec('COMMIT');
+  } catch(error) { db.exec('ROLLBACK'); throw error; }
 }
 
 module.exports = {

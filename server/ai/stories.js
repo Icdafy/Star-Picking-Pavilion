@@ -146,15 +146,15 @@ function normalizeJudgement(json, count) {
   return out;
 }
 
-async function judge(doc, candidates, settings) {
+async function judge(doc, candidates, settings, confirmation = false) {
   const prompt = industry.renderPrompt('group-pair');
   const user = `<item id="NEW">\n${describe(doc)}\n</item>\n${candidates.map((c, i) => `<candidate id="${i}">\n${describe(c.evidence)}\n</candidate>`).join('\n')}`;
   const { value } = await withReceipt({
-    task: 'group',
-    keyParts: [prompt.version, modelFor(settings), user],
+    task: confirmation ? 'group-confirm' : 'group',
+    keyParts: [prompt.version, modelFor(settings), user, confirmation ? 'independent-confirmation-v1' : 'initial'],
     validate: v => Array.isArray(v) && v.length === candidates.length,
     call: async () => normalizeJudgement(extractJson(await chat([
-      { role: 'system', content: prompt.text },
+      { role: 'system', content: prompt.text + (confirmation ? '\n这是独立复核：必须核对主体、轮次、任务批次、日期及完成状态。没有足够证据表明是同一事件或明确后续进展时返回 different。不要因为同公司或同赛道就合并。' : '') },
       { role: 'user', content: user }
     ], { settings, model: modelFor(settings), maxTokens: 400 })), candidates.length)
   });
@@ -280,8 +280,12 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
             .filter(v => v.relation !== 'different' && v.confidence >= config.sameMinConfidence)
             .sort((a, b) => Number(b.relation === 'same') - Number(a.relation === 'same') || b.confidence - a.confidence)[0];
           if (best) {
-            target = best.candidate.storyId;
-            relation = best.relation === 'development' ? 'development' : 'report';
+            // AIHOT 的灰区复核：不向第二次请求泄露第一次结论；独立回执避免重复付费。
+            const confirmation = best.confidence < 0.85 ? (await judge(doc, [best.candidate], settings, true))[0] : best;
+            if (confirmation.relation === best.relation && confirmation.confidence >= config.sameMinConfidence) {
+              target = best.candidate.storyId;
+              relation = best.relation === 'development' ? 'development' : 'report';
+            }
           }
         } catch (error) {
           if (error?.budgetExceeded) { judgeBudget = 0; break; }

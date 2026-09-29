@@ -46,6 +46,6 @@ function isAccessChallenge(html) {
   const $ = cheerio.load(html);
   $('script,style,noscript').remove();
   // A comment widget's captcha script is not a challenge blocking the article.
-  return /环境异常|访问过于频繁|请完成验证|captcha|登录后查看|verify (?:that )?you are human|checking your browser/i.test($('title').text() + ' ' + $('body').text());
+  return /环境异常|访问过于频繁|请完成验证|正在进行安全检测|captcha|登录后查看|verify (?:that )?you are human|checking your browser/i.test($('title').text() + ' ' + $('body').text());
 }
 module.exports = { extractContent, enrichArticle, isAccessChallenge };

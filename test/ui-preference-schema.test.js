@@ -12,6 +12,7 @@ const ElectronPreferences = require('../electron/ui-preferences');
 const TODAY = '2026-07-23';
 const AQUA_FIELDS = Object.freeze([
   'aquaMode',
+  'aquaEnabled',
   'aquaBlur',
   'aquaFrost',
   'aquaHue',

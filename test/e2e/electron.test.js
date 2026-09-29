@@ -25,6 +25,7 @@ const EXPECTED_UI_PREFERENCE_KEYS = [
   'aquaBlur',
   'aquaBrightness',
   'aquaCritters',
+  'aquaEnabled',
   'aquaFrost',
   'aquaHue',
   'aquaMode',

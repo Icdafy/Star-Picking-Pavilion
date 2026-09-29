@@ -21,6 +21,7 @@
     'theme',
     'textScale',
     'aquaMode',
+    'aquaEnabled',
     'aquaBlur',
     'aquaFrost',
     'aquaHue',
@@ -84,6 +85,7 @@
       theme: 'dark',
       textScale: 'md',
       aquaMode: 'mica',
+      aquaEnabled: true,
       aquaBlur: 2,
       aquaFrost: 20,
       aquaHue: 220,
@@ -238,6 +240,7 @@
         value => isFiniteNumberInRange(value, 0, 100),
         defaults.aquaWallpaperFrost
       ),
+      aquaEnabled: chooseValue(source.aquaEnabled, secondary.aquaEnabled, value => typeof value === 'boolean', defaults.aquaEnabled),
       aquaWhale: chooseValue(
         source.aquaWhale,
         secondary.aquaWhale,
@@ -297,6 +300,7 @@
     if (field === 'aquaBackground') return AQUA_BACKGROUNDS.has(value);
     if (field === 'aquaWallpaperBlur') return isFiniteNumberInRange(value, 0, 40);
     if (field === 'aquaWallpaperFrost') return isFiniteNumberInRange(value, 0, 100);
+    if (field === 'aquaEnabled') return typeof value === 'boolean';
     if (field === 'aquaWhale') return typeof value === 'boolean';
     if (field === 'aquaCritters') return typeof value === 'boolean';
     if (field === 'view') return VIEWS.has(value);

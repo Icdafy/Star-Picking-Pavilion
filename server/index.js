@@ -789,6 +789,7 @@ process.on('message', handleControlMessage);
 process.once('SIGTERM', shutdownServer);
 
 seedSources();
+require('./ai/capital-migration').migrateCapital();
 server.listen(REQUESTED_PORT, '127.0.0.1', () => {
   const port = server.address().port;
   const ready = { type: 'server:ready', port, nonce: SERVER_NONCE };
