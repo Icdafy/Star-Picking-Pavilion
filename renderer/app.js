@@ -472,6 +472,11 @@ const sourcesController = SourcesController.createSourcesController({
   toast, confirmGlass,
   elements: {
     list: $('#sourcesList'),
+    summary: $('#sourcesSummary'),
+    search: $('#sourcesSearch'),
+    status: $('#sourcesStatus'),
+    type: $('#sourcesType'),
+    domain: $('#sourcesDomain'),
     addButton: $('#btnAddSource'),
     dialog: $('#srcDialog'),
     form: $('#srcForm'),

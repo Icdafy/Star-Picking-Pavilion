@@ -35,7 +35,10 @@ test('external source creation and import are usable in the real Electron UI', {
     // Electron 的窗口 IPC 返回时，渲染进程的 resize 事件可能尚未生效。
     await page.waitForFunction(width => innerWidth === width && innerHeight === 920, width);
     const bounds = await page.locator('#ingestDialog').boundingBox();
-    assert.ok(Math.abs(bounds.x + bounds.width / 2 - width / 2) < 2, `dialog stays centered in ${width}px: ${JSON.stringify(bounds)}`);
+    // 模态框相对可视区居中；信源列表较长时页面有纵向滚动条，可视宽度 = clientWidth（不含滚动条）
+    const visible = await page.evaluate(() => document.documentElement.clientWidth);
+    assert.ok(visible <= width && visible >= width - 24, `visible width ${visible} within ${width}`);
+    assert.ok(Math.abs(bounds.x + bounds.width / 2 - visible / 2) < 2, `dialog stays centered in ${width}px: ${JSON.stringify(bounds)}`);
     assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 920, 'dialog stays in viewport');
   }
   if (process.env.SPP_LAYOUT_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.SPP_LAYOUT_SCREENSHOT_DIR, 'external-ingest.png') });

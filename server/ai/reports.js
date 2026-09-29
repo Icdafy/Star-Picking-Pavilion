@@ -7,7 +7,10 @@
 // 再用 report-lead.md 让模型改写（只用本期输入里的事实），改写结果写回同一期。
 // 读者打开日报不会触发模型调用。
 //
-// 刊期窗口一律按采集时间（fetched_at）归属：每条资料只属于一期，迟到的新闻不会永久漏掉。
+// 刊期窗口按采集时间（fetched_at）归属：每条资料只属于一期，迟到的新闻不会永久漏掉。
+// 周报 / 月报再进一步（AIHOT de46b70）：按“采集与归组完成两者较晚的时刻”归属——上期结束前采到、
+// 结束后才判完的资料进入下一期，不会被已定稿的上一期和按采集时间计的下一期同时漏掉。
+// 融资事件按入库（first_seen_at）归属：报道日期更早、本期才补抽出来的融资同样计入本期。
 //   日报：前一日 08:00（不含）– 当日 08:00（含），与每日研究归档同一口径
 //   周报：ISO 周，周一 00:00 – 下周一 00:00（本地时间）
 //   月报：自然月
@@ -107,10 +110,17 @@ const ITEM_COLUMNS = `a.id, a.title, a.title_zh, a.url, a.ai_summary, a.ai_reaso
   a.attention_score, a.quality_score, a.featured, a.cluster_id, a.breakthrough_score, a.published_at, a.fetched_at,
   s.name AS source_name, s.tier, cl.size AS cluster_size`;
 
-function windowRows(start, end, extra = '') {
+// fetched：按采集时间；released：按 max(采集, 归组完成)，尚未归组的资料等归组后进入当期
+function windowPredicate(basis = 'fetched') {
+  return basis === 'released'
+    ? 'a.grouped_at IS NOT NULL AND MAX(a.fetched_at, a.grouped_at) > ? AND MAX(a.fetched_at, a.grouped_at) <= ?'
+    : 'a.fetched_at > ? AND a.fetched_at <= ?';
+}
+
+function windowRows(start, end, extra = '', basis = 'fetched') {
   return db.prepare(`SELECT ${ITEM_COLUMNS} FROM articles a JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters cl ON cl.id = a.cluster_id
-    WHERE a.relevant = 1 AND a.fetched_at > ? AND a.fetched_at <= ? ${extra}
+    WHERE a.relevant = 1 AND ${windowPredicate(basis)} ${extra}
     ORDER BY COALESCE(a.attention_score, a.quality_score) DESC, a.id DESC LIMIT 5000`).all(start, end);
 }
 
@@ -152,16 +162,15 @@ function hotInWindow(start, end, limit) {
 
 function dealsInWindow(start, end) {
   const { listDeals } = require('./deals');
-  return listDeals({ since: start, until: end, limit: 200 })
-    .filter(d => Date.parse(d.firstSeenAt) > Date.parse(start));
+  return listDeals({ seenWindow: [start, end], limit: 200 });
 }
 
-function companyBoard(start, end, limit = 15) {
+function companyBoard(start, end, limit = 15, basis = 'fetched') {
   return db.prepare(`SELECT c.id, c.name, c.domain, c.segment, c.status, c.watch,
       COUNT(DISTINCT a.id) AS reports, COUNT(DISTINCT COALESCE(a.participant_key, 'source:' || a.source_id)) AS participants,
       SUM(a.featured) AS featured
     FROM article_companies ac JOIN articles a ON a.id = ac.article_id JOIN companies c ON c.id = ac.company_id
-    WHERE ac.role = 'primary' AND a.relevant = 1 AND a.fetched_at > ? AND a.fetched_at <= ?
+    WHERE ac.role = 'primary' AND a.relevant = 1 AND ${windowPredicate(basis)}
     GROUP BY c.id ORDER BY participants DESC, reports DESC, featured DESC LIMIT ?`).all(start, end, limit)
     .map(r => ({ id: r.id, name: r.name, domain: r.domain, segment: r.segment, status: r.status, watch: r.watch,
       reports: r.reports, participants: r.participants, featured: r.featured || 0 }));
@@ -180,12 +189,12 @@ function investorsOf(deals, limit = 10) {
   return [...board.values()].sort((a, b) => b.deals - a.deals || b.leads - a.leads).slice(0, limit);
 }
 
-function portfolioUpdates(start, end) {
+function portfolioUpdates(start, end, basis = 'fetched') {
   const rows = db.prepare(`SELECT c.id AS company_id, c.name AS company_name, c.watch, ${ITEM_COLUMNS}
     FROM article_companies ac JOIN companies c ON c.id = ac.company_id AND c.watch > 0
     JOIN articles a ON a.id = ac.article_id JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters cl ON cl.id = a.cluster_id
-    WHERE a.relevant = 1 AND a.fetched_at > ? AND a.fetched_at <= ?
+    WHERE a.relevant = 1 AND ${windowPredicate(basis)}
     ORDER BY c.watch DESC, COALESCE(a.attention_score, a.quality_score) DESC`).all(start, end);
   const byCompany = new Map();
   for (const row of rows) {
@@ -212,8 +221,8 @@ function factualLead({ label, totals, hot, sections, deals }) {
 }
 
 // 组稿：给定窗口，出一期的全部版块
-function composeIssue({ start, end, label, periodLabel, perSection = 8, hotLimit = 8 }) {
-  const rows = windowRows(start, end);
+function composeIssue({ start, end, label, periodLabel, perSection = 8, hotLimit = 8, basis = 'fetched' }) {
+  const rows = windowRows(start, end, '', basis);
   const items = rows.map(itemOf);
   const featured = foldByStory(items.filter(i => i.featured));
   const sections = SECTION_ORDER.map(category => ({
@@ -238,7 +247,7 @@ function composeIssue({ start, end, label, periodLabel, perSection = 8, hotLimit
   return {
     label,
     periodLabel,
-    window: { start, end, basis: 'fetched_at' },
+    window: { start, end, basis: basis === 'released' ? 'released_at' : 'fetched_at' },
     generatedAt: now(),
     totals,
     byDomain,
@@ -248,8 +257,8 @@ function composeIssue({ start, end, label, periodLabel, perSection = 8, hotLimit
     sections,
     deals: deals.slice(0, 40),
     investors: investorsOf(deals),
-    companies: companyBoard(start, end),
-    portfolio: portfolioUpdates(start, end),
+    companies: companyBoard(start, end, 15, basis),
+    portfolio: portfolioUpdates(start, end, basis),
     breakthroughs
   };
 }
@@ -270,7 +279,8 @@ function generatePeriod(kind, key, { overwrite = false } = {}) {
   // 已结束的刊期是定稿；进行中的刊期 30 分钟内复用，之后重新组稿（保留模型导语直到数据变化）
   if (existing && !overwrite && (finished || Date.now() - Date.parse(existing.generatedAt) < 30 * 60e3)) return existing;
   const issue = composeIssue({ start: period.start, end: new Date(Math.min(Date.parse(period.end), Date.now())).toISOString(),
-    label: period.label, periodLabel: period.periodLabel, perSection: kind === 'monthly' ? 12 : 10, hotLimit: kind === 'monthly' ? 15 : 10 });
+    label: period.label, periodLabel: period.periodLabel, perSection: kind === 'monthly' ? 12 : 10, hotLimit: kind === 'monthly' ? 15 : 10,
+    basis: 'released' });
   const content = { kind, key: period.key, finished, ...issue, window: { ...issue.window, periodEnd: period.end } };
   if (existing?.leadSource === 'model' && existing.totals?.featured === content.totals.featured && existing.totals?.deals === content.totals.deals) {
     content.lead = existing.lead;

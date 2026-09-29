@@ -358,6 +358,10 @@ CREATE TABLE IF NOT EXISTS model_usage (
   calls INTEGER NOT NULL DEFAULT 0
 );
 `);
+  // v0.2.2：融资事件性质（equity | ipo | ma | secondary | debt），一级市场视图默认只看前三类
+  const dealCols = new Set(db.prepare('PRAGMA table_info(deals)').all().map(c => c.name));
+  if (!dealCols.has('deal_kind')) db.exec("ALTER TABLE deals ADD COLUMN deal_kind TEXT NOT NULL DEFAULT 'equity'");
+  db.exec('CREATE INDEX IF NOT EXISTS idx_deals_kind ON deals(deal_kind)');
 }
 migrate();
 

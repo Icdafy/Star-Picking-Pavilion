@@ -214,11 +214,11 @@
   </section>
 
   <section id="viewCapital" class="view" role="tabpanel" hidden>
-    <header class="intel-hero glass">
+    <header class="intel-hero intel-hero-compact glass">
       <div>
         <p class="intel-kicker">PRIMARY MARKET · 一级市场雷达</p>
         <h2 class="view-title">被投与潜在标的，一处看全</h2>
-        <p>融资、上市、订单、试验与人事动态，全部抽取自公开报道并附原文链接；公司库可自建、可标记关注与被投。</p>
+        <p>融资、上市、订单、试验与人事动态均抽取自公开报道并附原文链接；上市公司定增、债权融资与合资设立单独归类，不混入一级市场统计。</p>
       </div>
       <button class="btn-primary btn-compact" id="btnAddCompany" type="button" aria-controls="addCompanyForm">+ 收录公司</button>
     </header>
@@ -240,7 +240,8 @@
     </form>
     <div class="intel-toolbar glass">
       <div class="intel-tabs" id="capitalTabs" role="tablist" aria-label="一级市场分区">
-        <button class="chip active" type="button" role="tab" aria-selected="true" data-capital-tab="deals">融资动态</button>
+        <button class="chip active" type="button" role="tab" aria-selected="true" data-capital-tab="overview">市场概览</button>
+        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="deals">融资动态</button>
         <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="activity">企业动态</button>
         <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="heat">公司热度</button>
         <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="companies">公司库</button>
@@ -256,7 +257,7 @@
           <select id="capitalDays"><option value="30">近 30 天</option><option value="90" selected>近 90 天</option><option value="180">近 180 天</option><option value="365">近一年</option></select>
         </label>
         <label class="intel-check"><input id="capitalWatched" type="checkbox"> 只看关注与被投</label>
-        <input id="capitalSearch" class="intel-search" type="search" placeholder="搜索企业名称、别名或型号…" aria-label="搜索一级市场企业" maxlength="40">
+        <input id="capitalSearch" class="intel-search" type="search" placeholder="搜索企业、别名、型号或投资机构…" aria-label="搜索一级市场企业或投资机构" maxlength="40">
       </div>
     </div>
     <div id="capitalBody" aria-live="polite"></div>
@@ -308,6 +309,20 @@
     <div class="src-head">
       <h2 class="view-title">信源监控台</h2>
       <button class="btn-primary" id="btnAddSource">+ 提报信源</button>
+    </div>
+    <div class="src-toolbar glass">
+      <div class="src-summary" id="sourcesSummary" aria-live="polite"></div>
+      <div class="src-filters">
+        <input id="sourcesSearch" class="intel-search" type="search" placeholder="搜索信源名称、地址或说明…" aria-label="搜索信源" maxlength="60" autocomplete="off">
+        <div class="intel-domains" id="sourcesStatus" role="group" aria-label="信源运行状态">
+          <button class="chip active" type="button" data-source-status="" aria-pressed="true">全部</button>
+          <button class="chip" type="button" data-source-status="on" aria-pressed="false">运行中</button>
+          <button class="chip" type="button" data-source-status="err" aria-pressed="false">异常</button>
+          <button class="chip" type="button" data-source-status="off" aria-pressed="false">已停用</button>
+        </div>
+        <label class="intel-select"><span>类型</span><select id="sourcesType"><option value="">全部</option><option value="rss">RSS</option><option value="html">网页</option><option value="api">接口</option><option value="wechat">公众号</option><option value="external">外部导入</option></select></label>
+        <label class="intel-select"><span>领域</span><select id="sourcesDomain"><option value="">全部</option><option value="lowaltitude">低空经济</option><option value="aerospace">商业航天</option><option value="both">双领域</option></select></label>
+      </div>
     </div>
     <div id="sourcesList" class="src-list" tabindex="-1"></div>
   </section>

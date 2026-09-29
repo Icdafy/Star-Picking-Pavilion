@@ -40,6 +40,21 @@ function stringArray(value, label) {
   return value;
 }
 
+const DEAL_SORTS = new Set(['date', 'amount', 'sources']);
+// 一级市场融资筛选：时间窗、领域、关键词、仅关注、阶段、事件性质、排序
+function dealFilters(q) {
+  const text = (q.get('q') || '').trim();
+  if (text.length > 40) throw new HttpError(400, '检索词不得超过 40 个字符');
+  const stage = q.get('stage') || null;
+  if (stage && !deals.STAGES[stage]) throw new HttpError(400, '不支持的融资阶段');
+  const kind = q.get('kind') || 'primary';
+  if (!['primary', 'all'].includes(kind) && !deals.DEAL_KINDS[kind]) throw new HttpError(400, '不支持的事件性质');
+  const sort = q.get('sort') || 'date';
+  if (!DEAL_SORTS.has(sort)) throw new HttpError(400, '不支持的排序方式');
+  return { days: intParam(q.get('days'), 90, 1, 3650, '天数'), domain: domainParam(q.get('domain')), q: text,
+    watchedOnly: q.get('watched') === '1', stage, kind, sort };
+}
+
 // 业务层抛出的 {status} 错误统一转成 HttpError，其余照常冒泡为 500
 async function guard(action) {
   try {
@@ -158,17 +173,25 @@ async function handleIntelRoute({ req, res, url, json, readJsonBody, queryFeed }
   }
 
   if (p === '/api/deals' && method === 'GET') {
-    const days = intParam(q.get('days'), 90, 1, 3650, '天数');
-    const domain = domainParam(q.get('domain'));
-    const text = (q.get('q') || '').trim();
-    if (text.length > 40) throw new HttpError(400, '检索词不得超过 40 个字符');
-    const filters = { days, domain, q: text, watchedOnly: q.get('watched') === '1' };
+    const filters = dealFilters(q);
+    const list = deals.listDeals({ ...filters, limit: intParam(q.get('limit'), 120, 1, 500, '条数') });
     json(res, 200, {
-      days,
-      deals: deals.listDeals({ ...filters, limit: intParam(q.get('limit'), 120, 1, 500, '条数') }),
-      investors: deals.investorBoard(filters),
+      days: filters.days,
+      deals: list,
+      investors: deals.investorBoard({ ...filters, stage: null, sort: 'date' }),
       discovered: deals.discoveredCompanies(filters)
     });
+    return true;
+  }
+  if (p === '/api/capital/overview' && method === 'GET') {
+    const { days, domain, q: text, watchedOnly } = dealFilters(q);
+    json(res, 200, deals.overview({ days, domain, q: text, watchedOnly }));
+    return true;
+  }
+  if (p === '/api/deals/export' && method === 'GET') {
+    const format = q.get('format') || 'csv';
+    if (!['csv', 'markdown'].includes(format)) throw new HttpError(400, '导出格式须为 csv 或 markdown');
+    json(res, 200, deals.exportDeals(dealFilters(q), format));
     return true;
   }
 

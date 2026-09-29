@@ -25,6 +25,9 @@
     const STATUS_LABEL = Object.freeze({ private: '未上市', listed: '已上市', state: '国有体系', unknown: '状态待核' });
     const DEAL_STATUS = Object.freeze({ completed: '已完成', announced: '已宣布', rumored: '传闻' });
     const WATCH_LABEL = Object.freeze({ 0: '未标记', 1: '关注', 2: '被投' });
+    const STAGE_LABEL = Object.freeze({ early: '早期', growth: '成长期', late: '后期', ipo: '上市进程', strategic: '战略与并购', unknown: '轮次未披露' });
+    const TIER_LABEL = Object.freeze({ b10: '十亿级+', b1: '亿元级', m10: '千万级', small: '千万以下' });
+    const KIND_LABEL = Object.freeze({ equity: '股权融资', ipo: '上市进程', ma: '并购与转让', secondary: '上市公司再融资', debt: '债权与租赁', jv: '合资设立' });
 
     function createIntelRender({ esc, safeHttpUrl, timeAgo = null } = {}) {
       if (typeof esc !== 'function' || typeof safeHttpUrl !== 'function') {
@@ -130,9 +133,9 @@
         return names.slice(0, 6).map(name => leads.has(name) ? `<b title="领投">${esc(name)}</b>` : esc(name)).join('、') + (names.length > 6 ? ' 等' : '');
       }
 
-      function dealList(deals, { showCompany = true } = {}) {
+      function dealList(deals, { showCompany = true, emptyText = '这个时间窗内还没有抽取到融资、上市或并购事件。' } = {}) {
         const list = Array.isArray(deals) ? deals : [];
-        if (!list.length) return empty('静 候 佳 音', '这个时间窗内还没有抽取到融资、上市或并购事件。');
+        if (!list.length) return empty('静 候 佳 音', emptyText);
         return `<div class="deal-list${showCompany ? '' : ' compact'}" role="table" aria-label="融资与资本事件">
     <div class="deal-row deal-head" role="row"><span class="dc-date" role="columnheader">日期</span>${showCompany ? '<span class="dc-company" role="columnheader">公司</span>' : ''}<span class="dc-round" role="columnheader">轮次</span><span class="dc-amount" role="columnheader">金额</span><span class="dc-investors" role="columnheader">投资方</span><span class="dc-source" role="columnheader">报道</span></div>
     ${list.map(deal => {
@@ -142,8 +145,8 @@
       return `<div class="deal-row" role="row">
       <span class="deal-date dc-date" role="cell" title="${deal.dateBasis === 'published' ? '报道日期，实际融资日期未披露' : deal.dateBasis === 'discovered' ? '采集日期，原文未披露日期' : '原文披露的事件日期'}">${esc(deal.date || String(deal.firstSeenAt || '').slice(0, 10))}${deal.dateBasis === 'published' ? '<small>报道</small>' : deal.dateBasis === 'discovered' ? '<small>发现</small>' : ''}</span>
       ${showCompany ? `<span class="dc-company" role="cell">${company}${domainChip(deal.domain)}</span>` : ''}
-      <span class="dc-round" role="cell"><span class="deal-round">${esc(deal.round)}</span><small class="deal-status ${esc(deal.status)}">${DEAL_STATUS[deal.status] || ''}</small></span>
-      <span class="deal-amount dc-amount" role="cell">${esc(amountOf(deal))}</span>
+      <span class="dc-round" role="cell"><span class="deal-round">${esc(deal.round)}</span><small class="deal-status ${esc(deal.status)}">${DEAL_STATUS[deal.status] || ''}${['secondary', 'debt', 'jv'].includes(deal.kind) ? ` · ${KIND_LABEL[deal.kind]}` : ''}</small></span>
+      <span class="deal-amount dc-amount" role="cell">${esc(amountOf(deal))}${TIER_LABEL[deal.tier] ? `<small class="deal-tier ${esc(deal.tier)}">${TIER_LABEL[deal.tier]}</small>` : ''}</span>
       <span class="deal-investors dc-investors" role="cell">${investorsOf(deal)}</span>
       <span class="dc-source" role="cell">${deal.article ? `<a href="${url(deal.article.url)}" target="_blank" rel="noopener" title="${esc(deal.article.title || '')}">${esc(deal.article.source || '原文')}</a>` : ''}${Number(deal.sourceCount) > 1 ? ` <small class="muted">共 ${esc(deal.sourceCount)} 篇</small>` : ''}</span>
     </div>`;
@@ -237,11 +240,110 @@
       function investorTable(list) {
         const rows = Array.isArray(list) ? list : [];
         if (!rows.length) return empty('虚 位 以 待', '这个时间窗内的融资报道还没有披露投资方。');
-        return `<div class="investor-list">${rows.map((inv, index) => `<div class="investor-row glass">
+        return `<p class="intel-note">按出现的融资事件计数，同一笔融资的多篇报道只算一次；点击机构名查看它参与的全部融资。</p><div class="investor-list">${rows.map((inv, index) => `<div class="investor-row glass">
     <span class="ch-rank">${index + 1}</span>
-    <div><b>${esc(inv.name)}</b><div class="muted">${(inv.companies || []).map(esc).join('、')}</div></div>
+    <div>
+      <button type="button" class="link-btn" data-investor="${esc(inv.name)}" title="查看该机构参与的融资">${esc(inv.name)}</button>${(inv.domains || []).map(domainChip).join('')}
+      <div class="muted">${(inv.companies || []).map(esc).join('、')}</div>
+      ${(inv.stages || []).length ? `<div class="investor-stages">${inv.stages.map(s => `<span>${esc(s.label || STAGE_LABEL[s.id] || '')} ${esc(s.count)}</span>`).join('')}${inv.last ? `<span class="muted">最近 ${esc(inv.last)}</span>` : ''}</div>` : ''}
+    </div>
     <span class="investor-count"><b>${esc(inv.deals)}</b> 起${inv.leads ? ` · 领投 ${esc(inv.leads)}` : ''}</span>
   </div>`).join('')}</div>`;
+      }
+
+      // ---------- 一级市场 · 概览 ----------
+      function yi(value) {
+        const n = Number(value) || 0;
+        if (n >= 1e8) return `${num(n / 1e8, n >= 1e10 ? 0 : 1)} 亿元`;
+        if (n >= 1e4) return `${num(n / 1e4, 0)} 万元`;
+        return n ? `${num(n, 0)} 元` : '—';
+      }
+
+      function barList(items, { total = null, action = null, tone = 'flag' } = {}) {
+        const list = (Array.isArray(items) ? items : []).filter(i => i && i.count != null);
+        const max = Math.max(1, ...list.map(i => Number(i.count) || 0));
+        const sum = total ?? list.reduce((s, i) => s + (Number(i.count) || 0), 0);
+        return `<ul class="cap-bars ${tone}">${list.map(item => {
+          const count = Number(item.count) || 0;
+          const pct = sum ? Math.round(count / sum * 100) : 0;
+          const label = `<span class="cb-label">${esc(item.label)}</span>`;
+          const bar = `<span class="cb-track" aria-hidden="true"><i style="width:${Math.round(count / max * 100)}%"></i></span><span class="cb-num">${esc(count)}<small>${pct}%</small></span>`;
+          return action && count && item.id
+            ? `<li><button type="button" class="cb-row" data-${action}="${esc(item.id)}" aria-label="${esc(item.label)} ${esc(count)} 起，点击查看">${label}${bar}</button></li>`
+            : `<li><div class="cb-row${count ? '' : ' is-zero'}">${label}${bar}</div></li>`;
+        }).join('')}</ul>`;
+      }
+
+      function monthlyChart(monthly) {
+        const list = Array.isArray(monthly) ? monthly : [];
+        if (!list.length) return '';
+        const max = Math.max(1, ...list.map(m => Number(m.total) || 0));
+        return `<div class="cap-months" role="img" aria-label="${esc(list.map(m => `${m.month} ${m.total} 起`).join('，'))}">${list.map(m => {
+          const la = Number(m.lowaltitude) || 0, ae = Number(m.aerospace) || 0, other = Math.max(0, (Number(m.total) || 0) - la - ae);
+          const h = v => `${Math.round(v / max * 100)}%`;
+          return `<div class="cm-col" title="${esc(m.month)}：低空 ${la} · 航天 ${ae}${other ? ` · 其他 ${other}` : ''}">
+      <span class="cm-total">${esc(m.total || '')}</span>
+      <div class="cm-stack"><i class="ae" style="height:${h(ae)}"></i><i class="la" style="height:${h(la)}"></i>${other ? `<i class="ot" style="height:${h(other)}"></i>` : ''}</div>
+      <span class="cm-label">${esc(String(m.month).slice(5))}月</span>
+    </div>`;
+        }).join('')}</div>
+    <div class="cap-legend"><span><i class="la"></i>低空经济</span><span><i class="ae"></i>商业航天</span></div>`;
+      }
+
+      function miniDeals(deals, emptyText) {
+        const list = Array.isArray(deals) ? deals : [];
+        if (!list.length) return `<p class="muted cap-empty">${esc(emptyText)}</p>`;
+        return `<ul class="cap-mini">${list.map(d => `<li>
+    ${d.companyId ? `<button type="button" class="link-btn" data-company="${esc(d.companyId)}">${esc(d.companyName)}</button>` : `<b>${esc(d.companyName)}</b>`}${domainChip(d.domain)}
+    <span class="cap-mini-meta"><span class="deal-round">${esc(d.round)}</span> · ${esc(amountOf(d))} · ${esc(d.date || '')}</span>
+    ${d.article?.url ? `<a class="cap-mini-src" href="${url(d.article.url)}" target="_blank" rel="noopener" title="${esc(d.article.title || '')}">原文</a>` : ''}
+  </li>`).join('')}</ul>`;
+      }
+
+      function capitalOverview(o) {
+        if (!o || !o.totals) return empty('静 候 佳 音', '暂无一级市场数据。');
+        const t = o.totals;
+        if (!t.deals) {
+          return empty('静 候 佳 音', `近 ${o.days || 90} 天还没有抽取到一级市场融资事件。采集与分析完成后会自动出现；也可以放宽时间窗。`);
+        }
+        const share = t.deals ? Math.round((t.lowaltitude || 0) / t.deals * 100) : 0;
+        const tiles = [
+          ['融资事件', `${t.deals}`, `${t.completed} 起已完成${t.rumored ? ` · ${t.rumored} 起传闻` : ''}`],
+          ['涉及公司', `${t.companies}`, `${t.withInvestors} 起披露投资方`],
+          ['亿元级以上', `${t.largeRounds}`, '按原文金额量级估算'],
+          ['明确披露金额', yi(t.disclosedCny), `${t.disclosedCount} 起写明人民币数字`],
+          ['领域分布', `${t.lowaltitude} : ${t.aerospace}`, `低空 ${share}% · 航天 ${100 - share}%`]
+        ];
+        return `<div class="cap-overview">
+    <div class="cap-kpis">${tiles.map(([label, value, hint]) => `<div class="cap-kpi glass"><span class="ck-label">${esc(label)}</span><b class="ck-value">${esc(value)}</b><span class="ck-hint">${esc(hint)}</span></div>`).join('')}</div>
+    <div class="cap-grid">
+      <section class="glass card-pad cap-card"><h3>融资阶段 <span class="muted">点击查看该阶段明细</span></h3>${barList(o.stages, { action: 'deal-stage' })}</section>
+      <section class="glass card-pad cap-card"><h3>金额量级 <span class="muted">外币与约数仅用于分档</span></h3>${barList(o.tiers, { tone: 'accent' })}</section>
+      <section class="glass card-pad cap-card"><h3>月度节奏 <span class="muted">按融资或报道日期</span></h3>${monthlyChart(o.monthly)}</section>
+      <section class="glass card-pad cap-card"><h3>热门赛道 <span class="muted">仅统计公司库内公司</span></h3>${o.segments?.length ? barList(o.segments, { tone: 'second' }) : '<p class="muted cap-empty">融资主体尚未收录到公司库，收录后按赛道统计。</p>'}</section>
+      <section class="glass card-pad cap-card"><h3>大额融资</h3>${miniDeals(o.large, '窗口内没有披露金额的融资。')}</section>
+      <section class="glass card-pad cap-card"><h3>上市进程 <span class="muted">IPO · 辅导 · Pre-IPO</span></h3>${miniDeals(o.pipeline, '窗口内没有上市辅导、IPO 或 Pre-IPO 报道。')}</section>
+      <section class="glass card-pad cap-card cap-wide"><h3>活跃机构</h3>${o.investors?.length ? `<ol class="cap-investors">${o.investors.map(inv => `<li><button type="button" class="link-btn" data-investor="${esc(inv.name)}">${esc(inv.name)}</button><span class="muted">${esc(inv.deals)} 起${inv.leads ? ` · 领投 ${esc(inv.leads)}` : ''} · ${(inv.companies || []).slice(0, 3).map(esc).join('、')}</span></li>`).join('')}</ol>` : '<p class="muted cap-empty">窗口内的融资报道尚未披露投资方。</p>'}</section>
+    </div>
+    ${t.excluded ? `<p class="intel-note cap-excluded">另有 ${esc(t.excluded)} 起${(o.excludedKinds || []).map(k => `${esc(k.label)} ${esc(k.count)}`).join('、') ? `（${(o.excludedKinds || []).map(k => `${esc(k.label)} ${esc(k.count)} 起`).join('、')}）` : ''}不属于一级市场股权交易，未计入统计；可在“融资动态”的事件性质里查看。</p>` : ''}
+  </div>`;
+      }
+
+      // 融资动态的筛选工具条：阶段、事件性质、排序、导出
+      function dealTools(view = {}) {
+        const stages = [['', '全部阶段'], ...Object.entries(STAGE_LABEL)];
+        const kinds = [['primary', '一级市场交易'], ['equity', '仅股权融资'], ['ipo', '仅上市进程'], ['ma', '仅并购与转让'], ['all', '全部（含再融资、债权、合资）']];
+        const sorts = [['date', '按日期'], ['amount', '按金额量级'], ['sources', '按报道数']];
+        const option = (value, label, current) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(label)}</option>`;
+        return `<div class="deal-tools">
+    <div class="deal-stages" role="group" aria-label="融资阶段">${stages.map(([id, label]) => `<button type="button" class="chip${(view.stage || '') === id ? ' active' : ''}" data-deal-stage="${esc(id)}" aria-pressed="${(view.stage || '') === id}">${esc(label)}</button>`).join('')}</div>
+    <div class="deal-controls">
+      <label class="intel-select"><span>性质</span><select data-deal-kind aria-label="事件性质">${kinds.map(([v, l]) => option(v, l, view.kind || 'primary')).join('')}</select></label>
+      <label class="intel-select"><span>排序</span><select data-deal-sort aria-label="排序方式">${sorts.map(([v, l]) => option(v, l, view.sort || 'date')).join('')}</select></label>
+      <button type="button" class="btn-ghost btn-compact" data-act="deals-export" data-format="csv" title="导出为 Excel 可直接打开的 CSV">导出 CSV</button>
+      <button type="button" class="btn-ghost btn-compact" data-act="deals-export" data-format="markdown">导出 .md</button>
+    </div>
+  </div>`;
       }
 
       function discoveredList(list) {
@@ -321,7 +423,7 @@
 
       return Object.freeze({
         industryInfo, sparkline, hotList, storyReports, dealList, companyHeat, companyGrid, companyDetail,
-        investorTable, discoveredList, articleList, issueBlocks, issueItem, empty
+        investorTable, discoveredList, articleList, issueBlocks, issueItem, empty, capitalOverview, dealTools
       });
     }
 
@@ -415,7 +517,7 @@
      关注 / 被投标记写回本机库；标记关注时服务端会为该公司补一条检索线。
      依赖全部注入，工厂体不直读 window/document。 */
   const CapitalViewController = (function createCapitalViewControllerModule() {
-    const TABS = Object.freeze(['deals', 'activity', 'heat', 'companies', 'investors']);
+    const TABS = Object.freeze(['overview', 'deals', 'activity', 'heat', 'companies', 'investors']);
     const WATCH_TEXT = Object.freeze({ 0: '已取消标记', 1: '已标记为关注', 2: '已标记为被投' });
 
     function splitNames(value) {
@@ -423,13 +525,13 @@
     }
 
     function createCapitalViewController({
-      api, esc, render, skeletons, toast, confirm, requestGuard, elements
+      api, esc, render, skeletons, toast, confirm, requestGuard, elements, saveText = null
     } = {}) {
       if (typeof api !== 'function' || typeof esc !== 'function' || !render
         || typeof skeletons !== 'function' || typeof toast !== 'function' || !requestGuard || !elements?.body) {
         throw new TypeError('capital view controller requires api, esc, render, skeletons, toast, requestGuard and elements.body');
       }
-      const view = { tab: 'deals', domain: '', days: 90, watched: false, q: '', companyId: null };
+      const view = { tab: 'overview', domain: '', days: 90, watched: false, q: '', companyId: null, stage: '', kind: 'primary', sort: 'date' };
       let searchTimer = null;
 
       function query(params) {
@@ -446,7 +548,7 @@
           tab.setAttribute('aria-selected', String(on));
         }
         if (elements.search) elements.search.hidden = Boolean(view.companyId);
-        if (elements.days) elements.days.disabled = !['deals', 'activity', 'investors'].includes(view.tab);
+        if (elements.days) elements.days.disabled = !['overview', 'deals', 'activity', 'investors'].includes(view.tab);
       }
 
       async function show(loader) {
@@ -469,10 +571,16 @@
           const id = view.companyId;
           return show(async () => render.companyDetail(await api(`/api/companies/${encodeURIComponent(id)}`)));
         }
+        if (view.tab === 'overview') {
+          return show(async () => render.capitalOverview(await api('/api/capital/overview'
+            + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q }))));
+        }
         if (view.tab === 'deals') {
           return show(async () => {
-            const data = await api('/api/deals' + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q }));
-            return render.dealList(data.deals) + render.discoveredList(data.discovered);
+            const data = await api('/api/deals' + dealQuery());
+            const filtered = view.stage || view.kind !== 'primary' || view.q;
+            return render.dealTools(view) + render.dealList(data.deals, filtered
+              ? { emptyText: '当前筛选条件下没有融资事件，可放宽阶段、性质或时间窗。' } : {}) + render.discoveredList(data.discovered);
           });
         }
         if (view.tab === 'activity') {
@@ -495,6 +603,42 @@
           const data = await api('/api/deals' + query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q }));
           return render.investorTable(data.investors);
         });
+      }
+
+      function dealQuery(extra = {}) {
+        return query({ days: view.days, domain: view.domain, watched: view.watched ? 1 : '', q: view.q,
+          stage: view.stage, kind: view.kind === 'primary' ? '' : view.kind, sort: view.sort === 'date' ? '' : view.sort, ...extra });
+      }
+
+      function switchTab(tab) {
+        view.tab = tab;
+        view.companyId = null;
+        return load();
+      }
+
+      // 本地另存为：blob + a[download]，不经过任何外部服务
+      function save(filename, text) {
+        if (typeof saveText === 'function') return saveText(filename, text);
+        const doc = globalThis.document;
+        if (!doc) return;
+        const blob = new Blob([`\ufeff${text}`], { type: filename.endsWith('.csv') ? 'text/csv;charset=utf-8' : 'text/markdown;charset=utf-8' });
+        const href = URL.createObjectURL(blob);
+        const anchor = doc.createElement('a');
+        anchor.href = href;
+        anchor.download = filename;
+        doc.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(href), 10_000);
+      }
+
+      async function exportDeals(format) {
+        try {
+          const result = await api('/api/deals/export' + dealQuery({ format }));
+          if (!result.count) { toast('当前筛选条件下没有可导出的融资事件', true); return; }
+          save(result.filename, result.content);
+          toast(`已导出 ${result.count} 起融资事件到 ${result.filename}`);
+        } catch (error) { toast('导出失败：' + error.message, true); }
       }
 
       function openCompany(id) {
@@ -526,6 +670,19 @@
       elements.body.addEventListener('click', async event => {
         if (event.target.closest('[data-act="retry-capital"]')) { load(); return; }
         if (event.target.closest('[data-act="company-back"]')) { view.companyId = null; load(); return; }
+        const exportButton = event.target.closest('[data-act="deals-export"]');
+        if (exportButton) { exportDeals(exportButton.dataset.format); return; }
+        const stageChip = event.target.closest('[data-deal-stage]');
+        if (stageChip) { view.stage = stageChip.dataset.dealStage || ''; switchTab('deals'); return; }
+        const investor = event.target.closest('[data-investor]');
+        if (investor) {
+          // 机构名 → 融资动态里检索它参与的全部融资（检索覆盖投资方字段）
+          view.q = investor.dataset.investor.slice(0, 40);
+          if (elements.search) elements.search.value = view.q;
+          view.stage = '';
+          switchTab('deals');
+          return;
+        }
         const watch = event.target.closest('[data-watch]');
         if (watch) { setWatch(watch.dataset.company, watch.dataset.watch); return; }
         const adoptButton = event.target.closest('[data-act="company-adopt"]');
@@ -548,6 +705,13 @@
         if (company) openCompany(company.dataset.company);
       });
 
+      elements.body.addEventListener('change', event => {
+        const kind = event.target.closest('[data-deal-kind]');
+        if (kind) { view.kind = kind.value || 'primary'; load(); return; }
+        const sort = event.target.closest('[data-deal-sort]');
+        if (sort) { view.sort = sort.value || 'date'; load(); }
+      });
+
       elements.body.addEventListener('submit', async event => {
         const form = event.target.closest('[data-form="company-aliases"]');
         if (!form) return;
@@ -565,9 +729,7 @@
       elements.tabs?.addEventListener('click', event => {
         const tab = event.target.closest('[data-capital-tab]');
         if (!tab || !TABS.includes(tab.dataset.capitalTab)) return;
-        view.tab = tab.dataset.capitalTab;
-        view.companyId = null;
-        load();
+        switchTab(tab.dataset.capitalTab);
       });
       elements.domains?.addEventListener('click', event => {
         const chip = event.target.closest('[data-capital-domain]');
@@ -622,7 +784,7 @@
       });
       elements.addForm?.addEventListener('reset', () => { elements.addForm.hidden = true; });
 
-      return Object.freeze({ load, openCompany });
+      return Object.freeze({ load, openCompany, switchTab, state: () => ({ ...view }) });
     }
 
     return Object.freeze({ createCapitalViewController, splitNames });

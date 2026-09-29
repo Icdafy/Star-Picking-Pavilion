@@ -1,6 +1,6 @@
 {
   "_说明": "行业包 · 公司库。只记录身份信息（名称、别名、代表型号、赛道、上市状态），不写任何融资、估值等会过时的事实——这些一律从真实报道里抽取（见“一级市场”视图）。status：private=未上市（一级市场标的）、listed=已上市、state=国有体系、unknown=状态待核实。用户可以在应用里新增自己的被投公司、补别名，并把任意公司标为“关注”或“被投”；内置条目随版本增量同步，不覆盖用户的标记。",
-  "version": 2,
+  "version": 3,
   "companies": [
     { "id": "autoflight", "name": "峰飞航空", "aliases": ["峰飞航空科技", "峰飞", "AutoFlight"], "products": ["盛世龙", "凯瑞鸥", "V2000CG"], "domain": "lowaltitude", "segment": "eVTOL整机", "region": "cn", "status": "private" },
     { "id": "aerofugia", "name": "沃飞长空", "aliases": ["沃飞", "AEROFUGIA"], "products": ["AE200"], "domain": "lowaltitude", "segment": "eVTOL整机", "region": "cn", "status": "private" },
@@ -67,6 +67,19 @@
     { "id": "axiom", "name": "Axiom Space", "aliases": [], "products": [], "domain": "aerospace", "segment": "载人与太空旅游", "region": "intl", "status": "private" },
     { "id": "impulse", "name": "Impulse Space", "aliases": [], "products": [], "domain": "aerospace", "segment": "在轨服务", "region": "intl", "status": "private" },
     { "id": "rocket-lab", "name": "Rocket Lab", "aliases": ["火箭实验室"], "products": ["Electron", "Neutron", "中子号"], "domain": "aerospace", "segment": "运载火箭", "region": "intl", "status": "listed" },
-    {"id":"dream-aerospace","name":"追梦空天科技","aliases":["追梦空天"],"products":["DF600","DF3000"],"domain":"lowaltitude","segment":"混动eVTOL整机","region":"cn","status":"private"}
+    {"id":"dream-aerospace","name":"追梦空天科技","aliases":["追梦空天"],"products":["DF600","DF3000"],"domain":"lowaltitude","segment":"混动eVTOL整机","region":"cn","status":"private"},
+    {"id":"govy","name":"高域科技","aliases":["广汽高域","广东高域科技","高域","GOVY"],"products":["GOVY AirCab"],"domain":"lowaltitude","segment":"eVTOL整机","region":"cn","status":"private"},
+    {"id":"lanxiao-aviation","name":"蓝霄航空","aliases":[],"products":[],"domain":"lowaltitude","segment":"eVTOL整机","region":"cn","status":"private"},
+    {"id":"huayu-xianxiang","name":"华羽先翔","aliases":["长沙华羽先翔","华羽先翔航空"],"products":["鸿鹄"],"domain":"lowaltitude","segment":"eVTOL整机","region":"cn","status":"private"},
+    {"id":"yuntu-aviation","name":"云途航空","aliases":["云途航空科技"],"products":[],"domain":"lowaltitude","segment":"eVTOL整机","region":"cn","status":"private"},
+    {"id":"jiushidu-aviation","name":"九十度航空","aliases":[],"products":[],"domain":"lowaltitude","segment":"eVTOL整机","region":"cn","status":"private"},
+    {"id":"shangfei-aviation","name":"尚飞航空","aliases":[],"products":[],"domain":"lowaltitude","segment":"eVTOL整机","region":"cn","status":"private"},
+    {"id":"hangjing","name":"航景创新","aliases":[],"products":[],"domain":"lowaltitude","segment":"无人直升机","region":"cn","status":"private"},
+    {"id":"hanglian-tech","name":"航链科技","aliases":["浙江航链科技"],"products":[],"domain":"lowaltitude","segment":"工业无人机","region":"cn","status":"private"},
+    {"id":"kasen-aviation","name":"佧森航空","aliases":["合肥佧森航空"],"products":[],"domain":"lowaltitude","segment":"eVTOL热管理","region":"cn","status":"private"},
+    {"id":"qingwei-aviation","name":"庆为航空","aliases":["深圳庆为航空"],"products":[],"domain":"lowaltitude","segment":"飞控与航电","region":"cn","status":"private"},
+    {"id":"yufeng-flight","name":"驭风飞行","aliases":["北京驭风飞行"],"products":["云哨M1000-CNS"],"domain":"lowaltitude","segment":"浮空器","region":"cn","status":"private"},
+    {"id":"weifen-aerospace","name":"微分航宇","aliases":[],"products":[],"domain":"aerospace","segment":"航天分离机构","region":"cn","status":"private"},
+    {"id":"zhixing-space","name":"智星空间","aliases":[],"products":[],"domain":"aerospace","segment":"卫星研制","region":"cn","status":"private"}
   ]
 }

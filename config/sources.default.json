@@ -1,6 +1,6 @@
 {
   "_说明": "信源种子库 —— 首次启动全量导入；之后按 _version 幂等增量补新源（url 唯一，不覆盖用户改动、不复活已删项）。分级学习 AIHOT：T1=官方一手，T1.5=官方社媒/次级渠道，T2=媒体/KOL/聚合检索。type: rss=标准RSS/Atom（支持 rsshub://路由，需在设置填 RSSHub 地址） | api=公开JSON（东财检索 eastmoney://关键词，可带 ?pages=N&mode=relevance|recent|both&guard=off；巨潮公告 cninfo://检索词?column=szse|sse，检索词可空=全量公告流；上交所 sse://检索词；深交所 szse://；财联社电报 cls://检索词） | html=网页爬虫（配 selector） | bing=必应资讯RSS（大陆常空）。intl:true 标记国外情报源。enabled:false 默认停用，在『信源』页一键启用。",
-  "_version": 10,
+  "_version": 11,
   "_迁移说明": "种子库的 INSERT OR IGNORE 只会补新源，改不动老库里已有的那一行——所以修地址、修选择器、清退死源必须走 _migrations，且在补新源之前执行（否则新地址会被插成第二条，老的那条继续每轮空转）。每一步都幂等：relocate 只在『老地址还在、新地址还没有』时改写，两边都在就停用老的；retire 只停用不删除，用户的历史文章与统计原样保留，随时可在信源页手工启用。",
   "_migrations": [
     {"from":"eastmoney://丰翼科技","to":"eastmoney://丰翼?pages=2&mode=both","note":"v0.2.1 实测修复：公司简称及双排序检索，避免默认排序空结果。"},
@@ -301,6 +301,28 @@
     {"name":"一级市场·航空电推进融资","url":"eastmoney://航空电推进融资?pages=2&mode=both","type":"api","tier":"T2","domain":"lowaltitude","note":"公开免费检索；出版方按原始媒体识别。检索命中不是融资确认，须经过正文与事件抽取。"},
     {"name":"商业航天发展·用户提供文章1","url":"https://mp.weixin.qq.com/s/OCmQht6APSBkzzIWBiWbzA","type":"wechat","tier":"T2","domain":"aerospace","enabled":false,"note":"2026-09-29 实测微信环境验证且 robots 禁止采集，暂不可用。保留精确原文入口，可手动打开；持续自动更新需配置可用的公开 RSS/Wechat2RSS 订阅。未伪造正文或融资事件。"},
     {"name":"商业航天发展·用户提供文章2","url":"https://mp.weixin.qq.com/s/DCjVddOOyk-KPkwPTzCWCw","type":"wechat","tier":"T2","domain":"aerospace","enabled":false,"note":"2026-09-29 实测微信环境验证且 robots 禁止采集，暂不可用。保留精确原文入口，可手动打开；持续自动更新需配置可用的公开 RSS/Wechat2RSS 订阅。未伪造正文或融资事件。"},
-    {"name":"商业航天发展·用户提供文章3","url":"https://mp.weixin.qq.com/s/4LOX5NESQ-jyMC1QNpFcnA","type":"wechat","tier":"T2","domain":"aerospace","enabled":false,"note":"2026-09-29 实测微信环境验证且 robots 禁止采集，暂不可用。保留精确原文入口，可手动打开；持续自动更新需配置可用的公开 RSS/Wechat2RSS 订阅。未伪造正文或融资事件。"}
+    {"name":"商业航天发展·用户提供文章3","url":"https://mp.weixin.qq.com/s/4LOX5NESQ-jyMC1QNpFcnA","type":"wechat","tier":"T2","domain":"aerospace","enabled":false,"note":"2026-09-29 实测微信环境验证且 robots 禁止采集，暂不可用。保留精确原文入口，可手动打开；持续自动更新需配置可用的公开 RSS/Wechat2RSS 订阅。未伪造正文或融资事件。"},
+    {"name":"上交所·科创板IPO·航空航天","url":"sseipo://?csrc=C37&days=540","type":"api","tier":"T1","domain":"both","note":"v0.2.2 实测公开免费（2026-09-30）：上交所科创板发行上市审核项目动态，证监会行业 C37，首轮返回中科宇航、蓝箭航天、微纳星空、中电科蓝天；每次状态变化生成一条上市进程资料。"},
+    {"name":"上交所·科创板IPO·航天","url":"sseipo://航天?days=540","type":"api","tier":"T1","domain":"aerospace","note":"v0.2.2 实测公开免费（2026-09-30）：按公司名称检索科创板审核项目。"},
+    {"name":"深交所·IPO审核·航空航天","url":"szseipo://?industry=航空航天&pages=3&days=540","type":"api","tier":"T1","domain":"both","note":"v0.2.2 实测公开免费（2026-09-30）：深交所创业板/主板发行上市审核项目，按证监会行业过滤，首轮返回腾盾科创、成立航空、晋铭航空。"},
+    {"name":"一级市场·商业航天完成融资","url":"eastmoney://商业航天 完成融资?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"aerospace","note":"v0.2.2 实测公开免费（2026-09-30）：资本守卫（领域词库 + 标题资本信号）过滤后首轮 13 条，含星邑空间、中科密位、深蓝航天。"},
+    {"name":"一级市场·卫星完成融资","url":"eastmoney://卫星 完成融资?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"aerospace","note":"v0.2.2 实测公开免费（2026-09-30）：首轮 12 条，含鲸鹏芯海、执宇航天。"},
+    {"name":"一级市场·航天A轮融资","url":"eastmoney://航天 A轮融资?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"aerospace","note":"v0.2.2 实测公开免费（2026-09-30）：首轮 12 条，含派铂宇航 A++ 轮。"},
+    {"name":"一级市场·eVTOL完成融资","url":"eastmoney://eVTOL 完成融资?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"lowaltitude","note":"v0.2.2 实测公开免费（2026-09-30）：首轮 11 条；融资租赁、融资融券等非股权融资在采集层剔除。"},
+    {"name":"一级市场·无人机完成融资","url":"eastmoney://无人机 完成融资?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"lowaltitude","note":"v0.2.2 实测公开免费（2026-09-30）：首轮 8 条。"},
+    {"name":"一级市场·低空天使轮","url":"eastmoney://低空经济 天使轮?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"lowaltitude","note":"v0.2.2 实测公开免费（2026-09-30）：早期项目补充线。"},
+    {"name":"一级市场·低空并购与辅导","url":"eastmoney://低空 上市辅导?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"lowaltitude","note":"v0.2.2 实测公开免费（2026-09-30）：上市辅导、并购与增资公告。"},
+    {"name":"一级市场·产业基金","url":"eastmoney://低空经济 产业基金?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"both","note":"v0.2.2 实测公开免费（2026-09-30）：产业基金设立与出资（LP 视角），只保留两行业相关条目。"},
+    {"name":"一级市场·周度融资盘点","url":"eastmoney://一级市场 融资 周报?pages=2&mode=both&guard=capital","type":"api","tier":"T2","domain":"both","note":"v0.2.2 实测公开免费（2026-09-30）：财联社创投通等周度盘点，仅保留提及两行业公司的期次。"},
+    {"name":"东财检索·高域科技","url":"eastmoney://高域科技?pages=2&mode=both","type":"api","tier":"T2","domain":"lowaltitude","note":"v0.2.2 实测公开免费（2026-09-30）：广汽旗下 eVTOL 整机企业，首轮 18 条。"},
+    {"name":"东财检索·航景创新","url":"eastmoney://航景创新?pages=2&mode=both","type":"api","tier":"T2","domain":"lowaltitude","note":"v0.2.2 实测公开免费（2026-09-30）：无人直升机与 eVTOL，首轮 8 条。"},
+    {"name":"投中网·融资","url":"https://www.chinaventure.com.cn/news/111.html","type":"html","tier":"T2","domain":"both","selector":{"list":"a[href*=\"/news/111-\"]","title":"h1","summary":"h2"},"note":"v0.2.2 实测公开免费（2026-09-30）：投中网融资栏目，卡片内取标题与导语，首轮 20 条；全行业融资，入库后按两行业预筛。"},
+    {"name":"泰伯网·空天资讯","url":"https://www.taibo.cn/","type":"html","tier":"T2","domain":"both","selector":{"list":"a[href*=\"/p/\"]"},"note":"v0.2.2 实测公开免费（2026-09-30）：空天信息与低空产业垂直媒体，首轮 40 条；列表无日期，发布时间取正文页结构化时间。"},
+    {"name":"无人机网·资讯","url":"https://www.youuav.com/news/","type":"html","tier":"T2","domain":"lowaltitude","selector":{"list":"a[href*=\"/news/detail/\"]"},"note":"v0.2.2 实测公开免费（2026-09-30）：无人机与低空产业资讯列表页（带日期），首轮 40 条；超过保留期的旧文在入库前丢弃。"},
+    {"name":"TechCrunch·Space","url":"https://techcrunch.com/category/space/feed/","type":"rss","tier":"T2","domain":"aerospace","intl":true,"note":"v0.2.2 实测公开免费（2026-09-30）：海外航天创投报道 RSS，首轮 20 条。"},
+    {"name":"eVTOL Insights","url":"https://evtolinsights.com/feed/","type":"rss","tier":"T2","domain":"lowaltitude","intl":true,"note":"v0.2.2 实测公开免费（2026-09-30）：海外 eVTOL/AAM 产业 RSS（含 PIPE、融资与订单），首轮 12 条。"},
+    {"name":"Urban Air Mobility News","url":"https://www.urbanairmobilitynews.com/feed/","type":"rss","tier":"T2","domain":"lowaltitude","intl":true,"note":"v0.2.2 实测公开免费（2026-09-30）：海外城市空中交通 RSS，首轮 10 条。"},
+    {"name":"European Spaceflight","url":"https://europeanspaceflight.com/feed/","type":"rss","tier":"T2","domain":"aerospace","intl":true,"note":"v0.2.2 实测公开免费（2026-09-30）：欧洲商业航天 RSS（含融资与合同），首轮 10 条。"},
+    {"name":"Via Satellite","url":"https://www.satellitetoday.com/feed/","type":"rss","tier":"T2","domain":"aerospace","intl":true,"note":"v0.2.2 实测公开免费（2026-09-30）：卫星产业 RSS（含 SPAC、并购与融资），首轮 10 条。"}
   ]
 }

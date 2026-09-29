@@ -1,6 +1,7 @@
 'use strict';
 const cheerio = require('cheerio');
 const { publicUrl, fetchPage } = require('./public-web');
+const { looseDateIso } = require('./loose-date');
 
 function extractContent(html, url) {
   const $ = cheerio.load(html);
@@ -25,10 +26,28 @@ function extractContent(html, url) {
     || $('meta[name="publishdate"]').attr('content') || $('time[datetime]').first().attr('datetime');
   const ct = html.match(/\b(?:ct|publish_time)\s*[:=]\s*["']?(\d{10})/);
   const publishedAt = published && Number.isFinite(Date.parse(published)) ? new Date(published).toISOString()
-    : ct ? new Date(Number(ct[1]) * 1000).toISOString() : null;
-  const publisherId = ($('#js_name').text().trim() || html.match(/var\s+user_name\s*=\s*["']([^"']+)/)?.[1] || '').slice(0, 120);
+    : ct ? new Date(Number(ct[1]) * 1000).toISOString() : visibleDate($);
+  // 出版方：公众号名；转载站的“文章来源：界面新闻”（东方财富等聚合页）——热度按真实出版方计独立信源
+  const publisherId = ($('#js_name').text().trim() || html.match(/var\s+user_name\s*=\s*["']([^"']+)/)?.[1]
+    || reprintSource($('.em_media').text() || $('body').text()) || '').slice(0, 120);
   return { text, images, publishedAt, publisherId,
     title: ($('#activity-name').text() || $('h1').first().text() || $('title').text()).trim().slice(0, 300) };
+}
+
+// 没有结构化发布时间时，只在时间 / 日期 / 发布信息类元素里找“年月日 + 时分”，按北京时间读；
+// 找不到就留空，不拿正文里提到的其他日期充数
+function visibleDate($) {
+  const pattern = /(20\d{2})[-/年.](\d{1,2})[-/月.](\d{1,2})日?\s+(\d{1,2}):(\d{2})/;
+  for (const el of $('time, [class*="time"], [class*="date"], [class*="publish"], [class*="info"], [class="meta"], [class*="meta "], [id*="time"], [id*="date"]').toArray().slice(0, 40)) {
+    const match = $(el).text().match(pattern);
+    if (match) return looseDateIso(match[0], '+08:00');
+  }
+  return null;
+}
+
+function reprintSource(text) {
+  const m = String(text || '').match(/文章来源[：:]\s*([^）)\s<>，,。；;]{2,30})/);
+  return m ? m[1].trim() : '';
 }
 
 async function enrichArticle(article) {
@@ -48,4 +67,4 @@ function isAccessChallenge(html) {
   // A comment widget's captcha script is not a challenge blocking the article.
   return /环境异常|访问过于频繁|请完成验证|正在进行安全检测|captcha|登录后查看|verify (?:that )?you are human|checking your browser/i.test($('title').text() + ' ' + $('body').text());
 }
-module.exports = { extractContent, enrichArticle, isAccessChallenge };
+module.exports = { extractContent, enrichArticle, isAccessChallenge, reprintSource };

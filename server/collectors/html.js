@@ -1,8 +1,11 @@
 'use strict';
 // HTML 爬虫适配器 —— 面向政府/官方网站的新闻列表页
-// selector_json: { list: "css选择器(a元素或含a的容器)", datePattern: "日期正则" }
+// selector_json: { list: "css选择器(a元素或含a的容器)", datePattern: "日期正则",
+//                  title: "链接内标题元素（可选，如 h1）", summary: "链接内摘要元素（可选）", utcOffset: "+08:00" }
+// 卡片式列表常把封面、标题、导语、出处整个包进一个 <a>：指定 title/summary 后只取对应元素的文字。
 const cheerio = require('cheerio');
 const { fetchText } = require('./fetch-util');
+const { looseDateIso } = require('./loose-date');
 
 async function fetch(source, settings) {
   const html = await fetchText(source.url, settings);
@@ -17,7 +20,9 @@ async function fetch(source, settings) {
     const $a = $(el).is('a') ? $(el) : $(el).find('a').first();
     if (!$a.length) return;
     const href = $a.attr('href');
-    const title = ($a.attr('title') || $a.text() || '').replace(/\s+/g, ' ').trim();
+    const titleText = cfg.title ? $a.find(cfg.title).first().text() : '';
+    const title = (titleText || $a.attr('title') || $a.text() || '').replace(/\s+/g, ' ').trim();
+    const summary = cfg.summary ? $a.find(cfg.summary).first().text().replace(/\s+/g, ' ').trim().slice(0, 400) : '';
     if (!href || !title || title.length < 10) return; // 过滤导航类短链接
     // 过滤站点导航/栏目入口等非新闻链接
     if (/^(链接到|进入|返回|首页|更多|查看|无障碍|english|登录|注册)/i.test(title)) return;
@@ -39,13 +44,9 @@ async function fetch(source, settings) {
     const ctx = $a.closest('li,tr,div').text() || '';
     const urlDate = url.match(/(?:\D)(20\d{2})(\d{2})(\d{2})(?:\D)/);
     const m = ctx.match(dateRe) || (urlDate ? [`${urlDate[1]}-${urlDate[2]}-${urlDate[3]}`] : null);
-    let publishedAt = null;
-    if (m) {
-      const norm = m[0].replace(/[年月]/g, '-').replace(/日/g, '');
-      const t = new Date(norm);
-      if (!isNaN(t)) publishedAt = t.toISOString();
-    }
-    items.push({ title, url, summary: '', publishedAt });
+    // 列表页日期不带时区：按信源时区（默认北京时间）读，不随本机时区漂移
+    const publishedAt = m ? looseDateIso(m[0], cfg.utcOffset || '+08:00') : null;
+    items.push({ title, url, summary, publishedAt });
   });
   return items.slice(0, 40);
 }

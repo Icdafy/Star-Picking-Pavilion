@@ -797,6 +797,15 @@ process.once('SIGTERM', shutdownServer);
 
 seedSources();
 require('./ai/capital-migration').migrateCapital();
+// 启动时：补转载文章的真实出版方（一次性），再按纯规则合并同一事件的重复条目（不调模型），有变化则重算热榜
+setImmediate(() => {
+  let publishers = { skipped: true };
+  try { publishers = require('./ai/publisher-backfill').backfillPublishers(); }
+  catch (error) { console.warn('[hot] 出版方回填失败:', error.message); }
+  require('./ai/stories').consolidateStories({})
+    .then(result => { if (result.merged || (!publishers.skipped && !publishers.unchanged)) require('./ai/hot').computeHotRanking(); })
+    .catch(error => console.warn('[stories] 启动合并失败:', error.message));
+});
 server.listen(REQUESTED_PORT, '127.0.0.1', () => {
   const port = server.address().port;
   const ready = { type: 'server:ready', port, nonce: SERVER_NONCE };

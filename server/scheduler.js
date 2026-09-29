@@ -8,7 +8,7 @@
 const cron = require('node-cron');
 const { collectAll } = require('./collectors');
 const { analyzePending, rescoreAfterClustering } = require('./ai/pipeline');
-const { groupPending, digestStories } = require('./ai/stories');
+const { groupPending, digestStories, consolidateStories } = require('./ai/stories');
 const { computeHotRanking, snapshotHeat } = require('./ai/hot');
 const { generateDaily } = require('./ai/daily');
 const { generatePeriod, previousPeriodKey, enhanceLeads } = require('./ai/reports');
@@ -131,6 +131,11 @@ async function analyzeOnce(trigger = 'loop', limit = 60) {
     const settings = loadSettings();
     // 归组：新判完的资料挂到事件上（或开新事件），热度信号随之写入
     const group = await groupPending({ settings });
+    // 事件级合并：同一批次各自开出的同一事件在这里并成一条（有新归组时才跑）
+    if (group.processed > 0) {
+      const consolidated = await consolidateStories({ settings }).catch(e => { console.warn('[stories]', e.message); return { merged: 0 }; });
+      group.consolidated = consolidated.merged;
+    }
     lastGroup = { at: lastAnalyzeAt, ...group };
     if (r.analyzed > 0 || group.processed > 0) {
       const rescore = rescoreAfterClustering();
@@ -167,6 +172,7 @@ async function runPipeline(trigger = 'manual') {
     if (!r.analyzed) break;
   }
   await groupPending({ settings: loadSettings(), limit: 1000 });
+  await consolidateStories({ settings: loadSettings() }).catch(e => console.warn('[stories]', e.message));
   const rescore = rescoreAfterClustering();
   computeHotRanking();
   lastHotAt = Date.now();

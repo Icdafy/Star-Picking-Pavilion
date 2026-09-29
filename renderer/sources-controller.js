@@ -21,18 +21,71 @@
     }
     const { timeAgo, hhmm, DOMAIN_NAME, delay, SKELETON_MIN_MS } = format;
     let importSourceId = null;
+    // v0.2.2：两百多个信源平铺无法查找——列表在本地按关键词、类型、领域与运行状态筛选，不重复请求
+    let allSources = [];
+    const filter = { q: '', status: '', type: '', domain: '' };
+    const TYPE_LABEL = { rss: 'RSS', html: '网页', api: '接口', wechat: '公众号', external: '外部导入', bing: '必应' };
 
-    async function loadSources() {
+    function statusOf(s) {
+      if (!s.enabled) return 'off';
+      if (s.health?.state === 'failing' || s.health?.consecutiveErrors || String(s.last_status || '').startsWith('error')) return 'err';
+      return 'on';
+    }
+
+    function matches(s) {
+      if (filter.status && statusOf(s) !== filter.status) return false;
+      if (filter.type && s.type !== filter.type) return false;
+      if (filter.domain && s.domain !== filter.domain) return false;
+      if (filter.q) {
+        const text = `${s.name} ${s.url} ${s.note || ''}`.toLowerCase();
+        if (!filter.q.toLowerCase().split(/\s+/).filter(Boolean).every(word => text.includes(word))) return false;
+      }
+      return true;
+    }
+
+    function renderSummary(shown) {
+      if (!elements.summary) return;
+      const counts = { on: 0, err: 0, off: 0 };
+      for (const s of allSources) counts[statusOf(s)]++;
+      const items = allSources.reduce((sum, s) => sum + (Number(s.item_count) || 0), 0);
+      elements.summary.innerHTML = `<span><b>${allSources.length}</b> 个信源</span><span class="ok"><b>${counts.on}</b> 运行中</span>`
+        + `<span class="err"><b>${counts.err}</b> 异常或退避</span><span class="off"><b>${counts.off}</b> 已停用</span>`
+        + `<span>累计采集 <b>${items.toLocaleString('zh-CN')}</b> 条</span>`
+        + (shown !== allSources.length ? `<span class="src-shown">筛选出 <b>${shown}</b> 个</span>` : '');
+    }
+
+    function renderList() {
       const list = elements.list;
-      // 每次操作后整表重载会丢键盘焦点——先记下，渲染后归还
       const focusKey = DomUtils.findFocusKey(list);
-      list.innerHTML = skeletons(4);
-      try {
-        const [sources] = await Promise.all([
-          api('/api/sources'),
-          delay(SKELETON_MIN_MS)
-        ]);
-        list.innerHTML = sources.map(s => {
+      const shown = allSources.filter(matches);
+      renderSummary(shown.length);
+      if (!shown.length) {
+        list.innerHTML = `<div class="empty-state glass"><div class="es-icon">查 无 此 源</div><p>没有符合筛选条件的信源，可清空搜索或切换状态、类型与领域。</p>
+      <button type="button" class="btn-ghost btn-compact" data-act="clear-source-filters">清空筛选</button></div>`;
+        return;
+      }
+      list.innerHTML = shown.map(sourceCard).join('');
+      if (focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
+    }
+
+    function clearFilters() {
+      Object.assign(filter, { q: '', status: '', type: '', domain: '' });
+      if (elements.search) elements.search.value = '';
+      if (elements.type) elements.type.value = '';
+      if (elements.domain) elements.domain.value = '';
+      syncStatusChips();
+      renderList();
+    }
+
+    function syncStatusChips() {
+      for (const chip of elements.status?.querySelectorAll?.('[data-source-status]') || []) {
+        const on = chip.dataset.sourceStatus === filter.status;
+        chip.classList.toggle('active', on);
+        chip.setAttribute('aria-pressed', String(on));
+      }
+    }
+
+    function sourceCard(s) {
           const st = !s.enabled ? 'idle' : s.last_status?.startsWith('error') ? 'err' : s.last_status === 'ok' ? 'ok' : 'idle';
           const health = s.health || {};
           const paused = health.pausedUntil
@@ -64,7 +117,20 @@
           <button data-act="remove" class="danger" data-focus-key="src-remove:${s.id}"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
         </div>
       </div>`;
-        }).join('');
+    }
+
+    async function loadSources() {
+      const list = elements.list;
+      // 每次操作后整表重载会丢键盘焦点——先记下，渲染后归还
+      const focusKey = DomUtils.findFocusKey(list);
+      list.innerHTML = skeletons(4);
+      try {
+        const [sources] = await Promise.all([
+          api('/api/sources'),
+          delay(SKELETON_MIN_MS)
+        ]);
+        allSources = Array.isArray(sources) ? sources : [];
+        renderList();
         if (focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
       } catch (e) {
         list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>加载失败：${esc(e.message)}</p>
@@ -76,6 +142,7 @@
       const btn = e.target.closest('button[data-act]');
       if (!btn) return;
       if (btn.dataset.act === 'retry-sources') { loadSources(); return; }
+      if (btn.dataset.act === 'clear-source-filters') { clearFilters(); return; }
       const id = btn.closest('.src-card').dataset.id;
       try {
         if (btn.dataset.act === 'import') {
@@ -170,7 +237,22 @@
       } finally { button.disabled = false; }
     });
 
-    return Object.freeze({ loadSources });
+    let searchTimer = null;
+    elements.search?.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { filter.q = String(elements.search.value || '').trim().slice(0, 60); renderList(); }, 160);
+    });
+    elements.status?.addEventListener('click', event => {
+      const chip = event.target.closest('[data-source-status]');
+      if (!chip) return;
+      filter.status = chip.dataset.sourceStatus || '';
+      syncStatusChips();
+      renderList();
+    });
+    elements.type?.addEventListener('change', () => { filter.type = elements.type.value || ''; renderList(); });
+    elements.domain?.addEventListener('change', () => { filter.domain = elements.domain.value || ''; renderList(); });
+
+    return Object.freeze({ loadSources, filterState: () => ({ ...filter }), TYPE_LABEL });
   }
 
   return Object.freeze({ createSourcesController });

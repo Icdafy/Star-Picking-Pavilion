@@ -312,6 +312,88 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
   return stats;
 }
 
+// ---------- 事件合并（v0.2.2） ----------
+// 归组是“新报道 → 已有报道”的增量判断：同一批里各自开出的事件、或综述后标题趋同的事件，
+// 之后再也不会互相比较，于是热榜上出现同一件事的两三个条目（例：星舰第 14 次试飞占了 9 个热点中的 6 个）。
+// 这里对近几天活跃的事件做一次事件级比较：标题几乎相同、或主报道事件键相同且日期状态不冲突 → 直接合并；
+// 相似但不确定的，有 Key 时交给同一套三分类（并独立复核），没有 Key 宁可不并。
+async function consolidateStories({ settings = null, nowMs = Date.now() } = {}) {
+  const config = industry.loadSelection().stories;
+  const rules = { windowDays: 4, titleOverlap: 0.8, judgeOverlap: 0.5, minShared: 6, judgeLimit: 6, ...(config.consolidate || {}) };
+  const since = new Date(nowMs - rules.windowDays * 86400e3).toISOString();
+  const stories = db.prepare(`SELECT c.id, c.title, c.digest, c.domain, c.size, c.main_article_id FROM clusters c
+    WHERE c.merged_into IS NULL AND c.size >= 1 AND c.latest_at >= ? ORDER BY c.size DESC, c.id LIMIT 800`).all(since);
+  const stats = { compared: stories.length, merged: 0, judged: 0 };
+  if (stories.length < 2) return stats;
+  const mainRow = db.prepare(`SELECT ${ROW_COLUMNS} FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ?`);
+  const items = stories.map(story => {
+    const row = story.main_article_id ? mainRow.get(story.main_article_id) : null;
+    const main = row ? docOf(row) : null;
+    return { ...story, main, titleGrams: bigrams(story.title || main?.title || ''), fullGrams: bigrams(`${story.title || ''} ${story.digest || main?.summary || ''}`) };
+  }).filter(item => item.main && item.titleGrams.size);
+  const pairs = [];
+  const postings = new Map();
+  items.forEach((item, i) => {
+    const shared = new Map();
+    for (const gram of item.titleGrams) for (const j of postings.get(gram) || []) shared.set(j, (shared.get(j) || 0) + 1);
+    for (const [j, count] of shared) {
+      const other = items[j];
+      if (item.domain && other.domain && item.domain !== other.domain) continue;
+      const titleOverlap = count / Math.min(item.titleGrams.size, other.titleGrams.size);
+      let fullShared = 0;
+      for (const gram of item.fullGrams) if (other.fullGrams.has(gram)) fullShared++;
+      const fullOverlap = fullShared / Math.min(item.fullGrams.size, other.fullGrams.size);
+      const sameKey = Boolean(item.main.eventKey && item.main.eventKey === other.main.eventKey);
+      if (titleOverlap >= rules.judgeOverlap || fullOverlap >= rules.judgeOverlap || sameKey) {
+        pairs.push({ a: other, b: item, titleOverlap, fullOverlap, shared: count, sameKey });
+      }
+    }
+    for (const gram of item.titleGrams) {
+      const bucket = postings.get(gram);
+      if (bucket) bucket.push(i); else postings.set(gram, [i]);
+    }
+  });
+  pairs.sort((x, y) => Number(y.sameKey) - Number(x.sameKey) || y.titleOverlap - x.titleOverlap || y.fullOverlap - x.fullOverlap);
+  const rootOf = id => {
+    let current = id;
+    for (let hops = 0; hops < 20; hops++) {
+      const next = db.prepare('SELECT merged_into FROM clusters WHERE id = ?').get(current)?.merged_into;
+      if (!next) return current;
+      current = next;
+    }
+    return current;
+  };
+  const hasKey = Boolean(settings?.ai?.apiKey);
+  let budget = hasKey ? rules.judgeLimit : 0;
+  for (const pair of pairs) {
+    const a = rootOf(pair.a.id), b = rootOf(pair.b.id);
+    if (a === b) continue;
+    if (!compatible(pair.a.main, pair.b.main)) continue;
+    if (storySize(a) + storySize(b) > config.maxStorySize) continue;
+    let merge = pair.sameKey || (pair.titleOverlap >= rules.titleOverlap && pair.shared >= rules.minShared);
+    if (!merge && budget > 0) {
+      budget--;
+      stats.judged++;
+      try {
+        const candidate = { evidence: pair.a.main };
+        const [first] = await judge(pair.b.main, [candidate], settings);
+        if (first.relation !== 'different' && first.confidence >= config.sameMinConfidence) {
+          const confirmation = first.confidence < 0.85 ? (await judge(pair.b.main, [candidate], settings, true))[0] : first;
+          merge = confirmation.relation === first.relation && confirmation.confidence >= config.sameMinConfidence;
+        }
+      } catch (error) {
+        if (error?.budgetExceeded) budget = 0;
+        else console.warn(`[stories] 事件合并判断失败 #${a}/#${b}:`, error.message);
+      }
+    }
+    if (!merge) continue;
+    const into = mergeStories(a, b);
+    refreshStory(into);
+    stats.merged++;
+  }
+  return stats;
+}
+
 // v0.1.x 的簇原样升级为事件：成员补上关系、信号与标记，不重新判断归属
 function migrateLegacyClusters() {
   const done = db.prepare("SELECT value FROM meta WHERE key = 'storiesMigrated'").get();
@@ -380,6 +462,8 @@ async function digestStories({ settings = null } = {}) {
 
 module.exports = {
   groupPending,
+  consolidateStories,
+  judge,
   digestStories,
   migrateLegacyClusters,
   mergeStories,

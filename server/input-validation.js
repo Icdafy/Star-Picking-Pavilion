@@ -45,13 +45,13 @@ function validateSourceUrl(type, value) {
     return url;
   }
   if (type === 'api') {
-    // 支持 eastmoney:// / cninfo:// / sse:// / szse:// / cls:// 五种 scheme，
+    // 支持 eastmoney:// / cninfo:// / sseipo:// / szseipo:// / sse:// / szse:// / cls:// 七种 scheme，
     // 具体格式交给采集层同源解析器把关，校验层不重复定义
     let spec;
     try { spec = parseApiSpec(url); } catch (error) {
       badRequest(error instanceof HttpError
         ? error.message
-        : 'API 信源地址必须以 eastmoney:// / cninfo:// / sse:// / szse:// / cls:// 开头且格式有效');
+        : 'API 信源地址必须以 eastmoney:// / cninfo:// / sseipo:// / szseipo:// / sse:// / szse:// / cls:// 开头且格式有效');
     }
     // eastmoney:// 的关键词必填已由 parseEastmoneySpec 保证；cninfo:// 检索词可空（全量公告流），
     // 其余 scheme 检索词可选 —— 长度单独校验，避免参数段混进来蒙混过关

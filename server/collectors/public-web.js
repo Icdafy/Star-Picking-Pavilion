@@ -3,6 +3,8 @@ const dns = require('node:dns');
 const net = require('node:net');
 const { Agent, fetch } = require('undici');
 const { readBoundedBody } = require('./fetch-util');
+// 公开网页正文抓取如实标明身份与版本，便于站点按 robots.txt 识别
+const CRAWLER_UA = `StarPickingPavilion/${require('../../package.json').version} (+https://github.com/Icdafy/Star-Picking-Pavilion)`;
 
 function isPublicAddress(address) {
   if (net.isIP(address) === 4) {
@@ -37,7 +39,7 @@ async function publicFetch(value, { maxBytes = 2 * 1024 * 1024, fetchImpl = fetc
   const signal = AbortSignal.timeout(15000);
   for (let redirects = 0; redirects < 4; redirects++) {
     const response = await fetchImpl(url.href, { dispatcher, signal, redirect: 'manual',
-      headers: { 'User-Agent': 'StarPickingPavilion/0.1.4 (+https://github.com/Icdafy/Star-Picking-Pavilion)', Accept: '*/*' } });
+      headers: { 'User-Agent': CRAWLER_UA, Accept: '*/*' } });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
       const next = publicUrl(new URL(response.headers.get('location'), url).href);

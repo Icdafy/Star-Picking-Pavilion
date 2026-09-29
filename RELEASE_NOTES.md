@@ -1,25 +1,25 @@
-# 摘星阁 v0.2.1
+# 摘星阁 v0.2.2
 
-一级市场与界面优化版，保留数据库、星标、备忘与偏好。
+一级市场深化与免费信源扩容版，保留数据库、星标、备忘与偏好；升级时一次性合并历史重复融资并补全转载出版方。
 
-- 一级市场各分区支持企业名称、别名和型号搜索；新增企业动态，集中展示订单、取证、试验等进展。
-- 追梦空天／追梦空天科技统一归属，迁移合并历史融资，保留原文证据、投资方和关注备注。
-- 保留 A++、A++++、B1、天使+ 轮次，区分 Pre-IPO 与 IPO；约数不冒充精确金额，历史报道不冒充近期融资。
-- 修正深浅主题下拉选项，窄窗口保留融资原文和投资方。
-- 界面氛围总开关放在恢复默认左侧，关闭后隐藏背景并暂停流体与星鲸渲染，重启后保留。
-- 新增投中网、36氪空天、航投基金及产业链免费检索，修复五条检索线，暂停两条持续空结果源。
-- AIHOT 核心链路逐项核对，并补充不确定事件的独立复核。两次独立评分、当前热点、一级市场、日报及周报月报继续使用 deepseek-v4-flash-vision-exp。
+- **AIHOT 同步**：对照上游至 885b736，移植 Atom XHTML 标题摘要、无时区列表日期按信源时区、周报月报迟到资料归属与事件关系评测工具（`npm run eval:relations`）；合入外部内容导入入口。
+- **一级市场**新增默认分区「**市场概览**」：五项指标，融资阶段、金额量级、月度节奏、热门赛道、大额融资、上市进程与活跃机构；融资动态支持阶段、事件性质、排序筛选与 CSV／Markdown 导出。
+- 上市公司定增、债权与融资租赁、合资设立单独归类，不再混入一级市场统计；同一笔融资的全称、简称与母品牌写法合并，“未披露”轮次由后续报道补全。公司库新增 13 家近期有真实融资报道的公司。
+- **交易所上市进程**：接入上交所科创板、深交所创业板／主板 IPO 审核项目公开接口，每次审核状态变化生成一条资料（首轮含中科宇航、蓝箭航天、微纳星空、腾盾科创）。
+- **免费信源扩容 24 个**：11 条带资本守卫的一级市场检索线、投中网融资、泰伯网、无人机网与 5 个海外航天／eVTOL RSS，均于 2026-09-30 实测可用。
+- **当前热点**更准：同一批次开出的重复事件自动合并；东方财富转载按“文章来源”计真实出版方，不再把检索线重复计为独立信源。日报、周报、月报的融资按入库时间归属，旧报道补抽的融资不再漏计。
+- 信源监控台新增搜索、状态／类型／领域筛选与运行统计。两次独立评分、事件归组、刊期继续使用 deepseek-v4-flash-vision-exp。
 
-[AIHOT 整合审计](https://github.com/Icdafy/Star-Picking-Pavilion/blob/v0.2.1/docs/aihot-integration-audit.md)：本地为核心流程的桌面适配，并非上游全部功能整仓移植。
+[AIHOT 整合审计](https://github.com/Icdafy/Star-Picking-Pavilion/blob/v0.2.2/docs/aihot-integration-audit.md)：本地为核心流程的桌面适配，并非上游全部云端功能整仓移植。[v0.2.2 信源实测](https://github.com/Icdafy/Star-Picking-Pavilion/blob/v0.2.2/docs/v022-sources.md)。
 
-**公众号限制**：商业航天发展三个用户提供链接实测均要求微信环境验证，保留入口并标为受限，不能声称采集成功。持续采集仍需可用公开订阅和可读原文。[信源实测](https://github.com/Icdafy/Star-Picking-Pavilion/blob/v0.2.1/docs/v021-sources.md)。
+**公众号限制**：商业航天发展三个用户提供链接仍要求微信环境验证，保留入口并标为受限，不能声称采集成功。Crunchbase News、SpaceNews、Payload、DroneLife 等海外 RSS 对应用请求返回 403，未接入。
 
 ## 下载与校验
 
-安装包：`Star-Picking-Pavilion-Setup-0.2.1.exe`。此版本尚未代码签名，Windows SmartScreen 可能提示未知发布者；签名状态预期为 NotSigned。请核对 SHA256SUMS.txt 后安装。
+安装包：`Star-Picking-Pavilion-Setup-0.2.2.exe`。此版本尚未代码签名，Windows SmartScreen 可能提示未知发布者；签名状态预期为 NotSigned。请核对 SHA256SUMS.txt 后安装。
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.1.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.2.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

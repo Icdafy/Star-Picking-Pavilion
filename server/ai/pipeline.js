@@ -200,9 +200,16 @@ function isHistorical(article, selection) {
   return Number.isFinite(published) && fetched - published > selection.historicalHours * 3600e3;
 }
 
+// 同一出版方的不同写法（“证券时报网”“证券时报”“上海证券报·中国证券网”）归为同一个参与者
+function publisherKey(name) {
+  let key = String(name || '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g, '').split('·')[0];
+  if ([...key].length > 3) key = key.replace(/网$/, '');
+  return key.slice(0, 80);
+}
+
 function participantKeyOf(article) {
-  const publisher = String(article.publisher_id || '').trim().toLowerCase();
-  return publisher ? `pub:${publisher.slice(0, 80)}` : `source:${article.source_id}`;
+  const publisher = publisherKey(article.publisher_id);
+  return publisher ? `pub:${publisher}` : `source:${article.source_id}`;
 }
 
 // ---------- 主流程 ----------
@@ -575,5 +582,6 @@ module.exports = {
   persistAnalysis,
   isHistorical,
   participantKeyOf,
+  publisherKey,
   CATEGORIES
 };

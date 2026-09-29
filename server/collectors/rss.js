@@ -27,7 +27,7 @@ function resolveUrl(url, settings) {
 
 async function fetch(source, settings) {
   const xml = await fetchText(resolveUrl(source.url, settings), settings);
-  const feed = await parser.parseString(sanitizeXml(xml));
+  const feed = await parser.parseString(flattenAtomXhtml(sanitizeXml(xml)));
   return (feed.items || []).map(it => ({
     title: cleanText(it.title),
     url: normalizeUrl(it.link),
@@ -44,6 +44,21 @@ function sanitizeXml(xml) {
   return String(xml || '').replace(
     /&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[\da-f]+;)/gi,
     '&amp;'
+  );
+}
+
+// Atom 的 type="xhtml" 文本结构是混合内容：xml2js 会把 <title> 拆成对象（标题变成 [object Object]）
+// 并打乱文字顺序。解析前把它改写成等价的 type="html" 转义文本，保留标记与语序，交给 cleanText 统一去标签。
+// 对应 AIHOT 1db4b16「preserve Atom XHTML text constructs」。
+function flattenAtomXhtml(xml) {
+  return String(xml || '').replace(
+    /<(title|summary|content|subtitle|rights)(\s[^>]*?\btype\s*=\s*["']xhtml["'][^>]*)>([\s\S]*?)<\/\1>/gi,
+    (_, tag, attrs, inner) => {
+      const markup = inner.trim()
+        .replace(/^<div\b[^>]*>/i, '').replace(/<\/div>$/i, '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<${tag}${attrs.replace(/\btype\s*=\s*["']xhtml["']/i, 'type="html"')}>${markup}</${tag}>`;
+    }
   );
 }
 
@@ -105,4 +120,4 @@ function normalizeUrl(link) {
   }
 }
 
-module.exports = { fetch, resolveUrl, sanitizeXml, normalizeUrl };
+module.exports = { fetch, resolveUrl, sanitizeXml, flattenAtomXhtml, normalizeUrl, cleanText };
