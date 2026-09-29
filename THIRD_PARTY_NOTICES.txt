@@ -122,7 +122,7 @@ iconv-lite@0.7.3
 License: MIT
 Source: https://github.com/pillarjs/iconv-lite.git
 
-js-yaml@4.3.1
+js-yaml@4.3.2
 License: MIT
 Source: nodeca/js-yaml
 
@@ -186,7 +186,7 @@ tiny-typed-emitter@2.1.0
 License: MIT
 Source: https://github.com/binier/tiny-typed-emitter.git
 
-undici@8.9.0
+undici@8.11.2
 License: MIT
 Source: git+https://github.com/nodejs/undici.git
 

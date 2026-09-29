@@ -37,11 +37,11 @@ test('direct dependencies stay on the verified release lines', () => {
   assert.equal(packageJson.dependencies['iconv-lite'], '^0.7.3');
   assert.equal(packageJson.dependencies['node-cron'], '^4.6.0');
   assert.equal(packageJson.dependencies['rss-parser'], '^3.13.0');
-  assert.equal(packageJson.dependencies.undici, '^8.9.0');
+  assert.equal(packageJson.dependencies.undici, '^8.10.2');
   assert.equal(packageJson.devDependencies.electron, '^42.7.0');
   assert.equal(packageJson.devDependencies['electron-builder'], '^26.15.3');
   assert.deepEqual(packageJson.overrides, {
-    'js-yaml': '^4.3.0',
-    undici: '^8.9.0'
+    'js-yaml': '^4.3.2',
+    undici: '^8.10.2'
   });
 });

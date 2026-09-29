@@ -35,7 +35,7 @@
     "iconv-lite": "^0.7.3",
     "node-cron": "^4.6.0",
     "rss-parser": "^3.13.0",
-    "undici": "^8.9.0"
+    "undici": "^8.10.2"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "^6.0.0",
@@ -44,8 +44,8 @@
     "playwright": "^1.61.1"
   },
   "overrides": {
-    "js-yaml": "^4.3.0",
-    "undici": "^8.9.0"
+    "js-yaml": "^4.3.2",
+    "undici": "^8.10.2"
   },
   "build": {
     "buildVersion": "0.1.6",
