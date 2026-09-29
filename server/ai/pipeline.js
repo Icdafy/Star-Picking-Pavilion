@@ -194,6 +194,7 @@ async function ensureContent(article, settings) {
 
 // 旧文不刷屏：发现时已发布超过 historicalHours 的资料按原文时间归档，不进“今天”、不计热度
 function isHistorical(article, selection) {
+  if (article.imported_backfill) return true;
   const published = Date.parse(article.published_at);
   const fetched = Date.parse(article.fetched_at) || Date.now();
   return Number.isFinite(published) && fetched - published > selection.historicalHours * 3600e3;
@@ -224,7 +225,7 @@ async function analyzePending(onProgress, limit = 200) {
 
   const pending = db.prepare(`
     SELECT a.id, a.source_id, a.title, a.url, a.summary_raw, a.published_at, a.fetched_at, a.domain,
-           a.canonical_url, a.clean_version, a.image_url, a.content_text, a.content_status, a.images_json, a.vision_json, a.publisher_id,
+           a.canonical_url, a.clean_version, a.image_url, a.content_text, a.content_status, a.images_json, a.vision_json, a.publisher_id, a.imported_backfill,
            a.prefilter_attempts, s.name AS source_name, s.tier, s.intl
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.analyzed = 0

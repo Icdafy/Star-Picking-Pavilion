@@ -22,3 +22,7 @@
 | 许可署名 | MIT 原文保留在 THIRD_PARTY_NOTICES.txt，不使用 AIHOT 品牌标志 |
 
 验证：`test/v020-engine.test.js`、`test/v020-api.test.js`、`test/v021-capital.test.js`、`test/e2e/v021-ui.test.js`，不代表上游全部功能的等价验证。
+
+## 发布后继续整合（独立分支，未改写 v0.2.1 安装包）
+
+补充 [外部内容导入](external-ingest.md)：本机鉴权接口、信源页导入入口、URL 判重、历史回灌、现有分析管线接入。外部源不产生定时空抓取记录。此项缩小了上表“外部推送”的差距，未消除其余未移植项，也不代表微信原文已采集成功。

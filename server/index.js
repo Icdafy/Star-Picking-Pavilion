@@ -27,6 +27,7 @@ const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
 const { CATEGORIES } = require('./ai/pipeline');
 const { handleIntelRoute } = require('./intel-routes');
+const { ingestItems } = require('./ingest');
 const industry = require('./industry');
 const {
   parseFeedQuery, parseExportQuery, sanitizeDate, sanitizeFeedback,
@@ -475,6 +476,12 @@ const server = http.createServer(async (req, res) => {
         method: req.method
       }, { port: activePort, expectedToken: API_TOKEN });
       if (!permitted) return json(res, 403, { error: 'forbidden' });
+
+      if (p === '/api/ingest/items' && req.method === 'POST') {
+        const result = ingestItems(await readJsonBody(req));
+        invalidateStatsCache();
+        return json(res, 200, result);
+      }
 
       if (p === '/api/feed' && req.method === 'GET') return json(res, 200, queryFeed(u.searchParams));
       if (p === '/api/stats' && req.method === 'GET') return json(res, 200, getStats());

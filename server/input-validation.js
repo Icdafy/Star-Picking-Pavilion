@@ -4,7 +4,7 @@ const { HttpError } = require('./http-security');
 // 与采集器共用同一个解析器：信源地址的写法只有一处定义，校验与采集不会各说各话
 const { parseApiSpec } = require('./collectors/api');
 
-const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api', 'wechat']);
+const SOURCE_TYPES = new Set(['rss', 'bing', 'html', 'api', 'wechat', 'external']);
 const SOURCE_TIERS = new Set(['T1', 'T1.5', 'T2']);
 const SOURCE_DOMAINS = new Set(['both', 'lowaltitude', 'aerospace']);
 const FEED_VIEWS = new Set(['featured', 'all', 'starred']);
@@ -38,6 +38,12 @@ function validateHttpAddress(value) {
 
 function validateSourceUrl(type, value) {
   const url = boundedString(value, '信源地址', { min: 1, max: 2048 });
+  if (type === 'external') {
+    if (!/^external:\/\/[a-z0-9][a-z0-9-]{1,63}$/.test(url)) {
+      badRequest('外部导入地址须为 external:// 加 2–64 位小写字母、数字或连字符');
+    }
+    return url;
+  }
   if (type === 'api') {
     // 支持 eastmoney:// / cninfo:// / sse:// / szse:// / cls:// 五种 scheme，
     // 具体格式交给采集层同源解析器把关，校验层不重复定义

@@ -657,6 +657,7 @@
       <select name="type">
         <option value="rss">RSS / Atom 订阅</option>
         <option value="wechat">公众号安全采集（公开文章或订阅源）</option>
+        <option value="external">外部内容导入（脚本或手工整理）</option>
         <option value="api">公开 API（eastmoney/cninfo/sse/szse/cls scheme）</option>
         <option value="html">网页爬虫（官方新闻列表页）</option>
         <option value="bing">必应资讯 RSS</option>
@@ -683,6 +684,21 @@
     <div class="btn-row">
       <button class="btn-primary" value="ok">保存</button>
       <button class="btn-ghost" value="cancel" formnovalidate>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="ingestDialog" class="glass-dialog" aria-labelledby="ingestDialogTitle">
+  <form method="dialog" id="ingestForm">
+    <h3 id="ingestDialogTitle">导入外部内容</h3>
+    <p id="ingestSourceName"></p>
+    <p class="hint">粘贴 1–50 条文章组成的 JSON 数组（总计不超过 64 KB）。保留真实标题、原文链接与发布时间；导入后等待下一轮分析。</p>
+    <label class="field"><span>文章内容</span><textarea name="items" required rows="8" spellcheck="false" placeholder='[{"title":"文章标题","url":"https://example.com/article","publishedAt":"2026-09-29T08:00:00+08:00","summary":"摘要"}]'></textarea></label>
+    <label class="ingest-backfill"><input name="backfill" type="checkbox"> 作为历史回灌，不进入今日热点</label>
+    <p id="ingestResult" role="status" aria-live="polite"></p>
+    <div class="btn-row">
+      <button class="btn-primary" value="ok">导入</button>
+      <button class="btn-ghost" value="cancel" formnovalidate>关闭</button>
     </div>
   </form>
 </dialog>

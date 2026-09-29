@@ -475,7 +475,11 @@ const sourcesController = SourcesController.createSourcesController({
     addButton: $('#btnAddSource'),
     dialog: $('#srcDialog'),
     form: $('#srcForm'),
-    htmlFields: $('#srcHtmlFields')
+    htmlFields: $('#srcHtmlFields'),
+    ingestDialog: $('#ingestDialog'),
+    ingestForm: $('#ingestForm'),
+    ingestSourceName: $('#ingestSourceName'),
+    ingestResult: $('#ingestResult')
   }
 });
 const { loadSources } = sourcesController;

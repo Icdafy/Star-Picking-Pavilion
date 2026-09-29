@@ -125,7 +125,8 @@ async function collectAll(onProgress, { force = false } = {}) {
   seedSources();
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
-  const enabled = db.prepare('SELECT * FROM sources WHERE enabled = 1').all();
+  // 外部源由导入接口接收；不能把每轮的“未请求”伪记为采集成功。
+  const enabled = db.prepare("SELECT * FROM sources WHERE enabled = 1 AND type <> 'external'").all();
   const startedAt = Date.now();
   const sources = force ? enabled : enabled.filter(source => isDue(source, startedAt));
   const skipped = enabled.length - sources.length;

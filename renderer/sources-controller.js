@@ -20,6 +20,7 @@
       throw new TypeError('sources controller requires api, state, esc, DomUtils, format, skeletons, toast, confirmGlass and elements.list dependencies');
     }
     const { timeAgo, hhmm, DOMAIN_NAME, delay, SKELETON_MIN_MS } = format;
+    let importSourceId = null;
 
     async function loadSources() {
       const list = elements.list;
@@ -47,17 +48,18 @@
           ${paused}
         </div>
         <div class="src-meta">
-          <span>${esc(s.type.toUpperCase())}</span>
+          <span>${s.type === 'external' ? '外部导入' : esc(s.type.toUpperCase())}</span>
           <span>${DOMAIN_NAME[s.domain] || '双领域'}</span>
           <span>累计 ${s.item_count} 条</span>
           ${health.consecutiveErrors
             ? `<span style="color:var(--danger-ink)">连续失败 ${health.consecutiveErrors} 次</span>`
             : s.error_count ? `<span>累计失败 ${s.error_count} 次</span>` : ''}
-          <span>${s.last_fetch_at ? timeAgo(s.last_fetch_at) : '未采集'}</span>
+          <span>${s.last_fetch_at ? timeAgo(s.last_fetch_at) : s.type === 'external' ? '等待导入' : '未采集'}</span>
         </div>
         ${s.note ? `<div class="src-meta" style="margin-top:4px">${esc(s.note)}</div>` : ''}
         <div class="src-actions">
           <button data-act="toggle" data-focus-key="src-toggle:${s.id}">${s.enabled ? '停用' : '启用'}</button>
+          ${s.type === 'external' ? `<button data-act="import" data-focus-key="src-import:${s.id}"${s.enabled ? '' : ' disabled'}>导入内容</button>` : ''}
           ${health.pausedUntil ? `<button data-act="retry" data-focus-key="src-retry:${s.id}">立即重试</button>` : ''}
           <button data-act="remove" class="danger" data-focus-key="src-remove:${s.id}"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
         </div>
@@ -76,7 +78,14 @@
       if (btn.dataset.act === 'retry-sources') { loadSources(); return; }
       const id = btn.closest('.src-card').dataset.id;
       try {
-        if (btn.dataset.act === 'toggle') {
+        if (btn.dataset.act === 'import') {
+          if (btn.disabled || !elements.ingestDialog || !elements.ingestForm) return;
+          importSourceId = Number(id);
+          elements.ingestForm.reset();
+          elements.ingestSourceName.textContent = btn.closest('.src-card').querySelector('.src-name').textContent;
+          elements.ingestResult.textContent = '';
+          elements.ingestDialog.showModal();
+        } else if (btn.dataset.act === 'toggle') {
           const enabled = btn.textContent === '启用';
           await api(`/api/sources/${id}`, { method: 'PATCH', body: { enabled } });
           toast(enabled ? '信源已启用' : '信源已停用');
@@ -102,6 +111,9 @@
       const typeSelect = elements.form?.elements?.type;
       if (!htmlFields || !typeSelect) return;
       htmlFields.hidden = typeSelect.value !== 'html';
+      const urlInput = elements.form.elements.url;
+      if (urlInput) urlInput.placeholder = typeSelect.value === 'external'
+        ? 'external://my-crawler（自定义唯一标识）' : 'https://… 或 eastmoney://关键词';
     }
 
     if (elements.addButton && elements.dialog) {
@@ -114,6 +126,7 @@
       elements.form.elements?.type?.addEventListener('change', syncHtmlFields);
       elements.form.addEventListener('submit', async e => {
         if (e.submitter?.value !== 'ok') return;
+        e.preventDefault();
         const fd = new FormData(e.target);
         const body = Object.fromEntries(fd.entries());
         const list = String(body.selectorList || '').trim();
@@ -126,7 +139,8 @@
         }
         try {
           await api('/api/sources', { body });
-          toast('信源已提报，下轮采集生效');
+          toast(body.type === 'external' ? '信源已创建，可在信源卡片导入内容' : '信源已提报，下轮采集生效');
+          elements.dialog.close();
           e.target.reset();
           syncHtmlFields();
           loadSources();
@@ -135,6 +149,26 @@
         }
       });
     }
+
+    elements.ingestForm?.addEventListener('submit', async e => {
+      if (e.submitter?.value !== 'ok') return;
+      e.preventDefault();
+      const button = e.submitter;
+      button.disabled = true;
+      try {
+        const form = elements.ingestForm;
+        let items;
+        try { items = JSON.parse(form.elements.items.value); }
+        catch { throw new Error('请输入有效的 JSON 数组'); }
+        if (!Array.isArray(items) || !items.length || items.length > 50) throw new Error('每次须导入 1–50 条文章');
+        if (form.elements.backfill.checked) items = items.map(item => ({ ...item, backfill: true }));
+        const result = await api('/api/ingest/items', { body: { sourceId: importSourceId, items } });
+        elements.ingestResult.textContent = `新增 ${result.created} 条，重复 ${result.duplicates} 条。待下一轮采集分析后呈现。`;
+        await loadSources();
+      } catch (error) {
+        elements.ingestResult.textContent = `导入失败：${error.message}`;
+      } finally { button.disabled = false; }
+    });
 
     return Object.freeze({ loadSources });
   }

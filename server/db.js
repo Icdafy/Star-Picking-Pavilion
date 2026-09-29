@@ -238,6 +238,7 @@ function migrateV020(addCol) {
   addCol('fact_json', 'TEXT');
   addCol('deal_json', 'TEXT');
   addCol('prompt_version', 'TEXT');
+  addCol('imported_backfill', 'INTEGER NOT NULL DEFAULT 0'); // 外部导入显式回灌，不因后续分析重新变为今日新闻
   addCol('historical', 'INTEGER NOT NULL DEFAULT 0');      // 发现时已发布超过 48 小时：不刷“今天”、不计热度
   addCol('grouped_at', 'TEXT');
   addCol('story_relation', 'TEXT');                        // primary | report | development
@@ -387,11 +388,12 @@ function insertArticle(a) {
   }
   return withTransaction(() => {
     const stmt = db.prepare(`INSERT OR IGNORE INTO articles
-      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id, imported_backfill, historical)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
       a.publishedAt || null, now(), a.domain || null, a.image || null,
-      Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0, JSON.stringify(a.images || []), a.contentText || null, a.publisherId || null);
+      Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0, JSON.stringify(a.images || []), a.contentText || null, a.publisherId || null,
+      a.importedBackfill ? 1 : 0, a.historical || a.importedBackfill ? 1 : 0);
     if (r.changes > 0) {
       db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
         .run(r.lastInsertRowid, a.title, a.summaryRaw || '');

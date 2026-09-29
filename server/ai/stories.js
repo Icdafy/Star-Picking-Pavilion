@@ -50,7 +50,7 @@ function docOf(row) {
     tier: row.tier,
     attention: Number(row.attention_score ?? row.quality_score) || 0,
     observed: observedAt(row),
-    historical: Boolean(row.historical),
+    historical: Boolean(row.historical || row.imported_backfill),
     participantKey: row.participant_key || `source:${row.source_id}`,
     participantName: row.publisher_id || row.source_name || '',
     sourceName: row.source_name
@@ -64,7 +64,7 @@ function compatible(a, b) {
 }
 
 const ROW_COLUMNS = `a.id, a.source_id, a.title, a.title_zh, a.ai_summary, a.domain, a.category, a.cluster_id, a.event_key, a.events_json,
-  a.subjects_json, a.attention_score, a.quality_score, a.published_at, a.fetched_at, a.historical, a.participant_key, a.publisher_id,
+  a.subjects_json, a.attention_score, a.quality_score, a.published_at, a.fetched_at, a.historical, a.imported_backfill, a.participant_key, a.publisher_id,
   s.name AS source_name, s.tier`;
 
 // ---------- 召回池 ----------
@@ -326,7 +326,7 @@ function migrateLegacyClusters() {
         const doc = docOf(row);
         const published = Date.parse(row.published_at);
         const fetched = Date.parse(row.fetched_at);
-        doc.historical = Number.isFinite(published) && Number.isFinite(fetched) && fetched - published > selection.historicalHours * 3600e3;
+        doc.historical = doc.historical || (Number.isFinite(published) && Number.isFinite(fetched) && fetched - published > selection.historicalHours * 3600e3);
         attach(doc, id, 'report');
       }
       refreshStory(id);
