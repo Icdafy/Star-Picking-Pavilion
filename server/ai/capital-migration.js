@@ -3,7 +3,7 @@
 const { db } = require('../db');
 const companies = require('./companies');
 const deals = require('./deals');
-const array = value => { try { return JSON.parse(value || '[]'); } catch { return []; } };
+const array = value => { try { const parsed=JSON.parse(value || '[]'); return Array.isArray(parsed)?parsed:[]; } catch { return []; } };
 
 function migrateCapital() {
   if (db.prepare("SELECT value FROM meta WHERE key='capitalIdentityV021'").get()) return false;
@@ -40,7 +40,10 @@ function migrateCapital() {
       }
       const subjects = [...seen.values()];
       db.prepare('UPDATE articles SET subjects_json=? WHERE id=?').run(JSON.stringify(subjects),row.id);
+      // writeArticleCompanies 的新采集索引只含启用公司；迁移须额外保留用户停用公司的既有引用。
       companies.writeArticleCompanies(row.id, subjects);
+      for (const prior of linked) db.prepare(`INSERT INTO article_companies(article_id,company_id,role) VALUES(?,?,?)
+        ON CONFLICT(article_id,company_id) DO UPDATE SET role=CASE WHEN excluded.role='primary' THEN 'primary' ELSE article_companies.role END`).run(row.id,prior.id,prior.role);
     }
     // 只重键并合并确切相同公司+轮次的记录，所有证据与投资方取并集。
     reconcileDeals();
@@ -51,7 +54,7 @@ function migrateCapital() {
 }
 function reconcileDeals() {
     for (const row of db.prepare('SELECT * FROM deals ORDER BY id').all()) {
-      const hit = companies.resolveName(row.company_name);
+      const hit = companies.resolveName(row.company_name) || companies.getCompany(row.company_id);
       const name = hit?.name || row.company_name;
       const at = db.prepare('SELECT published_at FROM articles WHERE id=?').get(row.first_article_id)?.published_at || row.first_seen_at;
       const key = deals.dealKey(hit?.id || `name:${companies.identityKey(name)}`, row.round, row.deal_date, at);

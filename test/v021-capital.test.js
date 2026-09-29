@@ -64,3 +64,13 @@ test('WeChat challenge pages cannot become collected articles; valid feeds colle
  assert.equal(rows.length,1);assert.equal(rows[0].publisherId,'商业航天发展');
  assert.match(rows[0].contentText,/3亿元/);
 });
+test('migration preserves disabled-company deal and article references',()=>{
+ const a=article('追梦空天科技完成C轮融资');
+ companies.writeArticleCompanies(a.id,[{id:'dream-aerospace',name:'追梦空天科技',role:'primary'}]);
+ deals.recordDeal(a,deals.normalizeDeal({company:'追梦空天科技',round:'C轮'}),{domain:'lowaltitude'});
+ companies.updateCompany('dream-aerospace',{enabled:false});
+ db.prepare("DELETE FROM meta WHERE key='capitalIdentityV021'").run();
+ migrateCapital();
+ assert.equal(db.prepare("SELECT company_id FROM deals WHERE round='C轮'").get().company_id,'dream-aerospace');
+ assert.equal(db.prepare('SELECT company_id FROM article_companies WHERE article_id=?').get(a.id).company_id,'dream-aerospace');
+});

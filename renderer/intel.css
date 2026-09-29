@@ -131,6 +131,7 @@ select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .deal-list .deal-row:not(.deal-head):hover { background: var(--hover-bg); }
 .deal-head { font-size: var(--t-xs); color: var(--c-fg-faint); letter-spacing: .08em; font-weight: 700; }
 .deal-date { font-variant-numeric: tabular-nums; color: var(--c-fg-faint); }
+.deal-date small { display: block; font-size: var(--t-xs); }
 .deal-company { font: inherit; font-weight: 700; color: var(--c-fg); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 button.deal-company:hover { color: var(--accent-ink); }
 .deal-company.unregistered { color: var(--c-fg-dim); cursor: default; }
