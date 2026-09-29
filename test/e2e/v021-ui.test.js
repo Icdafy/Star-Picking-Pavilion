@@ -7,7 +7,7 @@ test('capital search and native options adapt to both themes; atmosphere off per
  const app=await electron.launch({args:['.','--hidden'],cwd:path.join(__dirname,'../..'),env:{...process.env,
  STAR_PICKING_PAVILION_TEST_DATA_DIR:dir,STAR_PICKING_PAVILION_NO_SCHEDULER:'1',STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE:'1'}});
  t.after(async()=>{await app.close().catch(()=>{});fs.rmSync(dir,{recursive:true,force:true})});
- const page=await app.firstWindow();await page.waitForSelector('.nav');
+ const page=await app.firstWindow();await page.waitForLoadState('load');await page.waitForSelector('.nav');
  await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setContentSize(800,700);w.showInactive()});
  await page.locator('[data-view="capital"]').click();
  await page.locator('#capitalSearch').fill('追梦空天');
