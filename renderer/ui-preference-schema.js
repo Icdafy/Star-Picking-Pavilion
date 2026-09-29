@@ -9,7 +9,7 @@
   const DSH_FLUID_BASE_HUE = 220;
   const THEMES = new Set(['light', 'dark']);
   const VIEWS = new Set([
-    'featured', 'all', 'starred', 'daily', 'links', 'sources', 'settings'
+    'featured', 'hot', 'capital', 'all', 'starred', 'daily', 'links', 'sources', 'settings'
   ]);
   const DOMAINS = new Set(['', 'lowaltitude', 'aerospace']);
   // 界面缩放档位。存的是档位名而不是倍率数字：倍率写死在 CSS 的

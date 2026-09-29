@@ -32,6 +32,36 @@ const VENDORED_PACKAGES = Object.freeze([
       'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
       'SOFTWARE.'
     ].join('\n')
+  }),
+  // v0.2.0 的情报内核（精选链、事件归组与热度、刊期、行业包提示词结构）改写自 AIHOT。
+  // 摘星阁不使用 AIHOT 的名称与标志。
+  Object.freeze({
+    key: 'AIHOT (adapted design and prompt structure)@2026-09-29',
+    license: 'MIT',
+    source: 'https://github.com/KKKKhazix/AIHOT',
+    notice: [
+      'MIT License',
+      '',
+      'Copyright (c) 2026 数字生命卡兹克',
+      '',
+      'Permission is hereby granted, free of charge, to any person obtaining a copy',
+      'of this software and associated documentation files (the "Software"), to deal',
+      'in the Software without restriction, including without limitation the rights',
+      'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+      'copies of the Software, and to permit persons to whom the Software is',
+      'furnished to do so, subject to the following conditions:',
+      '',
+      'The above copyright notice and this permission notice shall be included in all',
+      'copies or substantial portions of the Software.',
+      '',
+      'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+      'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+      'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+      'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+      'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+      'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+      'SOFTWARE.'
+    ].join('\n')
   })
 ]);
 

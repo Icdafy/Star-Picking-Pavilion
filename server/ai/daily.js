@@ -6,6 +6,12 @@ const { localDateString } = require('../date-time');
 const { loadScoring } = require('../config');
 const { buildDailyBundle } = require('../archive/daily-bundle');
 const { HttpError } = require('../http-security');
+const { composeIssue } = require('./reports');
+
+// v0.2.0 起日报与周报、月报同一结构：导语、热点事件、一级市场、我的关注、技术突破。
+// edition 低于此值的近期日报在读取时按原窗口重新组稿（原始资料仍在库里），老日报原样保留。
+const EDITION = 2;
+const REBUILD_RECENT_DAYS = 30;
 
 const PER_SECTION = 8;
 
@@ -38,10 +44,18 @@ function buildDailyContent(date) {
     items: section.items.slice(0, PER_SECTION)
   }));
   const featuredItems = sections.flatMap(section => section.items);
+  const issue = composeIssue({
+    start: bundle.window.start,
+    end: bundle.window.end,
+    label: `${date} 日报`,
+    periodLabel: '日报',
+    perSection: PER_SECTION
+  });
 
   return {
     date,
     windowVersion: 3,
+    edition: EDITION,
     window: bundle.window,
     truncated: bundle.truncated,
     generatedAt: now(),
@@ -56,8 +70,22 @@ function buildDailyContent(date) {
       aerospace: featuredItems.filter(r =>
         r.domain === 'aerospace' || r.domain === 'both').length
     },
-    sections
+    sections,
+    totals: issue.totals,
+    lead: issue.lead,
+    leadSource: issue.leadSource,
+    hot: issue.hot,
+    deals: issue.deals,
+    investors: issue.investors,
+    companies: issue.companies,
+    portfolio: issue.portfolio,
+    breakthroughs: issue.breakthroughs
   };
+}
+
+function isStaleEdition(report, date) {
+  if (!report || report.corrupt || Number(report.edition) >= EDITION) return false;
+  return Date.parse(localDateString()) - Date.parse(date) <= REBUILD_RECENT_DAYS * 86400e3;
 }
 
 function generateDaily(dateStr, { overwrite = false } = {}) {
@@ -67,7 +95,7 @@ function generateDaily(dateStr, { overwrite = false } = {}) {
     throw new HttpError(400, '日报日期不能晚于今天');
   }
   const existing = tryReadReport(date);
-  if (existing && !existing.corrupt && !overwrite) {
+  if (existing && !existing.corrupt && !overwrite && !isStaleEdition(existing, date)) {
     // 已有有效日报：默认不重生成，直接返回现有行
     return existing;
   }

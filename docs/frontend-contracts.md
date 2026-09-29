@@ -765,8 +765,8 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 | 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| 页面实际加载的全部本地 CSS | ≈ 241,115 B（约 235.5 KiB，含字体分片索引） | ≤ 250 KiB |
-| index.html `<script>` 标签总数 | 25（新增 aqua-shell.js 后预算已用尽） | ≤ 25 |
+| 页面实际加载的全部本地 CSS | ≈ 265,000 B（约 259 KiB，含字体分片索引与 v0.2.0 intel.css） | ≤ 275 KiB |
+| index.html `<script>` 标签总数 | 27（v0.2.0 新增合并后的 intel-views.js） | ≤ 27 |
 | 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
 | 全部已加载 CSS 的 `backdrop-filter` 声明 | 9 | ≤ 10 |
@@ -794,6 +794,11 @@ common-links-controller 后基线为 24；Aqua 外壳只新增一个集中式
 `aqua-shell.js` 后到达 25，与上限持平，预算正式用尽——
 后续任何阶段都不得再新增脚本标签（只准在既有模块内迁移或合并）。
 若需要突破 25 说明模块又在碎片化，应合并职责相近的模块，而不是继续放宽预算。
+
+v0.2.0 上调说明（26/26 → 27/27，CSS 250 → 275 KiB）：新增“当前热点”“一级市场”两个一等视图与刊期（周报、月报）。
+表示层（IntelRender）与两个视图控制器按上面的原则**合并**为单一的 `intel-views.js`，只净增一个脚本边界；
+新增样式集中在 `intel.css`（约 18 KiB），发布前逐一核对了 styles.css 与 aqua-shell.css 的类选择器，
+没有可清理的死规则。两项上限都只覆盖本次新增，没有预留余量。
 
 说明：阶段 4 起 feed 整表赋值的 3 个落点分别是 骨架屏、空态、失败态；
 正常数据整表重载改走 keyed diff 调和（`diff.reconcile`），分页追加走

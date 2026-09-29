@@ -1,0 +1,39 @@
+{
+  "_说明": "行业包 · 门槛与热度参数。每篇资料由评分模型独立打两次分（0–100，代码按内容类型权重从五轴合成），两次之和 ≥ 2 × 门槛才进精选，卡片显示两次的平均分（向下取整）。门槛按信源分级区分：官方一手的门槛低一些，媒体与聚合检索高一些。改了门槛或评分提示词，用 npm run eval:selection 在你自己标注的样本上重跑一遍再决定（见 docs/selection.md）。",
+  "thresholds": { "T1": 55, "T1.5": 59, "T2": 63 },
+  "understandFloor": 40,
+  "heuristicDiscount": 0.9,
+  "historicalHours": 48,
+  "hot": {
+    "_说明": "热度按事件算、不按文章算：48 小时内每个独立信源只算一次，24 小时减半；少于 2 个独立信源的事件不上热点。技术突破只给一个温和的权重，不改变“有多少人在说”这一本质。",
+    "windowHours": 48,
+    "halfLifeHours": 24,
+    "minParticipants": 2,
+    "maxEntries": 20,
+    "breakthroughWeight": 0.25,
+    "risingPct": 0.15,
+    "surgeMinRecent": 3,
+    "newHours": 6
+  },
+  "stories": {
+    "_说明": "事件归组：最近 recallDays 天内召回候选事件。字面相似 ≥ autoOverlap 或主事件键相同直接归入；落在 judgeOverlap 与 autoOverlap 之间、或同主体同动作类的，交给模型三分类（同一件事 / 后续进展 / 两件事）。",
+    "recallDays": 14,
+    "autoOverlap": 0.62,
+    "judgeOverlap": 0.34,
+    "minSharedGrams": 6,
+    "maxStorySize": 40,
+    "judgeLimitPerRound": 24,
+    "sameMinConfidence": 0.6,
+    "digestMinReports": 3,
+    "digestLimitPerRound": 3
+  },
+  "companies": {
+    "heatWindowDays": 7,
+    "halfLifeHours": 72
+  },
+  "budget": {
+    "_说明": "预算熔断：每小时、每天的模型调用上限，超过就暂停（资料保持待分析，下一个窗口继续），不会重复付费——已付费的结果存在回执里复用。",
+    "maxCallsPerHour": 900,
+    "maxCallsPerDay": 9000
+  }
+}

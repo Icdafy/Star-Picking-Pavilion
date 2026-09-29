@@ -39,6 +39,9 @@ const SettingsViewController = window.SettingsViewController;
 const Store = window.Store;
 const ViewRegistry = window.ViewRegistry;
 const CommonLinksController = window.CommonLinksController;
+const IntelRender = window.IntelRender;
+const HotViewController = window.HotViewController;
+const CapitalViewController = window.CapitalViewController;
 const AquaShell = window.AquaShell;
 // 阶段 3：纯函数与表示层已拆入 renderer/format-utils.js、renderer/feed-card.js，
 // 这里按名解构，保持组合根内调用点不变
@@ -389,6 +392,7 @@ const feedController = FeedController.createFeedController({
   toast, refreshStats, safeUrl, timeAgo,
   copyText,
   runTermSearch: term => searchController.runTermSearch(term),
+  openCompany: id => openCompany(id),
   elements: {
     list: $('#feedList'),
     btnMore: $('#btnMore'),
@@ -406,12 +410,50 @@ const { loadFeed, syncFeedToolbar } = feedController;
 // 批 4：toggleStar 与 #feedList 点击委托已随信息流控制器迁出，
 // 组合根只保留 loadFeed/工具条接线
 
+// v0.2.0 情报表示层：热点榜、一级市场、日报周报月报的新版块共用
+const intelRender = IntelRender.createIntelRender({ esc, safeHttpUrl: DomUtils.safeHttpUrl, timeAgo });
+
+// 从任何位置（卡片主体公司、热点、日报）打开公司档案
+function openCompany(id) {
+  if (!id) return;
+  if (state.view !== 'capital') switchView('capital');
+  capitalViewController.openCompany(id);
+}
+
+const hotViewController = HotViewController.createHotViewController({
+  api, esc, render: intelRender, skeletons,
+  requestGuard: Bootstrap.createLatestRequestGuard(),
+  onCompany: openCompany,
+  elements: { body: $('#hotBody'), meta: $('#hotMeta'), domains: $('#hotDomains') }
+});
+
+const capitalViewController = CapitalViewController.createCapitalViewController({
+  api, esc, render: intelRender, skeletons, toast,
+  confirm: (message, options) => confirmGlass(message, options),
+  requestGuard: Bootstrap.createLatestRequestGuard(),
+  elements: {
+    body: $('#capitalBody'),
+    tabs: $('#capitalTabs'),
+    domains: $('#capitalDomains'),
+    days: $('#capitalDays'),
+    watched: $('#capitalWatched'),
+    search: $('#capitalSearch'),
+    addButton: $('#btnAddCompany'),
+    addForm: $('#addCompanyForm')
+  }
+});
+
 const dailyViewController = DailyViewController.createDailyViewController({
   api, state, esc, safeUrl,
   format: formatUtils,
   skeletons,
   toast, preferenceActions, dailyRequestGuard,
+  render: intelRender,
   elements: {
+    periods: $('#periodSwitch'),
+    copy: $('#btnCopyDaily'),
+    exportButton: $('#btnExportDaily'),
+    onCompany: openCompany,
     body: $('#dailyBody'),
     date: $('#dailyDate'),
     sub: $('#dailySub'),
@@ -478,14 +520,27 @@ const viewRegistry = ViewRegistry.createViewRegistry({
 });
 const { syncTabIndicator, syncNavHeight } = viewRegistry;
 
-// 7 个视图全部注册：三个信息流视图共享 #viewFeed，onEnter 各自触发加载
+// 9 个视图全部注册：三个信息流视图共享 #viewFeed，onEnter 各自触发加载
 for (const feedView of FEED_VIEWS) {
   viewRegistry.registerView({ id: feedView, tab: '#viewFeed', isFeed: true, onEnter: () => registryDeps.loadFeed() });
 }
+viewRegistry.registerView({ id: 'hot', tab: '#viewHot', onEnter: () => hotViewController.loadHot() });
+viewRegistry.registerView({ id: 'capital', tab: '#viewCapital', onEnter: () => capitalViewController.load() });
 viewRegistry.registerView({ id: 'daily', tab: '#viewDaily', onEnter: () => registryDeps.loadDaily(state.dailyDate) });
 viewRegistry.registerView({ id: 'links', tab: '#viewLinks', onEnter: () => registryDeps.renderCommonLinks() });
 viewRegistry.registerView({ id: 'sources', tab: '#viewSources', onEnter: () => registryDeps.loadSources() });
-viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => registryDeps.loadSettings() });
+viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => { registryDeps.loadSettings(); loadIndustryInfo(); } });
+
+// 设置页“精选标准”：行业包的门槛、内容类型权重、提示词版本与本小时 / 今日调用量（只读）
+async function loadIndustryInfo() {
+  const box = $('#industryInfo');
+  if (!box) return;
+  try {
+    box.innerHTML = intelRender.industryInfo(await api('/api/industry'));
+  } catch (error) {
+    box.innerHTML = `<p class="muted">读取失败：${esc(error.message)}</p>`;
+  }
+}
 
 function switchView(view, { persist = true } = {}) {
   return viewRegistry.switchView(view, { persist });
@@ -521,9 +576,11 @@ async function initCategories() {
       const on = c === state.category;
       return `<button class="chip${on ? ' active' : ''}" data-cat="${esc(c)}" aria-pressed="${on}">${esc(c)}</button>`;
     }).join('');
-    $$('.chip').forEach(ch => ch.addEventListener('click', () => {
+    // 只绑分类条自己的 chips：词库面板、热点与一级市场的筛选也用 .chip 外观，
+    // 全局抓取会把它们的选中态清掉，还会把它们当成分类改写 state.category
+    $$('#catChips .chip').forEach(ch => ch.addEventListener('click', () => {
       const on = ch.classList.contains('active');
-      $$('.chip').forEach(x => {
+      $$('#catChips .chip').forEach(x => {
         x.classList.remove('active');
         x.setAttribute('aria-pressed', 'false');
       });

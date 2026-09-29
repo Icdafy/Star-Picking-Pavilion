@@ -49,6 +49,19 @@
       // title 属性里的数值一律 Number() 收敛，杜绝 undefined/对象裸插值
       const qualityText = Number(item.quality ?? 0);
       const heatText = Number(item.heat ?? 0);
+      // v0.2.0：两次独立评分。卡片显示平均分，门槛比较的是两次之和 ≥ 2 × 门槛
+      const passes = Array.isArray(item.scorePasses) && item.scorePasses.length === 2
+        ? item.scorePasses.map(Number).filter(Number.isFinite) : [];
+      if (passes.length === 2) {
+        const threshold = Number(item.threshold);
+        const detail = `两次独立评分 ${passes[0]} / ${passes[1]}，平均 ${v}${Number.isFinite(threshold) ? `；信源门槛 ${threshold}（两次之和需 ≥ ${Math.round(threshold * 20) / 10}）` : ''}`;
+        if (item.featured) {
+          return `<span class="score-pill featured" title="${esc(detail)}">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1C8 1 3 5.5 3 9.5a5 5 0 0 0 10 0c0-1.8-1-3.5-2-4.7C10.6 6.6 10 7.5 9 7.5 9.6 5.5 8 1 8 1z"/></svg>
+      精选 <b>${v}</b></span>`;
+        }
+        return `<span class="score-pill" title="${esc(detail)}">注意力 <b>${v}</b></span>`;
+      }
       if (item.featured) {
         return `<span class="score-pill featured" title="质量分 ${qualityText} · 当前热度 ${heatText}（随时间消退）">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1C8 1 3 5.5 3 9.5a5 5 0 0 0 10 0c0-1.8-1-3.5-2-4.7C10.6 6.6 10 7.5 9 7.5 9.6 5.5 8 1 8 1z"/></svg>
@@ -99,6 +112,30 @@
       };
     }
 
+    // 主体公司：公司库里的公司可点击，直达“一级市场 · 公司档案”
+    function companyChipsHtml(item) {
+      const list = Array.isArray(item.subjects)
+        ? item.subjects.filter(s => s?.id && s.name).slice(0, 4) : [];
+      if (!list.length) return '';
+      return `<div class="card-companies" role="group" aria-label="主体公司">${list.map(s =>
+        `<button class="card-company${s.role === 'primary' ? ' is-primary' : ''}" type="button" data-company="${esc(s.id)}"
+      title="查看「${esc(s.name)}」的公司档案、全部报道与融资记录">${esc(s.name)}</button>`).join('')}</div>`;
+    }
+
+    const DEAL_STATUS = Object.freeze({ completed: '已完成', announced: '已宣布', rumored: '传闻' });
+    function dealHtml(item) {
+      const deal = item.deal;
+      if (!deal || !deal.company) return '';
+      const parts = [deal.round, deal.amountText].filter(Boolean).map(esc).join(' · ');
+      const leads = Array.isArray(deal.leadInvestors) && deal.leadInvestors.length
+        ? `领投 ${deal.leadInvestors.slice(0, 2).map(esc).join('、')}` : '';
+      const others = Array.isArray(deal.investors) ? deal.investors.filter(n => !deal.leadInvestors?.includes(n)) : [];
+      const follow = others.length ? `参投 ${others.slice(0, 3).map(esc).join('、')}${others.length > 3 ? ' 等' : ''}` : '';
+      return `<div class="card-deal" role="note"><span class="cd-label">一级市场</span><b>${esc(deal.company)}</b>`
+        + `${parts ? `<span>${parts}</span>` : ''}${leads ? `<span>${leads}</span>` : ''}${follow ? `<span>${follow}</span>` : ''}`
+        + `<small>${DEAL_STATUS[deal.status] || ''}</small></div>`;
+    }
+
     function entityChipsHtml(item) {
       const list = Array.isArray(item.entities) ? item.entities.filter(e => e?.name).slice(0, 6) : [];
       if (!list.length) return '';
@@ -131,6 +168,8 @@
       scorePill,
       breakthroughPresentation,
       entityChipsHtml,
+      companyChipsHtml,
+      dealHtml,
       atomicEventsHtml
     });
   }
@@ -147,6 +186,11 @@
     importance: '重要性', novelty: '新颖度', credibility: '可信度',
     impact: '行业影响', timeliness: '时效性'
   });
+  // v0.2.0 起的 AIHOT 五轴（两次独立评分的平均，0–100）
+  const AXIS_NAMES = Object.freeze({
+    significance: '实质份量', novelty: '信息增量', credibility: '证据强度',
+    resonance: '共振面', actionability: '投资可行动性'
+  });
 
   function createCardRenderer({ esc, safeHttpUrl, format, template, doc } = {}) {
     if (typeof esc !== 'function' || typeof safeHttpUrl !== 'function' || !format
@@ -154,14 +198,15 @@
       throw new TypeError('card renderer requires esc, safeHttpUrl, format, template and doc dependencies');
     }
     const { timeAgo, dateLabel, hhmm } = format;
-    const { scorePill, breakthroughPresentation, entityChipsHtml, atomicEventsHtml } =
+    const { scorePill, breakthroughPresentation, entityChipsHtml, companyChipsHtml, dealHtml, atomicEventsHtml } =
       createFeedCard({ esc, safeHttpUrl, format });
 
     // 以下三段构建器仍产出 HTML 字符串：五维分解、突破徽标与突破依据属于
     // 「整块塞进克隆模板插槽」的内容，不为它们单独开模板节点
     function dimsHtml(item) {
       if (!item.scores) return '';
-      return Object.entries(DIM_NAMES).map(([k, name]) => `
+      const names = Object.hasOwn(item.scores, 'significance') ? AXIS_NAMES : DIM_NAMES;
+      return Object.entries(names).map(([k, name]) => `
     <div class="dim">
       <div class="dim-label"><span>${name}</span><b>${Math.round(item.scores[k] ?? 0)}</b></div>
       <div class="dim-bar"><i style="width:${Math.min(100, item.scores[k] ?? 0)}%"></i></div>
@@ -197,8 +242,11 @@
       tier.classList.add(`tier-${item.tier}`);
       tier.textContent = item.tier ?? '';
       const catTag = q('.cat-tag');
-      if (item.category) catTag.textContent = item.category;
-      else catTag.remove();
+      if (item.category) {
+        // 内容类型比分类更细（技术研发 · 技术解读）；两者相同就只显示一个
+        const typeLabel = item.itemTypeLabel && item.itemTypeLabel !== item.category ? ` · ${item.itemTypeLabel}` : '';
+        catTag.textContent = `${item.category}${typeLabel}`;
+      } else catTag.remove();
       const publication = item.publishedAt || item.reportedAt;
       q('.meta-time').textContent = publication ? `${timeAgo(publication)}发布` : '发布时间待确认';
       q('.meta-time').setAttribute('title', publication ? `报道发布时间：${publication}` : `发布时间未知；收录时间：${item.fetchedAt || '未知'}`);
@@ -230,7 +278,10 @@
       q('.card-score-group').appendChild(timingBadge);
       const title = q('.card-title');
       title.setAttribute('href', safeHttpUrl(item.url));
-      title.textContent = item.title ?? '';
+      // 自洽中文标题优先（外文稿与口号式标题尤其需要）；原标题留在悬停提示里可追溯
+      const displayTitle = item.titleZh || item.title || '';
+      title.textContent = displayTitle;
+      if (item.titleZh && item.title && item.titleZh !== item.title) title.setAttribute('title', `原标题：${item.title}`);
       const usefulImage = (Array.isArray(item.images) ? item.images : []).find(i => i && safeHttpUrl(i.url) !== '#');
       const thumbSrc = safeHttpUrl(usefulImage?.url || item.image);
       const thumb = q('.card-thumb');
@@ -247,13 +298,22 @@
       if (item.tags?.length) {
         tags.innerHTML = item.tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('');
       } else tags.remove();
+      const deal = dealHtml(item);
+      if (deal) q('.card-text').insertAdjacentHTML('beforeend', deal);
+      const companies = companyChipsHtml(item);
+      if (companies) q('.card-text').insertAdjacentHTML('beforeend', companies);
       const entities = entityChipsHtml(item);
       if (entities) q('.card-text').insertAdjacentHTML('beforeend', entities);
       const events = atomicEventsHtml(item);
       if (events) q('.card-content').insertAdjacentHTML('afterend', events);
       const reason = q('.card-reason');
-      if (item.reason) q('.cr-text').textContent = item.reason;
-      else reason.remove();
+      if (item.reason) {
+        q('.cr-text').textContent = item.reason;
+        // v0.2.0 的内容理解写的是“推荐理由”；老资料保留“情报研判”的叫法
+        const label = q('.cr-label');
+        const text = label && [...label.childNodes].reverse().find(node => node.nodeType === 3);
+        if (item.itemType && text) text.nodeValue = '推荐理由';
+      } else reason.remove();
       // 底栏：事件簇入口只在有簇时存在，五维入口只在有研判内容时存在；
       // 星标与复制固定在每张卡片上——留存与分发的入口不缺席
       const clusterToggle = q('.cluster-toggle');

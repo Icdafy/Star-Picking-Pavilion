@@ -1,13 +1,18 @@
 'use strict';
 // 调度：采集与分析解耦成两个独立循环，让评分「实时跟上」
 //   · 采集循环：每 intervalMinutes 分钟 collectAll 入库（默认 10 分钟）
-//   · 分析循环：每 analyzeIntervalSeconds 秒轮询，有 analyzed=0 就持续小批量打分 + 聚类
-//   · runPipeline：手动「立即采集分析」一次性全量（采集→抽干分析→聚类），供 /api/collect 与脚本用
+//   · 分析循环：每 analyzeIntervalSeconds 秒轮询：判断与写作 → 事件归组 → 门槛重判 → 热点榜
+//   · 定时：每小时热度快照；每天 08:00 日报；每周一 10:00 周报；每月 1 日 10:30 月报（学 AIHOT 的刊期）
+//   · runPipeline：手动「立即采集分析」一次性全量（采集→抽干分析→归组），供 /api/collect 与脚本用
+// 模型只在这里的任务里被调用；读者打开页面只读库里已有的结果。
 const cron = require('node-cron');
 const { collectAll } = require('./collectors');
 const { analyzePending, rescoreAfterClustering } = require('./ai/pipeline');
-const { clusterRecent } = require('./ai/cluster');
+const { groupPending, digestStories } = require('./ai/stories');
+const { computeHotRanking, snapshotHeat } = require('./ai/hot');
 const { generateDaily } = require('./ai/daily');
+const { generatePeriod, previousPeriodKey, enhanceLeads } = require('./ai/reports');
+const { pruneReceipts } = require('./ai/receipts');
 const { pruneDatabase } = require('./retention');
 const { loadSettings } = require('./config');
 const { collectionIntervalMs } = require('./schedule-policy');
@@ -22,6 +27,9 @@ let lastRun = null;        // 最近一次采集摘要
 let lastAnalyzeAt = null;  // 最近一次分析循环时间
 let lastPrune = null;      // 最近一次数据保留清理摘要
 let lastCompact = null;    // 最近一次数据库深度压缩摘要
+let lastGroup = null;      // 最近一次事件归组摘要
+let lastHotAt = 0;         // 最近一次热点榜计算时间
+let lastEditorialAt = 0;   // 最近一次导语改写与事件综述
 let schedulerStarted = false;
 let collectTimer = null;
 let analyzeTimer = null;
@@ -120,16 +128,27 @@ async function analyzeOnce(trigger = 'loop', limit = 60) {
   try {
     const r = await analyzePending(null, limit);
     lastAnalyzeAt = new Date().toISOString();
-    if (r.analyzed > 0) {
-      // 先聚类再重算：多源印证要等簇成型才知道，而精选阈值又依赖最新的分数分布，
-      // 顺序反过来的话「五家同时报道」这个最强信号永远进不了当轮的精选判定
-      clusterRecent();
+    const settings = loadSettings();
+    // 归组：新判完的资料挂到事件上（或开新事件），热度信号随之写入
+    const group = await groupPending({ settings });
+    lastGroup = { at: lastAnalyzeAt, ...group };
+    if (r.analyzed > 0 || group.processed > 0) {
       const rescore = rescoreAfterClustering();
-      console.log(`[analyze] (${trigger}) 打分 ${r.analyzed} 条（${r.mode}），`
-        + `聚类后重算 ${rescore.changed}/${rescore.rescored} 条，`
-        + `精选阈值偏移 ${rescore.shift >= 0 ? '+' : ''}${rescore.shift}，精选累计 ${r.featured ?? '-'}`);
+      console.log(`[analyze] (${trigger}) 判断 ${r.analyzed} 条（${r.mode}），入选 ${r.featured ?? 0}，`
+        + `归组 ${group.processed}（新事件 ${group.created}、归入 ${group.attached}、模型判定 ${group.judged}），`
+        + `门槛重判 ${rescore.changed}/${rescore.rescored}`);
     }
-    return r;
+    if (group.processed > 0 || Date.now() - lastHotAt > 10 * 60e3) {
+      computeHotRanking();
+      lastHotAt = Date.now();
+    }
+    // 花钱的编辑工作（事件综述、导语改写）节流到每 15 分钟一次
+    if (settings.ai.apiKey && !r.budgetPaused && Date.now() - lastEditorialAt > 15 * 60e3) {
+      lastEditorialAt = Date.now();
+      await digestStories({ settings }).catch(e => console.warn('[stories]', e.message));
+      await enhanceLeads({ settings }).catch(e => console.warn('[reports]', e.message));
+    }
+    return { ...r, group };
   } finally {
     analyzeRunning = false;
   }
@@ -147,9 +166,11 @@ async function runPipeline(trigger = 'manual') {
     total += r.analyzed || 0;
     if (!r.analyzed) break;
   }
-  clusterRecent();
+  await groupPending({ settings: loadSettings(), limit: 1000 });
   const rescore = rescoreAfterClustering();
-  console.log(`[pipeline] 手动全量完成：分析 ${total} 条，聚类后重算 ${rescore.changed} 条`);
+  computeHotRanking();
+  lastHotAt = Date.now();
+  console.log(`[pipeline] 手动全量完成：分析 ${total} 条，门槛重判 ${rescore.changed} 条`);
   return { ...lastRun, analyzed: total, rescored: rescore.changed };
 }
 
@@ -170,9 +191,23 @@ function startScheduler() {
     try { generateDaily(); console.log('[daily] 日报已生成'); }
     catch (e) { console.error('[daily]', e); }
   }));
+  // 每小时第 5 分钟：事件热度快照（热点走势图）
+  cronTasks.add(cron.schedule('5 * * * *', () => {
+    try { snapshotHeat(); } catch (e) { console.error('[hot]', e); }
+  }));
+  // 周报：每周一 10:00 出上周；月报：每月 1 日 10:30 出上月
+  cronTasks.add(cron.schedule('0 10 * * 1', () => {
+    try { generatePeriod('weekly', previousPeriodKey('weekly'), { overwrite: true }); console.log('[report] 周报已生成'); }
+    catch (e) { console.error('[report]', e); }
+  }));
+  cronTasks.add(cron.schedule('30 10 1 * *', () => {
+    try { generatePeriod('monthly', previousPeriodKey('monthly'), { overwrite: true }); console.log('[report] 月报已生成'); }
+    catch (e) { console.error('[report]', e); }
+  }));
   // 保留清理（日报之后 25 分钟，避开采集与日报的忙时）
   cronTasks.add(cron.schedule(`25 ${settings.dailyReportHour ?? 8} * * *`, () => {
     try {
+      pruneReceipts();
       const result = pruneOnce('cron');
       if (!result.skipped) compactOnce('cron', { mode: 'auto' });
     } catch (e) { console.error('[retention]', e); }
@@ -227,6 +262,7 @@ module.exports = {
     lastRun,
     lastAnalyzeAt,
     lastPrune,
-    lastCompact
+    lastCompact,
+    lastGroup
   })
 };

@@ -1,0 +1,268 @@
+/* 摘星阁 · v0.2.0 情报视图样式：当前热点、一级市场、刊期与卡片新增元素。
+   全部复用 styles.css 的设计令牌（颜色、间距、圆角、时长），深浅两套主题自动生效；
+   窄窗口（800px 起）全部降为单列，不出现横向滚动。 */
+
+/* ---------- 视图头 ---------- */
+.intel-hero {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-5);
+  padding: var(--sp-6) var(--sp-7); margin-bottom: var(--sp-4); flex-wrap: wrap;
+}
+.intel-hero .view-title { margin-bottom: var(--sp-2); }
+.intel-hero p { color: var(--c-fg-dim); font-size: var(--t-sm); max-width: 46rem; }
+.intel-kicker {
+  font-family: var(--font-ui); font-size: var(--t-xs); letter-spacing: .18em; color: var(--accent-ink);
+  margin-bottom: var(--sp-1); font-weight: 700;
+}
+.intel-domains, .intel-tabs { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.intel-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-5);
+  padding: var(--sp-3) var(--sp-5); margin-bottom: var(--sp-4); flex-wrap: wrap;
+}
+.intel-filters { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.intel-select, .intel-check { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--t-sm); color: var(--c-fg-dim); }
+.intel-select select, .intel-search {
+  font: inherit; font-size: var(--t-sm); color: var(--c-fg); background: var(--hover-bg);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: .25rem .5rem;
+}
+.intel-search { min-width: 14rem; }
+.intel-note { font-size: var(--t-sm); color: var(--c-fg-faint); margin: 0 0 var(--sp-3) var(--sp-1); }
+.intel-domain {
+  display: inline-block; font-size: var(--t-xs); padding: 0 .4375rem; border-radius: 99px; margin-left: var(--sp-2);
+  vertical-align: .0625rem; line-height: 1.6;
+}
+.intel-domain.la { color: var(--accent-ink); background: var(--accent-soft); }
+.intel-domain.ae { color: var(--second-ink); background: var(--second-soft); }
+.link-btn {
+  font: inherit; font-weight: 700; color: var(--c-fg); background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+}
+.link-btn:hover { color: var(--accent-ink); }
+.link-btn:focus-visible, .intel-company:focus-visible, .watch-btn:focus-visible, .deal-company:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* ---------- 当前热点 ---------- */
+.hot-list { list-style: none; display: grid; gap: var(--sp-3); padding: 0; margin: 0; }
+.hot-item {
+  display: grid; grid-template-columns: 2.75rem minmax(0, 1fr) auto; gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-6); content-visibility: auto; contain-intrinsic-size: auto 11rem;
+}
+.hot-rank {
+  font-family: var(--font-mono); font-size: var(--t-2xl); font-weight: 800; color: var(--c-fg-faint);
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.hot-rank.top { color: var(--flag); }
+.hot-meta { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--t-xs); color: var(--c-fg-faint); }
+.hot-meta .intel-domain { margin-left: 0; }
+.hot-cat { color: var(--c-fg-dim); }
+.hot-time { margin-left: auto; }
+.hot-badge {
+  font-size: var(--t-xs); font-weight: 800; padding: 0 .4375rem; border-radius: var(--radius-xs); line-height: 1.6;
+  border: 1px solid currentColor;
+}
+.hot-badge.surge { color: var(--c-red); }
+.hot-badge.new { color: var(--accent-ink); }
+.hot-badge.rising { color: var(--flag-ink); }
+.hot-badge.breakthrough { color: var(--second-ink); }
+.hot-title { font-family: var(--font-display); font-size: var(--t-lg); font-weight: 800; margin: var(--sp-2) 0 var(--sp-1); line-height: 1.4; }
+.hot-title a { color: var(--c-fg); text-decoration: none; }
+.hot-title a:hover { color: var(--accent-ink); }
+.hot-digest { color: var(--c-fg-dim); font-size: var(--t-base); line-height: 1.7; }
+.hot-digest-label {
+  font-size: var(--t-xs); color: var(--accent-ink); border: 1px solid var(--accent-line); border-radius: var(--radius-xs);
+  padding: 0 .3125rem; margin-right: var(--sp-2); vertical-align: .0625rem;
+}
+.hot-sources { font-size: var(--t-sm); color: var(--c-fg-faint); margin-top: var(--sp-2); }
+.hot-sources b { color: var(--flag-ink); }
+.hot-actions { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); flex-wrap: wrap; }
+.hot-rep { font-size: var(--t-sm); }
+.hot-reports { margin-top: var(--sp-3); }
+.story-reports { list-style: none; padding: var(--sp-3) var(--sp-4); margin: 0; border-radius: var(--radius-sm); background: var(--hover-bg); display: grid; gap: var(--sp-2); }
+.story-reports a { color: var(--c-fg); font-weight: 600; text-decoration: none; }
+.story-reports a:hover { color: var(--accent-ink); }
+.story-reports .muted { display: block; font-size: var(--t-xs); }
+.hot-side { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); min-width: 6.5rem; color: var(--flag); }
+.hot-heat { text-align: right; line-height: 1; }
+.hot-heat b { font-family: var(--font-mono); font-size: var(--t-2xl); font-weight: 800; color: var(--flag); font-variant-numeric: tabular-nums; }
+.hot-heat span { display: block; font-size: var(--t-xs); color: var(--c-fg-faint); margin-top: .25rem; }
+.hot-trend { font-size: var(--t-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+.hot-trend.up { color: var(--c-red); }
+.hot-trend.down { color: var(--c-green); }
+.hot-trend.flat, .hot-trend.unknown { color: var(--c-fg-faint); }
+.hot-trend.new { color: var(--accent-ink); }
+.sparkline { display: block; opacity: .9; }
+
+/* ---------- 公司标签（热点 / 卡片 / 刊期共用） ---------- */
+.intel-companies, .card-companies { display: flex; gap: .375rem; flex-wrap: wrap; margin-top: var(--sp-2); }
+.intel-company, .card-company {
+  font-size: var(--t-sm); color: var(--accent-ink); padding: .0625rem .5625rem; cursor: pointer;
+  border-radius: 99px; border: 1px solid var(--accent-line); background: transparent;
+  transition: background var(--dur) var(--ease);
+}
+.intel-company:hover, .card-company:hover { background: var(--accent-soft); }
+.card-company.is-primary { background: var(--accent-soft); font-weight: 700; }
+.intel-company i, .deal-company i {
+  font-style: normal; font-size: var(--t-xs); margin-left: .3125rem; color: var(--flag-ink);
+}
+.card-company:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 卡片里的一级市场行：融资事件抽取结果 */
+.card-deal {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .625rem; margin-top: var(--sp-2);
+  padding: .375rem .625rem; border-radius: var(--radius-sm); font-size: var(--t-sm);
+  background: var(--flag-soft); border: 1px solid var(--flag-line); color: var(--c-fg-dim);
+}
+.card-deal .cd-label { font-size: var(--t-xs); font-weight: 800; color: var(--flag-ink); letter-spacing: .08em; }
+.card-deal b { color: var(--c-fg); }
+.card-deal small { margin-left: auto; color: var(--c-fg-faint); }
+
+/* ---------- 一级市场 · 融资动态 ---------- */
+.deal-list { display: grid; gap: 1px; border-radius: var(--radius-md); overflow: hidden; }
+.deal-row {
+  display: grid; grid-template-columns: 6.5rem minmax(9rem, 1.2fr) 7rem 7.5rem minmax(10rem, 2fr) 7.5rem;
+  gap: var(--sp-3); align-items: center; padding: .625rem var(--sp-4); font-size: var(--t-sm);
+  background: var(--glass-bg-soft, var(--hover-bg));
+}
+.deal-list.compact .deal-row { grid-template-columns: 6.5rem 7rem 7.5rem minmax(10rem, 2fr) 7.5rem; }
+.deal-list .deal-row:not(.deal-head):hover { background: var(--hover-bg); }
+.deal-head { font-size: var(--t-xs); color: var(--c-fg-faint); letter-spacing: .08em; font-weight: 700; }
+.deal-date { font-variant-numeric: tabular-nums; color: var(--c-fg-faint); }
+.deal-company { font: inherit; font-weight: 700; color: var(--c-fg); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+button.deal-company:hover { color: var(--accent-ink); }
+.deal-company.unregistered { color: var(--c-fg-dim); cursor: default; }
+.deal-round { font-weight: 800; color: var(--flag-ink); }
+.deal-status { display: block; font-size: var(--t-xs); color: var(--c-fg-faint); }
+.deal-status.rumored { color: var(--state-warn); }
+.deal-amount { font-variant-numeric: tabular-nums; color: var(--c-fg); }
+.deal-investors { color: var(--c-fg-dim); }
+.deal-list a, .hot-rep, .story-reports .muted a {
+  color: var(--c-fg-dim); text-decoration: underline; text-decoration-color: var(--rail-line); text-underline-offset: .1875rem;
+}
+.deal-list a:hover, .hot-rep:hover { color: var(--accent-ink); text-decoration-color: var(--accent-line); }
+.deal-investors b { color: var(--c-fg); }
+.discovered { margin-top: var(--sp-4); }
+.discovered ul { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--sp-2); }
+.discovered li { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.discovered li .muted { font-size: var(--t-sm); }
+.discovered li button { margin-left: auto; }
+
+/* ---------- 一级市场 · 公司热度 / 活跃机构 ---------- */
+.company-heat, .investor-list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--sp-2); }
+.company-heat-row, .investor-row {
+  display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: var(--sp-4); align-items: center;
+  padding: var(--sp-4) var(--sp-5);
+}
+.ch-rank { font-family: var(--font-mono); font-size: var(--t-lg); font-weight: 800; color: var(--c-fg-faint); font-variant-numeric: tabular-nums; }
+.ch-name { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--t-md); }
+.ch-name .intel-domain { margin-left: 0; }
+.ch-name .muted { font-size: var(--t-xs); }
+.ch-top { display: block; margin-top: .25rem; color: var(--c-fg-dim); font-size: var(--t-sm); text-decoration: none; }
+.ch-top:hover { color: var(--accent-ink); }
+.ch-meta { font-size: var(--t-xs); color: var(--c-fg-faint); margin-top: .25rem; }
+.ch-side { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); }
+.ch-heat { position: relative; width: 8rem; height: 1.25rem; border-radius: 99px; background: var(--hover-bg); overflow: hidden; }
+.ch-heat i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--flag-soft), var(--flag-line)); border-radius: inherit; }
+.ch-heat b { position: relative; z-index: 1; display: block; text-align: right; padding-right: .5rem; font-size: var(--t-sm); line-height: 1.25rem; color: var(--flag-ink); font-variant-numeric: tabular-nums; }
+.ch-trend { font-size: var(--t-xs); color: var(--c-fg-faint); }
+.ch-trend.up { color: var(--c-red); }
+.ch-trend.down { color: var(--c-green); }
+.ch-trend.new { color: var(--accent-ink); }
+.investor-count { font-size: var(--t-sm); color: var(--c-fg-dim); white-space: nowrap; }
+.investor-count b { color: var(--flag-ink); font-size: var(--t-md); }
+.investor-row .muted { font-size: var(--t-xs); margin-top: .125rem; }
+
+/* 关注级别：未标记 / 关注 / 被投 */
+.watch-control { display: inline-flex; border: 1px solid var(--glass-border); border-radius: 99px; overflow: hidden; }
+.watch-btn {
+  font: inherit; font-size: var(--t-xs); padding: .1875rem .625rem; border: 0; background: transparent;
+  color: var(--c-fg-faint); cursor: pointer; transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.watch-btn + .watch-btn { border-left: 1px solid var(--glass-border); }
+.watch-btn:hover { color: var(--c-fg); background: var(--hover-bg); }
+.watch-btn.active { color: var(--flag-ink); background: var(--flag-soft); font-weight: 800; }
+.watch-btn.active[data-watch="0"] { color: var(--c-fg-dim); background: var(--hover-bg); }
+.watch-tag { font-size: var(--t-xs); margin-left: var(--sp-2); color: var(--flag-ink); }
+
+/* ---------- 一级市场 · 公司库与公司档案 ---------- */
+.company-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--sp-3); }
+.company-card { padding: var(--sp-4) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-2); }
+.company-card.watch-2 { border-color: var(--flag-line); }
+.company-card.watch-1 { border-color: var(--accent-line); }
+.company-card.is-disabled { opacity: .55; }
+.company-card header { display: flex; align-items: center; gap: var(--sp-2); }
+.company-name { font-size: var(--t-md); }
+.company-custom { font-size: var(--t-xs); color: var(--second-ink); border: 1px solid var(--second-line); border-radius: var(--radius-xs); padding: 0 .3125rem; }
+.company-tags { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--t-xs); color: var(--c-fg-faint); }
+.company-tags .intel-domain { margin-left: 0; }
+.company-tags .status-private { color: var(--flag-ink); }
+.company-products { font-size: var(--t-sm); color: var(--c-fg-dim); }
+.company-stats { display: flex; gap: var(--sp-3); flex-wrap: wrap; font-size: var(--t-xs); color: var(--c-fg-faint); }
+.company-stats b { color: var(--c-fg); font-size: var(--t-sm); }
+.company-card .watch-control { align-self: flex-start; margin-top: auto; }
+.company-detail { display: grid; gap: var(--sp-4); }
+.company-detail-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-5) var(--sp-6); flex-wrap: wrap; }
+.cdh-title { flex: 1; min-width: 12rem; }
+.cdh-title h2 { font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 800; letter-spacing: .04em; }
+.intel-articles { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--sp-2); }
+.intel-articles li { padding: .625rem var(--sp-3); border-radius: var(--radius-sm); }
+.intel-articles li:hover { background: var(--hover-bg); }
+.intel-articles li.is-featured { border-left: 3px solid var(--flag); }
+.intel-articles a { color: var(--c-fg); font-weight: 700; text-decoration: none; }
+.intel-articles a:hover { color: var(--accent-ink); }
+.intel-articles p { font-size: var(--t-sm); color: var(--c-fg-dim); margin-top: .125rem; }
+.ia-head { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--t-xs); color: var(--c-fg-faint); flex-wrap: wrap; }
+.ia-flag { color: var(--flag-ink); font-weight: 800; }
+.ia-cat { color: var(--c-fg-dim); }
+.ia-score { margin-left: auto; color: var(--flag); font-weight: 800; font-variant-numeric: tabular-nums; }
+.add-company-form { margin-bottom: var(--sp-4); }
+.add-company-form select { font: inherit; }
+
+/* ---------- 刊期：日报 / 周报 / 月报 ---------- */
+.period-switch { display: inline-flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); }
+.issue-lead { padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-5); }
+.issue-kicker { font-size: var(--t-xs); letter-spacing: .16em; color: var(--accent-ink); font-weight: 800; }
+.issue-lead p { font-size: var(--t-md); line-height: 1.85; margin-top: var(--sp-2); color: var(--c-fg); }
+.issue-totals { display: flex; gap: var(--sp-5); flex-wrap: wrap; margin-top: var(--sp-3); font-size: var(--t-sm); color: var(--c-fg-faint); }
+.issue-totals b { color: var(--flag-ink); font-size: var(--t-lg); font-variant-numeric: tabular-nums; margin-right: .125rem; }
+.di-reason { color: var(--c-fg-dim); }
+.issue-deals .deal-list { margin-top: var(--sp-2); }
+.issue-investors { margin-top: var(--sp-3); }
+.portfolio-block + .portfolio-block { margin-top: var(--sp-3); }
+.portfolio-name { display: flex; align-items: center; padding: 0 var(--sp-4); font-size: var(--t-md); }
+.issue-company-board { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: var(--sp-2) var(--sp-5); counter-reset: board; }
+.issue-company-board li { counter-increment: board; display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding: .375rem var(--sp-3); }
+.issue-company-board li::before { content: counter(board); font-family: var(--font-mono); font-weight: 800; color: var(--c-fg-faint); min-width: 1.5rem; }
+.issue-company-board .intel-domain { margin-left: 0; }
+.issue-company-board .muted { font-size: var(--t-xs); }
+
+/* ---------- 设置 · 精选标准 ---------- */
+.industry-thresholds { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--t-sm); margin-bottom: var(--sp-3); }
+.threshold-chip { padding: .0625rem .5625rem; border-radius: 99px; background: var(--flag-soft); color: var(--flag-ink); font-variant-numeric: tabular-nums; }
+.weight-table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
+.weight-table th, .weight-table td { padding: .3125rem .5rem; border-bottom: 1px solid var(--rail-line); text-align: center; }
+.weight-table th[scope="row"] { text-align: left; font-weight: 700; color: var(--c-fg); }
+.weight-table th[scope="row"] small { display: block; font-weight: 400; color: var(--c-fg-faint); font-size: var(--t-xs); }
+.weight-table thead th { color: var(--c-fg-faint); font-weight: 700; font-size: var(--t-xs); }
+.industry-budget, .industry-prompts { font-size: var(--t-sm); color: var(--c-fg-dim); margin-top: var(--sp-3); line-height: 1.8; }
+.industry-budget b { color: var(--flag-ink); }
+.industry-prompts code { font-size: var(--t-xs); margin-right: .25rem; }
+
+/* ---------- 窄窗口 ---------- */
+@media (max-width: 70rem) {
+  .deal-row { grid-template-columns: 6rem minmax(8rem, 1fr) 6.5rem 7rem minmax(0, 1.4fr); }
+  .deal-list.compact .deal-row { grid-template-columns: 6rem 6.5rem 7rem minmax(0, 1.4fr); }
+  .deal-row .dc-source { display: none; }
+}
+@media (max-width: 56rem) {
+  .hot-item { grid-template-columns: 2rem minmax(0, 1fr); }
+  .hot-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
+  .hot-heat { text-align: left; }
+  .company-heat-row, .investor-row { grid-template-columns: 2rem minmax(0, 1fr); }
+  .ch-side { grid-column: 2; flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .deal-row { grid-template-columns: 5.5rem minmax(0, 1fr) 5.5rem 6rem; }
+  .deal-list.compact .deal-row { grid-template-columns: 5.5rem 5.5rem minmax(0, 1fr); }
+  .deal-row .dc-investors { display: none; }
+  .intel-search { min-width: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intel-company, .card-company, .watch-btn { transition: none; }
+}

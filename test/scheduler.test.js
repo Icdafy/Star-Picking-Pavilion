@@ -38,11 +38,14 @@ test('daily report runs exactly at 08:00 and every cron task is destroyed on sto
 
 test('scheduler and pipeline compare ISO timestamps through SQLite time functions', () => {
   const pipeline = fs.readFileSync(path.join(__dirname, '..', 'server', 'ai', 'pipeline.js'), 'utf8');
-  const cluster = fs.readFileSync(path.join(__dirname, '..', 'server', 'ai', 'cluster.js'), 'utf8');
-  assert.doesNotMatch(pipeline, /fetched_at\s*>\s*datetime/);
-  assert.doesNotMatch(cluster, /fetched_at\s*>\s*datetime/);
-  assert.match(pipeline, /julianday\(fetched_at\)/);
-  assert.match(cluster, /julianday\(a\.fetched_at\)/);
+  // v0.2.0 的事件归组与刊期按 ISO 字符串绑定参数比较（两侧同为 toISOString 格式），同样不得混用 datetime()
+  const stories = fs.readFileSync(path.join(__dirname, '..', 'server', 'ai', 'stories.js'), 'utf8');
+  const reports = fs.readFileSync(path.join(__dirname, '..', 'server', 'ai', 'reports.js'), 'utf8');
+  for (const source of [pipeline, stories, reports]) {
+    assert.doesNotMatch(source, /fetched_at\s*[<>]=?\s*datetime/);
+  }
+  assert.match(pipeline, /julianday\(a\.fetched_at\)/);
+  assert.match(stories, /a\.fetched_at >= \?/);
 });
 
 test('database compaction is mutually exclusive and evaluated only after retention cleanup', () => {

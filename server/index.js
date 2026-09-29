@@ -26,6 +26,8 @@ const lexicon = require('./ai/lexicon');
 const { heatScore } = require('./ai/scoring');
 const { testConnection } = require('./ai/deepseek');
 const { CATEGORIES } = require('./ai/pipeline');
+const { handleIntelRoute } = require('./intel-routes');
+const industry = require('./industry');
 const {
   parseFeedQuery, parseExportQuery, sanitizeDate, sanitizeFeedback,
   sanitizeSourceInput, sanitizeStarInput
@@ -92,7 +94,12 @@ function isJsonObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-const SCORE_KEYS = Object.freeze(['importance', 'novelty', 'credibility', 'impact', 'timeliness']);
+// v0.1.x 的五维（importance…timeliness）与 v0.2.0 的 AIHOT 五轴（significance…actionability）并存：
+// 老资料保留当时的研判，新资料用新口径，出口按实际存在的键收口
+const SCORE_KEYS = Object.freeze([
+  'importance', 'novelty', 'credibility', 'impact', 'timeliness',
+  'significance', 'resonance', 'actionability'
+]);
 
 function clampScores(value) {
   if (!isJsonObject(value)) return null;
@@ -153,6 +160,29 @@ function clampBreakthroughSignals(value) {
   return Object.keys(clamped).length ? clamped : null;
 }
 
+function clampSubjects(value) {
+  return value
+    .filter(item => isJsonObject(item) && typeof item.name === 'string' && item.name.trim())
+    .map(item => ({
+      id: typeof item.id === 'string' && /^[a-z0-9-]{2,48}$/.test(item.id) ? item.id : null,
+      name: item.name.trim().slice(0, 40),
+      role: item.role === 'primary' ? 'primary' : 'mention'
+    }))
+    .slice(0, 8);
+}
+
+function clampDeal(value) {
+  if (!value || typeof value.company !== 'string' || !value.company.trim()) return null;
+  return {
+    company: value.company.trim().slice(0, 40),
+    round: typeof value.round === 'string' ? value.round.slice(0, 20) : '未披露',
+    amountText: typeof value.amountText === 'string' ? value.amountText.slice(0, 30) : '',
+    investors: boundedTextArray(value.investors, 40, 10),
+    leadInvestors: boundedTextArray(value.leadInvestors, 40, 5),
+    status: ['completed', 'announced', 'rumored'].includes(value.status) ? value.status : 'announced'
+  };
+}
+
 function articleRow(r, scoring, nowMs) {
   const timing = require('./ai/event-time').timingFields(r);
   const vision = parseOptionalJson(r.vision_json, {}, isJsonObject);
@@ -201,6 +231,18 @@ function articleRow(r, scoring, nowMs) {
     topics: boundedTextArray(parseOptionalJson(r.topics_json, [], Array.isArray), 100, 30),
     events: clampEvents(parseOptionalJson(r.events_json, [], Array.isArray)),
     eventKey: r.event_key || null,
+    // v0.2.0 AIHOT 内核的产物；老资料这些字段为 null / 空数组
+    titleZh: typeof r.title_zh === 'string' && r.title_zh.trim() ? r.title_zh.trim().slice(0, 120) : null,
+    itemType: r.item_type || null,
+    itemTypeLabel: r.item_type ? industry.itemTypeById(r.item_type)?.label || null : null,
+    authorRole: ['principal', 'observer', 'relayer'].includes(r.author_role) ? r.author_role : null,
+    scorePasses: Number.isFinite(Number(r.score_a)) && Number.isFinite(Number(r.score_b)) && r.score_a != null && r.score_b != null
+      ? [Math.round(Number(r.score_a)), Math.round(Number(r.score_b))] : null,
+    threshold: Number.isFinite(Number(r.selection_threshold)) && r.selection_threshold != null ? Number(r.selection_threshold) : null,
+    subjects: clampSubjects(parseOptionalJson(r.subjects_json, [], Array.isArray)),
+    deal: clampDeal(parseOptionalJson(r.deal_json, null, isJsonObject)),
+    historical: !!r.historical,
+    storyRelation: r.story_relation || null,
     starred: !!r.starred,
     starredAt: safeDate(r.starred_at),
     analyzed: r.analyzed
@@ -219,11 +261,17 @@ const EXPORT_MAX_ITEMS = 200;
 function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
   const scoring = loadScoring();
   const nowMs = Date.now();
-  const { view, domain, category, search, page } = parseFeedQuery(q, CATEGORIES);
+  const { view, domain, category, search, page, company } = parseFeedQuery(q, CATEGORIES);
   const SIZE = size;
 
   const where = [];
   const params = [];
+  // 公司视角：以该公司为主体的资料（标题命中或模型认定的主体）；正文顺带提及的不算，
+  // 否则一篇行业综述会出现在十几家公司的档案里
+  if (company) {
+    where.push("a.id IN (SELECT article_id FROM article_companies WHERE company_id = ? AND role = 'primary')");
+    params.push(company);
+  }
   if (view === 'featured') where.push('a.featured = 1');
   if (view === 'featured') where.push('a.relevant = 1');
   if (view === 'all') where.push("(a.relevant IS NULL OR a.relevant = 1)");
@@ -671,6 +719,11 @@ const server = http.createServer(async (req, res) => {
         const changed = db.prepare('DELETE FROM feedback WHERE id=?').run(Number(mFeedback[1])).changes;
         if (!changed) return json(res, 404, { error: '反馈不存在' });
         return json(res, 200, { ok: true });
+      }
+
+      if (await handleIntelRoute({ req, res, url: u, json, readJsonBody, queryFeed })) {
+        if (req.method !== 'GET') invalidateStatsCache();
+        return;
       }
 
       return json(res, 404, { error: 'not found' });

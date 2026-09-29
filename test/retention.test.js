@@ -90,21 +90,32 @@ test('clusters shrink, re-elect a main article, or disappear when members expire
   db.prepare('UPDATE articles SET quality_score = 90 WHERE id = ?').run(alsoFresh);
   db.prepare('UPDATE articles SET quality_score = 50 WHERE id = ?').run(fresh);
 
-  const dissolving = db.prepare('INSERT INTO clusters (main_article_id, size, updated_at) VALUES (?, 2, ?)')
+  // v0.2.0：只剩一篇报道的簇仍是一个事件（热度曲线、综述、后续进展都挂在它上面）
+  const narrowing = db.prepare('INSERT INTO clusters (main_article_id, size, updated_at) VALUES (?, 2, ?)')
     .run(lonelyStale, now()).lastInsertRowid;
-  db.prepare('UPDATE articles SET cluster_id = ? WHERE id IN (?, ?)').run(dissolving, lonelyFresh, lonelyStale);
+  db.prepare('UPDATE articles SET cluster_id = ? WHERE id IN (?, ?)').run(narrowing, lonelyFresh, lonelyStale);
+  // 成员全部过期的事件连同热度信号一起消失
+  const vanishing = db.prepare('INSERT INTO clusters (main_article_id, size, updated_at) VALUES (?, 1, ?)')
+    .run(stale, now()).lastInsertRowid;
+  const vanishingOnly = addArticle(sourceId, { title: '整个事件都已过期', ageDays: 400 });
+  db.prepare('UPDATE articles SET cluster_id = ? WHERE id = ?').run(vanishing, vanishingOnly);
+  db.prepare(`INSERT INTO story_signals (article_id, story_id, participant_key, observed_at) VALUES (?, ?, 'source:1', ?)`)
+    .run(lonelyFresh, vanishing, now());
 
   const result = pruneDatabase({
     settings: { collect: { retentionDays: 180, irrelevantRetentionDays: 21 } },
     nowMs: NOW_MS
   });
 
-  assert.equal(result.removedArticles, 2);
+  assert.equal(result.removedArticles, 3);
   const survivingCluster = db.prepare('SELECT main_article_id, size FROM clusters WHERE id = ?').get(shrinking);
   assert.equal(survivingCluster.size, 2);
   assert.equal(survivingCluster.main_article_id, alsoFresh);
-  assert.equal(db.prepare('SELECT COUNT(*) c FROM clusters WHERE id = ?').get(dissolving).c, 0);
-  assert.equal(db.prepare('SELECT cluster_id FROM articles WHERE id = ?').get(lonelyFresh).cluster_id, null);
+  const narrowed = db.prepare('SELECT main_article_id, size FROM clusters WHERE id = ?').get(narrowing);
+  assert.deepEqual({ ...narrowed }, { main_article_id: lonelyFresh, size: 1 });
+  assert.equal(db.prepare('SELECT cluster_id FROM articles WHERE id = ?').get(lonelyFresh).cluster_id, narrowing);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM clusters WHERE id = ?').get(vanishing).c, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM story_signals WHERE story_id = ?').get(vanishing).c, 0);
   assert.equal(result.removedClusters, 1);
 });
 

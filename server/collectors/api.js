@@ -87,7 +87,10 @@ async function fetchPage(keyword, { sort, pageIndex }, settings) {
     url: validWebUrl(a.url),
     summary: String(a.content || '').replace(/<[^>]+>/g, '').trim(),
     publishedAt: a.date ? new Date(a.date.replace(' ', 'T') + '+08:00').toISOString() : null,
-    image: (a.image && /^https?:\/\//.test(a.image)) ? a.image : null
+    image: (a.image && /^https?:\/\//.test(a.image)) ? a.image : null,
+    // 检索线只是入口，真正的出版方是 mediaName（财联社、证券时报……）：热度按它计独立参与者
+    publisherId: typeof a.mediaName === 'string' && a.mediaName.trim() && !/\p{Cc}/u.test(a.mediaName)
+      ? a.mediaName.trim().slice(0, 60) : null
   })).filter(a => a.title && a.url);
 }
 

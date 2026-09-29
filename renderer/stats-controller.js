@@ -54,7 +54,7 @@
         // 星标是用户手动收的，与 AI 是否配置无关，这里不该弹降级提示
         if (!s.aiConfigured && state.view === 'featured') {
           banner.hidden = false;
-          banner.innerHTML = '当前为<b>关键词启发式</b>降级模式 —— 在『设置』中填入 DeepSeek API Key 即可启用五维 AI 评分与智能精选。';
+          banner.innerHTML = '当前为<b>关键词启发式</b>降级模式 —— 在『设置』中填入 DeepSeek API Key 即可启用 AI 精选：两次独立评分、自洽中文标题与摘要、事件归组判断与融资事件抽取。';
         } else banner.hidden = true;
         return s;
       } catch { /* 后端未就绪 */ }

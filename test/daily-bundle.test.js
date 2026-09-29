@@ -59,7 +59,8 @@ function createFixture() {
       breakthrough_score REAL NOT NULL DEFAULT 0,
       breakthrough_bonus REAL NOT NULL DEFAULT 0,
       breakthrough_signals_json TEXT,
-      scoring_version INTEGER NOT NULL DEFAULT 1
+      scoring_version INTEGER NOT NULL DEFAULT 1,
+      title_zh TEXT, item_type TEXT, score_a REAL, score_b REAL, subjects_json TEXT, deal_json TEXT
     );
     INSERT INTO sources (id, name, tier) VALUES
       (1, '权威源', 'T1'),
@@ -277,7 +278,8 @@ test('research rows have a stable complete schema and sanitize unsafe URLs', () 
     'relevant', 'analyzed', 'scores', 'quality', 'heatAtCutoff', 'featured',
     'tags', 'clusterId', 'clusterSize', 'starred', 'lexiconTerms',
     'lexiconWeight', 'noiseHits', 'breakthroughScore', 'breakthroughBonus',
-    'breakthroughSignals', 'scoringVersion'
+    'breakthroughSignals', 'scoringVersion', 'titleZh', 'itemType', 'scorePasses',
+    'subjects', 'deal'
   ];
 
   assert.deepEqual(Object.keys(record), fields);

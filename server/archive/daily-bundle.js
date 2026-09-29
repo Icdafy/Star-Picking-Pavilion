@@ -13,7 +13,8 @@ const DAILY_RECORD_COLUMNS = `
   a.id, a.source_id, a.title, a.url, a.summary_raw, a.ai_summary, a.ai_reason,
   a.event_date, a.events_json, a.vision_json, a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
   a.scores_json, a.quality_score, a.featured, a.tags_json, a.cluster_id, a.starred,
-  a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json, a.scoring_version`;
+  a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json, a.scoring_version,
+  a.title_zh, a.item_type, a.score_a, a.score_b, a.subjects_json, a.deal_json`;
 const DAILY_RECORD_WINDOW_WHERE = `
   julianday(a.fetched_at) > julianday(?)
   AND julianday(a.fetched_at) <= julianday(?)`;
@@ -153,7 +154,14 @@ function mapRecord(row, { date, window, scoring }) {
     breakthroughScore,
     breakthroughBonus,
     breakthroughSignals,
-    scoringVersion: Number(row.scoring_version) || 1
+    scoringVersion: Number(row.scoring_version) || 1,
+    // v0.2.0：自洽中文标题、内容类型、两次独立评分、主体公司、融资事件
+    titleZh: row.title_zh == null ? null : String(row.title_zh),
+    itemType: row.item_type || null,
+    scorePasses: [row.score_a, row.score_b].every(value => Number.isFinite(Number(value)) && value != null)
+      ? [Number(row.score_a), Number(row.score_b)] : null,
+    subjects: parseJson(row.subjects_json, [], Array.isArray),
+    deal: parseJson(row.deal_json, null, value => value && typeof value === 'object' && !Array.isArray(value))
   };
 }
 

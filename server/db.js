@@ -219,6 +219,144 @@ function migrate() {
     db.exec('ALTER TABLE sources ADD COLUMN consecutive_errors INTEGER NOT NULL DEFAULT 0');
   }
   if (!srcCols.has('next_fetch_at')) db.exec('ALTER TABLE sources ADD COLUMN next_fetch_at TEXT');
+  migrateV020(addCol);
+}
+
+// v0.2.0 AIHOT 内核：两次独立评分、内容理解、事件（stories）与热度、一级市场（公司库与融资事件）。
+// 全部是向后兼容的增量：老数据列为 NULL，界面按“没有就不渲染”处理；老版本打开新库也不会读到陌生必填列。
+function migrateV020(addCol) {
+  addCol('prefilter_label', 'TEXT');                       // PASS | BLOCK | UNKNOWN（模型预筛结论）
+  addCol('prefilter_attempts', 'INTEGER NOT NULL DEFAULT 0');
+  addCol('score_a', 'REAL');                               // 第一次独立评分（0–100）
+  addCol('score_b', 'REAL');                               // 第二次独立评分
+  addCol('attention_score', 'REAL');                       // 两次平均，向下取整
+  addCol('selection_threshold', 'REAL');                   // 入选时用的门槛（按信源分级）
+  addCol('item_type', 'TEXT');
+  addCol('author_role', 'TEXT');
+  addCol('title_zh', 'TEXT');                              // 自洽中文标题
+  addCol('subjects_json', 'TEXT');                         // 主体公司 [{id?, name, role}]
+  addCol('fact_json', 'TEXT');
+  addCol('deal_json', 'TEXT');
+  addCol('prompt_version', 'TEXT');
+  addCol('historical', 'INTEGER NOT NULL DEFAULT 0');      // 发现时已发布超过 48 小时：不刷“今天”、不计热度
+  addCol('grouped_at', 'TEXT');
+  addCol('story_relation', 'TEXT');                        // primary | report | development
+  addCol('participant_key', 'TEXT');                       // 热度的独立参与者（出版方优先，其次信源）
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_grouping ON articles(relevant, grouped_at)');
+
+  // clusters 升级为 stories：一个事件 = 一个簇，老版本的簇就是它的前身，feed 的“簇内只显主条”继续成立
+  const clusterCols = new Set(db.prepare('PRAGMA table_info(clusters)').all().map(c => c.name));
+  const addClusterCol = (name, def) => { if (!clusterCols.has(name)) db.exec(`ALTER TABLE clusters ADD COLUMN ${name} ${def}`); };
+  addClusterCol('title', 'TEXT');
+  addClusterCol('domain', 'TEXT');
+  addClusterCol('category', 'TEXT');
+  addClusterCol('first_report_at', 'TEXT');
+  addClusterCol('latest_at', 'TEXT');
+  addClusterCol('digest', 'TEXT');
+  addClusterCol('digest_size', 'INTEGER NOT NULL DEFAULT 0');
+  addClusterCol('digest_at', 'TEXT');
+  addClusterCol('merged_into', 'INTEGER');
+  addClusterCol('created_at', 'TEXT');
+
+  db.exec(`
+CREATE TABLE IF NOT EXISTS story_signals (
+  article_id INTEGER PRIMARY KEY REFERENCES articles(id) ON DELETE CASCADE,
+  story_id INTEGER NOT NULL,
+  participant_key TEXT NOT NULL,
+  participant_name TEXT,
+  tier TEXT,
+  observed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_story_signals_story ON story_signals(story_id, observed_at);
+CREATE INDEX IF NOT EXISTS idx_story_signals_observed ON story_signals(observed_at);
+
+CREATE TABLE IF NOT EXISTS hot_rankings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  computed_at TEXT NOT NULL,
+  rule_version TEXT NOT NULL,
+  entries_json TEXT NOT NULL,
+  evidence_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_hot_rankings_time ON hot_rankings(computed_at DESC);
+
+CREATE TABLE IF NOT EXISTS story_heat_hourly (
+  story_id INTEGER NOT NULL,
+  hour TEXT NOT NULL,
+  heat REAL NOT NULL,
+  participants INTEGER NOT NULL,
+  PRIMARY KEY (story_id, hour)
+);
+
+CREATE TABLE IF NOT EXISTS companies (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  aliases_json TEXT NOT NULL DEFAULT '[]',
+  products_json TEXT NOT NULL DEFAULT '[]',
+  domain TEXT,
+  segment TEXT,
+  region TEXT,
+  status TEXT,
+  note TEXT,
+  custom INTEGER NOT NULL DEFAULT 0,
+  watch INTEGER NOT NULL DEFAULT 0,        -- 0 未标记 · 1 关注 · 2 被投
+  watch_note TEXT,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT,
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS article_companies (
+  article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'mention',    -- primary | mention
+  PRIMARY KEY (article_id, company_id)
+);
+CREATE INDEX IF NOT EXISTS idx_article_companies_company ON article_companies(company_id, role);
+
+CREATE TABLE IF NOT EXISTS deals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  deal_key TEXT NOT NULL UNIQUE,
+  company_id TEXT,
+  company_name TEXT NOT NULL,
+  domain TEXT,
+  round TEXT NOT NULL,
+  amount_text TEXT,
+  amount_cny REAL,
+  investors_json TEXT NOT NULL DEFAULT '[]',
+  lead_investors_json TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'announced',
+  deal_date TEXT,
+  first_article_id INTEGER,
+  article_ids_json TEXT NOT NULL DEFAULT '[]',
+  source_count INTEGER NOT NULL DEFAULT 1,
+  origin TEXT NOT NULL DEFAULT 'model',    -- model | heuristic
+  first_seen_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_deals_company ON deals(company_id);
+CREATE INDEX IF NOT EXISTS idx_deals_seen ON deals(first_seen_at DESC);
+
+CREATE TABLE IF NOT EXISTS period_reports (
+  kind TEXT NOT NULL,                      -- weekly | monthly
+  period_key TEXT NOT NULL,                -- 2026-W40 | 2026-09
+  content_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (kind, period_key)
+);
+
+CREATE TABLE IF NOT EXISTS model_receipts (
+  receipt_key TEXT PRIMARY KEY,            -- 任务 + 提示词版本 + 输入哈希
+  task TEXT NOT NULL,
+  response_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_model_receipts_created ON model_receipts(created_at);
+
+CREATE TABLE IF NOT EXISTS model_usage (
+  bucket TEXT PRIMARY KEY,                 -- h:YYYY-MM-DDTHH | d:YYYY-MM-DD
+  calls INTEGER NOT NULL DEFAULT 0
+);
+`);
 }
 migrate();
 

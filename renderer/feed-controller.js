@@ -23,7 +23,9 @@
     feedRequestGuard, renderSearchContext, elements,
     IntersectionObserver: InjectedIntersectionObserver,
     // 批 4 卡片交互依赖（均可选：不注入则不接线交互层）
-    toast, refreshStats, copyText, runTermSearch, safeUrl, timeAgo
+    toast, refreshStats, copyText, runTermSearch, safeUrl, timeAgo,
+    // v0.2.0：主体公司标签直达一级市场的公司档案（可选）
+    openCompany
   } = {}) {
     if (typeof api !== 'function' || !state || typeof esc !== 'function'
       || !DomUtils || !format || !card || !diff
@@ -193,6 +195,11 @@
         }
         // 实体标签即检索入口：看到「蓝箭航天」就想知道它最近还有什么动静，
         // 这一步不该再让人回到搜索框里手打一遍
+        const companyBtn = e.target.closest('.card-company');
+        if (companyBtn && typeof openCompany === 'function') {
+          openCompany(companyBtn.dataset.company);
+          return;
+        }
         const entityBtn = e.target.closest('.card-entity');
         if (entityBtn) {
           runTermSearch(entityBtn.dataset.entity);

@@ -1,14 +1,14 @@
 'use strict';
-// 八段式管线里四段纯代码环节的单测：
-// 结构化/清洗（normalize）、标注与实体提取（entities）、原子事件分离（events）、语义合并（merge）。
-// 这四段不调模型，因此可以被完全确定地断言——回归发生时这里必须先红。
+// 管线里纯代码环节的单测：
+// 结构化/清洗（normalize）、标注与实体提取（entities）、原子事件分离（events）。
+// v0.2.0 起事件归组由 ai/stories 负责（见 test/v020-engine.test.js），旧的语义合并通道已移除。
+// 这几段不调模型，因此可以被完全确定地断言——回归发生时这里必须先红。
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const normalize = require('../server/ai/normalize');
 const entities = require('../server/ai/entities');
 const events = require('../server/ai/events');
-const { semanticPairs } = require('../server/ai/merge');
 
 // ---------- ① 结构化 / ② 数据清洗 ----------
 
@@ -254,68 +254,4 @@ test('dirty-typed fields are dropped instead of stringified into garbage keys', 
   // 有限数字主体转字符串保留
   const [numeric] = events.normalizeEvents([{ a: 42, v: '完成首飞' }]);
   assert.equal(numeric.actor, '42');
-});
-
-// ---------- ⑧ 语义合并 ----------
-
-function collectPairs(rows, options) {
-  const merged = [];
-  semanticPairs(rows, (a, b, channel) => merged.push([a.id, b.id, channel].join('|')), options);
-  return merged;
-}
-
-test('semantic merge unites articles that share a primary event key', () => {
-  const key = 'lanjian|launch|zhuque';
-  const merged = collectPairs([
-    { id: 1, domain: 'aerospace', primaryEventKey: key, actionClass: 'launch', anchorKeys: ['lanjian'] },
-    { id: 2, domain: 'aerospace', primaryEventKey: key, actionClass: 'launch', anchorKeys: ['lanjian'] },
-    { id: 3, domain: 'aerospace', primaryEventKey: 'other|funding', actionClass: 'funding', anchorKeys: ['x'] }
-  ]);
-  assert.deepEqual(merged, ['1|2|event-key']);
-});
-
-test('anchor overlap needs two shared entities and a matching action class', () => {
-  const base = { domain: 'aerospace', primaryEventKey: null, actionClass: 'launch' };
-  // 只共享一个锚点：不并（否则「又一家公司拿到 SpaceX 订单」会被并进「SpaceX 发射成功」）
-  assert.deepEqual(collectPairs([
-    { ...base, id: 1, anchorKeys: ['spacex', 'starlink'] },
-    { ...base, id: 2, anchorKeys: ['spacex', 'kuiper'] }
-  ]), []);
-  // 共享两个锚点且动作类一致：并
-  assert.deepEqual(collectPairs([
-    { ...base, id: 1, anchorKeys: ['spacex', 'starlink'] },
-    { ...base, id: 2, anchorKeys: ['spacex', 'starlink'] }
-  ]), ['1|2|anchor-overlap']);
-  // 锚点相同但动作类不同：同一批公司在做不同的事，不并
-  assert.deepEqual(collectPairs([
-    { ...base, id: 1, anchorKeys: ['spacex', 'starlink'] },
-    { ...base, id: 2, actionClass: 'partnership', anchorKeys: ['spacex', 'starlink'] }
-  ]), []);
-});
-
-test('semantic merge never crosses domains and skips high-frequency anchors', () => {
-  const key = 'shared|launch';
-  // 跨领域禁并的约束在语义通道里同样成立
-  assert.deepEqual(collectPairs([
-    { id: 1, domain: 'aerospace', primaryEventKey: key, actionClass: 'launch', anchorKeys: [] },
-    { id: 2, domain: 'lowaltitude', primaryEventKey: key, actionClass: 'launch', anchorKeys: [] }
-  ]), []);
-
-  // 出现得太频繁的锚点没有判别力，把上限压到 2 之后它不再参与配对
-  const rows = Array.from({ length: 4 }, (unused, index) => ({
-    id: index + 1,
-    domain: 'aerospace',
-    primaryEventKey: null,
-    actionClass: 'launch',
-    anchorKeys: ['common', 'alsocommon']
-  }));
-  assert.deepEqual(collectPairs(rows, { maxAnchorPostings: 2 }), []);
-  assert.ok(collectPairs(rows).length > 0, '不设上限时这批本来是会被并起来的');
-});
-
-test('semanticPairs tolerates empty and malformed input', () => {
-  assert.equal(semanticPairs([], () => {}), 0);
-  assert.equal(semanticPairs(null, () => {}), 0);
-  assert.equal(semanticPairs([{ id: 1 }], () => {}), 0);
-  assert.equal(semanticPairs([{ id: 1, anchorKeys: null }, { id: 2 }], () => {}), 0);
 });

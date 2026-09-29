@@ -48,19 +48,22 @@ function countExpiring(plan) {
     .get(plan.articleCutoff, plan.irrelevantCutoff).c;
 }
 
-// 删除文章后，成员不足 2 条的簇失去意义；主条被删的簇要改推剩余最优条目。
+// v0.2.0 起簇就是“事件”：只剩一篇报道的事件仍然是事件（它的热度曲线、综述与后续进展还挂在上面），
+// 只有一篇成员都不剩的事件才删除，连同它的热度信号与小时快照；被合并的事件行保留作地址跳转，
+// 合并目标消失时一并清掉。主条被删的事件改推剩余最优条目。
 // 全部用集合式 SQL 完成：不再逐簇查成员（N+1），而是一条聚合重算、一条批量修正
 const SURVIVING_CLUSTERS = `
   SELECT cluster_id FROM articles
   WHERE cluster_id IS NOT NULL
-  GROUP BY cluster_id HAVING COUNT(*) >= 2`;
+  GROUP BY cluster_id HAVING COUNT(*) >= 1`;
 
 function repairClusters() {
-  // 小簇（含孤儿簇）：释放成员后删除簇行
-  db.prepare(`UPDATE articles SET cluster_id = NULL
-    WHERE cluster_id IN (SELECT id FROM clusters)
-      AND cluster_id NOT IN (${SURVIVING_CLUSTERS})`).run();
-  const removed = db.prepare(`DELETE FROM clusters WHERE id NOT IN (${SURVIVING_CLUSTERS})`).run().changes;
+  const orphan = `SELECT id FROM clusters WHERE merged_into IS NULL AND id NOT IN (${SURVIVING_CLUSTERS})`;
+  db.prepare(`DELETE FROM story_heat_hourly WHERE story_id IN (${orphan})`).run();
+  db.prepare(`DELETE FROM story_signals WHERE story_id IN (${orphan})`).run();
+  const removed = db.prepare(`DELETE FROM clusters WHERE id IN (${orphan})`).run().changes;
+  db.prepare(`DELETE FROM clusters WHERE merged_into IS NOT NULL
+    AND merged_into NOT IN (SELECT id FROM clusters WHERE merged_into IS NULL)`).run();
   // 存活簇：一条 UPDATE 重算计数与主条（源等级降序 → 质量分降序 → id 升序，与原逐簇排序一致）
   // 注：size 统计不带 sources JOIN，依赖 foreign_keys=ON 保证 articles.source_id 无悬空行，
   // 否则重算出的 size/main_article_id 会与带 JOIN 的查询口径不一致

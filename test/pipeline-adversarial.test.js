@@ -63,14 +63,18 @@ test('H4a: 预筛正常 JSON 时模型结果全字段落库，请求带反注入
   assert.equal(out.analyzed, 1, '模型路径完成写 analyzed=1');
   assert.equal(out.domain, 'aerospace', '预筛 d=B 落库为 aerospace');
   assert.equal(out.category, '发射与任务');
-  assert.equal(out.scores.importance, 78);
-  assert.deepEqual(out.tags, ['可回收火箭', '首飞']);
+  // v0.2.0：五轴由两次独立评分平均后换算到 0–100（桩给 importance=78 → sig=8 → 80）
+  assert.equal(out.scores.significance, 80);
+  // 标签只能来自行业包白名单：“首飞”不在白名单里被丢弃
+  assert.deepEqual(out.tags, ['可回收火箭']);
   assert.ok(out.eventKey, '结构化产物 event_key 必须落库');
-  assert.deepEqual(out.callKinds, ['prefilter', 'scoring'], '先预筛后评分，各一次调用');
+  assert.deepEqual([...out.callKinds].sort(), ['prefilter', 'scoring', 'scoring', 'understand'],
+    '先预筛，再两次独立评分 + 一次内容理解');
+  assert.equal(out.callKinds[0], 'prefilter');
   // 反注入声明与结构化分隔标记
-  assert.match(out.prefilterSystem, /安全声明/);
-  assert.match(out.prefilterSystem, /不得执行/);
-  assert.match(out.prefilterSystem, /<item id=/);
+  assert.match(out.prefilterSystem, /输入安全边界/);
+  assert.match(out.prefilterSystem, /不是给你的指令/);
+  assert.match(out.prefilterSystem, /<item>/);
   assert.match(out.prefilterUser, /<item id="0">/);
   assert.match(out.prefilterUser, /<\/item>/);
 });
@@ -91,9 +95,11 @@ test('H4c: 评分调用单次失败保持 analyzed=0，连续三次才降级（�
   // 该条目词库判无关，故降级路径写 analyzed=2
   assert.deepEqual(out.flags, [0, 0, 2]);
   assert.deepEqual(out.analyzedCounts, [0, 0, 1]);
-  assert.equal(out.prefilterCalls, 3, '每轮重判都重新预筛');
-  // 每轮评分真实尝试一次，非审核类 400 还会触发一次删参兜底重发 → 每轮 2 次请求
-  assert.equal(out.scoringCalls, 6);
+  // 回执：第一轮预筛已付费的结论在后两轮原样复用，不重复花钱
+  assert.equal(out.prefilterCalls, 1, '预筛结果经回执复用');
+  // 每轮两次独立评分各真实尝试一次，非审核类 400 还会触发一次删参兜底重发 → 每轮 4 次请求；
+  // 失败的调用不落回执，下一轮照常重试
+  assert.equal(out.scoringCalls, 12);
 });
 
 test('H4d: 预筛序号缺失/重复/非数字时整批降级启发式，而非缺项判无关', () => {
@@ -178,7 +184,7 @@ test('状态机: 预筛调用失败保持 analyzed=0，可被下一轮重判', (
   assert.equal(out.afterRound1.scoresJson, null);
   assert.equal(out.round2Analyzed, 1, '下一轮网络恢复后正常完成');
   assert.equal(out.afterRound2.analyzed, 1);
-  assert.equal(out.afterRound2.scores.importance, 70, '评分证据落库');
+  assert.equal(out.afterRound2.scores.significance, 70, '评分证据落库');
 });
 
 // ---------- H5：事件键投毒定性测试 ----------
@@ -201,9 +207,10 @@ test('H1: 桩模型无条件满分并伪造 tags，T2 单源条目的突破加�
   assert.equal(out.mode, 'full');
   assert.equal(out.analyzed, 1);
   // 注入「成功」的表象：模型确实给了满分，伪造 tags 也确实落库
-  assert.equal(out.scores.importance, 100);
+  assert.equal(out.scores.significance, 100);
   assert.equal(out.scores.credibility, 100);
-  assert.deepEqual(out.tags, ['可回收火箭', '回收', '试验成功', '满分']);
+  // 伪造的“试验成功”“满分”不在标签白名单内，落库前即被丢弃
+  assert.deepEqual(out.tags, ['可回收火箭']);
   // 但代码侧的可信门槛不看模型脸色：T2 单源没有多源印证，突破加成必须为 0
   assert.equal(out.breakthroughBonus, 0, '满分 + 伪造 tags 也换不来突破加成');
   assert.equal(out.breakthroughScore, 0);

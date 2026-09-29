@@ -27,7 +27,9 @@ index.html（Aqua 指挥舱静态外壳，25 条 <script src>，预算已用尽�
     │
     ├── 功能控制器层（一个视图/一条职责链一个工厂）
     │   ├── feed-controller.js          loadFeed/分页/哨兵预取 + 卡片交互委托/toggleStar
-    │   ├── daily-view-controller.js    日报导航/重生成
+    │   ├── daily-view-controller.js    日报 / 周报 / 月报切换、翻期与重生成
+    │   ├── intel-views.js              v0.2.0 单一脚本边界：IntelRender（热点、一级市场、刊期版块、
+    │   │                               精选标准的纯函数渲染）+ HotViewController + CapitalViewController
     │   ├── sources-controller.js       信源增删与软停用
     │   ├── search-controller.js        检索防抖 + 词库面板
     │   ├── common-links-controller.js  常用网址渲染与焦点恢复

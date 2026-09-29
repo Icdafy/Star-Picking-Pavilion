@@ -56,11 +56,12 @@ function item(id, patch = {}) {
 
 // ---------- 模板与渲染器依赖护栏 ----------
 
-test('index.html 内置卡片模板且仅允许已审计的 26 个脚本边界', () => {
+test('index.html 内置卡片模板且仅允许已审计的 27 个脚本边界', () => {
   assert.match(pageHtml, /<template id="cardTemplate">/, '卡片模板必须落在 index.html');
-  // v0.1.0.1 的第 26 个边界是独立、可审计的 DSH Aqua 图形引擎。
+  // v0.1.0.1 的第 26 个边界是独立、可审计的 DSH Aqua 图形引擎；
+  // v0.2.0 的第 27 个是合并后的情报视图 intel-views.js（热点、一级市场与表示层）。
   const scriptCount = [...pageHtml.matchAll(/<script\b/gi)].length;
-  assert.ok(scriptCount <= 26, `脚本标签已有 ${scriptCount} 个，上限 26 个`);
+  assert.ok(scriptCount <= 27, `脚本标签已有 ${scriptCount} 个，上限 27 个`);
   const { template } = makeRenderer();
   const card = template.content.firstElementChild;
   assert.equal(card.tagName, 'article');

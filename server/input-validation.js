@@ -112,7 +112,9 @@ function parseFeedQuery(query, categories) {
   if (!/^\d+$/.test(rawPage)) badRequest('页码必须是非负整数');
   const page = Number(rawPage);
   if (!Number.isSafeInteger(page) || page > 10_000) badRequest('页码超出允许范围');
-  return { view, domain, category, search, page };
+  const company = query.get('company') || '';
+  if (company && !/^(?:u-[0-9a-f]{10}|[a-z0-9-]{2,48})$/.test(company)) badRequest('公司编号无效');
+  return { view, domain, category, search, page, company };
 }
 
 // 日期只允许落在 2020-01-01 至明天之间：更早的数据不属于本产品，

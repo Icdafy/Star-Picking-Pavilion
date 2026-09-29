@@ -21,6 +21,46 @@ function writeSettings(baseUrl) {
   }, null, 2));
 }
 
+// v0.2.0：请求按系统提示词归类（预筛 / 两次独立评分 / 内容理解 / 事件修复 / 归组）
+function classify(system) {
+  if (system.includes('事件注意力评分器')) return 'scoring';
+  if (system.includes('相关性预筛')) return 'prefilter';
+  if (system.includes('内容理解编辑')) return 'understand';
+  if (system.includes('原子事件提取器')) return 'timing';
+  if (system.includes('归组判断员')) return 'group';
+  return 'other';
+}
+
+const LEGACY_ITEM_TYPES = {
+  政策法规: 'policy_regulation', 资本市场: 'financing_capital', 发射与任务: 'launch_flight',
+  技术研发: 'tech_breakthrough', 应用场景: 'commercial_order', 企业动态: 'industry_move', 观点报告: 'research_opinion'
+};
+
+// 场景仍用 v0.1.x 的桩响应形状书写（rel、五维 scores、summary/reason）：这里翻译成新管线的契约，
+// 让同一批失败语义场景（序号异常、毒丸、并发、注入）继续覆盖新管线
+function adaptLegacy(kind, content) {
+  let json;
+  try { json = JSON.parse(content); } catch { return content; }
+  if (kind === 'prefilter' && Array.isArray(json?.results) && json.results.some(r => r && 'rel' in r)) {
+    return JSON.stringify({ results: json.results.map(r => {
+      const { rel, ...rest } = r || {};
+      return { ...rest, label: rel ? 'PASS' : 'BLOCK' };
+    }) });
+  }
+  if (json && typeof json.scores === 'object' && json.scores) {
+    const itemType = LEGACY_ITEM_TYPES[json.category] || 'industry_move';
+    const axis = key => Math.round((Number(json.scores[key]) || 0) / 10);
+    if (kind === 'scoring') {
+      return JSON.stringify({ itemType, sig: axis('importance'), nov: axis('novelty'), cred: axis('credibility'), reson: axis('impact'), act: axis('timeliness') });
+    }
+    if (kind === 'understand') {
+      return JSON.stringify({ itemType, authorRole: 'relayer', tags: json.tags || [], titleZh: '', summaryZh: json.summary || '',
+        editorialJudgment: json.reason || '', subjects: [], fact: null, entities: json.entities || [], events: json.events || [], deal: null });
+    }
+  }
+  return content;
+}
+
 // 桩端点：handler(record, callIndex) 返回 { content } 或 { status, body }；
 // handler 可为 async（并发场景靠小延迟制造真实交错）
 function startStub(handler) {
@@ -32,7 +72,9 @@ function startStub(handler) {
       let payload = null;
       try { payload = JSON.parse(body); } catch {}
       const system = String(payload?.messages?.[0]?.content || '');
-      const record = { kind: system.includes('预筛员') ? 'prefilter' : 'scoring', payload };
+      const kind = classify(system);
+      // 老场景只区分预筛与“其余”：评分与内容理解都走场景里的评分响应
+      const record = { kind, legacyKind: kind === 'prefilter' ? 'prefilter' : 'scoring', payload };
       requests.push(record);
       let out;
       try {
@@ -48,7 +90,7 @@ function startStub(handler) {
         return;
       }
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ choices: [{ message: { content: out.content } }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: adaptLegacy(kind, out.content) } }] }));
     });
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
@@ -202,7 +244,7 @@ async function scenarioScoringFailure() {
 async function scenarioPrefilterBadIndex() {
   let prefilterCalls = 0;
   const stub = await startStub(({ kind }) => {
-    if (kind === 'scoring') return ok(VALID_SCORING);
+    if (kind !== 'prefilter') return ok(VALID_SCORING);
     prefilterCalls++;
     const rel = { rel: true, d: 'B' };
     if (prefilterCalls === 1) return ok({ results: [{ i: 0, ...rel }, { i: 1, ...rel }] });      // 缺 i=2
@@ -412,7 +454,7 @@ async function scenarioStateIrrelevant() {
 async function scenarioFailureRecover() {
   let prefilterCalls = 0;
   const stub = await startStub(({ kind }) => {
-    if (kind === 'scoring') return ok(VALID_SCORING);
+    if (kind !== 'prefilter') return ok(VALID_SCORING);
     prefilterCalls++;
     // 第一轮：非审核类 400 → 首次调用失败，删参兜底重发再撞一次 400 也失败（不写终态）
     if (prefilterCalls <= 2) return httpError(400, '{"error":"boom"}');
@@ -442,7 +484,7 @@ async function scenarioFailureRecover() {
 async function scenarioEventKeyPoisoning() {
   const { db, closeDatabase } = require(serverModule('db'));
   const { rescoreAfterClustering } = require(serverModule('ai', 'pipeline'));
-  const { clusterRecent } = require(serverModule('ai', 'cluster'));
+  const { groupPending } = require(serverModule('ai', 'stories'));
   const t1Source = insertSource(db, '官方试验平台', 'T1');
   const t2Source = insertSource(db, '地方快讯号', 'T2');
   const stamp = new Date().toISOString();
@@ -479,8 +521,8 @@ async function scenarioEventKeyPoisoning() {
   // 聚类前：T2 单源，可信门槛拦下，加成为 0
   rescoreAfterClustering();
   const before = { t2: bonusOf(t2Id) };
-  // 跑真实聚类：事件键通道是否把两条毫不相干的内容并簇
-  clusterRecent();
+  // 跑真实事件归组：事件键通道是否把两条毫不相干的内容归进同一事件（无 Key，灰区不合并）
+  await groupPending({});
   const t1Cluster = articleRow(db, t1Id).cluster_id;
   const t2Cluster = articleRow(db, t2Id).cluster_id;
   rescoreAfterClustering();
