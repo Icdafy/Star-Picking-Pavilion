@@ -34,9 +34,17 @@ test('external source creation and import are usable in the real Electron UI', {
     await app.evaluate(({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setContentSize(width, 920), width);
     // Electron 的窗口 IPC 返回时，渲染进程的 resize 事件可能尚未生效。
     await page.waitForFunction(width => innerWidth === width && innerHeight === 920, width);
-    const bounds = await page.locator('#ingestDialog').boundingBox();
-    // 模态框相对可视区居中；信源列表较长时页面有纵向滚动条，可视宽度 = clientWidth（不含滚动条）
-    const visible = await page.evaluate(() => document.documentElement.clientWidth);
+    // 模态框相对可视区居中；信源列表较长时页面有纵向滚动条，可视宽度 = clientWidth（不含滚动条）。
+    // 滚动条可能在信源列表异步渲染完之后才出现，所以对话框位置与可视宽度必须在同一帧里量，
+    // 并等到两者一致（慢速运行器上分两次量会差出半个滚动条宽）。
+    await page.waitForFunction(() => {
+      const rect = document.querySelector('#ingestDialog').getBoundingClientRect();
+      return Math.abs(rect.left + rect.width / 2 - document.documentElement.clientWidth / 2) < 2;
+    }).catch(() => {});
+    const { bounds, visible } = await page.evaluate(() => {
+      const rect = document.querySelector('#ingestDialog').getBoundingClientRect();
+      return { bounds: { x: rect.left, y: rect.top, width: rect.width, height: rect.height }, visible: document.documentElement.clientWidth };
+    });
     assert.ok(visible <= width && visible >= width - 24, `visible width ${visible} within ${width}`);
     assert.ok(Math.abs(bounds.x + bounds.width / 2 - visible / 2) < 2, `dialog stays centered in ${width}px: ${JSON.stringify(bounds)}`);
     assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 920, 'dialog stays in viewport');

@@ -289,6 +289,11 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   // 复现用户截图的长列表滚动状态：塔台不得钻入原生标题栏，日期标题应在
   // 塔台之后吸附，并且日期内容只是紧凑的液态玻璃胶囊而非整条实色块。
   await page.locator('.tab[data-view="featured"]').click();
+  // 等切换触发的信息流加载落定（骨架屏退场）再注入示例分组，否则加载完成时的整表调和会把它换掉
+  await page.waitForFunction(() => {
+    const list = document.querySelector('#feedList');
+    return list && list.children.length > 0 && !list.querySelector('.skeleton');
+  });
   await page.evaluate(() => {
     const list = document.querySelector('#feedList');
     const group = document.createElement('div');
