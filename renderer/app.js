@@ -696,6 +696,84 @@ $('#btnRefresh').addEventListener('click', async function () {
   }
 });
 
+// ---------- 命令面板（v0.2.4，Ctrl+K） ----------
+// 命令目录在这里声明：视图跳转取自侧栏标签（名称与顺序只有一个来源），操作复用现有按钮与回调。
+// aliases 收拼音全拼、首字母与英文，让「jx」「ribao」「model」都能命中。
+const VIEW_ALIASES = {
+  featured: ['jingxuan', 'jx', 'featured', 'picks'],
+  hot: ['redian', 'rd', 'hot', 'trending', '热门'],
+  capital: ['yijishichang', 'yjsc', 'capital', 'market', 'rongzi', '融资', '投融资', 'ipo'],
+  all: ['quanbudongtai', 'qbdt', 'all', 'feed', 'dongtai'],
+  starred: ['xingbiao', 'xb', 'starred', 'shoucang', '收藏'],
+  daily: ['qingbaoribao', 'qbrb', 'ribao', 'rb', 'daily', 'zhoubao', 'yuebao', '周报', '月报'],
+  links: ['changyongwangzhi', 'cywz', 'links', 'wangzhi', '网址导航'],
+  sources: ['xinyuan', 'xy', 'sources', 'rss', '信源监控'],
+  settings: ['shezhi', 'sz', 'settings', 'moxing', 'model', '模型', 'api', '密钥', 'deepseek']
+};
+const VIEW_GO_KEYS = Object.fromEntries(Object.entries(Shortcuts.GO_KEYS).map(([key, view]) => [view, key]));
+const exportKind = () => (FEED_VIEWS.includes(state.view) ? 'feed' : state.view === 'daily' ? 'daily' : null);
+function paletteCommands() {
+  const views = $$('.tab').map((tab, index) => {
+    const view = tab.dataset.view;
+    const go = VIEW_GO_KEYS[view];
+    return {
+      id: `view:${view}`, group: '跳转',
+      // 只取文字节点：星标标签里的计数角标不进命令名
+      label: [...tab.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join('').trim(),
+      detail: view === state.view ? '当前视图' : '',
+      keys: go ? ['G', go.toUpperCase()] : index < 8 ? ['Alt', String(index + 1)] : [],
+      aliases: VIEW_ALIASES[view] || [view],
+      run: () => switchView(view)
+    };
+  });
+  const actions = [
+    { id: 'refresh', label: '立即采集分析', keys: ['Alt', 'R'], aliases: ['caiji', 'cj', 'shuaxin', 'sx', 'refresh', '刷新'], run: () => $('#btnRefresh').click() },
+    { id: 'realtime', label: $('#btnRealtime').getAttribute('aria-pressed') === 'true' ? '暂停实时更新' : '恢复实时更新', aliases: ['shishi', 'ss', 'realtime', 'live', '实时'], run: () => $('#btnRealtime').click() },
+    { id: 'theme', label: '切换浅色 / 深色主题', keys: ['Alt', 'T'], aliases: ['zhuti', 'zt', 'theme', 'dark', 'light', '深色', '浅色', '宣纸白', '深空夜航'], run: () => toggleTheme() },
+    { id: 'search', label: '聚焦检索框', keys: ['/'], aliases: ['jiansuo', 'js', 'sousuo', 'search'], run: () => { $('#searchInput').focus(); $('#searchInput').select(); } },
+    { id: 'lexicon', label: '打开核心词库', keys: ['Alt', 'K'], aliases: ['ciku', 'ck', 'lexicon', '词库'], run: () => setLexiconOpen(true) },
+    { id: 'copy', label: state.view === 'daily' ? '复制整份日报' : '复制当前列表', keys: ['Alt', 'C'], aliases: ['fuzhi', 'fz', 'copy'], available: () => Boolean(exportKind()), run: () => runExport(exportKind(), 'text', 'copy') },
+    { id: 'export', label: state.view === 'daily' ? '导出日报为 Markdown' : '导出当前列表为 Markdown', aliases: ['daochu', 'dc', 'export', 'md', 'markdown'], available: () => Boolean(exportKind()), run: () => runExport(exportKind(), 'markdown', 'download') },
+    { id: 'add-source', label: '提报信源', aliases: ['tibaoxinyuan', 'tbxy', 'add source', '新增信源', '添加信源'], run: () => { switchView('sources'); $('#btnAddSource').click(); } },
+    { id: 'add-company', label: '收录公司', aliases: ['shoulugongsi', 'slgs', 'add company', '新增公司', '添加公司'], run: () => { switchView('capital'); $('#btnAddCompany').click(); } },
+    { id: 'zoom-in', label: '放大界面', keys: ['Ctrl', '+'], aliases: ['fangda', 'fd', 'zoom in', 'suofang'], run: () => stepTextScale(1) },
+    { id: 'zoom-out', label: '缩小界面', keys: ['Ctrl', '−'], aliases: ['suoxiao', 'sx', 'zoom out', 'suofang'], run: () => stepTextScale(-1) },
+    { id: 'zoom-reset', label: '恢复标准缩放', keys: ['Ctrl', '0'], aliases: ['biaozhun', 'bz', 'reset zoom', 'suofang'], run: () => { applyTextScale('md'); toast('界面缩放：标准'); } },
+    { id: 'top', label: '回到顶部', keys: ['Home'], aliases: ['huidaodingbu', 'hddb', 'top', 'dingbu'], run: scrollToTop }
+  ].map(command => ({ group: '操作', ...command }));
+  const browsing = [
+    { id: 'kbd-next', label: '逐条浏览：下一条 / 上一条', keys: ['J', 'K'], aliases: ['jk', 'next', 'liulan'], run: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })) },
+    { id: 'kbd-open', label: '打开焦点条目的原文', keys: ['O'], aliases: ['dakai', 'open', 'yuanwen'], run: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'o' })) },
+    { id: 'kbd-star', label: '星标焦点条目', keys: ['S'], aliases: ['xingbiao', 'star'], run: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 's' })) }
+  ].map(command => ({ group: '键盘浏览', ...command }));
+  return [...views, ...actions, ...browsing];
+}
+let paletteStorage = null;
+try { paletteStorage = window.localStorage; } catch { /* 隐私模式等场景下拿不到，面板照常工作 */ }
+const commandPalette = Shortcuts.createCommandPalette({
+  document,
+  dialog: $('#commandPalette'),
+  input: $('#paletteInput'),
+  list: $('#paletteList'),
+  getCommands: paletteCommands,
+  storage: paletteStorage,
+  onSearch: text => {
+    const input = $('#searchInput');
+    input.value = text;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+});
+$('#btnPalette').addEventListener('click', () => commandPalette.open());
+
+// J / K 可导航的条目：信息流卡片（不含骨架与关联报道里的嵌套项）与热点事件
+function keyboardNavItems() {
+  if (FEED_VIEWS.includes(state.view)) {
+    return $$('#feedList .card').filter(card => !card.classList.contains('skeleton') && !card.closest('.cluster-items'));
+  }
+  if (state.view === 'hot') return $$('#viewHot .hot-item');
+  return [];
+}
+
 // ---------- 键盘快捷键（批 2 拆入 renderer/shortcuts.js） ----------
 Shortcuts.createShortcuts({
   document, state, FEED_VIEWS,
@@ -704,7 +782,9 @@ Shortcuts.createShortcuts({
   scrollToTop, runExport,
   clickRefresh: () => $('#btnRefresh').click(),
   searchInput: $('#searchInput'), clearSearch,
-  lexiconPanel: $('#lexiconPanel'), lexiconToggle: $('#btnLexicon'), setLexiconOpen
+  lexiconPanel: $('#lexiconPanel'), lexiconToggle: $('#btnLexicon'), setLexiconOpen,
+  palette: commandPalette,
+  getNavItems: keyboardNavItems
 });
 
 // ---------- 滚动态：导航加重、回到顶部 ----------

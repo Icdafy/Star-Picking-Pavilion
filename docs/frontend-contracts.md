@@ -284,7 +284,7 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
   `#btnTestModel`、`#modelTestResult`（role=status）、`.model-row[data-provider]`（`.model-dot.is-ok/is-missing/is-local`）、
   `[data-models-act]` 动作、`[data-models-field]` 字段；勾选弹窗 `#modelPickerDialog`。密钥框为 password 且从不回填。
 - 不得出现 `setPrefilterModel` / `setScoringModel` / `setModel` / `setApiKey`；不得出现含 `deepseek-v4-pro` 的 placeholder/value
-- 预筛、图文、原子事件和日报共用一个分析模型（默认 `deepseek-v4-flash-vision-exp`）；未声明图片输入的模型跳过图文理解。
+- 预筛、图文、原子事件和日报共用一个分析模型（默认 `deepseek-flash`，即 DeepSeek V4.1 Flash）；未声明图片输入的模型跳过图文理解。
 - 新闻右上角 `.event-time-badge` 显示“当日报道／事后 N 天报道／计划事件／延期／暂停／事件日期待确认／报道日期待确认”。API 提供 `eventDate`、`reportedAt`、`reportDelayDays`、`timingStatus`（`dated/planned/postponed/unknown`）、独立的 `eventStatus` 和 `timingReason`；悬停解释证据缺失原因。卡片 `.meta-time` 使用报道发布时间，未知时明确提示；时间轴分组仍跟随事件日期优先的排序口径。
 - 每张新闻只展示一个 `.card-thumb` 右侧缩略图，优先使用视觉筛选结果；不再有下方图片证据区。
 - `id="setCloseToTray"`、`id="setLaunchAtLogin"`：`type="checkbox"` 且 `role="switch"`
@@ -768,7 +768,7 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 | 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| 页面实际加载的全部本地 CSS | ≈ 295,000 B（约 288 KiB，含字体分片索引、v0.2.0 intel.css 与 v0.2.3 模型设置） | ≤ 292 KiB |
+| 页面实际加载的全部本地 CSS | ≈ 293,000 B（约 286 KiB，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置与 v0.2.4 命令面板） | ≤ 292 KiB |
 | index.html `<script>` 标签总数 | 27（v0.2.0 新增合并后的 intel-views.js） | ≤ 27 |
 | 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
@@ -808,6 +808,11 @@ Models 页（提供商行、编辑卡、模型目录编辑器、添加卡分段�
 末尾的「v0.2.3 模型设置」区段；可读性与动效升级约 3 KiB。脚本**没有**新增：模型设置按「设置表单」职责并入
 既有的 `settings-form-controller.js`。新动效全部复用既有关键帧（card-in、spin、shimmer）或走
 transition / @starting-style / View Transitions，关键帧总数不变。
+
+v0.2.4 说明（预算不上调：CSS 仍 ≤ 292 KiB，脚本 27/27，关键帧 20/20，backdrop-filter 9/10）：命令面板与键盘
+浏览样式约 3.4 KiB，集中在 styles.css 的「v0.2.4 命令面板」区段，复用 `.glass-dialog` 的材质与开合过渡，
+不新增关键帧与滤镜；腾挪空间来自字体分片索引的无损压缩（去掉逐块注释与缩进，声明逐字不变，约 −5.6 KiB）。
+行为并入既有的 `shortcuts.js`（`createCommandPalette` / `rankCommands`），不新增脚本标签。
 
 说明：阶段 4 起 feed 整表赋值的 3 个落点分别是 骨架屏、空态、失败态；
 正常数据整表重载改走 keyed diff 调和（`diff.reconcile`），分页追加走

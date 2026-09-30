@@ -16,8 +16,8 @@ const { mostRecentDueDate } = require('../../electron/daily-archive');
 const projectRoot = path.join(__dirname, '..', '..');
 const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
 const DUMMY_API_KEY = 'sk-e2e-dummy-secret';
-// 默认分析模型：DeepSeek V4 Flash Vision；v0.2.3 起经设置页「模型」一节配置提供商
-const ANALYSIS_MODEL = 'deepseek-v4-flash-vision-exp';
+// 默认分析模型：DeepSeek V4.1 Flash；v0.2.3 起经设置页「模型」一节配置提供商
+const ANALYSIS_MODEL = 'deepseek-flash';
 const DEEPSEEK_SAVE_PATH = '/api/models/providers/deepseek';
 const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
 const MAX_GRACEFUL_CLOSE_MS = 4_000;

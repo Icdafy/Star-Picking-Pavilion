@@ -9,7 +9,7 @@ function settings(baseUrl = 'https://models.example/v1') {
   return { ai: { apiKey: 'sk-test-only', baseUrl, requestTimeoutMs: 1000 } };
 }
 
-test('requests use the model selected in settings, defaulting to Flash Vision', async () => {
+test('requests use the model selected in settings, defaulting to V4.1 Flash', async () => {
   const payloads = [];
   const fetchImpl = async (url, options) => { payloads.push(JSON.parse(options.body)); return response(); };
   await chat([{role:'user',content:'test'}], { settings: settings(), fetchImpl });
@@ -17,7 +17,7 @@ test('requests use the model selected in settings, defaulting to Flash Vision', 
     settings: {...settings(), ai: {...settings().ai, model:'moonshot-v1-8k'}}, fetchImpl
   });
   await chat([{role:'user',content:'test'}], { settings: settings(), model: 'explicit-model', fetchImpl });
-  assert.deepEqual(payloads.map(payload => payload.model), ['deepseek-v4-flash-vision-exp', 'moonshot-v1-8k', 'explicit-model']);
+  assert.deepEqual(payloads.map(payload => payload.model), ['deepseek-flash', 'moonshot-v1-8k', 'explicit-model']);
 });
 
 test('thinking extensions are only sent to DeepSeek; keyless local endpoints send no Authorization', async () => {

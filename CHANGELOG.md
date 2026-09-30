@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-01
+
+### DeepSeek V4.1 Flash
+
+- DeepSeek 于 2026-09-10 发布 V4.1 Flash，官方模型 ID 为 `deepseek-flash`；V4 Flash 与 V4 Flash Vision Exp 已退役（旧名暂由官方路由到 V4.1 Flash）。设置 → 模型里找不到 V4.1 Flash 的原因是内置目录仍只登记了退役的 `deepseek-v4-flash-vision-exp`。
+- DeepSeek 内置目录改为 `deepseek-flash`（DeepSeek V4.1 Flash，图文，1M 上下文 / 384K 输出，默认分析模型）与 `deepseek-v4-pro`（文本）；与 DeepSeek `/models` 实际返回一致。
+- 退役 ID 自动迁移：`deepseek-v4-flash`、`deepseek-v4-flash-vision-exp`、`deepseek-chat`、`deepseek-reasoner` 在读取设置时改指 `deepseek-flash`，用户自定义的 DeepSeek 模型目录里的同名行一并改名去重。
+
+### 命令面板与键盘优先
+
+- Ctrl+K 命令面板（参照 Linear / Raycast / Vercel）：跳转视图、执行操作（采集、实时开关、主题、词库、复制 / 导出、提报信源、收录公司、缩放、回顶）与情报库检索共用一个入口；中文名、拼音全拼、首字母与英文别名命中；无命中时回车即检索；最近使用置顶（本机 localStorage）。ARIA combobox + listbox，`aria-activedescendant` 跟随高亮；输入法选词时方向键与回车不被面板截获。
+- `G` + 字母跳转视图（F 精选、H 热点、C 一级市场、A 全部、S 星标、D 日报、L 网址、R 信源、逗号 设置），1.5 秒时间窗；`?` 打开面板。
+- `J` / `K` 在信息流卡片与热点事件间移动焦点（强调色描边、滚动避开粘顶壳层），`O` / Enter 打开原文、`S` 星标、`C` 复制、`E` 展开关联。
+- 侧栏标签悬停提示列出跳转序列与 Alt 数字键；设置页快捷键速查表更新（Alt 数字键实为 1–8）；顶栏新增命令面板入口按钮。
+- 性能预算不上调：字体分片索引无损压缩腾出约 5.6 KiB，命令面板样式约 3.4 KiB；脚本 27/27、关键帧 20/20、backdrop-filter 9/10。
+
 ## [0.2.3] - 2026-09-30
 
 ### 模型设置（照搬 DeepSeek Harness Models 页）

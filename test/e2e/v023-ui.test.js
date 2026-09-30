@@ -133,7 +133,7 @@ test('models settings: declare a custom API, fetch and adopt models, select, tes
   assert.match(await page.locator('#confirmDialogMessage').textContent(), /移除其配置和存储的 API 密钥/);
   await page.locator('#confirmDialogOk').click();
   await row.waitFor({ state: 'detached' });
-  await page.waitForFunction(() => document.querySelector('#modelsActiveSelect')?.value === 'deepseek|deepseek-v4-flash-vision-exp');
+  await page.waitForFunction(() => document.querySelector('#modelsActiveSelect')?.value === 'deepseek|deepseek-flash');
   await confirm.waitFor({ state: 'hidden' });
 
   // 主题切换：圆形揭开结束后 data-theme 落定，揭开用的临时类被移除

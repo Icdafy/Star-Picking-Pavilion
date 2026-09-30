@@ -3,7 +3,7 @@
 const { DEFAULT_MODEL } = require('./model-catalog');
 
 // v0.2.3 起分析模型由设置页「模型」一节选定（提供商 + 模型 ID），每个任务都用同一个；
-// 未配置时仍是 DeepSeek V4 Flash Vision。
+// 未配置时是 DeepSeek V4.1 Flash（deepseek-flash）。
 const VISION_MODEL = DEFAULT_MODEL;
 function modelFor(settings) {
   const model = settings?.ai?.model;

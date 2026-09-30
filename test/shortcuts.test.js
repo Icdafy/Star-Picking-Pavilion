@@ -160,3 +160,130 @@ test('isTypingTarget 覆盖 input/textarea/select/contenteditable', () => {
   assert.equal(sc.isTypingTarget({ tagName: 'BUTTON' }), false);
   assert.equal(sc.isTypingTarget(null), false);
 });
+
+// —— v0.2.4 命令面板与键盘优先层 ——
+const { rankCommands, scoreCommand, GO_KEYS } = require('../renderer/shortcuts');
+
+const COMMANDS = [
+  { id: 'view:featured', group: '跳转', label: '精选', aliases: ['jingxuan', 'jx', 'featured'] },
+  { id: 'view:daily', group: '跳转', label: '情报日报', aliases: ['qingbaoribao', 'qbrb', 'ribao', 'rb', 'daily'] },
+  { id: 'view:settings', group: '跳转', label: '设置', aliases: ['shezhi', 'sz', 'model', '模型'] },
+  { id: 'theme', group: '操作', label: '切换浅色 / 深色主题', aliases: ['zhuti', 'theme', '宣纸白'] },
+  { id: 'copy', group: '操作', label: '复制当前列表', aliases: ['copy'], available: () => false }
+];
+
+test('命令排序：中文名、拼音全拼、首字母、英文别名都能命中，名称前缀优先', () => {
+  assert.equal(rankCommands(COMMANDS, '日报')[0].id, 'view:daily');
+  assert.equal(rankCommands(COMMANDS, 'rb')[0].id, 'view:daily');
+  assert.equal(rankCommands(COMMANDS, 'ribao')[0].id, 'view:daily');
+  assert.equal(rankCommands(COMMANDS, 'jx')[0].id, 'view:featured');
+  assert.equal(rankCommands(COMMANDS, 'Model')[0].id, 'view:settings');
+  assert.equal(rankCommands(COMMANDS, '主题')[0].id, 'theme');
+  assert.equal(rankCommands(COMMANDS, '宣纸')[0].id, 'theme');
+  assert.deepEqual(rankCommands(COMMANDS, '完全不相关的词'), []);
+  assert.ok(scoreCommand(COMMANDS[1], '情报日报') > scoreCommand(COMMANDS[1], '日报'));
+});
+
+test('命令排序：不可用的命令不出现；空查询保留原序并把最近使用提到最前', () => {
+  assert.equal(rankCommands(COMMANDS, 'copy').length, 0);
+  const ranked = rankCommands(COMMANDS, '', ['theme']);
+  assert.deepEqual(ranked.map(command => command.id), ['theme', 'view:featured', 'view:daily', 'view:settings']);
+  assert.equal(ranked[0].group, '最近使用');
+});
+
+function makePalette() {
+  const calls = { toggle: 0, open: [] };
+  let open = false;
+  return {
+    calls,
+    palette: {
+      toggle() { calls.toggle++; open = !open; },
+      open(query) { calls.open.push(query); open = true; },
+      isOpen: () => open
+    }
+  };
+}
+
+test('Ctrl+K 打开命令面板，输入框里也生效；面板开着时其它快捷键不触发', () => {
+  const input = { tagName: 'INPUT', isContentEditable: false };
+  const { palette, calls: paletteCalls } = makePalette();
+  const { env, calls, searchInput } = makeEnv({ activeElement: input, extra: { palette } });
+  createShortcuts(env);
+  const ev = env.document.keydown({ key: 'k', ctrlKey: true });
+  assert.equal(paletteCalls.toggle, 1);
+  assert.equal(ev.defaultPrevented, true);
+  assert.equal(searchInput.focused, undefined, '有面板时 Ctrl+K 不再只是聚焦检索框');
+  env.document.keydown({ key: 't', altKey: true });
+  assert.equal(calls.toggleTheme, 0, '面板开着时键盘归面板');
+  env.document.keydown({ key: 'K', ctrlKey: true });
+  assert.equal(paletteCalls.toggle, 2, '再按一次 Ctrl+K 收起');
+});
+
+test('G 然后字母跳转视图，超时或未知字母不跳；? 打开面板', () => {
+  let clock = 0;
+  const tabs = Object.values(GO_KEYS).map(view => ({ dataset: { view } }));
+  const { palette, calls: paletteCalls } = makePalette();
+  const { env, calls } = makeEnv({ tabs, extra: { palette, now: () => clock } });
+  createShortcuts(env);
+  env.document.keydown({ key: 'g' });
+  env.document.keydown({ key: 'd' });
+  assert.deepEqual(calls.switchView, [['daily', undefined]]);
+  env.document.keydown({ key: 'g' });
+  clock += 5000;
+  env.document.keydown({ key: 'h' });
+  assert.equal(calls.switchView.length, 1, '超过时间窗的第二键不再触发跳转');
+  env.document.keydown({ key: 'g' });
+  env.document.keydown({ key: 'z' });
+  assert.equal(calls.switchView.length, 1);
+  env.document.keydown({ key: 'g' });
+  env.document.keydown({ key: ',' });
+  assert.deepEqual(calls.switchView.at(-1), ['settings', undefined]);
+  env.document.keydown({ key: '?' });
+  assert.deepEqual(paletteCalls.open, ['']);
+  assert.deepEqual(new Set(Object.values(GO_KEYS)).size, Object.keys(GO_KEYS).length, '每个视图只占一个键');
+});
+
+test('J / K 在条目间移动焦点，O / S / C / E 作用于焦点条目，正在输入时不劫持', () => {
+  const clicks = [];
+  const makeItem = id => {
+    const controls = {};
+    const item = {
+      id,
+      attrs: {},
+      hasAttribute(name) { return name in this.attrs; },
+      setAttribute(name, value) { this.attrs[name] = value; },
+      focus() { env.document.activeElement = item; },
+      scrollIntoView() {},
+      contains: node => node === item,
+      querySelector(selector) {
+        return controls[selector] ||= { click: () => clicks.push([id, selector]) };
+      }
+    };
+    return item;
+  };
+  const items = [makeItem('a'), makeItem('b'), makeItem('c')];
+  const { env } = makeEnv({ extra: { getNavItems: () => items } });
+  createShortcuts(env);
+  env.document.keydown({ key: 'j' });
+  assert.equal(env.document.activeElement, items[0]);
+  assert.equal(items[0].attrs.tabindex, '-1', '条目按需变为可编程聚焦');
+  env.document.keydown({ key: 'j' });
+  env.document.keydown({ key: 'j' });
+  env.document.keydown({ key: 'j' });
+  assert.equal(env.document.activeElement, items[2], '到底后停在最后一条');
+  env.document.keydown({ key: 'k' });
+  assert.equal(env.document.activeElement, items[1]);
+  env.document.keydown({ key: 'o' });
+  env.document.keydown({ key: 'Enter' });
+  env.document.keydown({ key: 's' });
+  env.document.keydown({ key: 'c' });
+  env.document.keydown({ key: 'e' });
+  assert.deepEqual(clicks.map(([id]) => id), ['b', 'b', 'b', 'b', 'b']);
+  assert.deepEqual(clicks.map(([, selector]) => selector), [
+    '.card-title, .hot-title a', '.card-title, .hot-title a', '[data-act="star"]', '[data-act="copy"]',
+    '.cluster-toggle, [data-act="story"], .dims-toggle'
+  ]);
+  env.document.activeElement = { tagName: 'INPUT' };
+  env.document.keydown({ key: 'j' });
+  assert.equal(env.document.activeElement.tagName, 'INPUT');
+});

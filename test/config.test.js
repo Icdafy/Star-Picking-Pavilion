@@ -107,7 +107,10 @@ test('editable settings reject invalid numeric, URL, and model values', () => {
     () => applySettingsPatch(current, { ai: { model: 'deepseek-v4-flash' } }),
     /不在「DeepSeek」的模型目录中/
   );
-  assert.throws(() => applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }), /模型目录/);
+  assert.throws(() => applySettingsPatch(current, { ai: { model: 'deepseek-v4.1-flash' } }), /模型目录/);
+  // V4.1 Flash 与 V4 Pro 是 DeepSeek 内置目录里的现行模型
+  assert.equal(applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }).settings.ai.model, 'deepseek-v4-pro');
+  assert.equal(applySettingsPatch(current, { ai: { model: 'deepseek-flash' } }).settings.ai.model, 'deepseek-flash');
 
   const valid = applySettingsPatch(current, {
     collect: { intervalMinutes: 30, rsshubBase: 'https://rsshub.example/' }
@@ -136,9 +139,9 @@ test('loading a malformed legacy settings file normalizes scheduler and request 
   assert.equal(loaded.dailyReportHour, 8);
   assert.equal(loaded.ai.requestTimeoutMs, 60000);
   assert.equal(loaded.ai.maxBatchPrefilter, 20);
-  // 旧库的两段式模型字段被收敛：prefilterModel 是空串、scoringModel 是已退役的 v4-pro，
-  // 两个都不可用，于是回落到默认模型而不是把 pro 带进新版本
-  assert.equal(loaded.ai.model, 'deepseek-v4-flash-vision-exp');
+  // 旧库的两段式模型字段被收敛：prefilterModel 是空串、scoringModel 是两段式时代的旧字段（值为 v4-pro），
+  // 两个字段都不再受理，于是回落到默认模型而不是把 pro 带进新版本
+  assert.equal(loaded.ai.model, 'deepseek-flash');
   assert.equal(Object.hasOwn(loaded.ai, 'prefilterModel'), false);
   assert.equal(Object.hasOwn(loaded.ai, 'scoringModel'), false);
   assert.equal(loaded.collect.intervalMinutes, 10);
@@ -199,4 +202,23 @@ test('loadScoring/loadBreakthroughs 解析失败时返回缓存或内置默认�
   assert.ok(breakthroughs && typeof breakthroughs === 'object');
   assert.ok(Number.isFinite(Number(breakthroughs.maxBonus)));
   assert.ok(Array.isArray(breakthroughs.eligibleCategories));
+});
+
+test('retired DeepSeek model IDs are upgraded to V4.1 Flash on load', async () => {
+  await fs.promises.writeFile(SETTINGS_PATH, JSON.stringify({
+    ai: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' }
+  }), 'utf8');
+  assert.equal(loadSettings().ai.model, 'deepseek-flash');
+
+  await fs.promises.writeFile(SETTINGS_PATH, JSON.stringify({
+    ai: {
+      activeProvider: 'deepseek',
+      model: 'deepseek-v4-flash-vision-exp',
+      providers: { deepseek: { models: [{ id: 'deepseek-v4-flash-vision-exp', input: ['text', 'image'] }, { id: 'deepseek-v4-flash' }] } }
+    }
+  }), 'utf8');
+  const loaded = loadSettings();
+  assert.equal(loaded.ai.model, 'deepseek-flash');
+  assert.deepEqual(loaded.ai.providers.deepseek.models.map(model => model.id), ['deepseek-flash']);
+  assert.deepEqual(loaded.ai.modelInput, ['text', 'image']);
 });

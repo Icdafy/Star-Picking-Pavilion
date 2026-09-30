@@ -1014,7 +1014,7 @@ test('快捷键随第八个视图扩展，并新增复制当前视图', () => {
   // 批 2：键盘快捷键迁到 renderer/shortcuts.js
   assert.match(shortcutsSource, /const tabIndex = '12345678'\.indexOf\(event\.key\);/);
   assert.match(shortcutsSource, /if \(letter === 'c'\)/);
-  assert.match(html, /切换第 1–7 个视图/);
+  assert.match(html, /切换第 1–8 个视图/);
   assert.match(html, /<kbd>Alt<\/kbd><kbd>C<\/kbd>/);
 });
 

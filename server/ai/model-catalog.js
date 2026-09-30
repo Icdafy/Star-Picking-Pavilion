@@ -1,7 +1,7 @@
 'use strict';
 // 模型提供商目录与配置归一化 —— 形制照搬 DeepSeek Harness 的 Models 设置页：
 // 内置目录只登记「端点 + 协议」，模型 ID 由端点自己通过 /models 报告（或手工键入），
-// 不在代码里替任何提供商编造模型清单与容量；目录外的网关 / 自建服务以
+// 不在代码里替任何提供商编造模型清单与容量（DeepSeek 例外：它是默认提供商，登记的是官方定价页公布的现行模型）；目录外的网关 / 自建服务以
 // 「自定义模型 API」声明，路由 ID、端点、协议、至少一个模型四项齐备才能创建。
 
 const PROTOCOLS = Object.freeze(['openai-completions', 'anthropic-messages']);
@@ -11,8 +11,19 @@ const PROTOCOL_LABELS = Object.freeze({
 });
 
 const DEFAULT_PROVIDER = 'deepseek';
-const DEFAULT_MODEL = 'deepseek-v4-flash-vision-exp';
-const DEFAULT_MODEL_NAME = 'DeepSeek V4 Flash Vision Experimental';
+// 2026-09-10 DeepSeek 发布 V4.1 Flash（原生多模态），官方模型 ID 为 deepseek-flash；
+// V4 Flash 与 V4 Flash Vision Exp 已退役，旧名暂由官方路由到 V4.1 Flash。
+// 依据：https://api-docs.deepseek.com/zh-cn/updates/ 与 /quick_start/pricing
+const DEFAULT_MODEL = 'deepseek-flash';
+const DEFAULT_MODEL_NAME = 'DeepSeek V4.1 Flash';
+// 已退役的 DeepSeek 模型 ID → 现行 ID。旧设置里选着它们时自动改指 V4.1 Flash，
+// 免得官方停止兼容路由那天整条精选链突然失效。
+const RETIRED_MODELS = Object.freeze({
+  'deepseek-v4-flash': DEFAULT_MODEL,
+  'deepseek-v4-flash-vision-exp': DEFAULT_MODEL,
+  'deepseek-chat': DEFAULT_MODEL,
+  'deepseek-reasoner': DEFAULT_MODEL
+});
 // 本机无密钥端点（Ollama 等）在运行时用它占位：让「有可用模型」的判断成立，
 // 请求时不发送 Authorization 头；它永远不会被写进凭据文件。
 const KEYLESS_PLACEHOLDER = 'spp-keyless-endpoint';
@@ -21,7 +32,10 @@ const CATALOG = Object.freeze([
   {
     provider: 'deepseek', displayName: 'DeepSeek', baseUrl: 'https://api.deepseek.com',
     api: 'openai-completions', builtin: true,
-    models: [{ id: DEFAULT_MODEL, name: DEFAULT_MODEL_NAME, input: ['text', 'image'] }]
+    models: [
+      { id: DEFAULT_MODEL, name: DEFAULT_MODEL_NAME, contextWindow: 1_000_000, maxTokens: 384_000, input: ['text', 'image'] },
+      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', contextWindow: 1_000_000, maxTokens: 384_000, input: ['text'] }
+    ]
   },
   { provider: 'openai', displayName: 'OpenAI', baseUrl: 'https://api.openai.com/v1', api: 'openai-completions' },
   { provider: 'anthropic', displayName: 'Anthropic', baseUrl: 'https://api.anthropic.com', api: 'anthropic-messages' },
@@ -86,6 +100,13 @@ function sanitizeModels(value) {
   return models;
 }
 
+// DeepSeek 路由上的退役模型 ID 换成现行 ID；其它提供商原样返回。
+function upgradeRetiredModel(provider, id) {
+  return provider === DEFAULT_PROVIDER && typeof id === 'string' && Object.hasOwn(RETIRED_MODELS, id)
+    ? RETIRED_MODELS[id]
+    : id;
+}
+
 // providers 字典：键是路由 ID。目录路由只存用户覆盖的字段；手工声明的路由
 // （declared）自己持有显示名称与协议。DeepSeek 永远在场，不可删除。
 function sanitizeProviders(raw) {
@@ -97,7 +118,11 @@ function sanitizeProviders(raw) {
     const next = {};
     const baseUrl = cleanText(profile.baseUrl, 2048);
     if (baseUrl) next.baseUrl = baseUrl.replace(/\/+$/, '');
-    const models = sanitizeModels(profile.models);
+    let models = sanitizeModels(profile.models);
+    if (models && id === DEFAULT_PROVIDER) {
+      const upgraded = models.map(model => ({ ...model, id: upgradeRetiredModel(id, model.id) }));
+      models = sanitizeModels(upgraded);
+    }
     if (models) next.models = models;
     if (!catalog) {
       if (!next.baseUrl) continue;
@@ -167,11 +192,13 @@ module.exports = {
   PROTOCOLS,
   PROTOCOL_LABELS,
   PROVIDER_ID,
+  RETIRED_MODELS,
   acceptsImages,
   catalogEntries,
   describeProvider,
   isCatalogProvider: id => CATALOG_BY_ID.has(id),
   resolveActive,
   sanitizeModels,
-  sanitizeProviders
+  sanitizeProviders,
+  upgradeRetiredModel
 };

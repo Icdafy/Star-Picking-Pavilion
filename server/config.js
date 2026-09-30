@@ -11,7 +11,7 @@ const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
 const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
-// 默认分析模型：DeepSeek V4 Flash Vision；v0.2.3 起可在「模型」设置中换成任意已配置提供商的模型。
+// 默认分析模型：DeepSeek V4.1 Flash（deepseek-flash，原生图文）；v0.2.3 起可在「模型」设置中换成任意已配置提供商的模型。
 const DEEPSEEK_MODEL = catalog.DEFAULT_MODEL;
 const DEEPSEEK_MODEL_RELEASE = catalog.DEFAULT_MODEL_NAME;
 // 运行时派生字段：由 providers + activeProvider 解析得出，只存在于内存，不落盘。
@@ -65,7 +65,7 @@ function normalizedRsshubBase(value) {
   }
 }
 
-// v0.2.2 及更早只有单一端点：ai.baseUrl 属于 DeepSeek，模型被锁定为 Flash Vision。
+// v0.2.2 及更早只有单一端点：ai.baseUrl 属于 DeepSeek，模型被锁定为默认视觉模型。
 // 没有 providers 字段的旧文件按这个口径迁入 providers.deepseek。
 function migrateLegacyProviders(raw) {
   const ai = raw?.ai && typeof raw.ai === 'object' ? raw.ai : {};
@@ -105,7 +105,7 @@ function normalizeSettings(raw) {
   settings.ai.activeProvider = typeof legacy.activeProvider === 'string'
     ? legacy.activeProvider
     : catalog.DEFAULT_PROVIDER;
-  settings.ai.model = boundedText(legacy.model, DEEPSEEK_MODEL, 200);
+  settings.ai.model = catalog.upgradeRetiredModel(settings.ai.activeProvider, boundedText(legacy.model, DEEPSEEK_MODEL, 200));
   for (const field of DERIVED_AI_FIELDS) delete settings.ai[field];
   applyActiveModel(settings);
   settings.ai.maxBatchPrefilter = boundedInteger(settings.ai.maxBatchPrefilter, 1, 50, DEFAULT_SETTINGS.ai.maxBatchPrefilter);

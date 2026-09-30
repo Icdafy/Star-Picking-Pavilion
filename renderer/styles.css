@@ -2270,6 +2270,62 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
 /* v6：主题化确认框——破坏性操作的最后一道关卡，替代与设计语言脱节的系统原生灰窗 */
 .confirm-dialog { width: 24rem; }
+
+/* v0.2.4 命令面板（Ctrl+K）—— 参照 Linear / Raycast：贴近上方三分之一处弹出，
+   一行大输入框 + 分组结果 + 右侧快捷键键帽；高亮行只换底色与左缘色条，不做位移。
+   复用 .glass-dialog 的材质与开合过渡，不新增关键帧与滤镜。 */
+.command-palette {
+  width: min(42rem, 94vw); padding: 0; margin-top: 12vh; overflow: hidden;
+  display: flex; flex-direction: column; max-height: min(76vh, 36rem);
+}
+.command-palette:not([open]) { display: none; }
+.palette-field {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--glass-border);
+}
+.palette-field svg { width: 1.25rem; height: 1.25rem; flex: none; color: var(--c-fg-faint); }
+.palette-field input {
+  flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--c-fg);
+  font-family: var(--font-ui); font-size: var(--t-md);
+}
+.palette-field input::placeholder { color: var(--c-fg-faint); }
+.palette-field input:focus-visible { outline: none; }
+.command-palette kbd {
+  font-family: var(--font-mono); font-size: var(--t-2xs); font-weight: 700; line-height: 1.5;
+  min-width: 1.35rem; padding: 0 .3125rem; text-align: center; color: var(--c-fg-dim);
+  border: 1px solid var(--glass-border); border-bottom-width: 2px; border-radius: var(--radius-xs);
+  background: var(--input-bg);
+}
+.palette-list { list-style: none; margin: 0; padding: var(--sp-2); overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+.palette-group {
+  padding: var(--sp-3) var(--sp-3) var(--sp-1); font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: .12em; color: var(--c-fg-faint);
+}
+.palette-option {
+  display: flex; align-items: center; gap: var(--sp-3); position: relative;
+  padding: .5625rem var(--sp-3); border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--c-fg-dim); font-size: var(--t-base); scroll-margin: var(--sp-2);
+}
+.palette-option[aria-selected="true"] { background: var(--accent-soft); color: var(--c-fg); }
+.palette-option[aria-selected="true"]::before {
+  content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 3px;
+  border-radius: 3px; background: var(--accent);
+}
+.palette-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-detail { font-size: var(--t-xs); color: var(--accent-ink); }
+.palette-keys { display: inline-flex; gap: .25rem; flex: none; }
+.palette-empty { padding: var(--sp-6) var(--sp-3); text-align: center; color: var(--c-fg-faint); }
+.palette-foot {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); margin: 0;
+  padding: var(--sp-3) var(--sp-5); border-top: 1px solid var(--glass-border);
+  font-size: var(--t-xs); color: var(--c-fg-faint);
+}
+.palette-foot span { display: inline-flex; align-items: center; gap: .25rem; }
+
+/* v0.2.4 键盘浏览：J / K 落焦的卡片与热点事件用强调色描边标出，滚动定位留出粘顶壳层 */
+.card:focus-visible, .hot-item:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px; scroll-margin-top: var(--stack-top);
+}
 .confirm-message {
   margin: 0 0 var(--sp-5);
   font-family: var(--font-body); font-size: var(--t-base); line-height: 1.9;

@@ -2,10 +2,16 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
+## v0.2.4 · DeepSeek V4.1 Flash 与键盘优先的命令面板
+
+- **DeepSeek V4.1 Flash**：DeepSeek 于 2026-09-10 发布 V4.1 Flash，官方模型 ID 是 `deepseek-flash`（不叫 v4.1-flash），V4 Flash 与 V4 Flash Vision Exp 已退役。DeepSeek 内置目录改为 `deepseek-flash`（原生图文，默认）与 `deepseek-v4-pro`；旧设置里的 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp`、`deepseek-chat`、`deepseek-reasoner` 在启动时自动改指 V4.1 Flash。
+- **命令面板（Ctrl+K）**：参照 Linear、Raycast、Vercel 的 ⌘K 范式，跳转视图、执行操作与检索情报库共用一个入口；中文名、拼音全拼、拼音首字母与英文别名都能命中（如 `rb` → 情报日报、`model` → 设置），没有命中时回车即检索；最近用过的命令排在最前。ARIA combobox 语义，屏幕阅读器可用。
+- **键盘优先**：`G` 再按字母跳转视图（`G F` 精选、`G H` 热点、`G C` 一级市场、`G D` 日报……），`J` / `K` 在卡片与热点事件间逐条移动，`O` 打开原文、`S` 星标、`C` 复制、`E` 展开关联；侧栏悬停提示与设置页速查表同步列出。
+
 ## v0.2.3 · 模型设置重构、双主题可读性与动效升级
 
 - **模型**（设置页）：交互照搬 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Models 设置页。每个提供商一行，绿点表示密钥已配置、红点表示缺失；编辑卡只露出 API 密钥，API 地址、协议与模型目录收在「自定义设置」里。「获取可用模型」用表单当前的地址与密钥询问提供商，勾选采纳；「添加模型提供商」可从内置目录（OpenAI、Anthropic、Kimi、智谱、阿里云百炼、火山方舟、硅基流动、OpenRouter、本机 Ollama）添加，或声明自定义模型 API（中转站、自部署服务，OpenAI / Anthropic 协议）。
-- **分析模型**：顶部选择整条精选链使用的模型并测试连接，默认仍是 `deepseek-v4-flash-vision-exp`；所选模型未声明图片输入时跳过图片理解。
+- **分析模型**：顶部选择整条精选链使用的模型并测试连接，默认是 DeepSeek V4.1 Flash（`deepseek-flash`，v0.2.4 起；旧的 `deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` 自动改指它）；所选模型未声明图片输入时跳过图片理解。
 - **可读性**：修复玻璃面板装饰层压在文字上导致的发灰；宣纸白墨色加深、正文加粗一档，深空夜航正文说明提亮。
 - **动效**：主题切换圆形揭开、对话框开合过渡、卡片随滚动渐入、模型设置错峰入场。
 
@@ -38,19 +44,19 @@ v0.2.0 以开源的 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT）为底�
 - **校准**：`npm run eval:selection -- --gold 样本.jsonl` 用你自己标注的样本跑预筛与两次评分，输出准确率、查准率、查全率与 40–90 分门槛扫描，判错条目逐条列出。
 - **兼容**：数据库只做增量迁移，旧资料保留当时的评分与研判；v0.1.x 的事件簇原样升级为事件，历史资本市场资料按标题规则补抽融资事件，已判相关的资料按公司库补建主体关联。星标、日报、备忘、设置、凭据与界面偏好全部保留。
 
-默认分析模型为 `deepseek-v4-flash-vision-exp`（v0.2.3 起可在设置 → 模型中更换）。接口依据：[DeepSeek 图像理解](https://api-docs.deepseek.com/zh-cn/guides/vision/)与[首次调用 API](https://api-docs.deepseek.com/zh-cn/)。启用 AI 后，相关新闻正文及经筛选的图片会发送给配置的模型服务。
+默认分析模型为 DeepSeek V4.1 Flash（`deepseek-flash`，原生图文；v0.2.3 起可在设置 → 模型中更换）。接口依据：[DeepSeek 图像理解](https://api-docs.deepseek.com/zh-cn/guides/vision/)与[首次调用 API](https://api-docs.deepseek.com/zh-cn/)。启用 AI 后，相关新闻正文及经筛选的图片会发送给配置的模型服务。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.3.exe`，双击并按向导安装。v0.2.3 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.4.exe`，双击并按向导安装。v0.2.4 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.3.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.4.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -102,7 +108,7 @@ v0.1.3 将 npm/Electron、安装器、Windows 文件属性、tag、Release 和�
 - 星标留存与「星标」视图，收藏的情报永久豁免数据保留清理
 - 日报与信息流可复制为纯文本、导出为 Markdown，单条可复制标题与链接
 - RSS、网页、公开 API 与 RSSHub 信源管理
-- 可选的 AI 判断与写作（Flash Vision 图文分析，支持提供该模型的兼容服务）；无密钥时整条链降级为词库启发式，热点、公司与融资抽取照常可用
+- 可选的 AI 判断与写作（V4.1 Flash 图文分析，支持提供该模型的兼容服务）；无密钥时整条链降级为词库启发式，热点、公司与融资抽取照常可用
 - 付费调用回执复用与每小时 / 每天预算熔断；`npm run eval:selection` 用自标注样本校准门槛
 - 实体标签点击即检索，多事件资讯展开为原子事件
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持

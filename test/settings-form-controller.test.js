@@ -47,7 +47,7 @@ function createElements() {
 
 function settingsWithPrefix(prefix) {
   return {
-    ai: { model: 'deepseek-v4-flash-vision-exp' },
+    ai: { model: 'deepseek-flash' },
     collect: {
       intervalMinutes: prefix === 'newer' ? 90 : 30,
       rsshubBase: `https://${prefix}-rsshub.example`,
@@ -174,11 +174,11 @@ test('provider drafts inherit the catalog models until the user overrides them',
   const deepseek = providerDraft({
     provider: 'deepseek', declared: false, keyConfigured: true, api: 'openai-completions',
     baseUrl: 'https://api.deepseek.com', defaultBaseUrl: 'https://api.deepseek.com', baseUrlCustomized: false,
-    models: [{ id: 'deepseek-v4-flash-vision-exp' }], modelsCustomized: false
+    models: [{ id: 'deepseek-flash' }], modelsCustomized: false
   });
   assert.equal(deepseek.overridden, false);
   assert.equal(deepseek.baseUrl, '', '未改过的端点留空，占位符显示提供商默认');
-  assert.deepEqual(deepseek.defaults, [{ id: 'deepseek-v4-flash-vision-exp' }]);
+  assert.deepEqual(deepseek.defaults, [{ id: 'deepseek-flash' }]);
   assert.equal(deepseek.detailsOpen, false);
   const gateway = providerDraft({
     provider: 'gw', declared: true, displayName: '网关', api: 'anthropic-messages',
