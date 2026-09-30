@@ -18,7 +18,9 @@ const WINDOWS = [
 const SCALES = ['sm', 'md', 'lg', 'xl'];
 const VIEWS = ['featured', 'hot', 'capital', 'daily', 'links', 'sources', 'settings'];
 
-test('全部窗口、缩放和核心视图无横向溢出且主导航完整可见', { timeout: 120_000 }, async t => {
+// 4 种窗口 × 4 档缩放 × 7 个视图共 112 个组合，每个组合都遍历全部可交互元素的计算样式；
+// GitHub Windows 运行器上 v0.2.3 已用到 116.5 s，贴着 120 s 上限，v0.2.4 超时。断言不变，只放宽时限。
+test('全部窗口、缩放和核心视图无横向溢出且主导航完整可见', { timeout: 300_000 }, async t => {
   const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-layout-'));
   const screenshotDir = process.env.SPP_LAYOUT_SCREENSHOT_DIR;
   await fs.promises.copyFile(fixture, path.join(dataDir, 'settings.json'));
