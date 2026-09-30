@@ -49,13 +49,18 @@ test('desktop window and every renderer path reserve a draggable overlay title b
     assert.match(css, /#desktop-titlebar-drag-region\s*\{/);
     assert.match(css, /-webkit-app-region:\s*drag/);
     assert.match(css, /\.desktop-titlebar-liquid-glass\s*\{/);
-    assert.match(css, /backdrop-filter:\s*blur\(18px\) saturate\(17[05]%\)/);
+    // v0.2.5 无缝标题栏：透明、无分界线，只保留滚动内容经过时的柔化模糊
+    const block = css.match(/\.desktop-titlebar-liquid-glass\s*\{[^}]*\}/)[0];
+    assert.match(block, /background:\s*transparent/);
+    assert.match(block, /backdrop-filter:\s*blur\(12px\)/);
+    assert.doesNotMatch(block, /border-bottom|box-shadow/);
   }
   for (const html of [index, startupFailure]) {
     assert.match(html, /id="desktop-titlebar-drag-region"/);
     assert.match(html, /class="desktop-titlebar-liquid-glass"/);
   }
-  assert.match(aqua, /\.desktop-titlebar-liquid-glass::before[\s\S]*animation:\s*blob-drift/);
+  assert.match(aqua, /\.desktop-titlebar-liquid-glass\s*\{[^}]*mask-image:\s*linear-gradient\(#000 50%, transparent\)/);
+  assert.doesNotMatch(aqua, /\.desktop-titlebar-liquid-glass::(?:before|after)/);
 });
 
 test('standalone Aqua engine retains the exact DSH 1.1.0 fluid and whale contracts', () => {

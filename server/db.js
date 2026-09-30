@@ -3,6 +3,7 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('node:path');
 const fs = require('node:fs');
+const { clampPublishedAt } = require('./date-time');
 
 // 数据目录：打包后由 Electron 主进程注入 userData 路径（可写）；开发/直跑回退到 ../data
 const DATA_DIR = process.env.STAR_PICKING_PAVILION_DATA_DIR
@@ -364,9 +365,18 @@ CREATE TABLE IF NOT EXISTS model_usage (
   db.exec('CREATE INDEX IF NOT EXISTS idx_deals_kind ON deals(deal_kind)');
 }
 migrate();
+repairFuturePublishedAt();
 
 // ---------- 通用助手 ----------
 function now() { return new Date().toISOString(); }
+
+// v0.2.5：早期版本把晚于采集时刻的发布时间原样入库（见 date-time.clampPublishedAt），一次性改回采集时刻。
+// 两列都是 toISOString 写入的定长 UTC 字符串，可直接按字符串比较；先只读计数，确有需要才写。
+function repairFuturePublishedAt() {
+  const { count } = db.prepare('SELECT COUNT(*) AS count FROM articles WHERE published_at > fetched_at').get();
+  if (count) db.prepare('UPDATE articles SET published_at = fetched_at WHERE published_at > fetched_at').run();
+  return count;
+}
 
 // articles 与 articles_fts 必须原子双写：任一失败整体回滚，
 // 否则主表行和全文影子行会永久错位（检索到不存在的条目，或条目永远搜不到）
@@ -390,12 +400,13 @@ function insertArticle(a) {
     const existing = db.prepare('SELECT id FROM articles WHERE canonical_url = ? LIMIT 1').get(canonicalUrl);
     if (existing) return false;
   }
+  const fetchedAt = now();
   return withTransaction(() => {
     const stmt = db.prepare(`INSERT OR IGNORE INTO articles
       (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id, imported_backfill, historical)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
-      a.publishedAt || null, now(), a.domain || null, a.image || null,
+      clampPublishedAt(a.publishedAt, fetchedAt), fetchedAt, a.domain || null, a.image || null,
       Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0, JSON.stringify(a.images || []), a.contentText || null, a.publisherId || null,
       a.importedBackfill ? 1 : 0, a.historical || a.importedBackfill ? 1 : 0);
     if (r.changes > 0) {
@@ -459,7 +470,7 @@ function closeDatabase() {
 
 module.exports = {
   db, now, insertArticle, updateArticleFts, deleteArticles,
-  checkpointWal, databaseFileBytes, closeDatabase, withTransaction, DATA_DIR, DATABASE_PATH,
+  checkpointWal, databaseFileBytes, closeDatabase, withTransaction, repairFuturePublishedAt, DATA_DIR, DATABASE_PATH,
   DELETE_BATCH_SIZE
 };
 

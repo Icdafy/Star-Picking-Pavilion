@@ -34,6 +34,7 @@ const { enrichArticle } = require('../collectors/article-content');
 const { refreshEventTiming } = require('./event-timing-migration');
 const { repairTiming } = require('./timing-repair');
 const { reserveCall } = require('./receipts');
+const { clampPublishedAt } = require('../date-time');
 
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 const ANALYSIS_VERSION = 3;
@@ -170,7 +171,7 @@ async function ensureContent(article, settings) {
     try { priorImages = JSON.parse(article.images_json || '[]'); } catch {}
     const candidates = content.images.length ? content.images : priorImages.length ? priorImages : article.image_url ? [{ url: article.image_url }] : [];
     article.images_json = JSON.stringify(candidates);
-    if (content.publishedAt && !article.published_at) article.published_at = content.publishedAt;
+    if (content.publishedAt && !article.published_at) article.published_at = clampPublishedAt(content.publishedAt, article.fetched_at);
     db.prepare('UPDATE articles SET content_text=?, content_status=?, images_json=?, publisher_id=?, published_at=? WHERE id=?')
       .run(article.content_text, article.content_status, article.images_json, article.publisher_id, article.published_at, article.id);
   }

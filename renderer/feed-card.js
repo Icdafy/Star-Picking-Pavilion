@@ -178,7 +178,11 @@
   // 时间轴的时间基准：星标视图按收藏时间排序，分组标题就必须同样用收藏时间，
   // 否则日期分组会随发布时间来回跳，出现「今天 / 3月2日 / 今天」这样的乱序标题。
   //（自 app.js 迁入）
-  const publishedTime = item => item.eventDate ? item.eventDate + 'T00:00:00+08:00' : item.publishedAt || item.fetchedAt;
+  // 时间轴只显示已经发生的时间：任何晚于收录时间的取值（上游写错的未来日期）都以收录时间为准
+  const publishedTime = item => {
+    const time = item.eventDate ? item.eventDate + 'T00:00:00+08:00' : item.publishedAt || item.fetchedAt;
+    return item.fetchedAt && Date.parse(time) > Date.parse(item.fetchedAt) ? item.fetchedAt : time;
+  };
   const starredTime = item => item.starredAt || item.fetchedAt;
 
   // 五维研判维度名（自 app.js 迁入，仅卡片五维分解使用）

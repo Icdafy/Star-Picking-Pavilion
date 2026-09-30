@@ -2,6 +2,12 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
+## v0.2.5 · 时间校正、无缝标题栏与更清晰的滚动条
+
+- **时间校正**：全部动态不再出现“未来日期”。上游把申报截止日当成发布日期（投资界列表页）或按次一交易日零点标注（交易所公告）时，发布时间一律以采集时刻为准；已入库的这类条目在首次启动时自动改回。
+- **无缝标题栏**：标题栏去掉描边、投影与独立底色，与下方共用同一层背景，深浅主题一致；内容滚到下方时渐隐模糊，没有硬分界线。
+- **滚动条**：14px 轨道里的 8px 实色胶囊，悬停加粗、拖动变强调色，颜色加深、不再与背景相近。
+
 ## v0.2.4 · DeepSeek V4.1 Flash 与键盘优先的命令面板
 
 - **DeepSeek V4.1 Flash**：DeepSeek 于 2026-09-10 发布 V4.1 Flash，官方模型 ID 是 `deepseek-flash`（不叫 v4.1-flash），V4 Flash 与 V4 Flash Vision Exp 已退役。DeepSeek 内置目录改为 `deepseek-flash`（原生图文，默认）与 `deepseek-v4-pro`；旧设置里的 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp`、`deepseek-chat`、`deepseek-reasoner` 在启动时自动改指 V4.1 Flash。
@@ -51,12 +57,12 @@ v0.2.0 以开源的 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT）为底�
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.4.exe`，双击并按向导安装。v0.2.4 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.5.exe`，双击并按向导安装。v0.2.5 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.4.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.5.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

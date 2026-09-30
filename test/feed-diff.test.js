@@ -46,10 +46,11 @@ function makeDiffList() {
 const day1 = '2026-08-01T09:30:00';
 const day2 = '2026-08-02T15:45:00';
 
+// 收录时间默认跟随发布时间：时间轴不显示晚于收录时间的日期（v0.2.5），夹具不能自造“未来发布”
 function item(id, patch = {}) {
   return Object.assign({
     id, title: `标题 ${id}`, source: '测试源', tier: 't1',
-    url: `https://example.com/${id}`, publishedAt: day1, fetchedAt: day1,
+    url: `https://example.com/${id}`, publishedAt: day1, fetchedAt: patch.publishedAt || day1,
     summary: `摘要 ${id}`
   }, patch);
 }

@@ -229,9 +229,9 @@
   --hover-bg: rgba(168,190,255,.07);
   --active-bg: rgba(168,190,255,.13);
   --rail-line: rgba(168,190,255,.16);
-  --scrollbar-track: rgba(94,234,212,.045);
-  --scrollbar-thumb: rgba(94,234,212,.34);
-  --scrollbar-thumb-hover: rgba(94,234,212,.58);
+  --scrollbar-track: rgba(94,234,212,.06);
+  --scrollbar-thumb: rgba(94,234,212,.62);
+  --scrollbar-thumb-hover: rgba(94,234,212,.86);
   --scrim: rgba(2,4,12,.62);
   --sticky-veil: linear-gradient(180deg, rgba(4,6,14,.94) 62%, rgba(4,6,14,0));
 
@@ -318,9 +318,9 @@
   --hover-bg: rgba(70,84,116,.05);
   --active-bg: rgba(70,84,116,.1);
   --rail-line: rgba(70,84,116,.16);
-  --scrollbar-track: rgba(13,148,136,.055);
-  --scrollbar-thumb: rgba(13,148,136,.3);
-  --scrollbar-thumb-hover: rgba(13,148,136,.52);
+  --scrollbar-track: rgba(13,148,136,.07);
+  --scrollbar-thumb: rgba(13,148,136,.68);
+  --scrollbar-thumb-hover: rgba(13,148,136,.9);
   --scrim: rgba(40,46,66,.38);
   --sticky-veil: linear-gradient(180deg, rgba(246,244,238,.95) 62%, rgba(246,244,238,0));
 
@@ -540,7 +540,6 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
    氛围层动画，class 由脚本阶段挂到 body；逐层声明而非暂停父级，
    animation-play-state 不会从父元素继承 */
 body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .blob { animation-play-state: paused; }
-body.is-idle .desktop-titlebar-liquid-glass::before { animation-play-state: paused; }
 
 .grain {
   position: absolute; inset: 0; mix-blend-mode: overlay;
@@ -551,7 +550,7 @@ body.is-idle .desktop-titlebar-liquid-glass::before { animation-play-state: paus
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .aurora, .stars, .comet, .blob, .desktop-titlebar-liquid-glass::before,
+  .aurora, .stars, .comet, .blob,
   .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot,
   .card-new::before, .breakthrough-pill::after {
     animation: none !important;
@@ -2363,18 +2362,22 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent-line); transform: translateY(-2px); }
 .to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
 
-/* ---------- 滚动条 ---------- */
-html { scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); scrollbar-width: thin; }
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* ---------- 滚动条 ----------
+   v0.2.5：参照 VS Code、Discord 与 macOS 叠加滚动条——14px 轨道里放一根 8px 的实色胶囊，
+   悬停加粗到 10px、按住再加深，位置一眼可见。不再在 html 上写 scrollbar-width / scrollbar-color：
+   Chromium 121 起只要设置了这两个标准属性（scrollbar-color 还会被所有子元素继承），
+   下面的 ::-webkit-scrollbar 定制就整体失效，退回系统细滚动条。 */
+::-webkit-scrollbar { width: 14px; height: 14px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 ::-webkit-scrollbar-thumb {
-  min-height: 2.5rem;
-  border: 2px solid transparent;
+  min-height: 3rem;
+  border: 3px solid transparent;
   border-radius: 999px;
   background: var(--scrollbar-thumb);
-  background-clip: content-box;
+  background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { border-width: 2px; background: var(--scrollbar-thumb-hover); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:active { border-width: 2px; background: var(--accent); background-clip: padding-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
 /* ---------- 响应式 ---------- */
@@ -2481,7 +2484,6 @@ body.theme-transition *::after {
   --dur-glide: 320ms;
 }
 [data-fx-tier="lite"] .blob { animation: none; }
-[data-fx-tier="lite"] .desktop-titlebar-liquid-glass::before { animation: none; }
 [data-fx-tier="static"] {
   --glass-blur: none;
 }
@@ -2489,7 +2491,6 @@ body.theme-transition *::after {
 [data-fx-tier="static"] .stars,
 [data-fx-tier="static"] .comet { animation: none; }
 [data-fx-tier="static"] .blob { animation: none; }
-[data-fx-tier="static"] .desktop-titlebar-liquid-glass::before { animation: none; }
 
 /* v0.1.4 evidence remains readable on narrow cards. */
 .event-time-badge { font-size: .72em; color: var(--text-muted); max-width: 100%; overflow-wrap: anywhere; }

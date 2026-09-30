@@ -243,8 +243,9 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     };
   });
   assert.ok(lightChrome.titlebarHeight >= 28);
-  assert.match(lightChrome.titlebarBackdrop, /blur\(18px\).*saturate\(1\.75\)/);
-  assert.notEqual(lightChrome.titlebarBackground, 'none');
+  // v0.2.5 无缝标题栏：没有独立底色，只在滚动内容经过时柔化
+  assert.match(lightChrome.titlebarBackdrop, /blur\(12px\)/);
+  assert.equal(lightChrome.titlebarBackground, 'none');
   assert.equal(lightChrome.titlebarPointerEvents, 'none');
   assert.match(lightChrome.scrollbarThumb, /13\s*,\s*148\s*,\s*136/);
   assert.notEqual(lightChrome.scrollbarTrack, 'transparent');

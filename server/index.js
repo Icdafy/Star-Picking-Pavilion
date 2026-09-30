@@ -37,7 +37,7 @@ const {
 const packageJson = require('../package.json');
 const { resolveStaticFile } = require('./static-files');
 const { closeHttpServerGracefully } = require('./http-close');
-const { localDateString, startOfLocalDayIso } = require('./date-time');
+const { localDateString, startOfLocalDayIso, clampPublishedAt } = require('./date-time');
 const { createSettingsUpdateCoordinator } = require('./settings-persistence');
 const {
   API_TOKEN_HEADER,
@@ -201,8 +201,8 @@ function articleRow(r, scoring, nowMs) {
   const rawQuality = Number(r.quality_score);
   const quality = Number.isFinite(rawQuality) ? Math.max(0, Math.min(100, rawQuality)) : null;
   const safeDate = value => value && Number.isFinite(new Date(value).getTime()) ? value : null;
-  const publishedAt = safeDate(r.published_at);
   const fetchedAt = safeDate(r.fetched_at);
+  const publishedAt = clampPublishedAt(safeDate(r.published_at), fetchedAt);
   const breakthroughScore = Math.max(0, Math.min(1,
     Number(r.breakthrough_score) || 0));
   const breakthroughBonus = Math.max(0, Number(r.breakthrough_bonus) || 0);

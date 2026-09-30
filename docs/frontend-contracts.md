@@ -814,6 +814,11 @@ v0.2.4 说明（预算不上调：CSS 仍 ≤ 292 KiB，脚本 27/27，关键帧
 不新增关键帧与滤镜；腾挪空间来自字体分片索引的无损压缩（去掉逐块注释与缩进，声明逐字不变，约 −5.6 KiB）。
 行为并入既有的 `shortcuts.js`（`createCommandPalette` / `rankCommands`），不新增脚本标签。
 
+v0.2.5 说明（预算不变：CSS ≈ 292,300 B ≤ 292 KiB，脚本 27/27，关键帧 20/20，backdrop-filter 9/10）：标题栏改为无缝——
+`.desktop-titlebar-liquid-glass` 去掉描边、投影、`::before` / `::after` 流动高光与独立底色，只留一层 12px 模糊并用
+`mask-image` 自上而下淡出（scroll edge effect），backdrop-filter 处数不变；滚动条去掉 html 上的
+`scrollbar-width` / `scrollbar-color`（Chromium 121 起它们会让 `::-webkit-scrollbar` 定制整体失效），改为 14px 轨道 + 8px 胶囊。
+
 说明：阶段 4 起 feed 整表赋值的 3 个落点分别是 骨架屏、空态、失败态；
 正常数据整表重载改走 keyed diff 调和（`diff.reconcile`），分页追加走
 `diff.appendPage`，实时新条目走 `diff.prependFresh` 前置插入，三者都不产生

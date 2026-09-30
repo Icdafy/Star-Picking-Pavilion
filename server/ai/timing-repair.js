@@ -1,6 +1,7 @@
 'use strict';
 const { normalizeEvents, primaryEventKey } = require('./events');
 const { timingFields } = require('./event-time');
+const { clampPublishedAt } = require('../date-time');
 
 const REPAIR_VERSION = 3;
 // A separate events-only repair never resets relevance, scores, stars or summaries.
@@ -31,7 +32,7 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
         const content = await enrich(row);
         row.content_text = content.text || row.content_text || '';
         row.content_status = content.status;
-        row.published_at ||= content.publishedAt || null;
+        row.published_at ||= clampPublishedAt(content.publishedAt, row.fetched_at);
         database.prepare('UPDATE articles SET content_text=?,content_status=?,published_at=? WHERE id=?')
           .run(row.content_text,row.content_status,row.published_at,row.id);
       }

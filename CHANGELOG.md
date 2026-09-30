@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-01
+
+### 修复：全部动态出现未来日期
+
+- 全部动态第一条显示「11月2日」（当天为 10 月 1 日）：投资界列表页把公告里的申报截止日（2026-11-02）当成发布日期，交易所公告按次一交易日零点标注，晚于采集时刻的发布时间被原样入库，按时间倒序排到最前。
+- 新增 `clampPublishedAt`（server/date-time.js）：发布时间晚于采集时刻时以采集时刻为准。入库（insertArticle）、正文补采（pipeline、timing-repair）、读取接口（行转条目）与时间轴分组（publishedTime）统一校正。
+- 启动时一次性修复旧库中 `published_at > fetched_at` 的行（先只读计数，确有需要才写）。
+
+### 无缝标题栏
+
+- 标题栏去掉描边、投影、流动高光与独立底色，与下方共用同一层氛围背景（参照 macOS 统一工具栏、Windows 11 内容延伸进标题栏、Linear / Arc / VS Code）。
+- 保留一层 12px 模糊并用蒙版自上而下淡出（Apple scroll edge effect），只在内容滚到标题栏下方时起柔化作用，下沿止于吸顶面板上方。启动失败页同步改为无缝标题栏。
+
+### 滚动条
+
+- 移除 html 上的 `scrollbar-width: thin` / `scrollbar-color`：Chromium 121 起设置这两个标准属性（后者还会继承）会让 `::-webkit-scrollbar` 定制整体失效，此前实际显示的是系统细滚动条。
+- 14px 轨道 + 8px 胶囊（3px 透明边框），悬停 10px 并加深，拖动时为强调色；滑块不透明度深色主题 .34 → .62、浅色主题 .3 → .68。
+
 ## [0.2.4] - 2026-10-01
 
 ### DeepSeek V4.1 Flash
@@ -141,6 +159,24 @@
 本项目遵循 [Semantic Versioning](https://semver.org/)。
 
 ## [Unreleased]
+
+## [0.2.5] - 2026-10-01
+
+### 修复：全部动态出现未来日期
+
+- 全部动态第一条显示「11月2日」（当天为 10 月 1 日）：投资界列表页把公告里的申报截止日（2026-11-02）当成发布日期，交易所公告按次一交易日零点标注，晚于采集时刻的发布时间被原样入库，按时间倒序排到最前。
+- 新增 `clampPublishedAt`（server/date-time.js）：发布时间晚于采集时刻时以采集时刻为准。入库（insertArticle）、正文补采（pipeline、timing-repair）、读取接口（行转条目）与时间轴分组（publishedTime）统一校正。
+- 启动时一次性修复旧库中 `published_at > fetched_at` 的行（先只读计数，确有需要才写）。
+
+### 无缝标题栏
+
+- 标题栏去掉描边、投影、流动高光与独立底色，与下方共用同一层氛围背景（参照 macOS 统一工具栏、Windows 11 内容延伸进标题栏、Linear / Arc / VS Code）。
+- 保留一层 12px 模糊并用蒙版自上而下淡出（Apple scroll edge effect），只在内容滚到标题栏下方时起柔化作用，下沿止于吸顶面板上方。启动失败页同步改为无缝标题栏。
+
+### 滚动条
+
+- 移除 html 上的 `scrollbar-width: thin` / `scrollbar-color`：Chromium 121 起设置这两个标准属性（后者还会继承）会让 `::-webkit-scrollbar` 定制整体失效，此前实际显示的是系统细滚动条。
+- 14px 轨道 + 8px 胶囊（3px 透明边框），悬停 10px 并加深，拖动时为强调色；滑块不透明度深色主题 .34 → .62、浅色主题 .3 → .68。
 
 ## [0.1.4] - 2026-09-05
 
