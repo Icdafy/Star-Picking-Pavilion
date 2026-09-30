@@ -279,9 +279,12 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
   `setAquaWhale/setAquaCritters`、`btnAquaWallpaperClear/btnAquaReset`；
   模式和背景分段按钮分别使用 `data-aqua-mode` / `data-aqua-background` 与
   `aria-pressed`。壁纸 file input 不得用 `hidden`，应保留键盘可聚焦的视觉隐藏实现。
-- `id="btnClearAiKey"`；`id="setModel"` 为只读，`placeholder="deepseek-v4-flash-vision-exp"`
-- 不得出现 `setPrefilterModel` / `setScoringModel`；不得出现含 `deepseek-v4-pro` 的 placeholder/value
-- 预筛、图文、原子事件和日报统一使用 `deepseek-v4-flash-vision-exp`，保存配置及请求层均限制为此模型。
+- 模型（v0.2.3，照搬 DeepSeek Harness Models 页）：`#modelsCard` 内 `#modelsSection` 由
+  `SettingsFormController.createModelsSettings` 渲染——`#modelsActiveSelect`（选项值 `provider|modelId`）、
+  `#btnTestModel`、`#modelTestResult`（role=status）、`.model-row[data-provider]`（`.model-dot.is-ok/is-missing/is-local`）、
+  `[data-models-act]` 动作、`[data-models-field]` 字段；勾选弹窗 `#modelPickerDialog`。密钥框为 password 且从不回填。
+- 不得出现 `setPrefilterModel` / `setScoringModel` / `setModel` / `setApiKey`；不得出现含 `deepseek-v4-pro` 的 placeholder/value
+- 预筛、图文、原子事件和日报共用一个分析模型（默认 `deepseek-v4-flash-vision-exp`）；未声明图片输入的模型跳过图文理解。
 - 新闻右上角 `.event-time-badge` 显示“当日报道／事后 N 天报道／计划事件／延期／暂停／事件日期待确认／报道日期待确认”。API 提供 `eventDate`、`reportedAt`、`reportDelayDays`、`timingStatus`（`dated/planned/postponed/unknown`）、独立的 `eventStatus` 和 `timingReason`；悬停解释证据缺失原因。卡片 `.meta-time` 使用报道发布时间，未知时明确提示；时间轴分组仍跟随事件日期优先的排序口径。
 - 每张新闻只展示一个 `.card-thumb` 右侧缩略图，优先使用视觉筛选结果；不再有下方图片证据区。
 - `id="setCloseToTray"`、`id="setLaunchAtLogin"`：`type="checkbox"` 且 `role="switch"`
@@ -667,7 +670,7 @@ transform/box-shadow 过渡，曲线取 `--spring-medium`）；`backdrop-filter:
 | 悬停浮起（卡片级） | `.card`、`.common-links-card` | transform/box-shadow → `--spring-medium` + `--dur` |
 | 悬停浮起（小控件） | `.lex-term`、`.btn-icon`、`.btn-primary`/`.btn-ghost`、`.src-card`、`.new-flash`、`.common-links-open`、`.update-pill` 等 | transform → `--spring-light` + `--dur-snap` |
 | 按压缩放 | 全站通用 `:active` 组 + `.to-top:active` | `:active` 内独立声明 `transition: transform var(--dur-snap) var(--spring-light)`，抬起回落基线过渡自然带弹 |
-| 弹层进出 | `.toast`、`.to-top`（transition）、`.glass-dialog[open]`、`.lexicon-panel.is-open`（消费 dialog-in） | `--spring-medium`，浮层入场配 `--dur-glide`、常驻浮层配 `--dur` |
+| 弹层进出 | `.toast`、`.to-top`、`.glass-dialog`（v0.2.3 起开合都走 transition + @starting-style）、`.lexicon-panel.is-open`（消费 dialog-in） | `--spring-medium`，浮层入场配 `--dur-glide`、常驻浮层配 `--dur` |
 | tab 指示块 | `.tab-indicator` | transform → `--spring-medium` + `--dur`；width/height 保留（见豁免） |
 | 既有入场消费方 | view-in（`.view`/`.common-links-card`/`.empty-state`）、card-in、flash-in、reveal、star-pop | 关键帧本体不动，消费处 timing-function 换 `--spring-medium`/`--spring-light`，不新增关键帧 |
 
@@ -765,7 +768,7 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 | 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| 页面实际加载的全部本地 CSS | ≈ 265,000 B（约 259 KiB，含字体分片索引与 v0.2.0 intel.css） | ≤ 275 KiB |
+| 页面实际加载的全部本地 CSS | ≈ 295,000 B（约 288 KiB，含字体分片索引、v0.2.0 intel.css 与 v0.2.3 模型设置） | ≤ 292 KiB |
 | index.html `<script>` 标签总数 | 27（v0.2.0 新增合并后的 intel-views.js） | ≤ 27 |
 | 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
@@ -799,6 +802,12 @@ v0.2.0 上调说明（26/26 → 27/27，CSS 250 → 275 KiB）：新增“当前
 表示层（IntelRender）与两个视图控制器按上面的原则**合并**为单一的 `intel-views.js`，只净增一个脚本边界；
 新增样式集中在 `intel.css`（约 18 KiB），发布前逐一核对了 styles.css 与 aqua-shell.css 的类选择器，
 没有可清理的死规则。两项上限都只覆盖本次新增，没有预留余量。
+
+v0.2.3 上调说明（CSS 275 → 292 KiB，脚本仍 27/27，关键帧仍 20/20）：设置页「模型」一节照搬 DeepSeek Harness 的
+Models 页（提供商行、编辑卡、模型目录编辑器、添加卡分段切换、勾选弹窗），样式约 15 KiB，集中在 styles.css
+末尾的「v0.2.3 模型设置」区段；可读性与动效升级约 3 KiB。脚本**没有**新增：模型设置按「设置表单」职责并入
+既有的 `settings-form-controller.js`。新动效全部复用既有关键帧（card-in、spin、shimmer）或走
+transition / @starting-style / View Transitions，关键帧总数不变。
 
 说明：阶段 4 起 feed 整表赋值的 3 个落点分别是 骨架屏、空态、失败态；
 正常数据整表重载改走 keyed diff 调和（`diff.reconcile`），分页追加走

@@ -9,14 +9,76 @@ function settings(baseUrl = 'https://models.example/v1') {
   return { ai: { apiKey: 'sk-test-only', baseUrl, requestTimeoutMs: 1000 } };
 }
 
-test('every request uses Flash Vision even with a stale Pro override', async () => {
-  let payload;
+test('requests use the model selected in settings, defaulting to Flash Vision', async () => {
+  const payloads = [];
+  const fetchImpl = async (url, options) => { payloads.push(JSON.parse(options.body)); return response(); };
+  await chat([{role:'user',content:'test'}], { settings: settings(), fetchImpl });
   await chat([{role:'user',content:'test'}], {
-    settings: {...settings(), ai: {...settings().ai, model:'deepseek-v4-pro'}},
-    model: 'deepseek-v4-pro',
-    fetchImpl: async (url, options) => { payload=JSON.parse(options.body); return response(); }
+    settings: {...settings(), ai: {...settings().ai, model:'moonshot-v1-8k'}}, fetchImpl
   });
-  assert.equal(payload.model,'deepseek-v4-flash-vision-exp');
+  await chat([{role:'user',content:'test'}], { settings: settings(), model: 'explicit-model', fetchImpl });
+  assert.deepEqual(payloads.map(payload => payload.model), ['deepseek-v4-flash-vision-exp', 'moonshot-v1-8k', 'explicit-model']);
+});
+
+test('thinking extensions are only sent to DeepSeek; keyless local endpoints send no Authorization', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => { calls.push({ url, headers: options.headers, body: JSON.parse(options.body) }); return response(); };
+  await chat([{role:'user',content:'test'}], {
+    settings: { ai: { ...settings().ai, activeProvider: 'openai', providerName: 'OpenAI', model: 'gpt-x' } }, fetchImpl
+  });
+  await chat([{role:'user',content:'test'}], {
+    settings: { ai: { ...settings('http://127.0.0.1:11434/v1').ai, apiKey: 'spp-keyless-endpoint', activeProvider: 'ollama', model: 'qwen3' } }, fetchImpl
+  });
+  assert.equal('thinking' in calls[0].body, false);
+  assert.equal(calls[0].headers.Authorization, 'Bearer sk-test-only');
+  assert.equal(calls[1].url, 'http://127.0.0.1:11434/v1/chat/completions');
+  assert.equal('Authorization' in calls[1].headers, false);
+});
+
+test('anthropic-messages providers speak the Messages protocol with images and a separate system prompt', async () => {
+  let call;
+  const text = '{"ok":true}';
+  const result = await chat([
+    { role: 'system', content: '只输出 JSON' },
+    { role: 'user', content: [{ type: 'text', text: '看图' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } }] }
+  ], {
+    settings: { ai: { ...settings('https://api.anthropic.com').ai, api: 'anthropic-messages', activeProvider: 'anthropic', providerName: 'Anthropic', model: 'claude-x' } },
+    fetchImpl: async (url, options) => {
+      call = { url, headers: options.headers, body: JSON.parse(options.body) };
+      return response({ chunks: [JSON.stringify({ content: [{ type: 'text', text }] })] });
+    }
+  });
+  assert.equal(result, text);
+  assert.equal(call.url, 'https://api.anthropic.com/v1/messages');
+  assert.equal(call.headers['x-api-key'], 'sk-test-only');
+  assert.equal(call.headers['anthropic-version'], '2023-06-01');
+  assert.equal(call.body.system, '只输出 JSON');
+  assert.equal(call.body.model, 'claude-x');
+  assert.deepEqual(call.body.messages[0].content[1], { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } });
+});
+
+test('model discovery reports only what the endpoint lists, and a stored key never leaves as a header to an unknown scheme', async () => {
+  const { discoverModels } = require('../server/ai/deepseek');
+  let request;
+  const models = await discoverModels({
+    baseUrl: 'https://gateway.example/v1', apiKey: 'sk-typed',
+    fetchImpl: async (url, options) => {
+      request = { url, headers: options.headers };
+      return response({ chunks: [JSON.stringify({ data: [
+        { id: 'b-model', context_length: 131072, architecture: { input_modalities: ['text', 'image'] } },
+        { id: 'a-model', name: 'A Model' },
+        { id: 'a-model' },
+        { id: '' }
+      ] })] });
+    }
+  });
+  assert.equal(request.url, 'https://gateway.example/v1/models');
+  assert.equal(request.headers.Authorization, 'Bearer sk-typed');
+  assert.deepEqual(models, [
+    { id: 'a-model', name: 'A Model' },
+    { id: 'b-model', contextWindow: 131072, input: ['text', 'image'] }
+  ]);
+  await assert.rejects(discoverModels({ baseUrl: 'http://gateway.example/v1', fetchImpl: async () => response() }), /HTTPS/);
 });
 
 function response({ contentLength, chunks = ['{"choices":[{"message":{"content":"ok"}}]}'] } = {}) {

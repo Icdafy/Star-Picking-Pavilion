@@ -1,7 +1,7 @@
 'use strict';
 
 // 阶段 3 批 2：settings-view-controller 自 app.js 抽离后的 Node 单测。
-// 覆盖：依赖护栏、非安装版降级提示、AI 配置保存成败两路、情报备忘回看与删除。
+// 覆盖：依赖护栏、非安装版降级提示、模型设置装配（v0.2.3）、情报备忘回看与删除。
 // 用假 $（选择器→桩元素表）与假子控制器工厂驱动，不触碰真实 DOM。
 
 const test = require('node:test');
@@ -47,7 +47,7 @@ function makeEl(selector, registry) {
   };
 }
 
-function createController({ saveAi = 'ok', feedback = [], feedbackDelete = 'ok' } = {}) {
+function createController({ feedback = [], feedbackDelete = 'ok' } = {}) {
   const listeners = {};
   const els = new Map();
   const $ = selector => {
@@ -58,6 +58,7 @@ function createController({ saveAi = 'ok', feedback = [], feedbackDelete = 'ok' 
   const requests = [];
   const formCalls = [];
   const statsCalls = [];
+  const modelsOptions = [];
   const ctrl = createSettingsViewController({
     $,
     api: async (url, opts) => {
@@ -83,15 +84,16 @@ function createController({ saveAi = 'ok', feedback = [], feedbackDelete = 'ok' 
     SettingsFormController: {
       createSettingsFormController: () => ({
         load: async () => formCalls.push('load'),
-        saveAi: async () => {
-          formCalls.push('saveAi');
-          if (saveAi === 'fail') throw new Error('AI 保存失败');
-        },
         saveCollect: async () => formCalls.push('saveCollect'),
-        saveRetention: async () => formCalls.push('saveRetention'),
-        clearApiKey: async () => formCalls.push('clearApiKey')
-      })
+        saveRetention: async () => formCalls.push('saveRetention')
+      }),
+      createModelsSettings: options => {
+        modelsOptions.push(options);
+        return { load: async () => formCalls.push('models-load') };
+      }
     },
+    focusTools: { findFocusKey: () => 'focus-key', restoreFocusByKey: () => true },
+    motion: { fadeSlideIn() {}, staggerIn() {} },
     DesktopSettingsController: null,
     StorageMaintenanceController: {
       createStorageMaintenanceController: () => ({
@@ -103,7 +105,7 @@ function createController({ saveAi = 'ok', feedback = [], feedbackDelete = 'ok' 
     DailyArchiveController: null
   });
   const fire = (selector, type, event = {}) => listeners[selector]?.[type]?.(event);
-  return { ctrl, $, toasts, requests, formCalls, statsCalls, fire, els };
+  return { ctrl, $, toasts, requests, formCalls, statsCalls, fire, els, modelsOptions };
 }
 
 test('非安装版降级：桌面设置与每日归档控件禁用并给出说明', () => {
@@ -115,15 +117,20 @@ test('非安装版降级：桌面设置与每日归档控件禁用并给出说�
   assert.match($('#dailyArchiveStatus').textContent, /每日新闻简报自动归档仅在安装版中可用/);
 });
 
-test('保存 AI 配置成功 toast 并刷新塔台，失败 toast 错误文案', async () => {
-  const ok = createController();
-  await ok.fire('#btnSaveAi', 'click');
-  assert.deepEqual(ok.toasts, [['AI 配置已保存，下轮分析生效', false]]);
-  assert.deepEqual(ok.statsCalls, ['refresh']);
-
-  const bad = createController({ saveAi: 'fail' });
-  await bad.fire('#btnSaveAi', 'click');
-  assert.deepEqual(bad.toasts, [['AI 配置保存失败：AI 保存失败', true]]);
+test('模型设置装配到 #modelsSection 与勾选弹窗，并随设置页一起加载', async () => {
+  const env = createController();
+  assert.equal(env.modelsOptions.length, 1);
+  const options = env.modelsOptions[0];
+  assert.equal(options.root.selector, '#modelsSection');
+  assert.equal(options.picker.selector, '#modelPickerDialog');
+  assert.equal(typeof options.request, 'function');
+  assert.equal(typeof options.confirm, 'function');
+  assert.equal(options.findFocusKey(), 'focus-key');
+  assert.equal(typeof options.motion.fadeSlideIn, 'function');
+  await env.ctrl.loadSettings();
+  assert.ok(env.formCalls.includes('models-load'));
+  assert.equal(typeof env.ctrl.loadModels, 'function');
+  assert.equal(env.listeners?.['#btnSaveAi'], undefined);
 });
 
 test('loadSettings 载入表单并回看情报备忘', async () => {

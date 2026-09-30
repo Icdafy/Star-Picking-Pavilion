@@ -85,19 +85,21 @@ body {
 }
 
 /* ---------- 可调材质 ---------- */
+/* v0.2.3：云母透明度 = 可读性底线 + 用户磨砂量。旧版纯按磨砂量缩放，默认磨砂 20 时
+   面板只有 20% 实度，正文压在流体高光上发灰；底线保证文字下方至少一半实底。 */
 [data-aqua-mode="mica"][data-theme="dark"] {
   --glass-bg: linear-gradient(180deg,
-    color-mix(in srgb, rgb(42 46 56) calc(50% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, rgb(22 25 34) calc(50% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, rgb(30 34 44) calc(52% + 34% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(16 19 28) calc(52% + 34% * var(--dsh-aqua-frost)), transparent));
   --glass-bg-deep: linear-gradient(180deg,
-    color-mix(in srgb, rgb(42 46 56) calc(64% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, rgb(16 20 28) calc(64% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, rgb(30 34 44) calc(66% + 28% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(14 17 25) calc(66% + 28% * var(--dsh-aqua-frost)), transparent));
   --glass-bg-soft: linear-gradient(180deg,
-    color-mix(in srgb, rgb(42 46 56) calc(36% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, rgb(16 20 28) calc(30% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, rgb(30 34 44) calc(40% + 30% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(14 17 25) calc(36% + 30% * var(--dsh-aqua-frost)), transparent));
   --card-bg: linear-gradient(180deg,
-    color-mix(in srgb, rgb(22 25 34) calc(72% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, rgb(10 12 18) calc(68% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, rgb(18 21 30) calc(70% + 24% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(10 12 18) calc(68% + 24% * var(--dsh-aqua-frost)), transparent));
   --card-bg-featured:
     linear-gradient(160deg,
       rgb(78 48 28 / calc(22% + var(--aqua-user-frost) * .14%)),
@@ -108,17 +110,17 @@ body {
 
 [data-aqua-mode="mica"][data-theme="light"] {
   --glass-bg: linear-gradient(180deg,
-    color-mix(in srgb, white calc(50% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, white calc(35% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, white calc(62% + 30% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(252 251 248) calc(56% + 30% * var(--dsh-aqua-frost)), transparent));
   --glass-bg-deep: linear-gradient(180deg,
-    color-mix(in srgb, white calc(70% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, white calc(58% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, white calc(76% + 22% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(252 251 248) calc(72% + 22% * var(--dsh-aqua-frost)), transparent));
   --glass-bg-soft: linear-gradient(180deg,
-    color-mix(in srgb, white calc(34% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, white calc(22% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, white calc(46% + 30% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(252 251 248) calc(40% + 30% * var(--dsh-aqua-frost)), transparent));
   --card-bg: linear-gradient(180deg,
-    color-mix(in srgb, white calc(76% * var(--dsh-aqua-frost)), transparent),
-    color-mix(in srgb, white calc(62% * var(--dsh-aqua-frost)), transparent));
+    color-mix(in srgb, white calc(80% + 18% * var(--dsh-aqua-frost)), transparent),
+    color-mix(in srgb, rgb(252 251 248) calc(76% + 18% * var(--dsh-aqua-frost)), transparent));
   --card-bg-featured:
     linear-gradient(160deg,
       rgb(255 246 232 / calc(70% + var(--aqua-user-frost) * .22%)),

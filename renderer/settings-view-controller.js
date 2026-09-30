@@ -1,7 +1,7 @@
 'use strict';
 
 /* 摘星阁 · 设置视图控制器
-   阶段 3 批 2 自 app.js 抽离：AI 配置、采集、数据保留、桌面运行、
+   阶段 3 批 2 自 app.js 抽离：模型（v0.2.3 重构，形制照搬 DSH Models 页）、采集、数据保留、桌面运行、
    每日归档、存储治理与情报备忘的装配和接线。
    $、api、toast、桌面桥与各子控制器工厂一律走依赖注入。 */
 
@@ -13,7 +13,8 @@
   function createSettingsViewController({
     $, api, esc, timeAgo, formatBytes, toast, confirmGlass, refreshStats,
     Desktop, SettingsFormController, DesktopSettingsController,
-    StorageMaintenanceController, DailyArchiveController
+    StorageMaintenanceController, DailyArchiveController,
+    focusTools = {}, motion = null
   } = {}) {
     if (typeof $ !== 'function' || typeof api !== 'function'
       || typeof esc !== 'function' || typeof timeAgo !== 'function'
@@ -25,16 +26,24 @@
 
     const settingsForm = SettingsFormController.createSettingsFormController({
       elements: {
-        apiKey: $('#setApiKey'),
-        baseUrl: $('#setBaseUrl'),
-        model: $('#setModel'),
         intervalMinutes: $('#setInterval'),
         rsshubBase: $('#setRsshub'),
         retentionDays: $('#setRetentionDays'),
-        irrelevantRetentionDays: $('#setIrrelevantRetentionDays'),
-        clearApiKeyButton: $('#btnClearAiKey')
+        irrelevantRetentionDays: $('#setIrrelevantRetentionDays')
       },
       request: api
+    });
+
+    const modelsSettings = SettingsFormController.createModelsSettings({
+      root: $('#modelsSection'),
+      picker: $('#modelPickerDialog'),
+      request: api,
+      toast,
+      confirm: confirmGlass,
+      escapeHTML: esc,
+      findFocusKey: focusTools.findFocusKey,
+      restoreFocusByKey: focusTools.restoreFocusByKey,
+      motion
     });
 
     const desktopSettings = (
@@ -168,6 +177,7 @@
       try {
         await Promise.all([
           settingsForm.load(),
+          modelsSettings.load(),
           desktopSettings?.load(),
           dailyArchive?.load()
         ]);
@@ -175,42 +185,6 @@
       loadMaintenance();
       loadFeedback();
     }
-
-    $('#btnSaveAi').addEventListener('click', async () => {
-      try {
-        await settingsForm.saveAi();
-        toast('AI 配置已保存，下轮分析生效');
-        refreshStats();
-      } catch (error) {
-        toast('AI 配置保存失败：' + error.message, true);
-      }
-    });
-
-    $('#btnClearAiKey').addEventListener('click', async () => {
-      if (!await confirmGlass('确定清除已由 Windows 安全保存的 AI API Key？清除后将使用关键词启发式降级模式。', { title: '清除密钥', okText: '清除' })) return;
-      try {
-        await settingsForm.clearApiKey();
-        toast('AI API Key 已清除');
-        refreshStats();
-      } catch (error) {
-        toast('清除密钥失败：' + error.message, true);
-      }
-    });
-
-    $('#btnTestAi').addEventListener('click', async () => {
-      const el = $('#aiTestResult');
-      el.textContent = '测试中…'; el.className = 'test-result';
-      $('#btnTestAi').disabled = true;
-      try {
-        const r = await api('/api/settings/test', { body: {} });
-        el.textContent = r.ok ? '✓ 连接正常' : '✗ ' + r.error;
-        el.classList.add(r.ok ? 'ok' : 'fail');
-      } catch (e) {
-        el.textContent = '✗ ' + e.message; el.classList.add('fail');
-      } finally {
-        $('#btnTestAi').disabled = false;
-      }
-    });
 
     $('#btnSaveCollect').addEventListener('click', async () => {
       try {
@@ -294,7 +268,7 @@
       }
     });
 
-    return Object.freeze({ loadSettings });
+    return Object.freeze({ loadSettings, loadModels: () => modelsSettings.load() });
   }
 
   return Object.freeze({ createSettingsViewController });

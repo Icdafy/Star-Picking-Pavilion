@@ -102,12 +102,12 @@ test('editable settings reject invalid numeric, URL, and model values', () => {
   assert.throws(() => applySettingsPatch(current, { ai: { model: '' } }), /模型/);
   // 两段式模型是 v0.0.14 之前的形态，字段本身已经不再受理
   assert.throws(() => applySettingsPatch(current, { ai: { scoringModel: 'x' } }), /设置字段/);
-  // v4-pro 已从本应用移除：设置层直接挡住，避免有人把它填回去
+  // v0.2.3 起模型必须出现在当前提供商的模型目录里；目录外的 ID 先在「模型」设置中添加
   assert.throws(
     () => applySettingsPatch(current, { ai: { model: 'deepseek-v4-flash' } }),
-    /已从本应用移除/
+    /不在「DeepSeek」的模型目录中/
   );
-  assert.throws(() => applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }), /已从本应用移除/);
+  assert.throws(() => applySettingsPatch(current, { ai: { model: 'deepseek-v4-pro' } }), /模型目录/);
 
   const valid = applySettingsPatch(current, {
     collect: { intervalMinutes: 30, rsshubBase: 'https://rsshub.example/' }

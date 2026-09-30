@@ -2,6 +2,13 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
+## v0.2.3 · 模型设置重构、双主题可读性与动效升级
+
+- **模型**（设置页）：交互照搬 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Models 设置页。每个提供商一行，绿点表示密钥已配置、红点表示缺失；编辑卡只露出 API 密钥，API 地址、协议与模型目录收在「自定义设置」里。「获取可用模型」用表单当前的地址与密钥询问提供商，勾选采纳；「添加模型提供商」可从内置目录（OpenAI、Anthropic、Kimi、智谱、阿里云百炼、火山方舟、硅基流动、OpenRouter、本机 Ollama）添加，或声明自定义模型 API（中转站、自部署服务，OpenAI / Anthropic 协议）。
+- **分析模型**：顶部选择整条精选链使用的模型并测试连接，默认仍是 `deepseek-v4-flash-vision-exp`；所选模型未声明图片输入时跳过图片理解。
+- **可读性**：修复玻璃面板装饰层压在文字上导致的发灰；宣纸白墨色加深、正文加粗一档，深空夜航正文说明提亮。
+- **动效**：主题切换圆形揭开、对话框开合过渡、卡片随滚动渐入、模型设置错峰入场。
+
 ## v0.2.2 · 一级市场概览、交易所上市进程与免费信源扩容
 
 - **一级市场「市场概览」**（默认分区）：融资事件数、涉及公司、亿元级以上、明确披露金额、领域分布五个指标，融资阶段（早期 / 成长期 / 后期 / 上市进程 / 战略与并购）、金额量级、月度节奏、热门赛道、大额融资、上市进程与活跃机构；点阶段直接跳到对应明细，点机构检索它参与的全部融资。
@@ -31,19 +38,19 @@ v0.2.0 以开源的 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT）为底�
 - **校准**：`npm run eval:selection -- --gold 样本.jsonl` 用你自己标注的样本跑预筛与两次评分，输出准确率、查准率、查全率与 40–90 分门槛扫描，判错条目逐条列出。
 - **兼容**：数据库只做增量迁移，旧资料保留当时的评分与研判；v0.1.x 的事件簇原样升级为事件，历史资本市场资料按标题规则补抽融资事件，已判相关的资料按公司库补建主体关联。星标、日报、备忘、设置、凭据与界面偏好全部保留。
 
-继续统一使用 `deepseek-v4-flash-vision-exp`。接口依据：[DeepSeek 图像理解](https://api-docs.deepseek.com/zh-cn/guides/vision/)与[首次调用 API](https://api-docs.deepseek.com/zh-cn/)。启用 AI 后，相关新闻正文及经筛选的图片会发送给配置的模型服务。
+默认分析模型为 `deepseek-v4-flash-vision-exp`（v0.2.3 起可在设置 → 模型中更换）。接口依据：[DeepSeek 图像理解](https://api-docs.deepseek.com/zh-cn/guides/vision/)与[首次调用 API](https://api-docs.deepseek.com/zh-cn/)。启用 AI 后，相关新闻正文及经筛选的图片会发送给配置的模型服务。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.2.exe`，双击并按向导安装。v0.2.2 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.3.exe`，双击并按向导安装。v0.2.3 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.2.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.3.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -224,9 +231,9 @@ v0.2.2 起，融资事件另按性质分类（股权融资 / 上市进程 / 并�
 
 ## AI 与隐私
 
-默认的关键词启发式模式不调用 AI 服务。只有在设置页配置 API Key 后，摘星阁才会把待分析文章的标题、摘要等选定文本发送到你配置的模型服务；数据处理规则、费用和留存政策由该模型服务提供方决定。
+默认的关键词启发式模式不调用 AI 服务。只有在设置页「模型」中为分析模型所属的提供商配置 API Key 后，摘星阁才会把待分析文章的标题、摘要等选定文本发送到你配置的模型服务；数据处理规则、费用和留存政策由该模型服务提供方决定。
 
-API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用当前 Windows 用户的系统加密能力保存。更换电脑或 Windows 账户后，应重新输入 Key。
+API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用当前 Windows 用户的系统加密能力保存（多个提供商的密钥合为一份密文）；界面与接口只显示「是否已配置」，已保存的密钥只会发往它被保存时对应的 API 地址。更换电脑或 Windows 账户后，应重新输入 Key。
 
 应用还会按功能需要访问用户启用的资讯信源、RSSHub、常用网址和 GitHub 更新服务。常用网址会交给系统默认浏览器打开；公开发行前必须确认其中不包含未经授权的内部链接。
 

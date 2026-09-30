@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-30
+
+### 模型设置（照搬 DeepSeek Harness Models 页）
+
+- 设置页「AI 分析引擎」重构为「模型」一节：提供商行（名称、自定义标记、密钥状态点、编辑 / 删除）、行内编辑卡（API 密钥 + 折叠的「自定义设置」：显示名称、API 地址、API 协议、模型目录）、删除确认。
+- 模型目录编辑器：模型 ID、显示名称、上下文窗口、最大输出（支持 256K / 1M 写法）、输入类型（文本 / 图片）；「获取可用模型」询问表单当前的端点与未保存密钥，勾选弹窗可搜索、全选，已有模型默认不勾选；内置目录路由可「恢复默认模型」。
+- 「添加模型提供商」：第三方目录（OpenAI、Anthropic、Kimi、智谱、阿里云百炼、火山方舟、硅基流动、OpenRouter、Ollama）与自定义模型 API 两种模式，分段切换不丢草稿；自定义路由需 Provider ID、端点、协议与至少一个模型。
+- 分析模型选择与测试连接（显示延迟）；新增 `/api/models`、`/api/models/providers[/:id]`、`/api/models/active`、`/api/models/discover`、`/api/models/test`，与设置写入共用一条事务队列，凭据先写、设置落盘失败时回滚。
+- 请求层支持 OpenAI Chat Completions 与 Anthropic Messages；DeepSeek 的 thinking 参数只发给 DeepSeek；本机 Ollama 等免密钥端点不发 Authorization；所选模型未声明图片输入时跳过图片理解且不落库。
+- 多提供商密钥：凭据文件仍是单个 safeStorage 密文；只有 DeepSeek 一把密钥时保持旧格式，多提供商时存为密钥包。已存密钥只发往保存时的端点，改端点未重填密钥即作废。
+- 旧设置迁移：`ai.baseUrl` 迁入 `providers.deepseek`；`ai.baseUrl`、`apiKey` 等派生字段不再落盘。
+
+### 可读性
+
+- 修复玻璃面板内顶光装饰层画在文字之上、把卡片上沿文字刷灰的问题（宣纸白尤甚）；日期标题同理。
+- 宣纸白：墨色 #1d2536 / #515c74 / #646e86 → #0c1220 / #2c3548 / #465066，强调色墨色加深，正文字重 450。
+- 深空夜航：正文说明 #a9b5d4 → #d3dbef，辅助文字 #7d8ab0 → #a8b3cf。
+- 云母材质两主题加可读性底线（实度 = 底线 + 用户磨砂量）。
+
+### 动效
+
+- 主题切换：View Transitions 圆形揭开；对话框打开 / 关闭过渡（@starting-style + allow-discrete）。
+- 卡片随滚动渐入（`animation-timeline: view()`，复用 card-in 关键帧，关键帧总数不变）。
+- 模型设置：行与编辑卡错峰入场、分段控件弹性滑块、折叠区展开淡入、获取中旋转指示。
+
 ## [0.2.2] - 2026-09-30
 
 ### AIHOT 同步（上游至 885b736）

@@ -330,24 +330,10 @@
   <section id="viewSettings" class="view" role="tabpanel" hidden>
     <h2 class="view-title">设置</h2>
     <div class="settings-grid">
-      <div class="glass card-pad">
-        <h3>AI 分析引擎 <span class="muted">DeepSeek / OpenAI 兼容协议</span></h3>
-        <label class="field"><span>API Key</span>
-          <input id="setApiKey" type="password" placeholder="sk-…（留空则使用关键词启发式降级模式）" autocomplete="off">
-        </label>
-        <label class="field"><span>接口地址</span>
-          <input id="setBaseUrl" type="text" placeholder="https://api.deepseek.com">
-        </label>
-        <label class="field"><span>分析模型</span>
-          <input id="setModel" type="text" readonly placeholder="deepseek-v4-flash-vision-exp">
-        </label>
-        <div class="btn-row">
-          <button class="btn-primary" id="btnSaveAi">保存</button>
-          <button class="btn-ghost" id="btnTestAi">测试连接</button>
-          <button class="btn-ghost" id="btnClearAiKey" disabled>清除已保存密钥</button>
-          <span id="aiTestResult" class="test-result" role="status"></span>
-        </div>
-        <p class="hint">v0.2.0 采用 AIHOT 式精选链：预筛 → 同一标准独立评分两次（两次之和 ≥ 2 × 信源门槛才入选）→ 内容理解（自洽标题、答案先行摘要、推荐理由、主体公司、融资事件）→ 事件归组与热度。每一步的提示词与门槛都在 <code>config/industry/</code>，付费调用有回执复用与每小时 / 每天预算熔断。预筛、评分、理解、图片与原子事件统一使用 <code>deepseek-v4-flash-vision-exp</code>。新闻分别显示发布时间与事件报道时差；日期待确认时，悬停可查看具体原因。有可用密钥时，每轮最多补提取 5 条历史新闻，优先收藏与精选，失败最多尝试两次。</p>
+      <div class="glass card-pad models-card" id="modelsCard">
+        <h3>模型 <span class="muted">填入各提供商的 API 密钥即可使用其模型</span></h3>
+        <div id="modelsSection" class="models-section" aria-live="polite"></div>
+        <p class="hint">精选链：预筛 → 同一标准独立评分两次（两次之和 ≥ 2 × 信源门槛才入选）→ 内容理解（自洽标题、答案先行摘要、推荐理由、主体公司、融资事件）→ 事件归组与热度。每一步都使用上方选定的<strong>分析模型</strong>，默认 <code>deepseek-v4-flash-vision-exp</code>；所选模型未声明图片输入时自动跳过图片理解，换回视觉模型后补做。提示词与门槛在 <code>config/industry/</code>，付费调用有回执复用与每小时 / 每天预算熔断。密钥只经 Windows 安全加密保存在本机，界面与接口永远只显示「是否已配置」。</p>
       </div>
       <div class="glass card-pad industry-card">
         <h3>精选标准 <span class="muted">行业包 config/industry</span></h3>
@@ -716,6 +702,22 @@
       <button class="btn-ghost" value="cancel" formnovalidate>关闭</button>
     </div>
   </form>
+</dialog>
+
+<!-- 模型设置 ·「获取可用模型」勾选弹窗：已在目录中的模型默认不勾选，采纳不会覆盖已调好的容量 -->
+<dialog id="modelPickerDialog" class="glass-dialog model-picker" aria-labelledby="modelPickerTitle" aria-describedby="modelPickerDesc">
+  <h3 id="modelPickerTitle">选择要添加的模型</h3>
+  <p id="modelPickerDesc" class="confirm-message">以下是模型提供商报告的可用模型，勾选要添加的模型。</p>
+  <div class="picker-toolbar">
+    <input type="search" data-picker-search placeholder="搜索模型" aria-label="搜索模型" autocomplete="off" spellcheck="false">
+    <button type="button" class="btn-ghost btn-compact" data-picker-act="toggle-all">全选</button>
+  </div>
+  <ul class="picker-list" data-picker-list></ul>
+  <div class="btn-row picker-actions">
+    <span class="picker-count" data-picker-count></span>
+    <button type="button" class="btn-ghost" data-picker-act="cancel">取消</button>
+    <button type="button" class="btn-primary" data-picker-act="adopt">添加所选</button>
+  </div>
 </dialog>
 
 <!-- 破坏性操作的确认弹窗：与玻璃拟态同源，替代系统原生灰窗 -->

@@ -3,17 +3,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-let SettingsFormController;
-try {
-  SettingsFormController = require('../renderer/settings-form-controller');
-} catch {
-  SettingsFormController = null;
-}
+const SettingsFormController = require('../renderer/settings-form-controller');
 
 function deferred() {
   let resolve;
-  const promise = new Promise(resolvePromise => { resolve = resolvePromise; });
-  return { promise, resolve };
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
 
 class FakeInput extends EventTarget {
@@ -21,7 +20,6 @@ class FakeInput extends EventTarget {
     super();
     this._value = String(value);
     this.dataset = {};
-    this.placeholder = '';
   }
 
   get value() {
@@ -40,238 +38,48 @@ class FakeInput extends EventTarget {
 
 function createElements() {
   return {
-    apiKey: new FakeInput(),
-    baseUrl: new FakeInput(),
-    model: new FakeInput(),
     intervalMinutes: new FakeInput(),
     rsshubBase: new FakeInput(),
     retentionDays: new FakeInput(),
-    irrelevantRetentionDays: new FakeInput(),
-    clearApiKeyButton: { disabled: true }
+    irrelevantRetentionDays: new FakeInput()
   };
 }
 
-const loadedSettings = Object.freeze({
-  ai: {
-    _hasKey: false,
-    baseUrl: 'https://loaded.example/v1',
-    model: 'loaded-model',
-  },
-  collect: {
-    intervalMinutes: 10,
-    rsshubBase: 'https://loaded-rsshub.example'
-  }
-});
-
-function settingsWithPrefix(prefix, hasKey = false) {
+function settingsWithPrefix(prefix) {
   return {
-    ai: {
-      _hasKey: hasKey,
-      baseUrl: `https://${prefix}.example/v1`,
-      model: `${prefix}-model`,
-    },
+    ai: { model: 'deepseek-v4-flash-vision-exp' },
     collect: {
       intervalMinutes: prefix === 'newer' ? 90 : 30,
-      rsshubBase: `https://${prefix}-rsshub.example`
+      rsshubBase: `https://${prefix}-rsshub.example`,
+      retentionDays: prefix === 'newer' ? 60 : 30,
+      irrelevantRetentionDays: 7
     }
   };
 }
 
-test('late settings load preserves every user edit and AI save still supplies the API key', async () => {
-  assert.ok(SettingsFormController, 'settings form controller must exist');
+test('the settings form no longer owns AI fields: those moved to the models section', () => {
+  assert.throws(() => SettingsFormController.createSettingsFormController({ elements: {}, request: async () => ({}) }), /intervalMinutes/);
+  const controller = SettingsFormController.createSettingsFormController({ elements: createElements(), request: async () => ({}) });
+  assert.deepEqual(Object.keys(controller).sort(), ['load', 'saveCollect', 'saveRetention']);
+});
+
+test('late settings load preserves every user edit', async () => {
   const loadGate = deferred();
   const elements = createElements();
-  const requests = [];
-  const request = async (path, options) => {
-    requests.push({ path, options });
-    if (!options) return loadGate.promise;
-    return { ok: true, credentialConfigured: true };
-  };
   const controller = SettingsFormController.createSettingsFormController({
     elements,
-    request
+    request: async (path, options) => (options ? { ok: true } : loadGate.promise)
   });
 
   const loading = controller.load();
-  elements.apiKey.fill('sk-user-edit');
-  elements.baseUrl.fill('https://user.example/v1');
-  elements.model.fill('user-model');
   elements.intervalMinutes.fill('45');
   elements.rsshubBase.fill('https://user-rsshub.example');
-
-  loadGate.resolve(loadedSettings);
+  loadGate.resolve(settingsWithPrefix('loaded'));
   await loading;
 
-  assert.equal(elements.apiKey.value, 'sk-user-edit');
-  assert.equal(elements.baseUrl.value, 'https://user.example/v1');
-  assert.equal(elements.model.value, 'user-model');
   assert.equal(elements.intervalMinutes.value, '45');
   assert.equal(elements.rsshubBase.value, 'https://user-rsshub.example');
-
-  await controller.saveAi();
-  assert.deepEqual(requests[1], {
-    path: '/api/settings',
-    options: {
-      body: {
-        ai: {
-          apiKey: 'sk-user-edit',
-          baseUrl: 'https://user.example/v1',
-          model: 'user-model',
-        }
-      }
-    }
-  });
-
-  await controller.saveCollect();
-  assert.deepEqual(requests[2], {
-    path: '/api/settings',
-    options: {
-      body: {
-        collect: {
-          intervalMinutes: 45,
-          rsshubBase: 'https://user-rsshub.example'
-        }
-      }
-    }
-  });
-});
-
-test('successful save and explicit clear reset credential state while a later clean load still applies', async () => {
-  assert.ok(SettingsFormController, 'settings form controller must exist');
-  const elements = createElements();
-  const loads = [
-    {
-      ai: {
-        _hasKey: true,
-        baseUrl: 'https://reloaded.example/v1',
-        model: 'reloaded-model',
-      },
-      collect: {
-        intervalMinutes: 60,
-        rsshubBase: 'https://reloaded-rsshub.example'
-      }
-    }
-  ];
-  const request = async (path, options) => {
-    if (!options) return loads.shift();
-    if (options.body.ai?.apiKey === null) {
-      return { ok: true, credentialConfigured: false };
-    }
-    return { ok: true, credentialConfigured: true };
-  };
-  const controller = SettingsFormController.createSettingsFormController({
-    elements,
-    request
-  });
-
-  elements.apiKey.fill('sk-saved');
-  elements.baseUrl.fill('https://saved.example/v1');
-  elements.model.fill('saved-model');
-  await controller.saveAi();
-
-  assert.equal(elements.apiKey.value, '');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
-  assert.equal(elements.clearApiKeyButton.disabled, false);
-
-  elements.apiKey.fill('sk-unsaved-replacement');
-  await controller.clearApiKey();
-  assert.equal(elements.apiKey.value, '');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'false');
-  assert.equal(elements.clearApiKeyButton.disabled, true);
-
-  await controller.load();
-  assert.equal(elements.apiKey.value, '');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
-  assert.equal(elements.baseUrl.value, 'https://reloaded.example/v1');
-  assert.equal(elements.model.value, 'reloaded-model');
-  assert.equal(elements.intervalMinutes.value, '60');
-  assert.equal(elements.rsshubBase.value, 'https://reloaded-rsshub.example');
-});
-
-test('editing API key B while key A is saving preserves B but updates stored credential metadata', async () => {
-  const saveGate = deferred();
-  const elements = createElements();
-  const request = async (path, options) => {
-    if (options) return saveGate.promise;
-    return settingsWithPrefix('late-load', true);
-  };
-  const controller = SettingsFormController.createSettingsFormController({
-    elements,
-    request
-  });
-
-  elements.apiKey.fill('sk-key-a');
-  const saving = controller.saveAi();
-  elements.apiKey.fill('sk-key-b');
-  saveGate.resolve({ ok: true, credentialConfigured: true });
-  await saving;
-
-  assert.equal(elements.apiKey.value, 'sk-key-b');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
-  assert.match(elements.apiKey.placeholder, /Windows/);
-  assert.equal(elements.clearApiKeyButton.disabled, false);
-
-  await controller.load();
-  assert.equal(elements.apiKey.value, 'sk-key-b');
-});
-
-test('editing API key B while clear is pending preserves B but applies cleared metadata', async () => {
-  const clearGate = deferred();
-  const elements = createElements();
-  const request = async (path, options) => {
-    if (options) return clearGate.promise;
-    return settingsWithPrefix('late-load', true);
-  };
-  const controller = SettingsFormController.createSettingsFormController({
-    elements,
-    request
-  });
-
-  elements.apiKey.fill('sk-key-a');
-  const clearing = controller.clearApiKey();
-  elements.apiKey.fill('sk-key-b');
-  clearGate.resolve({ ok: true, credentialConfigured: false });
-  await clearing;
-
-  assert.equal(elements.apiKey.value, 'sk-key-b');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'false');
-  assert.match(elements.apiKey.placeholder, /^sk-/);
-  assert.equal(elements.clearApiKeyButton.disabled, true);
-
-  await controller.load();
-  assert.equal(elements.apiKey.value, 'sk-key-b');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'false');
-});
-
-test('failed save leaves all unsaved fields dirty across a later settings load', async () => {
-  const elements = createElements();
-  let failed = false;
-  const request = async (path, options) => {
-    if (options && !failed) {
-      failed = true;
-      throw new Error('injected save failure');
-    }
-    return loadedSettings;
-  };
-  const controller = SettingsFormController.createSettingsFormController({
-    elements,
-    request
-  });
-
-  elements.apiKey.fill('sk-unsaved');
-  elements.baseUrl.fill('https://unsaved.example/v1');
-  elements.model.fill('unsaved-model');
-  elements.intervalMinutes.fill('75');
-  elements.rsshubBase.fill('https://unsaved-rsshub.example');
-
-  await assert.rejects(controller.saveAi(), /injected save failure/);
-  await controller.load();
-
-  assert.equal(elements.apiKey.value, 'sk-unsaved');
-  assert.equal(elements.baseUrl.value, 'https://unsaved.example/v1');
-  assert.equal(elements.model.value, 'unsaved-model');
-  assert.equal(elements.intervalMinutes.value, '75');
-  assert.equal(elements.rsshubBase.value, 'https://unsaved-rsshub.example');
+  assert.equal(elements.retentionDays.value, '30');
 });
 
 test('an older settings load resolving last cannot roll back a newer load', async () => {
@@ -286,45 +94,97 @@ test('an older settings load resolving last cannot roll back a newer load', asyn
 
   const olderLoad = controller.load();
   const newerLoad = controller.load();
-  newer.resolve(settingsWithPrefix('newer', true));
+  newer.resolve(settingsWithPrefix('newer'));
   await newerLoad;
-  older.resolve(settingsWithPrefix('older', false));
+  older.resolve(settingsWithPrefix('older'));
   await olderLoad;
 
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
-  assert.equal(elements.baseUrl.value, 'https://newer.example/v1');
-  assert.equal(elements.model.value, 'newer-model');
   assert.equal(elements.intervalMinutes.value, '90');
   assert.equal(elements.rsshubBase.value, 'https://newer-rsshub.example');
+  assert.equal(elements.retentionDays.value, '60');
 });
 
-test('successful AI and collect saves mark unchanged submitted fields clean for later reload', async () => {
+test('successful saves mark unchanged submitted fields clean; failed saves keep them dirty', async () => {
   const elements = createElements();
   const calls = [];
-  const request = async (path, options) => {
-    calls.push({ path, options });
-    if (options) return { ok: true, credentialConfigured: true };
-    return settingsWithPrefix('reloaded', true);
-  };
+  let failNext = false;
   const controller = SettingsFormController.createSettingsFormController({
     elements,
-    request
+    request: async (path, options) => {
+      calls.push({ path, options });
+      if (options && failNext) throw new Error('injected save failure');
+      return options ? { ok: true } : settingsWithPrefix('reloaded');
+    }
   });
 
-  elements.apiKey.fill('sk-synchronized');
-  elements.baseUrl.fill('https://saved.example/v1');
-  elements.model.fill('saved-model');
   elements.intervalMinutes.fill('55');
   elements.rsshubBase.fill('https://saved-rsshub.example');
-  await controller.saveAi();
   await controller.saveCollect();
+  assert.deepEqual(calls[0].options.body, { collect: { intervalMinutes: 55, rsshubBase: 'https://saved-rsshub.example' } });
+  elements.retentionDays.fill('120');
+  failNext = true;
+  await assert.rejects(controller.saveRetention(), /injected save failure/);
+  failNext = false;
   await controller.load();
 
-  assert.equal(elements.apiKey.value, '');
-  assert.equal(elements.apiKey.dataset.hasStoredKey, 'true');
-  assert.equal(elements.baseUrl.value, 'https://reloaded.example/v1');
-  assert.equal(elements.model.value, 'reloaded-model');
   assert.equal(elements.intervalMinutes.value, '30');
   assert.equal(elements.rsshubBase.value, 'https://reloaded-rsshub.example');
-  assert.equal(calls.length, 3);
+  assert.equal(elements.retentionDays.value, '120', '保存失败的字段仍是用户的值');
+});
+
+test('capacity fields read 256K / 1M shorthands and write back the shortest round-trip spelling', () => {
+  const { parseCapacity, formatCapacity } = SettingsFormController;
+  assert.equal(parseCapacity(''), undefined);
+  assert.equal(parseCapacity('131072'), 131072);
+  assert.equal(parseCapacity('256K'), 256000);
+  assert.equal(parseCapacity('1m'), 1000000);
+  assert.equal(parseCapacity('2.3M'), 2300000);
+  assert.ok(Number.isNaN(parseCapacity('lots')));
+  assert.equal(formatCapacity(256000), '256K');
+  assert.equal(formatCapacity(1000000), '1M');
+  assert.equal(formatCapacity(131072), '131072');
+  assert.equal(formatCapacity(undefined), '');
+});
+
+test('API key drafts reject quoted values, env lines and whitespace, but blank means keep the stored key', () => {
+  const { apiKeyFailure } = SettingsFormController;
+  assert.equal(apiKeyFailure(''), '');
+  assert.equal(apiKeyFailure('sk-valid_123'), '');
+  assert.match(apiKeyFailure('   '), /留空则保持/);
+  assert.match(apiKeyFailure('"sk-quoted"'), /格式错误/);
+  assert.match(apiKeyFailure('OPENAI_API_KEY=sk-x'), /格式错误/);
+  assert.match(apiKeyFailure('sk a'), /格式错误/);
+});
+
+test('model rows are validated by position, and payloads drop blank optional fields', () => {
+  const { modelRowsFailure, draftRow, rowPayload } = SettingsFormController;
+  const rows = [draftRow({ id: 'a' }), draftRow({ id: 'a' })];
+  assert.deepEqual(modelRowsFailure(rows), { index: 1, message: '模型 ID 不能重复。' });
+  assert.deepEqual(modelRowsFailure([draftRow({ id: '' })]), { index: 0, message: '模型 ID 不能为空。' });
+  const capacity = draftRow({ id: 'x' });
+  capacity.contextText = '12.5';
+  assert.match(modelRowsFailure([capacity]).message, /上下文窗口/);
+  const row = draftRow({ id: ' gpt-x ', contextWindow: 128000, input: ['text', 'image'] });
+  row.name = '  ';
+  assert.deepEqual(rowPayload(row), { id: 'gpt-x', contextWindow: 128000, input: ['text', 'image'] });
+});
+
+test('provider drafts inherit the catalog models until the user overrides them', () => {
+  const { providerDraft } = SettingsFormController;
+  const deepseek = providerDraft({
+    provider: 'deepseek', declared: false, keyConfigured: true, api: 'openai-completions',
+    baseUrl: 'https://api.deepseek.com', defaultBaseUrl: 'https://api.deepseek.com', baseUrlCustomized: false,
+    models: [{ id: 'deepseek-v4-flash-vision-exp' }], modelsCustomized: false
+  });
+  assert.equal(deepseek.overridden, false);
+  assert.equal(deepseek.baseUrl, '', '未改过的端点留空，占位符显示提供商默认');
+  assert.deepEqual(deepseek.defaults, [{ id: 'deepseek-v4-flash-vision-exp' }]);
+  assert.equal(deepseek.detailsOpen, false);
+  const gateway = providerDraft({
+    provider: 'gw', declared: true, displayName: '网关', api: 'anthropic-messages',
+    baseUrl: 'https://gw.example', models: [], modelsCustomized: false
+  });
+  assert.equal(gateway.overridden, true);
+  assert.equal(gateway.baseUrl, 'https://gw.example');
+  assert.equal(gateway.detailsOpen, true, '没有模型时直接展开自定义设置');
 });

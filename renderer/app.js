@@ -166,9 +166,49 @@ function applyTheme(theme, { persist = true } = {}) {
     preferenceActions.remember('theme', theme);
   }
 }
-function toggleTheme() {
+// v0.2.3：主题切换走 View Transitions——新主题从触发点（主题按钮或屏幕中心）以圆形
+// 扩散揭开，旧画面整帧保留到揭开结束，不再出现全表颜色逐个过渡的「闪一下」。
+// 不支持 / reduced 偏好 / static 档位 / 页面隐藏时直接同步切换，行为与旧版一致。
+let themeViewTransition = null;
+function toggleTheme(event) {
   const cur = document.documentElement.dataset.theme;
-  applyTheme(cur === 'light' ? 'dark' : 'light');
+  const next = cur === 'light' ? 'dark' : 'light';
+  const canReveal = typeof document.startViewTransition === 'function'
+    && !prefersReducedMotion()
+    && document.documentElement.dataset.fxTier !== 'static'
+    && !document.hidden;
+  if (!canReveal || themeViewTransition) {
+    applyTheme(next);
+    return;
+  }
+  const origin = event?.currentTarget?.getBoundingClientRect?.() || $('#btnTheme')?.getBoundingClientRect?.();
+  const x = origin ? origin.left + origin.width / 2 : window.innerWidth / 2;
+  const y = origin ? origin.top + origin.height / 2 : window.innerHeight / 2;
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+  document.documentElement.classList.add('theme-reveal');
+  try {
+    themeViewTransition = document.startViewTransition(() => {
+      themeAppliedOnce = false; // 揭开动画已经承担过渡，不再叠加逐属性颜色过渡
+      applyTheme(next);
+    });
+  } catch {
+    document.documentElement.classList.remove('theme-reveal');
+    applyTheme(next);
+    return;
+  }
+  themeViewTransition.ready.then(() => {
+    document.documentElement.animate({
+      clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]
+    }, {
+      duration: 560,
+      easing: 'cubic-bezier(.3, .9, .35, 1)',
+      pseudoElement: '::view-transition-new(root)'
+    });
+  }).catch(() => {});
+  themeViewTransition.finished.finally(() => {
+    document.documentElement.classList.remove('theme-reveal');
+    themeViewTransition = null;
+  });
 }
 $('#btnTheme').addEventListener('click', toggleTheme);
 
@@ -495,7 +535,9 @@ const { loadSources } = sourcesController;
 const settingsViewController = SettingsViewController.createSettingsViewController({
   $, api, esc, timeAgo, formatBytes, toast, confirmGlass, refreshStats,
   Desktop, SettingsFormController, DesktopSettingsController,
-  StorageMaintenanceController, DailyArchiveController
+  StorageMaintenanceController, DailyArchiveController,
+  focusTools: { findFocusKey: DomUtils.findFocusKey, restoreFocusByKey: DomUtils.restoreFocusByKey },
+  motion
 });
 const { loadSettings } = settingsViewController;
 

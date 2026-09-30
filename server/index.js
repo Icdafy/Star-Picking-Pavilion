@@ -8,7 +8,7 @@ const { createCredentialIpcTracer } = require('../electron/credential-ipc-trace'
 const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
 const { db, now, closeDatabase, DATABASE_PATH } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
-const { persistApiKey } = require('./runtime-credentials');
+const runtimeCredentials = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
 const { describeHealth } = require('./source-health');
 const { countExpiring, getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
@@ -24,7 +24,8 @@ const {
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const lexicon = require('./ai/lexicon');
 const { heatScore } = require('./ai/scoring');
-const { testConnection } = require('./ai/deepseek');
+const { discoverModels, testConnection } = require('./ai/deepseek');
+const { createModelRoutes } = require('./model-routes');
 const { CATEGORIES } = require('./ai/pipeline');
 const { handleIntelRoute } = require('./intel-routes');
 const { ingestItems } = require('./ingest');
@@ -56,9 +57,19 @@ const traceCredentialIpc = createCredentialIpcTracer({
 const settingsUpdateCoordinator = createSettingsUpdateCoordinator({
   loadSettings,
   applySettingsPatch,
-  persistCredential: persistApiKey,
+  persistCredential: (value, provider = 'deepseek') => runtimeCredentials.persistProviderKey(provider, value),
+  persistProviderCredential: (provider, value) => runtimeCredentials.persistProviderKey(provider, value),
+  readProviderCredential: provider => runtimeCredentials.getProviderKey(provider),
   saveSettings,
   trace: traceCredentialIpc
+});
+
+const modelRoutes = createModelRoutes({
+  loadSettings,
+  coordinator: settingsUpdateCoordinator,
+  credentials: runtimeCredentials,
+  discoverModels,
+  testConnection
 });
 
 const MIME = {
@@ -727,6 +738,8 @@ const server = http.createServer(async (req, res) => {
         if (!changed) return json(res, 404, { error: '反馈不存在' });
         return json(res, 200, { ok: true });
       }
+
+      if (await modelRoutes.handle({ req, res, pathname: p, json, readJsonBody })) return;
 
       if (await handleIntelRoute({ req, res, url: u, json, readJsonBody, queryFeed })) {
         if (req.method !== 'GET') invalidateStatsCache();

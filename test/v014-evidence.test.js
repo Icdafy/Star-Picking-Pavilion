@@ -10,10 +10,12 @@ const { publicUrl, publicFetch, robotsAllowed, isPublicAddress } = require('../s
 const wechat = require('../server/collectors/wechat');
 
 const settings = { ai: { baseUrl: 'https://api.deepseek.com', model: VISION_MODEL } };
-test('all providers and tasks use Flash Vision', () => {
+test('every task uses the one model selected in settings, defaulting to Flash Vision', () => {
   assert.equal(modelFor(settings), VISION_MODEL);
   assert.equal(modelFor(settings, 'reasoning'), VISION_MODEL);
-  assert.equal(modelFor({ai:{baseUrl:'https://custom.example',model:'custom'}}, 'reasoning'), VISION_MODEL);
+  assert.equal(modelFor({ai:{baseUrl:'https://custom.example',model:'custom'}}, 'reasoning'), 'custom');
+  assert.equal(modelFor({ai:{}}), VISION_MODEL);
+  assert.equal(modelFor(null), VISION_MODEL);
 });
 test('event dates resolve against publication including New Year, never collection', () => {
   assert.equal(resolveEventDate('昨日','2026-01-01T04:00:00Z'),'2025-12-31');

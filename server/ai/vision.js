@@ -1,6 +1,6 @@
 'use strict';
 const { chat, extractJson } = require('./deepseek');
-const { VISION_MODEL } = require('./model-policy');
+const { modelFor } = require('./model-policy');
 const { publicFetch } = require('../collectors/public-web');
 
 function imageMime(b) {
@@ -23,7 +23,7 @@ async function analyzeImages(article, candidates, settings, { fetchImage = publi
     } catch {}
   }
   if (!images.length) return { status: 'unavailable', images: [] };
-  const out = await call([{ role: 'user', content: blocks }], { settings, model: VISION_MODEL, maxTokens: 1400 });
+  const out = await call([{ role: 'user', content: blocks }], { settings, model: modelFor(settings), maxTokens: 1400 });
   const j = extractJson(out);
   if (!Array.isArray(j?.images)) throw new Error('图片分析响应无效');
   const seen = new Set();

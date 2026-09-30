@@ -28,7 +28,7 @@ const industry = require('../industry');
 const editorial = require('./editorial');
 const companies = require('./companies');
 const deals = require('./deals');
-const { modelFor } = require('./model-policy');
+const { modelFor, acceptsImageInput } = require('./model-policy');
 const { analyzeImages } = require('./vision');
 const { enrichArticle } = require('../collectors/article-content');
 const { refreshEventTiming } = require('./event-timing-migration');
@@ -177,6 +177,8 @@ async function ensureContent(article, settings) {
   if (!settings) return {};
   let vision = {};
   try { vision = JSON.parse(article.vision_json || '{}'); } catch {}
+  // 所选模型未声明图片输入：本轮只做文本理解、不落库，换回视觉模型后自动补做
+  if (!vision.status && !acceptsImageInput(settings)) return { status: 'text-only', images: [] };
   if (!vision.status) {
     let candidates = [];
     try { candidates = JSON.parse(article.images_json || '[]'); } catch {}

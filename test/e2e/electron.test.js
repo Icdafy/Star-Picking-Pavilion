@@ -16,8 +16,9 @@ const { mostRecentDueDate } = require('../../electron/daily-archive');
 const projectRoot = path.join(__dirname, '..', '..');
 const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
 const DUMMY_API_KEY = 'sk-e2e-dummy-secret';
-// v0.0.14 起只有一个模型：预筛与研判共用 deepseek-v4-flash（DeepSeek-V4-Flash-0731）
+// 默认分析模型：DeepSeek V4 Flash Vision；v0.2.3 起经设置页「模型」一节配置提供商
 const ANALYSIS_MODEL = 'deepseek-v4-flash-vision-exp';
+const DEEPSEEK_SAVE_PATH = '/api/models/providers/deepseek';
 const TEST_ARTICLE_TITLE = 'E2E 政策法规持久化测试文章';
 const MAX_GRACEFUL_CLOSE_MS = 4_000;
 const EXPECTED_UI_PREFERENCE_KEYS = [
@@ -140,14 +141,14 @@ function captureSettingsRequestProgress(page) {
   const isSettingsPost = request => {
     try {
       return request.method() === 'POST'
-        && new URL(request.url()).pathname === '/api/settings';
+        && new URL(request.url()).pathname === DEEPSEEK_SAVE_PATH;
     } catch {
       return false;
     }
   };
   const captureApiKeySupplied = request => {
     try {
-      apiKeySupplied = Boolean(request.postDataJSON()?.ai?.apiKey);
+      apiKeySupplied = Boolean(request.postDataJSON()?.apiKey);
     } catch {
       apiKeySupplied = false;
     }
@@ -312,7 +313,7 @@ async function collectStalledSaveDiagnostics({
     try {
       const settings = JSON.parse(await fs.promises.readFile(settingsFile, 'utf8'));
       diagnostics.settingsParseable = true;
-      diagnostics.settingsBaseUrlMatches = settings?.ai?.baseUrl === expectedBaseUrl;
+      diagnostics.settingsBaseUrlMatches = settings?.ai?.providers?.deepseek?.baseUrl === expectedBaseUrl;
       diagnostics.settingsModelMatches = settings?.ai?.model === ANALYSIS_MODEL;
     } catch {}
   }
@@ -340,8 +341,11 @@ async function assertPersistedFiles(dataDir, expected) {
   }
 
   const settings = JSON.parse(settingsRaw);
-  assert.equal(settings.ai.baseUrl, expected.baseUrl);
+  // v0.2.3：端点按提供商存放；派生出来的 ai.baseUrl / apiKey 只在内存里，不落盘
+  assert.equal(settings.ai.providers.deepseek.baseUrl, expected.baseUrl);
+  assert.equal(settings.ai.activeProvider, 'deepseek');
   assert.equal(settings.ai.model, ANALYSIS_MODEL);
+  assert.equal(Object.hasOwn(settings.ai, 'baseUrl'), false);
   // 两段式模型字段必须彻底消失，否则升级后仍然可能被读回去打到 pro
   assert.equal(Object.hasOwn(settings.ai, 'prefilterModel'), false);
   assert.equal(Object.hasOwn(settings.ai, 'scoringModel'), false);
@@ -563,9 +567,6 @@ test('real Electron desktop flow is secure, persistent across restart and single
   await firstPage.locator('.tab[data-view="settings"]').click();
   await settingsLoadStarted.promise;
   try {
-    await firstPage.locator('#setBaseUrl').fill(mockBaseUrl);
-    await firstPage.locator('#setApiKey').fill(DUMMY_API_KEY);
-    assert.equal(await firstPage.locator('#setModel').getAttribute('readonly'), '');
     await firstPage.locator('#setInterval').fill('45');
     await firstPage.locator('#setRsshub').fill(`${mockBaseUrl}/rsshub`);
 
@@ -577,9 +578,6 @@ test('real Electron desktop flow is secure, persistent across restart and single
     await settingsLoadFinished;
     await waitForTwoAnimationFrames(firstPage);
 
-    assert.equal(await firstPage.locator('#setApiKey').inputValue(), DUMMY_API_KEY);
-    assert.equal(await firstPage.locator('#setBaseUrl').inputValue(), mockBaseUrl);
-    assert.equal(await firstPage.locator('#setModel').inputValue(), ANALYSIS_MODEL);
     assert.equal(await firstPage.locator('#setInterval').inputValue(), '45');
     assert.equal(await firstPage.locator('#setRsshub').inputValue(), `${mockBaseUrl}/rsshub`);
   } finally {
@@ -587,17 +585,23 @@ test('real Electron desktop flow is secure, persistent across restart and single
     await firstPage.unroute('**/api/settings', delaySettingsLoad);
   }
 
-  await firstPage.locator('#btnSaveAi').click();
+  // 设置 → 模型：编辑 DeepSeek 行，在「自定义设置」里改 API 地址并填入密钥
+  const deepseekRow = firstPage.locator('.model-row[data-provider="deepseek"]');
+  await deepseekRow.waitFor();
+  assert.equal(await deepseekRow.locator('.model-dot.is-missing').count(), 1);
+  await deepseekRow.locator('[data-models-act="edit"]').click();
+  await deepseekRow.locator('input[data-models-field="apiKey"]').fill(DUMMY_API_KEY);
+  await deepseekRow.locator('details.models-customized > summary').click();
+  await deepseekRow.locator('input[data-models-field="baseUrl"]').fill(mockBaseUrl);
+  await deepseekRow.locator('[data-models-act="submit"]').click();
   try {
     await firstPage.waitForFunction(() => {
-      const input = document.querySelector('#setApiKey');
-      const toast = document.querySelector('#toast');
-      const toastText = toast?.textContent || '';
-      const success = input?.dataset.hasStoredKey === 'true'
-        && toast?.classList.contains('show')
-        && toastText.includes('AI 配置已保存');
-      const failure = toast?.classList.contains('show')
-        && toastText.startsWith('AI 配置保存失败');
+      const row = document.querySelector('.model-row[data-provider="deepseek"]');
+      const saved = document.querySelector('.models-saved')?.textContent || '';
+      const failure = row?.querySelector('.model-editor .models-error')?.textContent || '';
+      const success = Boolean(row?.querySelector('.model-dot.is-ok'))
+        && !row.querySelector('.model-editor')
+        && saved.includes('已保存 DeepSeek');
       return success || failure;
     }, undefined, { timeout: 15_000 });
   } catch (error) {
@@ -614,32 +618,28 @@ test('real Electron desktop flow is secure, persistent across restart and single
     throw error;
   }
   const saveResult = await firstPage.evaluate(() => {
-    const input = document.querySelector('#setApiKey');
-    const toast = document.querySelector('#toast');
-    const toastText = toast?.textContent || '';
+    const row = document.querySelector('.model-row[data-provider="deepseek"]');
     return {
-      success: input?.dataset.hasStoredKey === 'true'
-        && toast?.classList.contains('show')
-        && toastText.includes('AI 配置已保存'),
-      toastText
+      success: Boolean(row?.querySelector('.model-dot.is-ok')),
+      endpoint: row?.querySelector('.model-row-sub code')?.textContent || '',
+      failure: row?.querySelector('.models-error')?.textContent || ''
     };
   });
   if (!saveResult.success) {
-    console.log(`[e2e] DeepSeek save failure toast: ${saveResult.toastText}`);
+    console.log(`[e2e] DeepSeek save failure: ${saveResult.failure}`);
   }
-  assert.equal(
-    saveResult.success,
-    true,
-    `DeepSeek settings save failed: ${saveResult.toastText}`
-  );
+  assert.equal(saveResult.success, true, `DeepSeek provider save failed: ${saveResult.failure}`);
+  assert.equal(saveResult.endpoint, mockBaseUrl);
+  // 密钥输入框从不回填
+  assert.equal(await firstPage.locator('input[data-models-field="apiKey"]').count(), 0);
   assert.equal(settingsRequestOutput.finished, true);
   assert.equal(settingsRequestOutput.failed, false);
   assert.equal(settingsRequestOutput.apiKeySupplied, true);
   assert.deepEqual(settingsRequestOutput.stages, ['request-finished']);
 
-  await firstPage.locator('#btnTestAi').click();
+  await firstPage.locator('#btnTestModel').click();
   await firstPage.waitForFunction(() => {
-    const result = document.querySelector('#aiTestResult');
+    const result = document.querySelector('#modelTestResult');
     return result?.classList.contains('ok') && result.textContent.includes('连接正常');
   }, undefined, { timeout: 5_000 });
   assert.deepEqual(mockCalls[0], {
@@ -858,12 +858,11 @@ test('real Electron desktop flow is secure, persistent across restart and single
 
   await secondPage.locator('.tab[data-view="settings"]').click();
   await secondPage.waitForFunction(expected => {
-    const key = document.querySelector('#setApiKey');
-    const baseUrl = document.querySelector('#setBaseUrl');
-    const model = document.querySelector('#setModel');
-    return key?.dataset.hasStoredKey === 'true'
-      && baseUrl?.value === expected.baseUrl
-      && model?.value === expected.model;
+    const row = document.querySelector('.model-row[data-provider="deepseek"]');
+    const active = document.querySelector('#modelsActiveSelect');
+    return Boolean(row?.querySelector('.model-dot.is-ok'))
+      && row.querySelector('.model-row-sub code')?.textContent === expected.baseUrl
+      && active?.value === `deepseek|${expected.model}`;
   }, {
     baseUrl: mockBaseUrl,
     model: ANALYSIS_MODEL
@@ -885,9 +884,9 @@ test('real Electron desktop flow is secure, persistent across restart and single
   assert.equal(maskedSettings.ai._hasKey, true);
   assert.equal(Object.hasOwn(maskedSettings.ai, 'apiKey'), false);
 
-  await secondPage.locator('#btnTestAi').click();
+  await secondPage.locator('#btnTestModel').click();
   await secondPage.waitForFunction(() => {
-    const result = document.querySelector('#aiTestResult');
+    const result = document.querySelector('#modelTestResult');
     return result?.classList.contains('ok') && result.textContent.includes('连接正常');
   }, undefined, { timeout: 5_000 });
   assert.deepEqual(mockCalls[1], {

@@ -1,25 +1,30 @@
 'use strict';
-// 配置体系：settings.json（用户可改，含 DeepSeek API Key）+ scoring.json（计分公式参数）
+// 配置体系：settings.json（用户可改；模型提供商与分析模型，密钥另经 safeStorage 加密保存）+ scoring.json（计分公式参数）
 const fs = require('node:fs');
 const path = require('node:path');
 const { DATA_DIR } = require('./db');
 const { HttpError, validateAiBaseUrl } = require('./http-security');
-const { getApiKey, setApiKey } = require('./runtime-credentials');
+const { getApiKey, setApiKey, getProviderKey } = require('./runtime-credentials');
+const catalog = require('./ai/model-catalog');
 
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
 const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
-// All analysis uses the single Flash Vision model.
-const { VISION_MODEL: DEEPSEEK_MODEL } = require('./ai/model-policy');
-const DEEPSEEK_MODEL_RELEASE = 'DeepSeek V4 Flash Vision Experimental';
+// 默认分析模型：DeepSeek V4 Flash Vision；v0.2.3 起可在「模型」设置中换成任意已配置提供商的模型。
+const DEEPSEEK_MODEL = catalog.DEFAULT_MODEL;
+const DEEPSEEK_MODEL_RELEASE = catalog.DEFAULT_MODEL_NAME;
+// 运行时派生字段：由 providers + activeProvider 解析得出，只存在于内存，不落盘。
+const DERIVED_AI_FIELDS = ['apiKey', 'baseUrl', 'api', 'modelInput', 'providerName'];
 
 const DEFAULT_SETTINGS = {
   // —— AI 分析层（DeepSeek，OpenAI 兼容协议；留好接口，可换任意兼容服务）——
   ai: {
     apiKey: '',
     baseUrl: 'https://api.deepseek.com',
-    model: DEEPSEEK_MODEL,             // 唯一分析模型
+    activeProvider: catalog.DEFAULT_PROVIDER, // 分析模型所属的提供商
+    model: DEEPSEEK_MODEL,             // 分析模型（所有任务共用）
+    providers: { deepseek: {} },       // 已添加的提供商：端点 / 协议 / 模型目录覆盖
     maxBatchPrefilter: 20,             // 预筛单次批量
     requestTimeoutMs: 60000
   },
@@ -60,13 +65,49 @@ function normalizedRsshubBase(value) {
   }
 }
 
-// Every saved model, including legacy per-task choices, migrates to Flash Vision.
-function resolveModel() { return DEEPSEEK_MODEL; }
+// v0.2.2 及更早只有单一端点：ai.baseUrl 属于 DeepSeek，模型被锁定为 Flash Vision。
+// 没有 providers 字段的旧文件按这个口径迁入 providers.deepseek。
+function migrateLegacyProviders(raw) {
+  const ai = raw?.ai && typeof raw.ai === 'object' ? raw.ai : {};
+  if (ai.providers && typeof ai.providers === 'object' && !Array.isArray(ai.providers)) {
+    return { providers: ai.providers, activeProvider: ai.activeProvider, model: ai.model };
+  }
+  const legacyBase = boundedText(ai.baseUrl, '', 2048).replace(/\/+$/, '');
+  const deepseek = legacyBase && legacyBase !== DEFAULT_SETTINGS.ai.baseUrl ? { baseUrl: legacyBase } : {};
+  return { providers: { deepseek }, activeProvider: catalog.DEFAULT_PROVIDER, model: DEEPSEEK_MODEL };
+}
+
+// 把 providers / activeProvider / model 解析成运行时直接可用的派生字段。
+function applyActiveModel(settings) {
+  const active = catalog.resolveActive(settings.ai.providers, settings.ai.activeProvider, settings.ai.model);
+  settings.ai.activeProvider = active.provider;
+  settings.ai.model = active.model;
+  settings.ai.baseUrl = active.described.baseUrl;
+  settings.ai.api = active.described.api;
+  settings.ai.providerName = active.described.displayName;
+  settings.ai.modelInput = Array.isArray(active.entry?.input) ? [...active.entry.input] : null;
+  return active;
+}
+
+function activeApiKey(settings) {
+  const provider = settings.ai.activeProvider;
+  const key = getProviderKey(provider);
+  if (key) return key;
+  return catalog.describeProvider(provider, settings.ai.providers[provider]).keyOptional
+    ? catalog.KEYLESS_PLACEHOLDER
+    : '';
+}
 
 function normalizeSettings(raw) {
+  const legacy = migrateLegacyProviders(raw);
   const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
-  settings.ai.baseUrl = boundedText(settings.ai.baseUrl, DEFAULT_SETTINGS.ai.baseUrl, 2048);
-  settings.ai.model = boundedText(resolveModel(raw), DEEPSEEK_MODEL, 120);
+  settings.ai.providers = catalog.sanitizeProviders(legacy.providers);
+  settings.ai.activeProvider = typeof legacy.activeProvider === 'string'
+    ? legacy.activeProvider
+    : catalog.DEFAULT_PROVIDER;
+  settings.ai.model = boundedText(legacy.model, DEEPSEEK_MODEL, 200);
+  for (const field of DERIVED_AI_FIELDS) delete settings.ai[field];
+  applyActiveModel(settings);
   settings.ai.maxBatchPrefilter = boundedInteger(settings.ai.maxBatchPrefilter, 1, 50, DEFAULT_SETTINGS.ai.maxBatchPrefilter);
   settings.ai.requestTimeoutMs = boundedInteger(settings.ai.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.ai.requestTimeoutMs);
   settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 10, 720, DEFAULT_SETTINGS.collect.intervalMinutes);
@@ -95,18 +136,18 @@ function loadSettings() {
     const legacyKey = String(raw?.ai?.apiKey || '').trim();
     if (!getApiKey() && legacyKey) setApiKey(legacyKey);
     const settings = normalizeSettings(raw);
-    settings.ai.apiKey = getApiKey();
+    settings.ai.apiKey = activeApiKey(settings);
     return settings;
   } catch {
-    const settings = structuredClone(DEFAULT_SETTINGS);
-    settings.ai.apiKey = getApiKey();
+    const settings = normalizeSettings({});
+    settings.ai.apiKey = activeApiKey(settings);
     return settings;
   }
 }
 
 async function saveSettings(settings, options = {}) {
   const sanitized = normalizeSettings(settings);
-  if (sanitized.ai) delete sanitized.ai.apiKey;
+  for (const field of DERIVED_AI_FIELDS) delete sanitized.ai[field];
   const temporary = `${SETTINGS_PATH}.${process.pid}-${Date.now()}.tmp`;
   const rename = options.rename || fs.promises.rename;
   await fs.promises.mkdir(path.dirname(SETTINGS_PATH), { recursive: true });
@@ -141,7 +182,10 @@ function applySettingsPatch(currentSettings, patch) {
     throw new HttpError(400, '包含不支持的采集设置字段');
   }
   const settings = structuredClone(currentSettings);
-  const currentKey = String(settings.ai.apiKey || getApiKey() || '');
+  // 旧版单端点接口（设置页之外的调用方与测试仍在用）作用于当前分析模型所属的提供商
+  const credentialProvider = settings.ai.activeProvider || catalog.DEFAULT_PROVIDER;
+  const providerProfile = () => settings.ai.providers?.[credentialProvider];
+  const currentKey = String(getProviderKey(credentialProvider) || '');
   let apiKey = currentKey;
   let credentialChanged = false;
 
@@ -158,6 +202,11 @@ function applySettingsPatch(currentSettings, patch) {
         apiKey = '';
         credentialChanged = Boolean(currentKey);
       }
+      const described = catalog.describeProvider(credentialProvider, providerProfile());
+      const profile = { ...(providerProfile() || {}) };
+      if (baseUrl !== described.defaultBaseUrl) profile.baseUrl = baseUrl;
+      else delete profile.baseUrl;
+      settings.ai.providers = { ...settings.ai.providers, [credentialProvider]: profile };
       settings.ai.baseUrl = baseUrl;
     }
     if (incomingKey === null) {
@@ -170,11 +219,12 @@ function applySettingsPatch(currentSettings, patch) {
     }
     if (patch.ai.model !== undefined) {
       const model = typeof patch.ai.model === 'string' ? patch.ai.model.trim() : '';
-      if (!model || model.length > 120 || /\p{Cc}/u.test(model)) {
-        throw new HttpError(400, '模型名称必须是 1 到 120 个字符的文本');
+      if (!model || model.length > 200 || /\p{Cc}/u.test(model)) {
+        throw new HttpError(400, '模型名称必须是 1 到 200 个字符的文本');
       }
-      if (model !== DEEPSEEK_MODEL) {
-        throw new HttpError(400, `${model} 已从本应用移除，请使用 ${DEEPSEEK_MODEL}（${DEEPSEEK_MODEL_RELEASE}）`);
+      const described = catalog.describeProvider(credentialProvider, providerProfile());
+      if (!described.models.some(entry => entry.id === model)) {
+        throw new HttpError(400, `${model} 不在「${described.displayName}」的模型目录中，请先在 设置 → 模型 里添加`);
       }
       settings.ai.model = model;
     }
@@ -215,7 +265,7 @@ function applySettingsPatch(currentSettings, patch) {
     settings.collect.rsshubBase = rsshubBase;
   }
   settings.ai.apiKey = apiKey;
-  return { settings, apiKey, credentialChanged };
+  return { settings, apiKey, credentialChanged, credentialProvider };
 }
 
 function deepMerge(base, over) {
@@ -423,5 +473,7 @@ module.exports = {
   SETTINGS_PATH,
   BREAKTHROUGHS_PATH,
   DEEPSEEK_MODEL,
-  DEEPSEEK_MODEL_RELEASE
+  DEEPSEEK_MODEL_RELEASE,
+  normalizeSettings,
+  activeApiKey
 };

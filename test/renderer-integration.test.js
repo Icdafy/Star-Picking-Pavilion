@@ -146,10 +146,13 @@ test('视图切换、分类、星标和持久化均接入 app.js', () => {
 });
 
 test('设置页不接收密钥内容，空输入不会覆盖已保存的密钥', () => {
-  assert.doesNotMatch(app, /setApiKey['"]\)\.value\s*=\s*s\.ai\.apiKey/);
-  assert.match(settingsFormController, /if \(apiKey\) aiPatch\.apiKey = apiKey/);
-  assert.match(settingsFormController, /apiKey:\s*null/);
-  assert.match(html, /id="btnClearAiKey"/);
+  // v0.2.3 模型设置：密钥输入框是 password 且从不回填；只有非空输入才进请求体，
+  // 清除走独立的 clearKey 动作并先经确认弹窗
+  assert.doesNotMatch(app, /setApiKey/);
+  assert.match(settingsFormController, /type="password" autocomplete="new-password" value="\$\{esc\(draft\.apiKey\)\}"/);
+  assert.match(settingsFormController, /if \(key\) body\.apiKey = key;/);
+  assert.match(settingsFormController, /body: \{ clearKey: true \}/);
+  assert.match(settingsFormController, /已配置——输入新值可替换/);
 });
 
 test('设置页通过竞态安全控制器加载和保存全部可编辑字段', () => {
@@ -159,8 +162,8 @@ test('设置页通过竞态安全控制器加载和保存全部可编辑字段',
   // 批 2：设置页接线迁入 renderer/settings-view-controller.js，断言改指新模块
   assert.match(settingsViewSource, /SettingsFormController\.createSettingsFormController/);
   assert.match(settingsViewSource, /settingsForm\.load\(\)/);
-  assert.match(settingsViewSource, /settingsForm\.saveAi\(\)/);
-  assert.match(settingsViewSource, /settingsForm\.clearApiKey\(\)/);
+  assert.match(settingsViewSource, /SettingsFormController\.createModelsSettings/);
+  assert.match(settingsViewSource, /modelsSettings\.load\(\)/);
   assert.match(settingsViewSource, /settingsForm\.saveCollect\(\)/);
 });
 
@@ -181,9 +184,10 @@ test('界面展示后端的安全错误消息并捕获设置保存失败', () =>
   assert.match(app, /const payload = await res\.json\(\)\.catch\(\(\) => null\)/);
   assert.match(app, /throw new Error\(payload\?\.error \|\| `请求失败/);
   // 批 2：错误 toast 随各自控制器迁移，断言改指对应模块源码
-  assert.match(settingsViewSource, /AI 配置保存失败：/);
+  assert.match(settingsFormController, /draft\.failure = error\.message/);
+  assert.match(settingsFormController, /删除失败：/);
+  assert.match(settingsFormController, /切换失败：/);
   assert.match(settingsViewSource, /采集设置保存失败：/);
-  assert.match(settingsViewSource, /清除密钥失败：/);
   assert.match(dailyViewSource, /日报重新生成失败：/);
   assert.match(sourcesControllerSource, /信源操作失败：/);
   assert.match(settingsViewSource, /反馈保存失败：/);
@@ -859,15 +863,15 @@ test('v0.0.14 卡片呈现实体标签与原子事件，实体点击即检索', 
   assert.ok(css.includes('.card-events'), '缺少原子事件样式');
 });
 
-test('v0.0.14 设置页只暴露单一分析模型字段', () => {
-  assert.match(html, /id="setModel"[^>]*placeholder="deepseek-v4-flash-vision-exp"/);
-  assert.doesNotMatch(html, /setPrefilterModel|setScoringModel/);
-  // v4-pro 只能作为「已移除」的说明出现，不能再是任何输入框的候选值
-  assert.doesNotMatch(html, /(?:placeholder|value)="[^"]*deepseek-v4-pro/);
+test('v0.2.3 设置页以「模型」一节选定唯一的分析模型', () => {
+  assert.match(html, /id="modelsCard"/);
+  assert.match(html, /id="modelsSection"/);
+  assert.match(html, /id="modelPickerDialog"[^>]*class="glass-dialog model-picker"/);
+  assert.doesNotMatch(html, /id="setModel"|id="setApiKey"|id="setBaseUrl"|setPrefilterModel|setScoringModel/);
   assert.doesNotMatch(html, /deepseek-v4-pro/);
-  assert.match(html, /id="setModel"[^>]*readonly/);
-  // 批 2：设置表单装配迁到 renderer/settings-view-controller.js，字段表落点改指新模块
-  assert.match(settingsViewSource, /model: \$\('#setModel'\)/);
+  // 分析模型只有一个选择框，所有任务共用；不回到按任务分模型的旧形态
+  assert.match(settingsFormController, /data-models-act="select-active"/);
+  assert.match(settingsFormController, /'\/api\/models\/active'/);
   assert.doesNotMatch(app, /prefilterModel|scoringModel/);
   assert.doesNotMatch(settingsViewSource, /prefilterModel|scoringModel/);
 });
