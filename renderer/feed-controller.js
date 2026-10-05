@@ -25,7 +25,7 @@
     // 批 4 卡片交互依赖（均可选：不注入则不接线交互层）
     toast, refreshStats, copyText, runTermSearch, safeUrl, timeAgo,
     // v0.2.0：主体公司标签直达一级市场的公司档案（可选）
-    openCompany
+    openCompany, getSearchIntent
   } = {}) {
     if (typeof api !== 'function' || !state || typeof esc !== 'function'
       || !DomUtils || !format || !card || !diff
@@ -52,10 +52,16 @@
       // 这样在加载途中切换领域/分类不会被静默丢弃。
       if (!reset && state.loading) return;
       const request = feedRequestGuard.begin();
+      const context = () => [state.view, state.domain, state.category, state.q].join('\u0000');
+      const requestedContext = context();
+      const requestedQuery = state.q;
       state.loading = true;
       const list = elements.list;
+      list.setAttribute?.('aria-busy', 'true');
+      if (elements.feedToolbarNote) elements.feedToolbarNote.textContent = '正在更新列表…';
       // 整表替换会丢掉键盘焦点——先记住焦点所在的控件，渲染后归还
       const focusKey = reset ? DomUtils.findFocusKey(list) : null;
+      const originalFocus = list.ownerDocument?.activeElement;
       if (reset) { state.page = 0; state.listed = 0; list.innerHTML = skeletons(); if (elements.newFlash) elements.newFlash.hidden = true; }
       try {
         const params = new URLSearchParams({ view: state.view, page: state.page });
@@ -67,6 +73,8 @@
           reset ? delay(SKELETON_MIN_MS) : Promise.resolve()
         ]);
         if (!request.isCurrent()) return;
+        if (context() !== requestedContext
+          || (typeof getSearchIntent === 'function' && getSearchIntent() !== requestedQuery)) return;
         const startIdx = state.page * 30;
         // 阶段 4：渲染走 keyed diff 调和——同 data-id 的节点复用、缺失项才新建，
         // 避免整页卡片全量解析
@@ -102,9 +110,12 @@
         syncFeedToolbar(data.items.length > 0 || state.listed > 0);
         elements.btnMore.hidden = !data.hasMore;
         if (elements.feedEnd) elements.feedEnd.hidden = data.hasMore || !data.items.length;
-        if (reset && focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
+        const activeFocus = list.ownerDocument?.activeElement;
+        if (reset && focusKey && (!activeFocus || activeFocus === originalFocus
+          || activeFocus === list.ownerDocument?.body)) DomUtils.restoreFocusByKey(list, focusKey, list);
       } catch (e) {
         if (!request.isCurrent()) return;
+        if (context() !== requestedContext) return;
         // 失败后列表骤短为错误态，哨兵会立刻进入视口——翻页入口必须同步
         // 隐藏，否则 Observer 触发 loadNextFeedPage，页码前跳、第 0 页被跳过
         elements.btnMore.hidden = true;
@@ -114,6 +125,7 @@
       <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-feed">重试</button></div>`;
       } finally {
         if (request.isCurrent()) state.loading = false;
+        if (request.isCurrent()) list.setAttribute?.('aria-busy', 'false');
       }
     }
 
@@ -158,6 +170,8 @@
         const id = Number(card.dataset.id);
         const starred = button.getAttribute('aria-pressed') !== 'true';
         button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.classList.add?.('is-busy');
         try {
           const result = await api(`/api/articles/${id}/star`, { body: { starred } });
           // 在星标视图里取消星标 = 从收藏夹里移出，必须整表重载，否则卡片会留在原地
@@ -178,6 +192,8 @@
           toast('星标操作失败：' + error.message, true);
         } finally {
           button.disabled = false;
+          button.setAttribute('aria-busy', 'false');
+          button.classList.remove?.('is-busy');
         }
       };
 
@@ -189,8 +205,19 @@
           const card = actionBtn.closest('.card');
           if (actionBtn.dataset.act === 'star') return toggleStar(card, actionBtn);
           const title = card.querySelector('.card-title');
-          const copied = await copyText(`${title.textContent.trim()}\n${title.href}`);
-          toast(copied ? '已复制标题与链接' : '复制失败，请手动选择文本', !copied);
+          actionBtn.disabled = true;
+          actionBtn.setAttribute('aria-busy', 'true');
+          actionBtn.classList.add('is-busy');
+          try {
+            const copied = await copyText(`${title.textContent.trim()}\n${title.href}`);
+            toast(copied ? '已复制标题与链接' : '复制失败，请手动选择文本', !copied);
+          } catch (error) {
+            toast('复制失败：' + error.message, true);
+          } finally {
+            actionBtn.disabled = false;
+            actionBtn.setAttribute('aria-busy', 'false');
+            actionBtn.classList.remove('is-busy');
+          }
           return;
         }
         // 实体标签即检索入口：看到「蓝箭航天」就想知道它最近还有什么动静，

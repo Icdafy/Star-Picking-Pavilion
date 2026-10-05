@@ -54,6 +54,8 @@
     });
 
     let pollTimer;
+    let pollRequest = 0;
+    let lastPollContext = null;
     // 轮询信号快照：先拉 /api/stats，仅当计数信号相对上轮变化时才探测 feed
     let lastPollSignals = null;
     function pollSignalsOf(s) {
@@ -61,13 +63,20 @@
     }
     async function pollRealtime() {
       clearTimeout(pollTimer);
-      const schedule = () => { pollTimer = setTimeout(pollRealtime, 18000); };
+      const request = ++pollRequest;
+      const context = () => [state.view, state.domain, state.category, state.q].join('\u0000');
+      const startedContext = context();
+      const current = () => request === pollRequest && !document.hidden && context() === startedContext;
+      const schedule = () => { if (request === pollRequest) pollTimer = setTimeout(pollRealtime, 18000); };
       if (document.hidden) return schedule();          // 后台标签页暂停
       const stats = await refreshStats();
+      if (!current()) { lastPollSignals = null; return schedule(); }
       // 无变化轮次直接跳过 feed 探测；stats 拉取失败时宁可多探一次不漏更新
       const signals = stats ? pollSignalsOf(stats) : null;
+      if (startedContext !== lastPollContext) lastPollSignals = null;
       if (signals !== null && signals === lastPollSignals) return schedule();
       lastPollSignals = signals;
+      lastPollContext = startedContext;
       // 仅信息流视图、非检索、非加载中才做增量探测
       if (!FEED_VIEWS.includes(state.view) || state.q || state.loading) return schedule();
       try {
@@ -75,10 +84,12 @@
         if (state.domain) params.set('domain', state.domain);
         if (state.category) params.set('category', state.category);
         const data = await api('/api/feed?' + params);
+        if (!current() || state.loading) { lastPollSignals = null; return schedule(); }
         const newItems = data.items.filter(i => !state.knownIds.has(i.id));
         if (newItems.length) {
           const atTop = getScrollY() < 220;
-          const reading = document.querySelector('.card.expanded, .cluster-items:not([hidden])');
+          const reading = document.querySelector('.card.expanded, .cluster-items:not([hidden])')
+            || document.activeElement?.closest?.('.card');
           state.freshIds = new Set(newItems.map(i => i.id));
           if (state.realtime && atTop && !reading) {
             elements.newFlash.hidden = true;

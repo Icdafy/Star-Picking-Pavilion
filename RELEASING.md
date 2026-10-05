@@ -2,6 +2,12 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
+当前 v0.2.7 任务在开发分支验收，尚未进入发布：既有只读
+`test/release-readiness.test.js` 锁定 0.2.6，版本生成声明又超出本次写入
+边界。全部必需项通过前不升 tag、不推 main、不创建 Release；详细证据见
+[BLOCKED.md](BLOCKED.md) 与 [验证报告](docs/v027-validation.md)。下文命令仍
+描述已发布的 v0.2.6 流程。本说明不改变任何工作流或发布门禁。
+
 ## 发布前授权门槛
 
 在任何公开推送前，维护者必须确认：

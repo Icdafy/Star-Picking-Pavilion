@@ -98,7 +98,7 @@
   /* —— 动效 —— */
   --dur-fast: 130ms;
   --dur: 220ms;
-  --dur-slow: 380ms;
+  --dur-slow: 280ms;
   /* v6.5：--dur-base 是 --dur 的语义别名，新规则按「快/基准/慢」三档取名 */
   --dur-base: var(--dur);
   --ease: cubic-bezier(.3, .9, .35, 1);
@@ -110,10 +110,10 @@
      弹性曲线三档按位移幅度分层：light 轻快微弹（胶囊、图标等小控件），
      medium 标准液态弹（浮层悬停、玻璃基元的默认档），heavy 沉稳大弹性（大幅位移强调动画）。 */
   --dur-snap: 160ms;
-  --dur-glide: 480ms;
+  --dur-glide: 280ms;
   --spring-light: cubic-bezier(.3, 1.2, .4, 1);
-  --spring-medium: cubic-bezier(.34, 1.56, .5, 1);
-  --spring-heavy: cubic-bezier(.3, 1.8, .4, 1);
+  --spring-medium: cubic-bezier(.22, .9, .3, 1);
+  --spring-heavy: cubic-bezier(.2, .8, .3, 1);
   /* v7：sticky 日期标题薄纱的模糊强度，供 date-head 统一引用（两主题同值） */
   --veil-blur: blur(6px);
 
@@ -727,7 +727,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
 [data-theme="light"] .lexicon-panel { background: linear-gradient(168deg, rgba(255,255,255,.98), rgba(252,250,244,.97)); }
 /* v6：面板从顶栏下方浮出——与对话框同源的入场，收起仍是瞬时（Esc/外点不该拖泥带水）。
    开合态走 .is-open 类（由 setLexiconOpen 维护），不写 :not([hidden]) 补丁规则 */
-.lexicon-panel.is-open { animation: dialog-in var(--dur-glide) var(--spring-medium); }
+.lexicon-panel.is-open { animation: none; }
 .lexicon-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
 .lexicon-head h3 {
   font-family: var(--font-display); font-size: var(--t-lg);
@@ -958,7 +958,7 @@ body.is-scrolled .nav {
 /* ---------- 主内容 ---------- */
 main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 
-.view { animation: view-in var(--dur-slow) var(--spring-medium) backwards; }
+.view { animation: none; }
 @keyframes view-in {
   from { opacity: 0; transform: translateY(10px); }
 }
@@ -1239,9 +1239,10 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 @keyframes card-in { from { opacity: 0; transform: translateY(12px); } }
 /* 评审修复：命中错峰入场（diff 新建行，feed-card staggerCreated 挂标）的行
    入场整体交给行级运动引擎，这里据此关掉行内卡片的 CSS 入场，避免祖孙
-   两层 transform 叠加、步长不同步导致入场轨迹错乱；首屏整表渲染与复用
-   行不挂此类，CSS 入场保持原样 */
+   两层 transform 叠加、步长不同步导致入场轨迹错乱；屏外新行与复用行
+   直接呈现终态，独立整表模板的 CSS 入场保持原样 */
 .stagger-in .card { animation: none; }
+.motion-reused .card { animation: none; }
 
 /* v5：悬停时浮起的渐变压边。用 mask 把 1px 的渐变描边「挖」出来——
    不占布局、不改盒模型，鼠标离开时整层淡出，比换 border-color 更有光泽。
@@ -2464,9 +2465,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
    属性，避免常驻全表 transition 拖累滚动； reduced 偏好由上方既有
    全局 1ms 兜底覆盖，且 app.js 在 reduced 偏好下不挂此类 */
 body.theme-transition,
-body.theme-transition *,
-body.theme-transition *::before,
-body.theme-transition *::after {
+body.theme-transition :is(.glass, .card, .tab, .pill, .chip, .btn-icon, .btn-ghost, .btn-primary, .lexicon-panel, .toast, input, select, textarea) {
   transition: color 260ms var(--ease), background-color 260ms var(--ease), border-color 260ms var(--ease) !important;
 }
 
@@ -2702,3 +2701,13 @@ body.theme-transition *::after {
 .model-row:hover { transform: translateY(-1px); }
 .model-row { transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--spring-light); }
 .model-row.is-open:hover { transform: none; }
+
+/* v0.2.7：操作反馈与运行中降级；时长按控件/内容层次复用现有令牌。 */
+.card-act.is-busy { opacity: .55; cursor: progress; }
+.feed-list[aria-busy="true"] { cursor: progress; }
+:root[data-fx-tier="static"], :root[data-fx-tier="static"] *,
+:root[data-fx-tier="static"] *::before, :root[data-fx-tier="static"] *::after,
+body.is-idle, body.is-idle *, body.is-idle *::before, body.is-idle *::after {
+  animation: none !important;
+  transition: none !important;
+}

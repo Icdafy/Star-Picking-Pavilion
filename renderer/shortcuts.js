@@ -216,6 +216,7 @@
     }
 
     dialog.addEventListener('close', () => {
+      if (dialog.open) return; // 旧 close 事件不能清掉重新打开面板的 ARIA 与焦点。
       input.setAttribute('aria-expanded', 'false');
       input.removeAttribute('aria-activedescendant');
       const target = returnFocus;

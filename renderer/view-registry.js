@@ -61,6 +61,7 @@
     function switchView(view, { persist = true } = {}) {
       const entry = views.get(view);
       const previous = views.get(state.view);
+      if (previous?.tab) motion?.cancelTree?.($(previous.tab));
       state.view = view;
       if (persist && preferenceActions) preferenceActions.remember('view', view);
       $$('.tab').forEach(t => {

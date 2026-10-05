@@ -7,7 +7,7 @@
 ## 1. 分层与模块边界
 
 ```
-index.html（Aqua 指挥舱静态外壳，25 条 <script src>，预算已用尽）
+index.html（Aqua 指挥舱静态外壳，27 条 <script src>，预算已用尽）
 └── app.js —— 组合根
     │ 职责只剩三件事：
     │  1. state 声明与 UI 基础设施（api/toast/confirmGlass/主题/缩放）
@@ -61,7 +61,7 @@ index.html（Aqua 指挥舱静态外壳，25 条 <script src>，预算已用尽�
 上传、清除、恢复默认和切回流体共享“最新请求 + 串行写队列”，旧压缩任务不得
 覆盖用户后续操作。
 
-液态玻璃阶段 3 新增职责（不新建文件，script 预算 25/25 已用尽）：
+液态玻璃阶段 3 新增职责（不新建文件，当前 script 预算 27/27 已用尽）：
 dom-utils.js 除转义/安全 URL/焦点工具外，新增 `createMotion(deps)`
 微型运动引擎（WAAPI，只做 transform/opacity）：spring/fadeSlideIn/
 staggerIn 三个 API，matchMedia/document/rAF 经 deps 注入，reduced 偏好
@@ -72,6 +72,15 @@ staggerIn 三个 API，matchMedia/document/rAF 经 deps 注入，reduced 偏好
 styles.css 尾部覆盖块只调 `--glass-blur`/`--dur-glide` 令牌值按档降载，
 不新增滤镜声明点与关键帧；系统运行期间切换 reduced-motion 会重新推导档位，
 Canvas 和 CSS 同步降到 static。realtime-poller 主循环 setTimeout 自调度不变。
+
+v0.2.7 候选的运动生命周期仍在上述模块内：createMotion 按元素持有最新
+动画，提供 cancel/cancelTree/cancelAll/dispose；减少动画、隐藏或失焦时取消
+运动，pagehide 时释放监听。局部增强可用 restoreStyles 清掉临时 inline，
+视图入场保留既有终态样式契约。主题意图同步写 DOM/state，再异步持久化，
+按钮承担短反馈；不再由截图回调写主题。词库与 Toast 复用运动引擎，原生
+dialog 保留键盘行为。信息流仅对可见新行错峰，复用行与屏外新行不重播；
+请求与实时轮询同时校验请求序号、视图/领域/分类/查询上下文，避免旧结果
+覆盖新意图。具体实测与尚未通过项见 [v0.2.7 验证报告](./v027-validation.md)。
 
 阶段 4 增量 diff 渲染引擎已接管 app.js 中剩余的卡片整卡模板：
 cardInner 迁为 index.html 的 `<template id="cardTemplate">`，
@@ -111,9 +120,11 @@ renderer/feed-card.js（createCardRenderer + createFeedDiffList），组合根
   - `test/typography.test.js`、`test/perf-guard.test.js` —— 排版与性能护栏
   - `test/<模块名>.test.js` —— 每个 renderer 模块一个 Node 单测
     （lint/UMD 护栏 + 假依赖行为分支：竞态跳过、错误路径、空态）
-- 纪律：被字面断言的代码行若移动/改写，必须在同一批变更里把断言升级为对
+- 通用演进纪律：被字面断言的代码行若移动/改写，必须在同一批变更里把断言升级为对
   新模块的 require 级/行为级断言，并在测试注释写明变更原因。禁止出现
   「代码已改、测试后补」的中间态。
+- 本次 v0.2.7 任务书规定既有测试只读，因此保持真实调用与字面锚点，
+  不适用上述测试改写流程；边界冲突记录于根目录 BLOCKED.md。
 
 ## 4. 新增视图/面板准入规范
 
@@ -127,7 +138,7 @@ renderer/feed-card.js（createCardRenderer + createFeedDiffList），组合根
    信息流家族视图另加 `isFeed: true` 并进入 `FEED_VIEWS` 集合
    （会同时获得筛选条、导出与实时轮询——这是语义承诺，不是样式）。
 3. 视图自身逻辑写成新控制器工厂（遵守第 2 节约定）。**script 标签预算已
-   用尽（25/25）**：新控制器不得新增 `<script src>`，应并入职责最接近的
+   用尽（27/27）**：新控制器不得新增 `<script src>`，应并入职责最接近的
    既有模块，或先合并现有模块腾出名额。
 4. 同步更新契约：`docs/frontend-contracts.md` 的脚本清单与锚点清单、
    `test/renderer-integration.test.js` 的导航/视图断言、
@@ -145,8 +156,8 @@ renderer/feed-card.js（createCardRenderer + createFeedDiffList），组合根
 | 阶段 4 | 卡片模板化（<template id="cardTemplate">）+ keyed diff 渲染引擎（feed-card.js 的 createCardRenderer/createFeedDiffList；feed-controller 走 reconcile/appendPage，realtime-poller 走 prependFresh） | 597 | 647 |
 | 液态玻璃阶段 3 | WAAPI 动效引擎内联 dom-utils.js（createMotion）+ fx-tier 运行时档位 + 视图切换去强制重排 + 信息流错峰入场 + 轮询 idle/rAF 批处理 + 主题平滑过渡 | 643 | 673 |
 
-script 标签：9 → 11 → 22 → 24 → 25（Aqua 外壳新增唯一运行时后达到上限，见 perf-guard
-测试注释与契约文档第 8 节的上调说明）；阶段 4 全部新代码放进既有
+script 标签：9 → 11 → 22 → 24 → 25 → 26（独立 DSH 引擎）→ 27（intel-views.js）；
+当前上限 27，见 perf-guard 测试与契约文档第 8 节。阶段 4 全部新代码放进既有
 feed-card.js / feed-controller.js / realtime-poller.js，未新增脚本。
 app.js 未达「约 300 行」的最终形态，差额主体是组合根理应持有的 UI
 基础设施（toast/api/主题/缩放/偏好持久化/视图注册与启动序列）；在脚本

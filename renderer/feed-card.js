@@ -458,18 +458,21 @@
 
     // 错峰入场只对本次实际新建的行节点生效（content-visibility 区域外的
     // 既有节点不重复动画）；动画是增强层，失败不影响渲染结果。
-    // 评审修复：motion 接管新建行入场——命中 stagger 的行挂 .stagger-in
-    //（styles.css 据此关掉行内卡片的 CSS 入场，避免行级 transform 与卡片
-    // 入场动画祖孙两层叠加、步长不同步），并清掉行构建器写入的 inline
-    // animationDelay。复用行与首屏整表渲染路径不经过这里，CSS 入场不变
+    // motion 接管可见新行；全部新行关闭重复 CSS 入场，屏外直接显示终态。
     function staggerCreated(rows) {
       if (!rows.length || !motion || typeof motion.staggerIn !== 'function') return;
       const limit = Number(motion.STAGGER_LIMIT) > 0 ? Number(motion.STAGGER_LIMIT) : 8;
-      const targets = rows.slice(0, limit);
+      const viewport = list.ownerDocument?.defaultView?.innerHeight;
+      const visible = rows.filter(row => {
+        if (!viewport || typeof row.getBoundingClientRect !== 'function') return true;
+        const rect = row.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < viewport;
+      });
+      const targets = visible.slice(0, limit);
       try {
-        motion.staggerIn(targets);
-        // 上限之外的行不挂标记，继续走卡片 CSS 入场，不出现入场空档
-        targets.forEach(row => {
+        motion.staggerIn(targets, { step: 25, duration: 260, distance: 6, restoreStyles: true });
+        // 所有新行关闭第二套 CSS 入场；视口之外直接显示终态。
+        rows.forEach(row => {
           row.classList?.add('stagger-in');
           const card = row.querySelector?.('.card');
           if (card?.style) card.style.animationDelay = '';
@@ -502,9 +505,9 @@
     function refreshRowCard(row, item, delayMs) {
       const newCard = renderer.renderCard(item);
       newCard.style.animationDelay = `${delayMs}ms`;
-      // 复用行的新卡片走卡片 CSS 入场：摘掉上一轮可能挂着的错峰标记，
-      // 避免残留类名把新卡片的入场一并关掉（复用行入场行为不变）
+      // 未注入增强层时保持旧卡片入场契约；注入时复用行不重复入场。
       row.classList?.remove('stagger-in');
+      if (motion) row.classList?.add('motion-reused');
       const oldCard = row.querySelector('.card');
       if (oldCard) {
         row.insertBefore(newCard, oldCard);
@@ -513,6 +516,7 @@
     }
 
     function reconcile(items, { startIdx = 0, timeOf = publishedTime } = {}) {
+      motion?.cancelTree?.(list);
       const rowsById = collectRowsById();
       list.replaceChildren();
       let reused = 0;

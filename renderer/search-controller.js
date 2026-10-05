@@ -11,7 +11,7 @@
   else if (root) root.SearchController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createSearchControllerModule() {
   function createSearchController({
-    api, state, esc, FEED_VIEWS, loadFeed, switchView, document, elements
+    api, state, esc, FEED_VIEWS, loadFeed, switchView, document, elements, motion
   } = {}) {
     if (typeof api !== 'function' || !state || typeof esc !== 'function'
       || !Array.isArray(FEED_VIEWS) || typeof loadFeed !== 'function'
@@ -155,11 +155,13 @@
     }
 
     function setLexiconOpen(open) {
+      motion?.cancelTree?.(lexiconPanel);
       lexiconPanel.hidden = !open;
       lexiconPanel.classList.toggle('is-open', open);
       lexiconToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       lexiconToggle.classList.toggle('is-on', open);
       if (open) {
+        motion?.fadeSlideIn?.(lexiconPanel, { duration: 220, distance: 6, restoreStyles: true });
         loadLexicon();
         lexiconFilter.focus();
       }
@@ -220,6 +222,7 @@
         if (!button) return;
         setLexiconOpen(false);
         runTermSearch(button.dataset.lexQuery || button.dataset.lexTerm);
+        searchInput.focus({ preventScroll: true });
       });
     }
 

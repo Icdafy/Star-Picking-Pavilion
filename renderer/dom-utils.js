@@ -58,27 +58,31 @@
   // 直接落终态不播动画；el.animate 缺席同样优雅降级为终态。document /
   // matchMedia / rAF 一律经 deps 注入，工厂体内不裸读全局。
   const MOTION_STIFFNESS = Object.freeze({
-    light: Object.freeze({ duration: 240 }),
-    medium: Object.freeze({ duration: 320 }),
-    heavy: Object.freeze({ duration: 440 })
+    light: Object.freeze({ duration: 160 }),
+    medium: Object.freeze({ duration: 260 }),
+    heavy: Object.freeze({ duration: 320 })
   });
   const SPRING_SAMPLES = 10;    // 采样帧数（含首尾共 11 帧，落在 8-12 预算内）
   const STAGGER_LIMIT = 8;      // 错峰入场上限：只作用于本次新增的前 N 个节点
-  const SPRING_EASING = 'cubic-bezier(.34, 1.56, .5, 1)';
+  const SPRING_EASING = 'cubic-bezier(.22, .9, .3, 1)';
 
-  // 阻尼振荡采样：0 → 约 +9% 过冲 → 回摆收敛于 1（t=1 强制落定）
+  // 轻阻尼采样：小幅回弹后收敛于 1（t=1 强制落定），正文少位移。
   function springProgress(t) {
     if (t >= 1) return 1;
-    return 1 - Math.exp(-6 * t) * Math.cos(8 * t);
+    return 1 - Math.exp(-8 * t) * Math.cos(5 * t);
   }
 
   function createMotion(deps = {}) {
     const { document: doc = null, matchMedia = null, raf = null } = deps || {};
+    const win = deps.window || doc?.defaultView;
+    const active = new Map();
+    let disposed = false;
+    let media = null;
+    try { media = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null; } catch {}
 
     function prefersReducedMotion() {
       try {
-        return typeof matchMedia === 'function'
-          && Boolean(matchMedia('(prefers-reduced-motion: reduce)')?.matches);
+        return Boolean(media?.matches);
       } catch {
         return false;
       }
@@ -92,8 +96,35 @@
     }
     // reduced 偏好与 static 档都跳过动画，直接落终态
     function shouldSkip() {
-      return prefersReducedMotion() || fxTier() === 'static';
+      return disposed || Boolean(doc?.hidden)
+        || (typeof doc?.hasFocus === 'function' && !doc.hasFocus())
+        || prefersReducedMotion() || fxTier() === 'static';
     }
+
+    function release(el, record) {
+      if (active.get(el) === record) {
+        active.delete(el);
+        if (record.restoreStyles) settle(el, record.original);
+      }
+      try { record.animation?.cancel(); } catch {}
+    }
+    function cancel(el) {
+      const record = active.get(el);
+      if (record) release(el, record);
+    }
+    function cancelAll() {
+      for (const [el, record] of active) release(el, record);
+    }
+    function cancelTree(root) {
+      if (!root) return;
+      for (const [el, record] of active) {
+        if (el === root || root.contains?.(el)) release(el, record);
+      }
+    }
+    function syncEnvironment() { if (shouldSkip()) cancelAll(); }
+    media?.addEventListener?.('change', syncEnvironment);
+    doc?.addEventListener?.('visibilitychange', syncEnvironment);
+    win?.addEventListener?.('blur', syncEnvironment);
 
     function settle(el, endStyle) {
       if (!el?.style || !endStyle) return;
@@ -116,13 +147,19 @@
     // inline，动画结束后自然落定。fill 只取 backwards：delay 期内应用首帧，
     // 避免错峰延迟期以 inline 终态闪现；不用 forwards/both，终态由 inline
     // 保证，动画结束不留 fill 锁住合成层
-    function spring(el, { keyframes, from, to, duration, stiffness = 'medium', delay = 0 } = {}) {
+    function spring(el, { keyframes, from, to, duration, stiffness = 'medium', delay = 0, restoreStyles = false } = {}) {
       if (!el) return null;
+      cancel(el);
       const preset = MOTION_STIFFNESS[stiffness] || MOTION_STIFFNESS.medium;
       const total = Number(duration) > 0 ? Number(duration) : preset.duration;
       const endStyle = to || lastFrameStyle(keyframes);
+      const original = {};
+      if (restoreStyles && el.style) {
+        for (const name of Object.keys(endStyle || {})) original[name] = el.style[name] || '';
+      }
       if (shouldSkip() || typeof el.animate !== 'function') {
         settle(el, endStyle);
+        if (restoreStyles) settle(el, original);
         return null;
       }
       const preBaked = Array.isArray(keyframes) && keyframes.length >= 2;
@@ -135,20 +172,23 @@
           easing: preBaked ? 'linear' : SPRING_EASING,
           fill: 'backwards'
         });
+        const record = { animation, original, restoreStyles };
+        active.set(el, record);
         // 结束后取消动画对象，释放合成层资源；终态已落在 inline style，
         // 取消不产生视觉跳变。rAF 缺失时直接取消，不作资源兜底的依赖，
         // rAF 只是「再等一帧」的可选优化
         if (animation && typeof animation.finished?.then === 'function') {
           animation.finished
             .then(() => {
-              const release = () => { try { animation.cancel(); } catch {} };
-              if (typeof raf === 'function') raf(release);
-              else release();
+              const finish = () => release(el, record);
+              if (typeof raf === 'function' && !shouldSkip()) raf(finish);
+              else finish();
             })
-            .catch(() => {});
+            .catch(() => { if (active.get(el) === record) release(el, record); });
         }
         return animation;
       } catch {
+        if (restoreStyles) settle(el, original);
         return null;
       }
     }
@@ -169,13 +209,14 @@
     }
 
     function fadeSlideIn(el, opts = {}) {
-      const distance = Number(opts.distance) > 0 ? Number(opts.distance) : 10;
+      const distance = Number(opts.distance) > 0 ? Number(opts.distance) : 6;
       return spring(el, {
         keyframes: fadeSlideFrames(distance),
         to: { transform: 'translateY(0)', opacity: '1' },
         duration: opts.duration,
         stiffness: opts.stiffness || 'medium',
-        delay: opts.delay
+        delay: opts.delay,
+        restoreStyles: opts.restoreStyles
       });
     }
 
@@ -184,7 +225,7 @@
     function staggerIn(els, opts = {}) {
       const nodes = (Array.isArray(els) ? els : Array.from(els || [])).filter(Boolean);
       const limited = nodes.slice(0, STAGGER_LIMIT);
-      const step = Number(opts.step) > 0 ? Number(opts.step) : 45;
+      const step = Number(opts.step) > 0 ? Number(opts.step) : 25;
       const baseDelay = Number(opts.delay) > 0 ? Number(opts.delay) : 0;
       limited.forEach((el, index) => fadeSlideIn(el, { ...opts, delay: baseDelay + index * step }));
       return limited.length;
@@ -194,6 +235,16 @@
       spring,
       fadeSlideIn,
       staggerIn,
+      cancel,
+      cancelAll,
+      cancelTree,
+      dispose() {
+        disposed = true;
+        cancelAll();
+        media?.removeEventListener?.('change', syncEnvironment);
+        doc?.removeEventListener?.('visibilitychange', syncEnvironment);
+        win?.removeEventListener?.('blur', syncEnvironment);
+      },
       STAGGER_LIMIT,
       MOTION_STIFFNESS
     });

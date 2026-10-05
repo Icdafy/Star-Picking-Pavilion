@@ -6,7 +6,7 @@
 > 逐条核对后再动手；任何一条被破坏，`npm test` 会立即报出来。
 >
 > 当前统计口径：Aqua 外壳升级后，页面实际加载的三份 CSS 合计约 235.5 KiB，
-> app.js 约 27 KiB、index.html 约 41.6 KiB；脚本仍为 25 条且预算已用尽。
+> 早期模块化记录中的文件体积为历史值；当前页面脚本为 27 条，预算 27/27 已用尽。
 
 ---
 
@@ -617,6 +617,8 @@ app.js 全部区段注释（顺序固定，是导航也是边界）：
 
 **动效令牌族（:root，追加在既有动效令牌后）**
 
+下表为阶段 1 历史值；v0.2.7 候选更新值及清理语义见 7.5。
+
 | 令牌 | 值 | 用途 |
 | --- | --- | --- |
 | `--dur-snap` | `160ms` | 开关/按压类即时小反馈 |
@@ -687,7 +689,7 @@ styles.css 该块内有同口径豁免注释。全部改动均被既有
 
 **阶段 3：WAAPI 动效引擎、fx-tier 运行时档位与视图切换改造（新增）**
 
-*运动引擎落点*：script 预算 25/25 已用尽，引擎内联进既有
+*运动引擎落点*：当前 script 预算 27/27 已用尽，引擎内联进既有
 `renderer/dom-utils.js`，新增导出 `DomUtils.createMotion(deps)` 工厂
 （UMD + Object.freeze，matchMedia/document/rAF 经 deps 注入）：
 
@@ -761,6 +763,39 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
   控件继续走 `--glass-shadow` 玻璃令牌族，不与阴影阶梯混用。
 
 ---
+
+### 7.5 v0.2.7 候选：最新意图、可中断运动与运行中清理
+
+本节描述当前开发分支，发布状态与失败证据见 `docs/v027-validation.md`；
+7.4 中的阶段值与旧演进记录保留供追溯，以本节说明当前变化。
+
+- createMotion 三档默认时长为 light 160ms / medium 260ms / heavy 320ms，
+  fadeSlideIn 默认位移 6px，staggerIn 默认步长 25ms，上限八节点（175ms）。
+  显式调用参数仍可覆盖，旧依赖行为不变。
+- 同一元素只持有最新 Animation；`cancel(el)`、`cancelTree(root)`、
+  `cancelAll()` 与 `dispose()` 负责释放。reduced-motion change、
+  visibilitychange 和 window blur 立即清理；隐藏/失焦/static 时直接终态。
+  `restoreStyles:true` 用于 Toast、按钮、词库、新行，结束或取消后恢复原
+  inline；默认 false 保持旧视图入场的终态写入契约。
+- `--dur-slow` 与 full 档 `--dur-glide` 为 280ms；medium 曲线为
+  `cubic-bezier(.22, .9, .3, 1)`，heavy 为 `cubic-bezier(.2, .8, .3, 1)`。
+  light 与历史别名保持原值，lite 档沿用已有令牌覆盖。
+- `.view` 与词库不叠加 CSS 入场；信息流新增行全部关闭重复卡片入场，
+  只选当前可见的前八个新行播 WAAPI。注入 motion 时复用行标记
+  `.motion-reused`；没有此增强依赖时保持旧快照契约。
+- 主题同步更新 state/DOM、原生主题 IPC 与持久化意图；按钮反馈 140ms，
+  颜色过渡 260ms、临时类 320ms 后清除。reduced-motion/visibilitychange
+  清掉临时类。颜色过渡收敛到主要表面/控件，不再全子树逐属性过渡。
+- 静态档与 body.is-idle 的 CSS animation/transition 直接关闭，包括伪元素；
+  full/lite 前台档仍播放既有氛围与交互运动。Aqua/DSH 的图形引擎未改。
+- 列表重置保留原骨架和最短驻留；aria-busy 与工具栏提供等待反馈。
+  请求返回时复核 view/domain/category/q 及输入框最新意图；实时轮询同时
+  校验序号与上下文，并把卡片内焦点视为阅读状态。
+- 确认框每次清空 returnValue，取消不能继承上次 OK；旧 close 事件不能
+  清掉重新打开命令面板的 ARIA/焦点；词库选词把焦点交给检索框。
+
+新增测试与取证脚本在实现前冻结，既有测试、预算、阈值不变。新增 E2E
+两项环境检查仍失败，不能以本节的实现描述代替门禁通过。
 
 ## 8. 性能护栏基线（test/perf-guard.test.js）
 

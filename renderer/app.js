@@ -151,10 +151,13 @@ function applyTheme(theme, { persist = true } = {}) {
   //（styles.css 定义 color/background-color/border-color 的 ~260ms 短过渡），
   // 结束后移除——避免常驻全表 transition 拖累滚动。首帧与 reduced
   // 偏好下不挂类；氛围层 animation-play-state 机制不受影响
-  if (themeAppliedOnce && !prefersReducedMotion()) {
+  if (themeAppliedOnce && !prefersReducedMotion() && !document.hidden) {
     document.body.classList.add('theme-transition');
     clearTimeout(themeTransitionTimer);
     themeTransitionTimer = setTimeout(() => document.body.classList.remove('theme-transition'), 320);
+  } else {
+    clearTimeout(themeTransitionTimer);
+    document.body.classList.remove('theme-transition');
   }
   themeAppliedOnce = true;
   document.documentElement.dataset.theme = theme;
@@ -166,50 +169,24 @@ function applyTheme(theme, { persist = true } = {}) {
     preferenceActions.remember('theme', theme);
   }
 }
-// v0.2.3：主题切换走 View Transitions——新主题从触发点（主题按钮或屏幕中心）以圆形
-// 扩散揭开，旧画面整帧保留到揭开结束，不再出现全表颜色逐个过渡的「闪一下」。
-// 不支持 / reduced 偏好 / static 档位 / 页面隐藏时直接同步切换，行为与旧版一致。
-let themeViewTransition = null;
-function toggleTheme(event) {
-  const cur = document.documentElement.dataset.theme;
-  const next = cur === 'light' ? 'dark' : 'light';
-  const canReveal = typeof document.startViewTransition === 'function'
-    && !prefersReducedMotion()
-    && document.documentElement.dataset.fxTier !== 'static'
-    && !document.hidden;
-  if (!canReveal || themeViewTransition) {
-    applyTheme(next);
-    return;
-  }
-  const origin = event?.currentTarget?.getBoundingClientRect?.() || $('#btnTheme')?.getBoundingClientRect?.();
-  const x = origin ? origin.left + origin.width / 2 : window.innerWidth / 2;
-  const y = origin ? origin.top + origin.height / 2 : window.innerHeight / 2;
-  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
-  document.documentElement.classList.add('theme-reveal');
-  try {
-    themeViewTransition = document.startViewTransition(() => {
-      themeAppliedOnce = false; // 揭开动画已经承担过渡，不再叠加逐属性颜色过渡
-      applyTheme(next);
-    });
-  } catch {
-    document.documentElement.classList.remove('theme-reveal');
-    applyTheme(next);
-    return;
-  }
-  themeViewTransition.ready.then(() => {
-    document.documentElement.animate({
-      clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]
-    }, {
-      duration: 560,
-      easing: 'cubic-bezier(.3, .9, .35, 1)',
-      pseudoElement: '::view-transition-new(root)'
-    });
-  }).catch(() => {});
-  themeViewTransition.finished.finally(() => {
-    document.documentElement.classList.remove('theme-reveal');
-    themeViewTransition = null;
+// v0.2.7：意图和主题同步落定；异步截图回调不能覆盖连点的最后一次选择。
+// 颜色只短暂过渡，按钮承担局部微反馈，长文没有整屏遮罩等待。
+function toggleTheme() {
+  applyTheme(state.theme === 'light' ? 'dark' : 'light');
+  motion.spring($('#btnTheme svg'), {
+    from: { transform: 'rotate(-12deg) scale(.94)', opacity: '.8' },
+    to: { transform: 'none', opacity: '1' },
+    duration: 140,
+    restoreStyles: true
   });
 }
+function settleThemeMotion() {
+  if (!prefersReducedMotion() && !document.hidden) return;
+  clearTimeout(themeTransitionTimer);
+  document.body.classList.remove('theme-transition');
+}
+reducedMotionQuery?.addEventListener?.('change', settleThemeMotion);
+document.addEventListener('visibilitychange', settleThemeMotion);
 $('#btnTheme').addEventListener('click', toggleTheme);
 
 // ---------- 界面缩放 ----------
@@ -292,11 +269,13 @@ function toast(msg, isError) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.toggle('error', !!isError);
-  // 连续触发时强制重放弹簧入场：文本变了但气泡原地不动，用户分辨不出
-  // 「这是一条新消息」——撤下再挂上，与 switchView 重放视图入场同款手法
-  el.classList.remove('show');
-  void el.offsetWidth;
   el.classList.add('show');
+  motion.spring(el, {
+    from: { transform: 'translate(-50%, 6px)', opacity: '.75' },
+    to: { transform: 'translate(-50%, 0)', opacity: '1' },
+    duration: 140,
+    restoreStyles: true
+  });
   clearTimeout(toastTimer);
   // 驻留时长随字数走：短消息不晾着碍事，长消息让人读得完
   const hold = Math.min(6000, 2400 + String(msg).length * 45);
@@ -306,15 +285,33 @@ function toast(msg, isError) {
 // ---------- 主题化确认 ----------
 // 破坏性操作的最后一道关卡。原生 confirm() 的系统灰窗与玻璃拟态设计语言
 // 完全脱节，且无法随主题、缩放档位变化；换上同源的 <dialog>。
+let activeConfirmation = null;
 function confirmGlass(message, { title = '请确认', okText = '确定' } = {}) {
   const dialog = $('#confirmDialog');
+  activeConfirmation?.(false);
+  const returnFocus = document.activeElement;
   $('#confirmDialogTitle').textContent = title;
   $('#confirmDialogMessage').textContent = message;
   $('#confirmDialogOk').textContent = okText;
+  dialog.returnValue = '';
   return new Promise(resolve => {
     // method="dialog" 的表单把按钮 value 写进 returnValue；Esc/外点关闭一律视为取消
-    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok'), { once: true });
-    dialog.showModal();
+    const cancel = () => { dialog.returnValue = 'cancel'; };
+    const close = () => { if (!dialog.open) finish(dialog.returnValue === 'ok'); };
+    const finish = value => {
+      dialog.removeEventListener('close', close);
+      dialog.removeEventListener('cancel', cancel);
+      if (activeConfirmation === finish) activeConfirmation = null;
+      resolve(value);
+      if (!dialog.open && returnFocus?.isConnected
+        && (document.activeElement === document.body || dialog.contains(document.activeElement))) {
+        returnFocus.focus({ preventScroll: true });
+      }
+    };
+    activeConfirmation = finish;
+    dialog.addEventListener('close', close);
+    dialog.addEventListener('cancel', cancel);
+    if (!dialog.open) dialog.showModal();
   });
 }
 
@@ -380,6 +377,7 @@ const aquaShell = AquaShell.createAquaShell({
   onChange: patch => store.setState(patch)
 });
 window.addEventListener('pagehide', () => aquaShell.dispose(), { once: true });
+window.addEventListener('pagehide', () => motion.dispose(), { once: true });
 const dailyRequestGuard = Bootstrap.createLatestRequestGuard();
 const feedRequestGuard = Bootstrap.createLatestRequestGuard();
 
@@ -427,6 +425,7 @@ const feedController = FeedController.createFeedController({
   card: { skeletons, publishedTime: FeedCard.publishedTime, starredTime: FeedCard.starredTime },
   diff: feedDiffList,
   feedRequestGuard,
+  getSearchIntent: () => $('#searchInput').value.trim(),
   renderSearchContext: () => searchController.renderSearchContext(),
   // 批 4：卡片交互层（toggleStar + 点击委托）随工厂接线；
   // runTermSearch 来自后面装配的检索控制器，用闭包懒解析
@@ -651,6 +650,7 @@ async function initCategories() {
 // ---------- 检索与词库（批 2 控制器装配） ----------
 const searchController = SearchController.createSearchController({
   api, state, esc, FEED_VIEWS, loadFeed, switchView, document,
+  motion,
   elements: {
     searchInput: $('#searchInput'),
     searchBox: $('#searchBox'),
