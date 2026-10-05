@@ -1,8 +1,28 @@
 # v0.2.7 阻塞记录
 
-## 2026-10-05 续跑状态
+## 当前状态（2026-10-05）
 
-当前发布硬阻塞：最终main CI尚未通过。首次main提交65b3f8d9eaafc7fcf9f66a3500945332286baa7b的CI run37302344612为869单元通过、桌面11/12；原有v021-ui在app.firstWindow前遭遇进程关闭，原布局与新增4项通过。后续门禁未运行，未推tag；失败日志/result.json保留，原因未定位，不改旧测试/超时或吞掉失败。将原样诊断并对包含此失败记录的最终main提交完整复验。
+无发布硬阻塞。正式[v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已为最新非draft/非prerelease版本，六资产下载、SHA-256、PE版本与更新元数据均校验通过；精确SHA`9a3ca396011409c482cb36f17c8aad8ca4ec442d`的main/release全部成功。详见[验证报告](docs/v027-validation.md)。
+
+用户最后明确取消按原任务书继续执行，要求直接推送本地v0.2.7并更新GitHub Releases。执行范围据此改为直接完成发布；当时在运行的既有release工作流随后成功，采用其已生成的同版本资产，没有追加实现或验收轮次。
+
+保留风险：一次本地恢复动画即时观测失败及多次Windows CI旧测试首窗口前进程退出，原因未定位；本地原样诊断未复现，最终main与release完整验证均通过。所有原始失败与成功分别留存，后续通过不等于根因修复。启动诊断提案仅在work/v027/，未应用到旧测试。
+
+## 续跑与发布过程记录（以下为当时状态）
+
+最新发布硬阻塞：第二次release[37307161572 / attempt2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/2)仍失败，6m55s；869单元、桌面11/12，旧v021在firstWindow前进程关闭（16.06s），其他原测试、112布局及新4项通过。后续发布步骤全未运行，没有正式Release/资产。v027-release-attempt2-failed.log/result.json/watch.log保留，Actions调试仍缺退出进程stderr，具体原因未定位；同一tag/精确SHA做第三次完整验收，再失败将按三次规则停止，不改旧测试、启动超时、工作流或门槛。
+
+当前发布硬阻塞：既有release首次[37307161572 / attempt1](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/1)失败，精确SHA9a3ca39的869单元通过、桌面10/12；原有external-ingest与v021均在firstWindow前遭遇进程关闭，布局与新增4项通过。后续审计/构建/安装/SBOM/发布未运行，没有正式Release/资产；tag保持原精确对象，不覆盖。原始v027-release-failed.log/result.json保留，原因仍未定位；补做原样诊断后仅完整复跑既有工作流，不修改旧测试、默认超时或CI门禁。
+
+原样本地external-ingest诊断1/1通过、fail/skip/todo0、10.36s，仅打开Playwright现有pw:browser日志；实际子进程正常退出0。原始v027-release-external-ingest-diagnostic.log保留，未复现不等于已修复。第二次release将对原tag/精确SHA开启Actions调试日志完整执行所有门禁。
+
+main CI硬阻塞已解除：精确SHA9a3ca396011409c482cb36f17c8aad8ca4ec442d的第三次完整验证[37303971624 / attempt2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)全成功，869/12、fail/skip/todo0、审计/声明/构建/1270包边界/一次性安装烟测均成功，8m18s。原始v027-main-ci-3-debug.log/result.json/verified.json保留。当前必需待完成项是注释tag、既有release工作流及六资产下载核验，目标仍未完成。
+
+注释tag已推且远端解引用正确；既有release run37307161572正在精确SHA9a3ca39执行完整门禁。当前必需待完成项收敛为release成功和六资产下载校验；只有tag存在不能宣称正式发布。
+
+历史风险：main第二次验证37303971624/attempt1为869单元、桌面11/12，旧v021通过而旧v024在首个窗口前进程关闭；原样本地v024为1/1、7.74s。两次失败与开发分支成功使用相同Windows镜像，旧测试未记录退出进程stderr，原因仍未定位。上述第三次完整通过不等于根因修复；不改旧测试、启动超时或工作流、不吞掉失败。
+
+首次main CI历史失败：提交65b3f8d9eaafc7fcf9f66a3500945332286baa7b、run37302344612为869单元通过、桌面11/12；原有v021-ui在app.firstWindow前遭遇进程关闭，原布局与新增4项通过。该次后续门禁未运行，失败日志/result.json保留，原因未定位。
 
 原样本地v021诊断1/1通过、fail/skip/todo0（v027-main-v021-diagnostic.log）；没有改测试、electron/server或默认超时，本地不复现不等于已定位/修复。失败与诊断都将随文档提交，完整精确SHA CI仍是硬要求。
 

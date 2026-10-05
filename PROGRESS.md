@@ -1,16 +1,38 @@
 # v0.2.7 执行进度
 
-## 用户继续授权后的续跑（2026-10-05）
+## 当前交付状态（2026-10-05）
 
-### 本轮收尾权威状态
+用户最后明确取消按原任务书继续执行，要求直接推送本地v0.2.7并更新GitHub Releases。执行范围据此改为直接完成发布；当时在运行的既有release工作流随后成功，采用其已生成的同版本资产，没有追加实现或验收轮次。
 
+正式[Release v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，为最新正式版，draft=false、prerelease=false。注释tag对象c313093672c44642a51e9f0b25f968dd5fc85f61解引用为`9a3ca396011409c482cb36f17c8aad8ca4ec442d`；该SHA的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)与[release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)全部成功。Release第三次完整执行9m31s，869/869单元、12/12桌面、fail/cancelled/skip/todo0；审计0、47项声明零差异、1270项包边界、一次性Windows安装/启动/单实例/关闭/卸载成功，用户数据保留。
+
+六项正式资产已下载到新隔离目录`F:\摘星阁\work\v027\release-download-20261005T123712739-af43c12b\assets`，文件尺寸与GitHub SHA-256摘要全部匹配。安装器`Star-Picking-Pavilion-Setup-0.2.7.exe`为99541227字节，SHA-256为`bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610`，与SHA256SUMS.txt一致；PE文件/产品版本0.2.7、NotSigned，latest.yml的版本/文件名/尺寸/实际SHA-512匹配。SBOM为CycloneDX1.6、41个组件，既有工作流Schema验证成功；第三方声明与注释tag内容一致。
+
+原始结果：work/v027/v027-release-attempt3.log/result.json/verified.json、v027-main-ci-3-debug.log/result.json/verified.json、v027-release-download-result.json与fresh目录中的release/latest/CI/PE元数据和verification.log。收尾提交只补发布记录与说明，产品、版本及验收内容与发布tag一致。
+
+- [x] 六条交互链、本地0.2.7版本和候选包、869/12本地回归已完成。
+- [x] 三件参考作品实际体验及六链双主题/双尺寸连续帧证据完成；compare-v2.html包含前后4096/4063实际呈现帧。
+- [x] 同机真实前台full三次导航P95中位13.9→7.4ms、长任务0→0，静态预算与降载/焦点/阅读位置检查完成。
+- [x] main/tag推送、正式Release六资产上传、新目录下载校验和最新正式版确认完成。
+- [x] 无发布硬阻塞。保留风险：一次本地恢复动画即时观测失败及多次Windows CI旧测试首窗口前进程退出，原因未定位；本地原样诊断未复现，最终main与release完整验证均通过。所有原始失败与成功分别留存，后续通过不等于根因修复。启动诊断提案仅在work/v027/，未应用到旧测试。
+
+## 续跑及发布过程记录（以下为当时状态）
+
+### 发布执行阶段记录
+
+- 发布第二次验收失败：[37307161572 / attempt2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/2)，6m55s；精确SHA9a3ca39、869单元通过、桌面11/12、fail1/skip/todo0，旧v021在firstWindow前Target closed（16.06s），external-ingest本次通过，原112布局与新4项通过。后续全部发布门禁未执行，没有Release/资产；v027-release-attempt2-failed.log/result.json/watch.log完整保留。Actions调试日志仍未提供旧测试的进程stderr，原因未定位；将对原tag/同一SHA做第三次完整验收，若再失败按任务书停止该验收并如实未完成。
+- 原样本地外部导入诊断通过：仅开启Playwright现有pw:browser日志，`node --test test/e2e/external-ingest.test.js`为1/1、fail/cancelled/skip/todo0、10.36s；实际子进程正常退出0，v027-release-external-ingest-diagnostic.log保留。未修改旧测试、被测功能或超时；未复现CI退出，原因未定位。将对同一tag/精确SHA以Actions调试日志执行第二次完整release验收。
+- 发布首次验收失败：[release37307161572 / attempt1](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/1)、精确SHA9a3ca39，7m30s。869单元通过、桌面10/12、fail2/skip/todo0；原有external-ingest与v021均在app.firstWindow前进程关闭，原112布局、新4项和v024通过。后续审计/构建/安装/SBOM/发布全部未运行，没有Release或资产。v027-release-failed.log/result.json/watch.log保留。两次main启动失败和这次release原因仍未定位；不修改旧测试/启动超时或绕门禁。补做原样外部导入诊断后，对同一tag开启Actions调试日志完整复验。
+- [x] 精确SHA9a3ca39通过main CI后已推注释tag v0.2.7：tag对象c313093672c44642a51e9f0b25f968dd5fc85f61，解引用为9a3ca396011409c482cb36f17c8aad8ca4ec442d，远端已核对。既有[release run37307161572](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572)由tag push触发，精确headSha匹配，正在执行完整门禁；未手动创建Release，正式发布及六资产核验仍待成功。
+- [x] 最终main精确SHA9a3ca396011409c482cb36f17c8aad8ca4ec442d的第三次完整验证通过：[run37303971624 / attempt2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)，8m18s；869/869单元、12/12桌面、fail/cancelled/skip/todo0，原112布局与新4项通过；审计0、47项声明零差异、构建、1270包边界和一次性Windows安装/启动/单实例/关闭/卸载通过，用户数据保留。v027-main-ci-3-debug.log/result.json/verified.json直接核验。未改产品、旧测试、超时、工作流或判据；两次启动失败原因仍未定位，历史原始输出继续保留。注释tag及release/下载核验待执行。
+- main第二次CI历史失败：提交9a3ca396011409c482cb36f17c8aad8ca4ec442d、run37303971624/attempt1，869单元通过、桌面11/12、fail1/skip/todo0。此次旧v021通过，旧v024-ui在app.firstWindow前报相同Target page/context/browser closed；原112布局和新增4项通过。后续门禁未执行，原始v027-main-ci-2-failed.log/result.json保留。原样本地`node --test test/e2e/v024-ui.test.js`为1/1通过、fail/cancelled/skip/todo0，7.74s；日志v027-main-v024-diagnostic.log。两个失败CI和已通过开发分支CI使用相同runner镜像，原因仍未定位，不将本地通过当作修复。第三次同一SHA启用Actions调试日志完整复跑已成功，见上述最终结果；不改旧测试、启动超时、工作流或验收判据。
 - 正式main首次CI失败：提交65b3f8d9eaafc7fcf9f66a3500945332286baa7b、run37302344612，869单元通过、桌面11/12、skip/todo0。原有v021-ui在app.firstWindow前报Target page/context/browser closed；原112布局与新增4项全部通过。后续审计/构建/安装门禁未执行，没有推tag。原始v027-main-ci-failed.log/result.json保留；产品/测试/构建相对已通过CI的5e04d43零差异。原因未定位，按原样诊断后以包含失败记录的最终main提交重新执行完整CI，不能用旧成功替代。
 - 原样本地诊断`node --test test/e2e/v021-ui.test.js`为1/1通过、fail/skip/todo0，原始v027-main-v021-diagnostic.log保留。没有修改该只读旧测试、启动程序、超时或CI流程；本地未复现不等于已定位或修复，后续完整main CI必须直接通过。
 - [x] 技术候选5e04d436c940a45fadbec0346ac15a0759d4e320已推指定开发分支，现有CI [37292639190](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37292639190)全部成功：869单元、12桌面（原112布局组合）、fail/skip/todo均0；生产审计0、47项声明零差异、构建、1270项包边界、一次性Windows安装/启动/单实例/关闭/卸载通过，用户数据标记保留。原始v027-final-ci.log/result.json/watch.log齐全，10m12s。CI ASAR13,399,011B、安装器99,541,227B；本地与CI分别记录，不混用产物。
 - [x] 最新本地全部命令通过，冻结full性能三次导航中位7.4ms≤15.29且≤20、长任务0/0/0，闲置7.1ms；真实原生与页面前台。当前本地未签名包0.2.7、SHA256=8bb0a04be11f250d27dcee7c2c6b2f0050efe84f721aead357b39d3ba73ebfeb，UI桥与更新元数据一致；不是正式Release资产。
 - [x] 同数据六链前后各52段连续呈现帧回放4096/4063帧，另补阅读通知四组合8截图，滚动600→600、焦点保留、工具栏避让、点击命中；静态预算293065/299008、脚本27/27、关键帧20/20、滤镜护栏9/10，源码边界审计通过。
 - [x] 参考作品实际体验3/3：Codex浏览器实际操作Linear导航展开/Esc关闭/入口归焦、Rauno Flashlight Tabs的Deployments→Home局部选中切换、Lusion动态3D与菜单展开/关闭；实际截图及页面状态确认，访问日期2026-10-05。docs/v027-motion-plan.md逐项记录链接、触发—运动—反馈、具体实现映射及观测限制；未复制品牌/素材/代码，没有虚构作品时长。早前URL识别停止记录保留，没有绕过检查。
-- [ ] 正式发布执行中：版本文档与参考体验已整理并推main；首次精确SHA65b3f8d CI失败已记录，将包含失败与诊断记录的最终main提交重新执行完整CI。产品与验收仍为已通过开发分支CI的5e04d43。只有最终CI通过后再推注释tag、运行既有release工作流并下载核验六资产；最新正式版仍v0.2.6，未推tag或冒称已发布。
+- [ ] 正式发布执行中：最终main精确SHA9a3ca39的完整CI已通过，其注释tag已推、既有release run37307161572进行中；产品与验收相对5e04d43不变。工作流全部成功后下载核验六资产，推tag本身不算发布成功。
 - 风险保留：一次本地恢复后即时动画断言失败未复现；三次真实状态诊断、本地完整复跑和当前WindowsCI均绿，不据此声称已定位原因。最初CI10/12、delta59→0以及无效失焦性能记录均保留，没有放宽或静默重试。
 - CI后产品与验收文件未再变动；本次补齐参考体验并整理正式发布文档，最终main发布前须验证包含这些文档的精确SHA。早前报告文档提交7890bf4保留。
 - [x] 发布准备文档8/8通过，fail/skip/todo0；47项声明再生成零差异，v0.2.7 artifact版本一致；相对5e04d43产品/测试/构建/版本/声明Git差异0。日志v027-publication-{document-gates,notices,version}.log。此前收尾32路径/凭证模式0审计记录保留，当前提交对象审计随后执行。

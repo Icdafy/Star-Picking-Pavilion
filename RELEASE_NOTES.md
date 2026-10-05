@@ -10,9 +10,11 @@
 
 技术验证：869项单元/集成、12项真实桌面回归（原112布局组合）全绿，fail/skip/todo均0；生产审计0漏洞、47项第三方声明零差异、1270项包边界检查通过。一次性Windows CI验证安装、启动、单实例、关闭、卸载及用户数据保留。本机没有运行安装器。
 
-同机真实前台、full档、1440×920、DPR1、144Hz、相同90条样本/30张卡片，三次导航rAF间隔P95中位数为旧版13.9ms→本版7.4ms，均满足≤20ms与同机基线110%；超过50ms长任务中位数0→0。该结果是调度采样，不代表所有GPU或慢CPU设备；绘制总成本有小幅增加。六条交互的双主题/双尺寸前后连续帧回放、红→绿与完整限制见[验证报告](docs/v027-validation.md)。实际体验Linear、Rauno和Lusion的映射见[交互计划](docs/v027-motion-plan.md)。
+同机真实前台、full档、1440×920、DPR1、144Hz、相同90条样本/30张卡片，三次导航rAF间隔P95中位数为旧版13.9ms→本版7.4ms，均满足≤20ms与同机基线110%；超过50ms长任务中位数0→0。该结果是调度采样，不代表所有GPU或慢CPU设备；绘制总成本有小幅增加。六条交互的双主题/双尺寸前后连续帧回放、红→绿与完整限制见[验证报告](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v027-validation.md)。实际体验Linear、Rauno和Lusion的映射见[交互计划](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v027-motion-plan.md)。
 
-验证过程保留两项未定位风险：一次本地恢复动画的即时观测失败，以及首次main CI中原有v021桌面测试在取得首个窗口前遇到进程关闭。失败日志、原样诊断与后续完整门禁结果均记录于验证报告；没有放宽断言、增加测试内重试或更改发布工作流。
+验证过程保留两类未定位风险：一次本地恢复动画的即时观测失败，以及多次Windows CI中不同原有桌面测试在取得首个窗口前遇到进程关闭。原样本机诊断未复现；最终main与release完整门禁均通过。失败与成功分别记录于验证报告，没有放宽断言、增加测试内重试或更改发布工作流。
+
+正式[v0.2.7 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，为最新非draft/非prerelease版本，六项资产完整。安装器SHA-256：`bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610`，新目录下载已与SHA256SUMS.txt和GitHub摘要复核；PE产品版本0.2.7、更新SHA-512匹配。完整[发布工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)成功。
 
 ## v0.2.7 安装包与发布策略
 

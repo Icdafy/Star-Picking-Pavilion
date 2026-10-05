@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-当前发布目标为v0.2.7。版本测试及生成声明的更新已获续跑授权；本地技术验收、开发分支CI及三件参考作品实际体验已完成。最终main精确SHA CI成功后才能推注释tag，由既有release工作流公开资产；当前证据见[验证报告](docs/v027-validation.md)与[BLOCKED.md](BLOCKED.md)。文档中的目标版本不代替远端发布状态核验。
+v0.2.7已正式发布，六资产上传与新目录下载校验完成，最新正式版状态已确认。精确SHA`9a3ca396011409c482cb36f17c8aad8ca4ec442d`的main与release工作流均成功；实际证据见[验证报告](docs/v027-validation.md)与[BLOCKED.md](BLOCKED.md)。以下保留常规发布流程供后续版本参考。
 
 ## 发布前授权门槛
 

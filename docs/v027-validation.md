@@ -1,6 +1,43 @@
-# v0.2.7 验证报告：正式发布执行中
+# v0.2.7 验证报告：正式发布完成
 
-## 当前续跑结果（2026-10-05）
+## 正式发布结果（2026-10-05）
+
+用户最后明确取消按原任务书继续执行，要求直接推送本地v0.2.7并更新GitHub Releases。执行范围据此改为直接完成发布；当时在运行的既有release工作流随后成功，采用其已生成的同版本资产，没有追加实现或验收轮次。
+
+正式[Release v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，为最新正式版，draft=false、prerelease=false。注释tag对象c313093672c44642a51e9f0b25f968dd5fc85f61解引用为`9a3ca396011409c482cb36f17c8aad8ca4ec442d`；该SHA的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)与[release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)全部成功。Release第三次完整执行9m31s，869/869单元、12/12桌面、fail/cancelled/skip/todo0；审计0、47项声明零差异、1270项包边界、一次性Windows安装/启动/单实例/关闭/卸载成功，用户数据保留。
+
+六项正式资产已下载到新隔离目录`F:\摘星阁\work\v027\release-download-20261005T123712739-af43c12b\assets`，文件尺寸与GitHub SHA-256摘要全部匹配。安装器`Star-Picking-Pavilion-Setup-0.2.7.exe`为99541227字节，SHA-256为`bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610`，与SHA256SUMS.txt一致；PE文件/产品版本0.2.7、NotSigned，latest.yml的版本/文件名/尺寸/实际SHA-512匹配。SBOM为CycloneDX1.6、41个组件，既有工作流Schema验证成功；第三方声明与注释tag内容一致。
+
+原始结果：work/v027/v027-release-attempt3.log/result.json/verified.json、v027-main-ci-3-debug.log/result.json/verified.json、v027-release-download-result.json与fresh目录中的release/latest/CI/PE元数据和verification.log。收尾提交只补发布记录与说明，产品、版本及验收内容与发布tag一致。
+
+已实际执行的发布命令为`git push origin refs/tags/v0.2.7`、`gh run watch 37307161572 --exit-status`，既有release工作流执行`npm test`、`npm run test:e2e`、`npm run audit:runtime`、`npm run notices`、`git diff --exit-code -- THIRD_PARTY_NOTICES.txt`、`npm run dist`、`npm run verify:package`、`npm run verify:version -- --tag v0.2.7 --artifacts`、一次性Windows烟测、SHA-256与CycloneDX生成及`gh release create`，全部成功。
+
+发布后实际执行`work/v027/download-and-verify-release.ps1 -V027ReleaseRunId 37307161572`：新目录`gh release download v0.2.7`、实际Get-FileHash/PE签名信息、现有版本验证器、GitHub摘要及更新元数据比较全部通过；没有本机运行安装器。
+
+| 正式资产 | 字节 | 下载SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 370 | e7cbba98475eed0423e2923cfc766d3083bfb89a4df91715810745ef075e5efe |
+| sbom.cdx.json | 81185 | 8f95db449d7387afb65cc90b8f22d8b7758d32abfeff5a3beb6cf8340816402a |
+| SHA256SUMS.txt | 105 | 74f38910f79ef4aab11ff4efb01f4ffe470a0b49672338232752acd2ad4b30ad |
+| Star-Picking-Pavilion-Setup-0.2.7.exe | 99541227 | bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610 |
+| Star-Picking-Pavilion-Setup-0.2.7.exe.blockmap | 105876 | 256daceb24af88d563f4a807f4a6cbb66e273407323b6a2c0cdb0552fe58e836 |
+| THIRD_PARTY_NOTICES.txt | 6346 | 40b7a01db860508a8ec8c33b8bcdf5e04d0a1f5bbac2cb557ee41fbcbcdb6db7 |
+
+更新SHA-512：`O5l/kSGCOnfHNVvrpiV/uYKi2+yueT4NeJbkz89idCNoWcLcdhFwHvnHdBj4K3oFYUkdS8wMdCj55+cLNeUrtQ==`。
+
+本地候选安装器的旧哈希8bb0a04b…为本机构建，正式下载资产使用上述bc1faf32…；两者分别留证，不混用。红→绿、性能原始样本、无效焦点取证及负控记录在下文保留。
+
+保留风险：一次本地恢复动画即时观测失败及多次Windows CI旧测试首窗口前进程退出，原因未定位；本地原样诊断未复现，最终main与release完整验证均通过。所有原始失败与成功分别留存，后续通过不等于根因修复。启动诊断提案仅在work/v027/，未应用到旧测试。
+
+## 发布执行记录（以下为各阶段当时状态）
+
+第二次release历史失败[37307161572 / attempt2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/2)，6m55s；精确SHA9a3ca39未变，869/869单元、桌面11/12、fail1/cancelled/skip/todo0。原有v021在firstWindow前Target closed，16.06s；external-ingest此次通过，原112布局与新4项通过。后续审计、声明、构建、安装、校验和、SBOM、发布全未运行，没有Release/资产。`v027-release-attempt2-failed.log/result.json/watch.log`保留。Actions调试仍没有旧测试的退出进程stderr，15s握手只是假设，不据此擅改超时或启动程序。对原tag/同一SHA做第三次完整验收，再失败按任务书停止此验收并如实未完成。
+首次release验收[37307161572 / attempt1](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/1)失败，7m30s；tag/headSha均未变，9a3ca39的869单元通过、桌面10/12、fail2/cancelled/skip/todo0。原有external-ingest在firstWindow前退出（20.76s），v021同一错误（15.96s）；原112布局与新4项、v024全部通过。其后审计、声明、构建、安装、校验和、SBOM与发布均未运行，没有Release资产。`v027-release-failed.log/result.json`及首次watch保留，不吞掉失败，不改旧测试/默认超时/工作流。原样本地外部导入诊断后，再以Actions调试日志对同一tag完整复验；main已通过的CI不替代release门禁，原因仍未定位。
+
+原样外部导入本地诊断：为现有Playwright设置pw:browser日志后执行`node --test test/e2e/external-ingest.test.js`，退出0、1/1、fail/cancelled/skip/todo0、10.36s；实际Electron子进程退出0，原始`v027-release-external-ingest-diagnostic.log`保留。日志开关没有替换被测功能或修改旧测试/超时；CI退出未复现，不等于已定位。第二次release按同一tag/精确SHA和原完整门禁验证。
+注释tag v0.2.7已推：对象c313093672c44642a51e9f0b25f968dd5fc85f61、远端解引用9a3ca396011409c482cb36f17c8aad8ca4ec442d，严格在该SHA的main完整CI成功后创建，v027-tag-push.log保留。tag push自动触发既有[release37307161572](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572)，headSha匹配；正在完整复跑版本/测试/审计/构建/一次性安装/SBOM/发布门禁，没有手动创建或覆盖Release。工作流成功和六资产下载校验尚待完成。
+最终main精确SHA9a3ca396011409c482cb36f17c8aad8ca4ec442d的第三次完整验证[37303971624 / attempt2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)全部成功，8m18s。直接核对原始`v027-main-ci-3-debug.log`和结果JSON：869/869单元、12/12桌面，fail/cancelled/skip/todo均0；原112布局与新4项通过，生产审计0漏洞、47项声明再生成Git零差异、构建、1270项包边界和一次性Windows安装/启动/单实例/关闭/卸载成功，用户数据保留。`verify-ci-run.cjs`对精确SHA、main分支、ci工作流、逐项步骤及原始计数校验通过。此次仅Actions调试日志完整复跑，未改产品/旧测试/超时/工作流/门槛。两次窗口启动失败仍是未定位风险，后续通过不等于已修复；原失败与诊断不覆盖。注释tag、release及六资产下载核验待执行。
+第二次main CI历史失败[37303971624 / attempt1](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/1)对应9a3ca396011409c482cb36f17c8aad8ca4ec442d，869单元通过、桌面11/12、fail1/skip/todo0。旧v021通过，旧v024-ui在`app.firstWindow`前出现同一Target closed错误，耗时18.57s；原112布局和新4项均通过，后续门禁未运行。`v027-main-ci-2-failed.log/result.json`保留。原样本地`node --test test/e2e/v024-ui.test.js`退出0，1/1、fail/cancelled/skipped/todo0、7.74s；`v027-main-v024-diagnostic.log`保留。已通过开发分支CI与两个失败CI的Windows镜像均为windows-2025-vs2026/20260925.250.1，不能归因为镜像变化。旧测试未转发退出进程stderr，15s后端握手超时只是待排查的可能，尚无证据确认。第三次同一SHA以Actions调试日志完整复跑现有工作流已成功；未更改旧测试、产品启动超时、工作流或门槛。
 
 正式main首次CI [37302344612](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37302344612)对应精确提交65b3f8d9eaafc7fcf9f66a3500945332286baa7b，869单元通过、桌面11/12，skip/todo0；原有v021-ui在app.firstWindow前报`Target page, context or browser has been closed`，原112布局和新增4项全部通过。后续生产审计/声明/构建/安装门禁未执行。原始v027-main-ci-failed.log/result.json保留；产品/测试/构建等与已通过开发分支CI的5e04d43零差异，不能据此断言根因已定位。未修改旧测试、默认超时、产品或判据；诊断后重新执行包含此失败记录的最终main精确提交CI。
 
@@ -12,7 +49,7 @@
 
 参考作品实际体验已完成3/3：2026-10-05在Codex浏览器实际操作Linear导航菜单与Esc归焦、Rauno Flashlight Tabs选中反馈，以及Lusion动态3D与菜单层次；实际页面状态和截图确认，映射及观测限制见[交互计划](v027-motion-plan.md)。早前超时/URL识别停止的失败记录保留，没有绕过检查或虚构先行调研。Raycast是额外尝试，不计入三项。
 
-本轮只整理正式版本与失败记录文档，产品与验收未变；当前main已为65b3f8d，首次CI失败，v0.2.7 tag不存在、最新正式版v0.2.6（draft=false/prerelease=false）。提交诊断记录后对最终main精确SHA完整复验，通过后再推注释tag，仅由既有release工作流发布，最后下载六资产核验。当前发布阻塞是最终main CI未通过；不把开发分支CI当作正式发布门禁。
+本轮只整理正式版本与失败记录文档，产品与验收未变；当前main为9a3ca39，其精确SHA完整CI已通过。v0.2.7注释tag已推，既有release正在执行，正式发布及最新正式版状态待核验；最后必须下载六资产复核。
 
 当前产品最新冻结性能口径三次全部通过：导航8.2/7.2/7.4ms，中位7.4ms（旧版13.9、110%上限15.29、绝对上限20）；超过50ms长任务0/0/0、中位0未增加。闲置7.1/7.2/7.1、中位7.1≤7.92。full档/1440×920/DPR1/144Hz/90条样本/30张首屏一致，原生每50ms和页面每帧前台校验全成立。日志 `v027-final-measure-foreground.log`、原始 `after-v2/`、摘要 `v027-final-perf-summary.json`。首次最新重测因原生失焦退出1，整次无效，不计入三次中位；失败日志 `v027-final-measure.log`、目录 `after-v2-invalid-focus-1/`完整保留。先前有效8.7ms样本封存在 `after-v2-pre-reading-fix/`，没有覆盖或改变冻结脚本及阈值。
 
