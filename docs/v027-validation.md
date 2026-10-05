@@ -2,6 +2,18 @@
 
 ## 当前续跑结果（2026-10-05）
 
+当前产品最新冻结性能口径三次全部通过：导航8.2/7.2/7.4ms，中位7.4ms（旧版13.9、110%上限15.29、绝对上限20）；超过50ms长任务0/0/0、中位0未增加。闲置7.1/7.2/7.1、中位7.1≤7.92。full档/1440×920/DPR1/144Hz/90条样本/30张首屏一致，原生每50ms和页面每帧前台校验全成立。日志 `v027-final-measure-foreground.log`、原始 `after-v2/`、摘要 `v027-final-perf-summary.json`。首次最新重测因原生失焦退出1，整次无效，不计入三次中位；失败日志 `v027-final-measure.log`、目录 `after-v2-invalid-focus-1/`完整保留。先前有效8.7ms样本封存在 `after-v2-pre-reading-fix/`，没有覆盖或改变冻结脚本及阈值。
+
+最新full渲染轨迹4s的三次中位总成本：Layout199.131→170.986ms、Paint130.187→132.524ms、UpdateLayoutTree516.719→412.501ms；绘制成本小幅增加，不能宣称所有成本下降。CPU4附加单次诊断lite P95 229→138.7ms/长任务28→23，static P95 104.1→41.6ms/长任务19→6、有限动画0。附加诊断不套用full的20ms门槛，也不据单次诊断推广所有慢CPU设备流畅。先前219.444ms/Layout与270.9ms/lite样本仍在after-v2-pre-reading-fix/；下文旧值属于此前候选。
+
+当前安装包已重建通过 `dist` / `verify:package` / `verify:version -- --tag v0.2.7 --artifacts`：1270项ASAR、13,389,299B；安装器99,542,963B、PE文件/产品0.2.7、NotSigned、SHA256=`8bb0a04be11f250d27dcee7c2c6b2f0050efe84f721aead357b39d3ba73ebfeb`。实际隔离Electron界面桥0.2.7，实际安装器SHA512与latest.yml/尺寸/文件名匹配；8项发布文档测试通过。日志与JSON `v027-final-{dist,package,artifact-version,installer,ui-and-update-version,document-gates}`。本机没有运行安装器，现有CI安装烟测仍待通过。
+
+最新完整本地回归：`npm test` 869/869、`npm run test:e2e` 12/12，fail/skip/todo均0；日志 `v027-final-unit-visible.log` / `v027-final-e2e-observed.log`，包含原112布局组合。审计0、47项声明重复生成Git差异0，见 `v027-final-{audit,notices}.log`。先前本地完整运行11/12时恢复后的即时动画断言一次失败（v027-final-e2e.log），两次原速及一次CPU4真实状态诊断均full/前台/260ms运行中，原因未定位。只增加失败诊断信息，保持原Animation且running判据及超时，没有增加重试或将失败静默豁免；后续CI仍须独立验证。
+
+通知布局修复后的实际四组合取证：800×600/1440×920、深浅主题，600→600、相同焦点，通知实际点击命中，位于粘顶工具栏下约8px、无横向溢出。截图检查发现第一次浮层定位部分遮挡，因此复用现有 `--stack-top` 安全偏移、使用有效的两层背景；原遮挡截图与新截图分别保留在 `evidence/reading-banner/` / `reading-banner-visible/`。后者 observations.json、`v027-reading-banner-visible.log` 含全部坐标和背景值。当前包已重建，前候选安装器哈希不用于新代码。
+
+开发分支此前已推d735815；首次CI [37287385385](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37287385385) 的869单元通过、桌面10/12，未运行打包/安装烟测。新确认取消需要等待close事件中的Promise结果；新通知流内高度使阅读scrollY移59px，真实4倍CPU/4核心复现。修成无高度占用sticky通知后同诊断delta0、焦点保留、通知可见，2/2绿；确认结果等待修正不改变严格false判据。完整复跑已通过，旧包哈希对应此前候选，不冒充CI通过。失败与红→绿日志见v027-ci-{failed,e2e-diagnostic,e2e-diagnostic-green}.log。
+
 用户明确“继续”后，按上一轮列出的必要范围更新目标版本测试/声明、纠正验收环境并继续验证。以下历史章节保留原三轮的失败，不代表当前状态；新环境口径与冻结哈希见 [协议2](v027-protocol-2.md)。
 
 - `npm run test:e2e`：12 pass / 0 fail / 0 skip / 0 todo，原8项、新4项以及原112布局组合全部通过。实际Electron无焦点模拟，确认20/21/30主题奇偶、原生/持久化一致、30导航、Esc归焦、增量/阅读位置、动态减少动画、真实隐藏/恢复和外观关闭持久化。日志 `work/v027/v027-e2e.log`。

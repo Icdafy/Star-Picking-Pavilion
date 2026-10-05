@@ -1116,13 +1116,17 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .update-pill.error { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
 
 /* 「N 条新情报」可点横幅 */
+/* 覆盖阅读区且不占流内高度，避免通知出现时滚动锚定把 scrollY 推移。 */
 .new-flash {
-  display: block;
-  width: 100%; margin-bottom: var(--sp-3); padding: .625rem var(--sp-5);
+  display: flex; align-items: center; justify-content: center;
+  position: sticky; top: var(--stack-top); z-index: 30;
+  width: min(100%, 26rem); height: 2.75rem;
+  margin: 0 0 -2.75rem auto; padding: 0 var(--sp-5);
   border-radius: var(--radius-md); font-family: var(--font-ui); font-size: var(--t-base); font-weight: 700;
   cursor: pointer; text-align: center;
   border: 1px solid var(--accent-line); color: var(--accent-ink);
-  background: linear-gradient(135deg, var(--accent-soft), transparent);
+  background: linear-gradient(135deg, var(--accent-soft), transparent), var(--card-bg);
+  box-shadow: var(--shadow-sm);
   transition: transform var(--dur-snap) var(--spring-light), box-shadow var(--dur-snap) var(--spring-light);
   animation: flash-in var(--dur-slow) var(--spring-light);
 }

@@ -102,7 +102,7 @@ test('v027 Electron: 30 interrupted navigations, modal/lexicon Esc focus and con
   await page.evaluate(()=>{window.__v027Confirm=null;confirmGlass('仅确认隔离样本').then(value=>window.__v027Confirm=value);});
   await page.locator('#confirmDialogOk').click();await page.waitForFunction(()=>window.__v027Confirm===true);
   await page.evaluate(()=>{window.__v027Confirm=null;confirmGlass('第二次确认应可取消').then(value=>window.__v027Confirm=value);});
-  await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open);
+  await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open&&window.__v027Confirm!==null);
   assert.equal(await page.evaluate(()=>window.__v027Confirm),false,'Esc after a previous OK must cancel');
   assert.equal(await page.evaluate(()=>document.activeElement.id),'btnPalette');assert.deepEqual(errors,[]);
 });
@@ -153,7 +153,8 @@ test('v027 Electron: runtime reduced-motion, static terminal state, hidden/resum
   await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setAlwaysOnTop(true);w.focus();w.webContents.focus();});
   await page.waitForFunction(()=>!document.hidden&&document.hasFocus()&&!document.body.classList.contains('is-idle'));
   assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].isFocused()),true);
-  assert.ok(await page.evaluate(()=>{document.querySelector('.tab[data-view=featured]').click();return document.querySelector('#viewFeed').getAnimations().some(a=>a.constructor.name==='Animation'&&a.playState==='running');}),'full foreground must admit motion after restore');
+  const restored=await page.evaluate(()=>{const before={tier:document.documentElement.dataset.fxTier,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,hidden:document.hidden,focused:document.hasFocus(),idle:document.body.classList.contains('is-idle')};document.querySelector('.tab[data-view=featured]').click();return {before,animations:document.querySelector('#viewFeed').getAnimations().map(a=>({name:a.constructor.name,state:a.playState,pending:a.pending}))};});
+  assert.ok(restored.animations.some(a=>a.name==='Animation'&&a.state==='running'),'full foreground must admit motion after restore: '+JSON.stringify(restored));
   await page.locator('.tab[data-view="settings"]').click();await page.locator('#setAquaEnabled').click();
   assert.equal(await page.evaluate(()=>document.documentElement.dataset.aquaEnabled),'off');
   await page.reload();await page.waitForSelector('.nav');assert.equal(await page.locator('#setAquaEnabled').getAttribute('aria-pressed'),'false');assert.deepEqual(errors,[]);
