@@ -1,10 +1,10 @@
 # v0.2.9 发布状态
 
-本地实现与验证完成；没有已知的实现硬阻塞。尚需完成 main 精确提交 CI、tag 发布、一次性 Windows 安装／卸载及六资产核验，不能在此之前记录正式发布成功。信源严格复查 186／186 通过；详见 docs/v029-validation.md。下方保留历史记录。
+无发布硬阻塞。最新正式版 [v0.2.9](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.9) 已发布；精确提交 `a3c8152a8b6a957963b4190d1c2e686d2299b10d` 的 main CI 与既有 Release 工作流首次执行全部通过，876／876 单元、14／14 桌面、0 生产漏洞、1271 包边界及一次性 Windows 安装／卸载成功。六项附件已在新目录重新下载，GitHub 摘要、校验文件、PE 版本和更新元数据完全匹配。信源严格复查 186／186 通过；详见 [验证记录](docs/v029-validation.md)。历史 CI 首窗口前退出风险未宣称根治，下方保留历史记录。
 
 ---
 
-# v0.2.8 当前状态
+# v0.2.8 历史状态
 
 无发布硬阻塞。新用户原始设置与主题滚动条已发布为最新正式版 [v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8)，已有用户配置优先。精确提交 `befc8a4c77c2381fd86cd24416c6d21f127aa9e6` 的 main CI、Release 与一次性 Windows 安装／卸载检查全部成功：874/874 单元、14/14 真实桌面、生产审计 0 漏洞、1270 项包边界通过；六项附件重新下载校验一致。在线信源严格复查仍为 40 成功、150 失败，东财接口空响应及旧启动退出风险未宣称根治。证据见 [docs/v028-validation.md](docs/v028-validation.md)。下方保留历史版本记录。
 

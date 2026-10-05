@@ -1,10 +1,10 @@
 # v0.2.9 当前状态
 
-标题栏已延展至窗口右边，正文在标题栏下方独立滚动；已清理 35 个信源入口，保留 186 个且严格复查全有内容、0 空结果、0 失败。旧库升级移除停用入口，保留历史文章及来源归属。本地 876 单元、14 桌面（112 布局）、0 漏洞、1271 包边界和版本检查通过。正式发布仍待 main 精确提交与 tag 门禁、一次性 Windows 安装烟测及六资产下载核验；详见 docs/v029-validation.md。
+标题栏已延展至窗口右边，正文在标题栏下方独立滚动；已清理 35 个信源入口，保留 186 个且严格复查全有内容、0 空结果、0 失败。旧库升级移除停用入口，保留历史文章及来源归属。最新正式版 [v0.2.9](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.9) 已发布：精确提交 `a3c8152a8b6a957963b4190d1c2e686d2299b10d` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37328372503) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37329530254) 首次执行全部通过，均为 876 单元、14 桌面（112 布局）、0 漏洞、1271 包边界；一次性 Windows 安装／启动／单实例／退出／卸载成功，用户数据保留。六项正式附件重新下载校验一致，安装器 99,540,524 B、PE 版本 0.2.9、NotSigned，更新元数据匹配。详见 [验证记录](docs/v029-validation.md)。
 
 ---
 
-# v0.2.8 当前状态
+# v0.2.8 历史状态
 
 新用户原始设置与主题滚动条已实现并发布为最新正式版 [v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8)。用户授权按本机配置设定默认值；只提取公开设置，已有用户配置优先。精确提交 `befc8a4c77c2381fd86cd24416c6d21f127aa9e6` 的 main CI 与 Release 全部成功：874/874 单元、14/14 真实桌面、生产审计 0 漏洞、1270 项包边界和一次性 Windows 安装／卸载检查通过，用户数据保留。六项附件已在新目录下载，GitHub 摘要、校验文件、PE 版本及更新元数据全部匹配。在线信源严格复查为 40 成功、150 失败，东财接口空响应及旧启动退出风险如实保留。证据见 [docs/v028-validation.md](docs/v028-validation.md)。下方保留历史版本记录。
 

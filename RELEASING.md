@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-本次候选版本为 v0.2.9：标题栏边界与信源清理。发布前须完成本地验证、main 精确提交 CI、受保护 tag 工作流及六项正式资产下载复核；结果记录在 [验证报告](docs/v029-validation.md)。此前正式版本为 [v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8)。
+最新正式版本为 [v0.2.9](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.9)：标题栏边界与信源清理。本地验证、main 精确提交 CI、既有 tag 工作流和六项正式附件下载核验均已通过；产品提交为 `a3c8152a8b6a957963b4190d1c2e686d2299b10d`，结果记录在 [验证报告](docs/v029-validation.md)。
 
 ## 发布前授权门槛
 

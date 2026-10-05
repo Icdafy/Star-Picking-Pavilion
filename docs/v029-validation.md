@@ -30,10 +30,31 @@
 
 首轮完整单元回归为 876 项、864 通过、12 失败：主要是版本、旧滚动结构和移除说明的固定预期，以及已移除占位源的旧数量断言。随新版更新对应契约，继续保留原功能、安全与历史数据断言。
 
-首轮桌面回归发现临时安全测试链接落在标题栏下方之外而被拖拽区遮挡；将该测试链接放入实际内容视口。另有原有 v027 桌面用例的点击稳定性和减少动画等待失败，完整原始日志保留，后续复验结果在发布前补充。
+首轮桌面回归发现临时安全测试链接落在标题栏下方之外而被拖拽区遮挡；将该测试链接放入实际内容视口。另有原有 v027 桌面用例的点击稳定性和减少动画等待失败，完整原始日志保留；后续完整复验结果见下文。
 
 复验为 **876／876 单元、14／14 真实桌面全通过**，fail、skip、todo 均为 0；桌面总耗时 204.18 秒，含原 112 种布局组合。隐式焦点滚动使用即时定位，明确回顶操作保留平滑滚动和减少动画降级，避免深层表单被正在进行的滚动反复移出视口。信源计数的补充回归 2／2 通过，已移除入口不再计入总数，历史文章数不变。
 
 生产依赖审计为 0 漏洞，第三方声明按版本重生成为 47 项；没有新增依赖。包边界检查 1,271 项通过，ASAR 13,387,924 B，本地候选安装器 99,542,256 B；PE 产品／文件版本均为 0.2.9，签名 NotSigned，SHA-256 为 `4ed4bbf958248041c00c1bb425c8f9990b84807eb8aa444fb30c1a59c1d186dc`。版本、安装包、更新元数据与目标 tag 统一为 0.2.9。
 
-当前仍为候选版本，必须通过 main 精确提交、原有 tag 发布门禁和六项附件复核后才能记录正式发布完成。安装及卸载烟测在一次性 Windows CI 执行，本机不运行安装器。正式资产以发布后重新下载的实际校验值为准。
+## 正式发布与下载核验
+
+2026-10-05 15:10:27 UTC（北京时间 23:10:27）发布 [摘星阁 v0.2.9](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.9)，Release ID 为 403850076；非 draft、非 prerelease，已通过 `/releases/latest` 确认为最新正式版。
+
+产品提交为 `a3c8152a8b6a957963b4190d1c2e686d2299b10d`。注释 tag 对象 `9ed928ccab928271335383f7f7424df2eeb6f271` 解引用为该提交，远端已核对。[main CI 37328372503](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37328372503) 首次执行 7m28s 全通过后才推 tag；既有 [Release 工作流 37329530254](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37329530254) 首次执行 8m17s 全通过并生成、上传六项附件，没有手工绕过门禁。
+
+两套完整 CI 均为 876／876 单元、14／14 真实桌面，fail、cancelled、skip、todo 为 0；生产依赖审计 0 漏洞，47 项声明无差异，1,271 项包边界通过。一次性 Windows runner 上安装、启动、单实例、退出、卸载均成功，用户数据标记保留。本机没有运行安装器。正式 CI 的 ASAR 为 13,396,402 B，安装器为 99,540,524 B，与本地候选包分别记录。
+
+六项正式附件重新下载到新的隔离目录 `work/v029/published-37329530254/`，逐项尺寸与 GitHub SHA-256 摘要完全一致，状态均为 uploaded：
+
+| 附件 | 字节数 |
+| --- | ---: |
+| Star-Picking-Pavilion-Setup-0.2.9.exe | 99,540,524 |
+| Star-Picking-Pavilion-Setup-0.2.9.exe.blockmap | 105,933 |
+| latest.yml | 370 |
+| SHA256SUMS.txt | 105 |
+| sbom.cdx.json | 81,185 |
+| THIRD_PARTY_NOTICES.txt | 6,346 |
+
+正式安装器 PE 产品／文件版本均为 0.2.9，签名状态 NotSigned；实际 SHA-256 为 `6437810808cecd72daa51e80e6c7d4d1cec0aaca038ddcfe1ee6f7f337e11769`，同时匹配 GitHub 摘要和 SHA256SUMS.txt。latest.yml 的版本、文件名、尺寸及两处 SHA-512 与实际安装器匹配。SBOM 为 CycloneDX 1.6、产品版本 0.2.9，由既有工作流完成 Schema 验证；第三方声明与提交内容一致。
+
+原始证据为 `work/v029/main-ci.{json,log,verified.json}`、`release-ci.{json,log,verified.json}`、`remote-tag.txt`，以及下载目录中的 Release／latest 元数据、`verification.json` 和 `pe-metadata.json`。发布后文档提交仅补足记录和 README 信源数量，产品与正式 tag 保持一致。历次失败日志保留，后续通过没有被当作旧 CI 启动退出风险的根因修复。
