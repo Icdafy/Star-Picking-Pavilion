@@ -1,6 +1,6 @@
 # v0.2.8 当前状态
 
-新用户原始设置与主题滚动条已实现。用户授权按本机配置设定默认值并发布 v0.2.8；只提取公开设置，已有用户配置优先。本地 874/874 单元与 14/14 真实桌面测试通过，生产审计 0 漏洞、1270 项包边界检查通过；精确提交 CI 和 Release 发布校验待完成。在线信源严格复查为 40 成功、150 失败，东财接口空响应及旧启动退出风险如实保留。证据见 [docs/v028-validation.md](docs/v028-validation.md)。下方保留历史版本记录。
+新用户原始设置与主题滚动条已实现并发布为最新正式版 [v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8)。用户授权按本机配置设定默认值；只提取公开设置，已有用户配置优先。精确提交 `befc8a4c77c2381fd86cd24416c6d21f127aa9e6` 的 main CI 与 Release 全部成功：874/874 单元、14/14 真实桌面、生产审计 0 漏洞、1270 项包边界和一次性 Windows 安装／卸载检查通过，用户数据保留。六项附件已在新目录下载，GitHub 摘要、校验文件、PE 版本及更新元数据全部匹配。在线信源严格复查为 40 成功、150 失败，东财接口空响应及旧启动退出风险如实保留。证据见 [docs/v028-validation.md](docs/v028-validation.md)。下方保留历史版本记录。
 
 ---
 
@@ -10,7 +10,7 @@
 
 用户最后明确取消按原任务书继续执行，要求直接推送本地v0.2.7并更新GitHub Releases。执行范围据此改为直接完成发布；当时在运行的既有release工作流随后成功，采用其已生成的同版本资产，没有追加实现或验收轮次。
 
-正式[Release v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，为最新正式版，draft=false、prerelease=false。注释tag对象c313093672c44642a51e9f0b25f968dd5fc85f61解引用为`9a3ca396011409c482cb36f17c8aad8ca4ec442d`；该SHA的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)与[release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)全部成功。Release第三次完整执行9m31s，869/869单元、12/12桌面、fail/cancelled/skip/todo0；审计0、47项声明零差异、1270项包边界、一次性Windows安装/启动/单实例/关闭/卸载成功，用户数据保留。
+正式[Release v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，当时为最新正式版，draft=false、prerelease=false。注释tag对象c313093672c44642a51e9f0b25f968dd5fc85f61解引用为`9a3ca396011409c482cb36f17c8aad8ca4ec442d`；该SHA的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37303971624/attempts/2)与[release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)全部成功。Release第三次完整执行9m31s，869/869单元、12/12桌面、fail/cancelled/skip/todo0；审计0、47项声明零差异、1270项包边界、一次性Windows安装/启动/单实例/关闭/卸载成功，用户数据保留。
 
 六项正式资产已下载到新隔离目录`F:\摘星阁\work\v027\release-download-20261005T123712739-af43c12b\assets`，文件尺寸与GitHub SHA-256摘要全部匹配。安装器`Star-Picking-Pavilion-Setup-0.2.7.exe`为99541227字节，SHA-256为`bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610`，与SHA256SUMS.txt一致；PE文件/产品版本0.2.7、NotSigned，latest.yml的版本/文件名/尺寸/实际SHA-512匹配。SBOM为CycloneDX1.6、41个组件，既有工作流Schema验证成功；第三方声明与注释tag内容一致。
 

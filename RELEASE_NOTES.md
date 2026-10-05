@@ -10,7 +10,9 @@
 
 设计参考、配置迁移与验证过程见 [v0.2.8 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v028-validation.md)。
 
-本地验证：874 项单元、14 项真实桌面测试（含原有 112 种布局组合）全绿；生产依赖审计 0 漏洞，1,270 项包边界检查通过。在线严格信源复查为 40 成功／150 失败，东财相关性检索返回空响应；采集器沿用旧版，该外部接口问题未在本版修复。旧桌面重启测试曾有一次未定位的启动退出，原样诊断与最终完整回归通过，详细失败记录保留。
+本地与正式发布验证：874 项单元、14 项真实桌面测试（含原有 112 种布局组合）全绿；生产依赖审计 0 漏洞，1,270 项包边界检查通过。精确发布提交的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37317993152) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37319279803) 全部成功，一次性 Windows CI 完成安装、启动、单实例、关闭、卸载及用户数据保留检查。
+
+在线严格信源复查为 40 成功／150 失败，东财相关性检索返回空响应；采集器沿用旧版，该外部接口问题未在本版修复。旧桌面重启测试曾有一次未定位的启动退出，原样诊断与最终完整回归通过，详细失败记录保留。
 
 ## 安装与校验
 
@@ -21,7 +23,9 @@ Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.8.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
-配套发布 blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 和第三方声明。
+正式 [v0.2.8 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8) 为最新非 draft／非 prerelease 版本。配套发布 blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 和第三方声明，六项附件已重新下载核对尺寸与 GitHub 摘要，更新元数据的实际 SHA-512 匹配。
+
+正式安装器 99,541,704 字节，PE 产品／文件版本 0.2.8，SHA-256：`174a914d0bf54250877cd03644b2b8a5c7b8913c245215db13a8471174d9c2d4`。
 
 ---
 
@@ -43,7 +47,7 @@ Get-Content .\SHA256SUMS.txt
 
 验证过程保留两类未定位风险：一次本地恢复动画的即时观测失败，以及多次Windows CI中不同原有桌面测试在取得首个窗口前遇到进程关闭。原样本机诊断未复现；最终main与release完整门禁均通过。失败与成功分别记录于验证报告，没有放宽断言、增加测试内重试或更改发布工作流。
 
-正式[v0.2.7 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，为最新非draft/非prerelease版本，六项资产完整。安装器SHA-256：`bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610`，新目录下载已与SHA256SUMS.txt和GitHub摘要复核；PE产品版本0.2.7、更新SHA-512匹配。完整[发布工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)成功。
+正式[v0.2.7 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已发布，当时为最新非draft/非prerelease版本，六项资产完整。安装器SHA-256：`bc1faf325fa6980c4c64b3f62c0afee06d363f81cf4666c6947fb6a03dc75610`，新目录下载已与SHA256SUMS.txt和GitHub摘要复核；PE产品版本0.2.7、更新SHA-512匹配。完整[发布工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37307161572/attempts/3)成功。
 
 ## v0.2.7 安装包与发布策略
 

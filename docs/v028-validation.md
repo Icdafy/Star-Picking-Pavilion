@@ -52,4 +52,10 @@
 
 2026-10-05 在线信源严格复查：190 条启用信源，40 成功、0 空结果、150 失败，均报 `Unexpected end of JSON input`。相同东财相关性请求直接探测返回 0 字节，故严格复查不通过；保留失败记录，不将接口故障计为采集成功。信源与采集器未在此版本修改。这项在线可用性检查不在既有 CI／Release 工作流内，正式发布仍必须通过所有既有门禁。
 
-精确提交 GitHub CI、一次性 Windows 安装烟测与正式 Release 校验待完成。
+2026-10-05 正式 [Release v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8) 已发布并设为最新正式版，draft=false、prerelease=false。注释 tag 对象 `78e5a64007ee6d5f7909ad334844957bfb6a0c9e` 解引用为 `befc8a4c77c2381fd86cd24416c6d21f127aa9e6`，与发布源提交一致；该精确提交的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37317993152) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37319279803) 全部成功。
+
+正式 Release 门禁：874/874 单元、14/14 真实桌面测试，fail／cancelled／skip／todo 均 0；生产依赖审计 0 漏洞、47 项第三方声明无差异、1,270 项包边界检查通过。一次性 Windows runner 完成安装、启动、单实例、关闭、卸载检查，并确认用户数据保留。没有更改既有工作流或绕过门禁。
+
+六项正式附件下载到新隔离目录 `work/v028/published-37319279803/`，尺寸及 GitHub SHA-256 摘要全部匹配。正式安装器 99,541,704 B，SHA-256 为 `174a914d0bf54250877cd03644b2b8a5c7b8913c245215db13a8471174d9c2d4`，与 SHA256SUMS.txt 一致；PE 产品／文件版本均为 0.2.8，签名状态 NotSigned。latest.yml 的版本、文件名、尺寸与实际 SHA-512 一致；SBOM 为 CycloneDX 1.6，主组件版本 0.2.8；第三方声明版本匹配。正式 CI 的 app.asar 为 13,401,894 B，其字节数与本地候选包不同，正式安装器校验值以上述公开附件为准。
+
+原始证据保留在被忽略的 `work/v028/`：`main-ci.log`、`release-ci.log`、隔离下载目录中的发布／最新版本元数据、`verification.json` 与 `pe-metadata.json`。发布后仅补文档和 Release 说明，产品代码、tag 与六项附件保持已经验证的版本。

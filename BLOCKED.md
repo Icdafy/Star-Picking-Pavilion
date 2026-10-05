@@ -1,6 +1,6 @@
 # v0.2.8 当前状态
 
-新用户原始设置与主题滚动条已实现。用户授权按本机配置设定默认值并发布 v0.2.8；只提取公开设置，已有用户配置优先。本地 874/874 单元与 14/14 真实桌面测试通过，生产审计 0 漏洞、1270 项包边界检查通过；精确提交 CI 和 Release 发布校验待完成。在线信源严格复查为 40 成功、150 失败，东财接口空响应及旧启动退出风险如实保留。证据见 [docs/v028-validation.md](docs/v028-validation.md)。下方保留历史版本记录。
+无发布硬阻塞。新用户原始设置与主题滚动条已发布为最新正式版 [v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8)，已有用户配置优先。精确提交 `befc8a4c77c2381fd86cd24416c6d21f127aa9e6` 的 main CI、Release 与一次性 Windows 安装／卸载检查全部成功：874/874 单元、14/14 真实桌面、生产审计 0 漏洞、1270 项包边界通过；六项附件重新下载校验一致。在线信源严格复查仍为 40 成功、150 失败，东财接口空响应及旧启动退出风险未宣称根治。证据见 [docs/v028-validation.md](docs/v028-validation.md)。下方保留历史版本记录。
 
 ---
 
@@ -8,7 +8,7 @@
 
 ## 当前状态（2026-10-05）
 
-无发布硬阻塞。正式[v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)已为最新非draft/非prerelease版本，六资产下载、SHA-256、PE版本与更新元数据均校验通过；精确SHA`9a3ca396011409c482cb36f17c8aad8ca4ec442d`的main/release全部成功。详见[验证报告](docs/v027-validation.md)。
+无发布硬阻塞。正式[v0.2.7](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.7)当时为最新非draft/非prerelease版本，六资产下载、SHA-256、PE版本与更新元数据均校验通过；精确SHA`9a3ca396011409c482cb36f17c8aad8ca4ec442d`的main/release全部成功。详见[验证报告](docs/v027-validation.md)。
 
 用户最后明确取消按原任务书继续执行，要求直接推送本地v0.2.7并更新GitHub Releases。执行范围据此改为直接完成发布；当时在运行的既有release工作流随后成功，采用其已生成的同版本资产，没有追加实现或验收轮次。
 

@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-当前目标版本为 v0.2.8：原始设置与主题滚动条。版本来源、默认状态和实际门禁证据见 [验证报告](docs/v028-validation.md)。仅在精确提交 CI、安装烟测和 Release 资产校验完成后记录正式发布成功。
+当前最新正式版为 [v0.2.8](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.8)：原始设置与主题滚动条。精确发布提交 `befc8a4c77c2381fd86cd24416c6d21f127aa9e6` 的 main CI、Release 和一次性 Windows 安装烟测全部成功，六项正式附件已经重新下载校验。版本来源、默认状态和实际门禁证据见 [验证报告](docs/v028-validation.md)。后续版本也须在这些检查完成后记录正式发布成功。
 
 ## 发布前授权门槛
 
