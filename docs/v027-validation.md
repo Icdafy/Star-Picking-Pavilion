@@ -2,15 +2,23 @@
 
 ## 当前续跑结果（2026-10-05）
 
+候选精确提交 `5e04d436c940a45fadbec0346ac15a0759d4e320` 的开发分支 [Windows CI 37292639190](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37292639190)全部成功，耗时10m12s。原始 `v027-final-ci.log` / `v027-final-ci-result.json` 直接记录 `# tests 869 / # pass 869 / # fail 0 / # skipped 0 / # todo 0` 和 `# tests 12 / # pass 12 / # fail 0 / # skipped 0 / # todo 0`，包含原112布局组合。生产审计 `found 0 vulnerabilities`，47项声明再生成Git零差异；构建、1270条包边界通过。CI ASAR13,399,011B、安装器99,541,227B，与本地构建分别保留，不混用哈希。一次性Windows的原始烟测输出为：`Installed, launched, checked single-instance, closed and uninstalled v0.2.7; user data retained.` 本机没有执行安装器或伪设CI=true。
+
+红→绿链：首次候选CI d735815的10/12失败已保留；确认观测改为等待Promise解析后仍严格false，阅读通知流内59px导致600→659，修复后CPU4诊断600→600、焦点保留，当前完整本地与CI12/12通过。一次本地恢复后即时动画断言失败原因未定位，诊断和后续全量本地/CI均通过；风险记录仍在，不声称根因已解决或吞掉失败。
+
+当前仅完成开发分支技术候选。参考作品实际体验0/3；main仍bcf9beb、v0.2.7 tag不存在、最新正式版v0.2.6（draft=false/prerelease=false），见 `v027-final-remote-state.log` / `v027-final-latest-release.json`。main精确SHA CI、注释tag、release与六资产/下载SHA256仍未执行，目标未完成，不把开发分支CI当作正式发布门禁。
+
 当前产品最新冻结性能口径三次全部通过：导航8.2/7.2/7.4ms，中位7.4ms（旧版13.9、110%上限15.29、绝对上限20）；超过50ms长任务0/0/0、中位0未增加。闲置7.1/7.2/7.1、中位7.1≤7.92。full档/1440×920/DPR1/144Hz/90条样本/30张首屏一致，原生每50ms和页面每帧前台校验全成立。日志 `v027-final-measure-foreground.log`、原始 `after-v2/`、摘要 `v027-final-perf-summary.json`。首次最新重测因原生失焦退出1，整次无效，不计入三次中位；失败日志 `v027-final-measure.log`、目录 `after-v2-invalid-focus-1/`完整保留。先前有效8.7ms样本封存在 `after-v2-pre-reading-fix/`，没有覆盖或改变冻结脚本及阈值。
 
 最新full渲染轨迹4s的三次中位总成本：Layout199.131→170.986ms、Paint130.187→132.524ms、UpdateLayoutTree516.719→412.501ms；绘制成本小幅增加，不能宣称所有成本下降。CPU4附加单次诊断lite P95 229→138.7ms/长任务28→23，static P95 104.1→41.6ms/长任务19→6、有限动画0。附加诊断不套用full的20ms门槛，也不据单次诊断推广所有慢CPU设备流畅。先前219.444ms/Layout与270.9ms/lite样本仍在after-v2-pre-reading-fix/；下文旧值属于此前候选。
 
-当前安装包已重建通过 `dist` / `verify:package` / `verify:version -- --tag v0.2.7 --artifacts`：1270项ASAR、13,389,299B；安装器99,542,963B、PE文件/产品0.2.7、NotSigned、SHA256=`8bb0a04be11f250d27dcee7c2c6b2f0050efe84f721aead357b39d3ba73ebfeb`。实际隔离Electron界面桥0.2.7，实际安装器SHA512与latest.yml/尺寸/文件名匹配；8项发布文档测试通过。日志与JSON `v027-final-{dist,package,artifact-version,installer,ui-and-update-version,document-gates}`。本机没有运行安装器，现有CI安装烟测仍待通过。
+当前本地安装包已重建通过 `dist` / `verify:package` / `verify:version -- --tag v0.2.7 --artifacts`：1270项ASAR、13,389,299B；安装器99,542,963B、PE文件/产品0.2.7、NotSigned、SHA256=`8bb0a04be11f250d27dcee7c2c6b2f0050efe84f721aead357b39d3ba73ebfeb`。实际隔离Electron界面桥0.2.7，实际安装器SHA512与latest.yml/尺寸/文件名匹配；8项发布文档测试通过。日志与JSON `v027-final-{dist,package,artifact-version,installer,ui-and-update-version,document-gates}`。本机没有运行安装器，独立CI安装烟测已通过；本地SHA256不是尚未发布的正式资产校验和。
 
-最新完整本地回归：`npm test` 869/869、`npm run test:e2e` 12/12，fail/skip/todo均0；日志 `v027-final-unit-visible.log` / `v027-final-e2e-observed.log`，包含原112布局组合。审计0、47项声明重复生成Git差异0，见 `v027-final-{audit,notices}.log`。先前本地完整运行11/12时恢复后的即时动画断言一次失败（v027-final-e2e.log），两次原速及一次CPU4真实状态诊断均full/前台/260ms运行中，原因未定位。只增加失败诊断信息，保持原Animation且running判据及超时，没有增加重试或将失败静默豁免；后续CI仍须独立验证。
+最新完整本地回归：`npm test` 869/869、`npm run test:e2e` 12/12，fail/skip/todo均0；日志 `v027-final-unit-visible.log` / `v027-final-e2e-observed.log`，包含原112布局组合。审计0、47项声明重复生成Git差异0，见 `v027-final-{audit,notices}.log`。先前本地完整运行11/12时恢复后的即时动画断言一次失败（v027-final-e2e.log），两次原速及一次CPU4真实状态诊断均full/前台/260ms运行中，原因未定位。只增加失败诊断信息，保持原Animation且running判据及超时，没有增加重试或将失败静默豁免；后续独立CI已通过，最终main/release仍须按既有门禁验证。
 
 通知布局修复后的实际四组合取证：800×600/1440×920、深浅主题，600→600、相同焦点，通知实际点击命中，位于粘顶工具栏下约8px、无横向溢出。截图检查发现第一次浮层定位部分遮挡，因此复用现有 `--stack-top` 安全偏移、使用有效的两层背景；原遮挡截图与新截图分别保留在 `evidence/reading-banner/` / `reading-banner-visible/`。后者 observations.json、`v027-reading-banner-visible.log` 含全部坐标和背景值。当前包已重建，前候选安装器哈希不用于新代码。
+
+### 先前续跑阶段记录（当时状态；以上为最新结果）
 
 开发分支此前已推d735815；首次CI [37287385385](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37287385385) 的869单元通过、桌面10/12，未运行打包/安装烟测。新确认取消需要等待close事件中的Promise结果；新通知流内高度使阅读scrollY移59px，真实4倍CPU/4核心复现。修成无高度占用sticky通知后同诊断delta0、焦点保留、通知可见，2/2绿；确认结果等待修正不改变严格false判据。完整复跑已通过，旧包哈希对应此前候选，不冒充CI通过。失败与红→绿日志见v027-ci-{failed,e2e-diagnostic,e2e-diagnostic-green}.log。
 
@@ -26,7 +34,7 @@
 - 另开全新隔离Electron直接观察界面桥版本0.2.7；用实际安装器重算SHA-512，和latest.yml逐字匹配，日志 `v027-ui-and-update-version.log/json`。
 - 六链连续帧补录完成：前后各52段，旧版4096帧、候选4063帧，同数据、双主题、两种尺寸；`work/v027/evidence/compare-v2.html` 按真实起始主题/尺寸匹配并按时间逐帧播放。首次操作后实际帧中位7/11ms，最长307/341ms（首次导航）；不伪称固定帧率或所有操作首帧即时。短反馈在回放中可观察，原frozen-1较迟截图仍保留。抽查窄屏暗色命令面板、浅色确认框和宽屏检索，文字及控件可读，主题20连点四组合均正确。
 - 渲染诊断的局限：full轨迹4s的Layout总时长中位199.131→219.444ms，Paint130.187→128.900ms，UpdateLayoutTree516.719→485.799ms；布局成本有增加，不能宣称全部渲染成本下降。4倍CPU单次lite P95为229→270.9ms，长任务28→21；static为104.1→69.5ms，长任务19→22，有限动画0。此项按冻结口径是附加诊断，不套用full档20ms门槛，也不冒称慢CPU普遍流畅；原始样本及轨迹全部保留。
-- 浏览器UI再次创建超时，备用Computer Use因无法可靠确认当前浏览器URL而中止；遵守停止要求。三个作品实际体验仍缺失。main/tag/正式Release与CI安装烟测尚未执行，不能标记目标完成。
+- 浏览器UI再次创建超时，备用Computer Use因无法可靠确认当前浏览器URL而中止；遵守停止要求。三个作品实际体验仍缺失。main/tag/正式Release尚未执行；开发分支CI安装烟测已通过，不能据此标记目标完成。
 - 本地完成提交前审计相对bcf9beb的32个授权路径，无用户数据/二进制/日志或凭证模式；package/lock只有版本字段变动，4个旧测试逐字只替换版本，release-readiness保留旧断言并增加新版说明检查。只推指定开发分支运行现有CI与一次性Windows安装烟测，不把候选分支CI冒充精确main SHA门禁。
 
 ## 原三轮历史结果（保留失败证据）
