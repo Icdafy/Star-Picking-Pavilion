@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.7 · 连贯交互与阅读反馈
+## v0.2.8 · 原始设置与主题滚动条
 
-- 主题快速连点按最后意图同步生效；导航立即显示选中状态，面板转场可打断。
-- 检索、筛选、分页与实时增量保持正确请求上下文；阅读中的新情报提示保留滚动位置和焦点，只对可见新增行错峰入场。
-- 星标、复制和Toast提供等待与完成反馈；命令面板、词库、确认框关闭后归焦，运行中减少动画及隐藏状态及时清理运动。
-- 沿用玻璃、星空、星鲸、双主题和full/lite/static档位，保留应用功能、内置信源、字体与本地数据格式；没有新增依赖。
+- 新用户使用维护者指定的原始设置：浅色主题、标准字号、背景效果／星鲸／星空关闭、精选首页、实时更新开启、采集间隔 60 分钟；常用网址默认选择“督办计划”，收藏为空。
+- 老用户升级保留本地设置。旧版缺省字段仍沿用旧默认值；浏览器旧设置可迁入桌面配置，空收藏、关闭开关和数值 0 都会保留。
+- 右侧滚动条从标题栏下方开始；14px 轨道中的胶囊滑块随流动背景色相、深浅主题变化，壁纸和关闭背景使用中性色。保留原生拖拽、滚轮、键盘滚动与吸顶布局。
+- 继续提供玻璃、星空、星鲸、双主题与 full/lite/static 档位，已有用户开启的效果不受新默认值影响；没有新增依赖。
 
-版本、界面与更新元数据统一为0.2.7，正式资产以[GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases)为准。实际验证、前后回放与性能采样限制见[验证报告](docs/v027-validation.md)，历史版本见[变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.8，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。默认状态、设计参考和验证记录见 [验证报告](docs/v028-validation.md)，历史版本见 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.7.exe`，双击并按向导安装。v0.2.7 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.8.exe`，双击并按向导安装。v0.2.8 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.7.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.8.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -234,7 +234,7 @@ npm run eval:selection -- --gold data/gold.jsonl  # 用自标注样本校准精�
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.2.7 --artifacts
+npm run verify:version -- --tag v0.2.8 --artifacts
 npm run notices
 ```
 

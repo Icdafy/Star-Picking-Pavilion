@@ -17,6 +17,34 @@
   const TEXT_SCALES = new Set(['sm', 'md', 'lg', 'xl']);
   const AQUA_MODES = new Set(['mica', 'compat']);
   const AQUA_BACKGROUNDS = new Set(['fluid', 'wallpaper']);
+  // v0.2.8 原始状态：维护者当前已安装应用的设置（仅公开偏好，不含用户数据）。
+  // 仅无本地设置的新用户使用；已有设置的缺省字段仍沿用旧版默认值。
+  const DEFAULT_APPEARANCE = Object.freeze({
+    aquaMode: 'mica',
+    aquaEnabled: false,
+    aquaBlur: 2,
+    aquaFrost: 20,
+    aquaHue: 40,
+    aquaBrightness: 42,
+    aquaBackground: 'fluid',
+    aquaWallpaperBlur: 0,
+    aquaWallpaperFrost: 0,
+    aquaWhale: false,
+    aquaCritters: false
+  });
+  const INITIAL_UI_PREFERENCES = Object.freeze({
+    theme: 'light',
+    textScale: 'md',
+    ...DEFAULT_APPEARANCE,
+    view: 'featured',
+    domain: '',
+    category: '',
+    dailyDate: null,
+    linksCategory: '督办计划',
+    commonLinksFavorites: Object.freeze([]),
+    realtime: true,
+    closeToTray: false
+  });
   const UI_PREFERENCE_FIELDS = Object.freeze([
     'theme',
     'textScale',
@@ -81,6 +109,16 @@
   }
 
   function getDefaultUiPreferences(commonLinks) {
+    return {
+      ...INITIAL_UI_PREFERENCES,
+      linksCategory: commonLinks.getCategories().includes(INITIAL_UI_PREFERENCES.linksCategory)
+        ? INITIAL_UI_PREFERENCES.linksCategory
+        : commonLinks.ALL_CATEGORY,
+      commonLinksFavorites: [...INITIAL_UI_PREFERENCES.commonLinksFavorites]
+    };
+  }
+
+  function getLegacyUiPreferences(commonLinks) {
     return {
       theme: 'dark',
       textScale: 'md',
@@ -346,11 +384,14 @@
   return Object.freeze({
     UI_PREFERENCES_VERSION,
     UI_PREFERENCE_FIELDS,
+    DEFAULT_APPEARANCE,
+    INITIAL_UI_PREFERENCES,
     TEXT_SCALES: Object.freeze([...TEXT_SCALES]),
     isPlainObject,
     isRealDateString,
     formatLocalDate,
     getDefaultUiPreferences,
+    getLegacyUiPreferences,
     migrateStoredUiPreferences,
     normalizeFavoriteCandidate,
     normalizeUiPreferences,

@@ -107,7 +107,7 @@ test('browser head load safely ignores corrupt preference JSON and retains legac
   assert.equal(document.documentElement.dataset.theme, 'light');
 });
 
-test('browser head load survives a SecurityError localStorage getter and applies dark', () => {
+test('browser head load survives a SecurityError localStorage getter and applies the initial light theme', () => {
   const document = { documentElement: { dataset: {}, style: {} } };
   const sandbox = { document };
   Object.defineProperty(sandbox, 'localStorage', {
@@ -121,8 +121,8 @@ test('browser head load survives a SecurityError localStorage getter and applies
 
   assert.doesNotThrow(() => runBrowserBootstrap(context));
   assert.equal(typeof context.StarPickingPavilionBootstrap.getSafeStorage, 'function');
-  assert.equal(document.documentElement.dataset.theme, 'dark');
-  assert.equal(document.documentElement.style.colorScheme, 'dark');
+  assert.equal(document.documentElement.dataset.theme, 'light');
+  assert.equal(document.documentElement.style.colorScheme, 'light');
 });
 
 test('null storage helpers read, migrate, and write without throwing', () => {

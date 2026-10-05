@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS = {
   },
   // —— 采集 ——
   collect: {
-    intervalMinutes: 10,               // 采集循环间隔（缩短以更实时）
+    intervalMinutes: 60,               // v0.2.8 原始状态；已有 settings.json 的值优先
     analyzeIntervalSeconds: 75,        // 分析循环间隔（秒）：持续给新采集项打分，实时跟上
     keepDays: 30,                      // 入库保留天数（过老的抓取项直接丢弃）
     retentionDays: 180,                // 已入库情报的保留天数（到期自动清理，含 FTS 索引）
@@ -98,9 +98,11 @@ function activeApiKey(settings) {
     : '';
 }
 
-function normalizeSettings(raw) {
+function normalizeSettings(raw, { existing = false } = {}) {
   const legacy = migrateLegacyProviders(raw);
-  const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), raw);
+  const defaults = structuredClone(DEFAULT_SETTINGS);
+  if (existing) defaults.collect.intervalMinutes = 10;
+  const settings = deepMerge(structuredClone(defaults), raw);
   settings.ai.providers = catalog.sanitizeProviders(legacy.providers);
   settings.ai.activeProvider = typeof legacy.activeProvider === 'string'
     ? legacy.activeProvider
@@ -110,7 +112,7 @@ function normalizeSettings(raw) {
   applyActiveModel(settings);
   settings.ai.maxBatchPrefilter = boundedInteger(settings.ai.maxBatchPrefilter, 1, 50, DEFAULT_SETTINGS.ai.maxBatchPrefilter);
   settings.ai.requestTimeoutMs = boundedInteger(settings.ai.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.ai.requestTimeoutMs);
-  settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 10, 720, DEFAULT_SETTINGS.collect.intervalMinutes);
+  settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 10, 720, defaults.collect.intervalMinutes);
   settings.collect.analyzeIntervalSeconds = boundedInteger(
     settings.collect.analyzeIntervalSeconds, 20, 3600, DEFAULT_SETTINGS.collect.analyzeIntervalSeconds
   );
@@ -135,7 +137,7 @@ function loadSettings() {
     const raw = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
     const legacyKey = String(raw?.ai?.apiKey || '').trim();
     if (!getApiKey() && legacyKey) setApiKey(legacyKey);
-    const settings = normalizeSettings(raw);
+    const settings = normalizeSettings(raw, { existing: true });
     settings.ai.apiKey = activeApiKey(settings);
     return settings;
   } catch {

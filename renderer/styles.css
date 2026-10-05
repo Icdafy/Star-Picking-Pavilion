@@ -49,6 +49,8 @@
    ============================================================ */
 
 :root {
+  --scrollbar-hue: var(--aqua-user-hue, 40deg);
+  --scrollbar-saturation: 36%;
   /* —— 字体 ——
      一条字体栈同时管住两种文字：Times New Roman 只覆盖拉丁字母、数字与
      西文标点，汉字在它里面查不到字形，会顺着栈落到思源黑体上。 */
@@ -229,9 +231,10 @@
   --hover-bg: rgba(168,190,255,.07);
   --active-bg: rgba(168,190,255,.13);
   --rail-line: rgba(168,190,255,.16);
-  --scrollbar-track: rgba(94,234,212,.06);
-  --scrollbar-thumb: rgba(94,234,212,.62);
-  --scrollbar-thumb-hover: rgba(94,234,212,.86);
+  --scrollbar-track: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 60% / .07);
+  --scrollbar-thumb: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 76% / .64);
+  --scrollbar-thumb-hover: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 80% / .88);
+  --scrollbar-thumb-active: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 84%);
   --scrim: rgba(2,4,12,.62);
   --sticky-veil: linear-gradient(180deg, rgba(4,6,14,.94) 62%, rgba(4,6,14,0));
 
@@ -318,9 +321,10 @@
   --hover-bg: rgba(70,84,116,.05);
   --active-bg: rgba(70,84,116,.1);
   --rail-line: rgba(70,84,116,.16);
-  --scrollbar-track: rgba(13,148,136,.07);
-  --scrollbar-thumb: rgba(13,148,136,.68);
-  --scrollbar-thumb-hover: rgba(13,148,136,.9);
+  --scrollbar-track: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 40% / .06);
+  --scrollbar-thumb: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 32% / .68);
+  --scrollbar-thumb-hover: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 24% / .9);
+  --scrollbar-thumb-active: hsl(var(--scrollbar-hue) var(--scrollbar-saturation) 20%);
   --scrim: rgba(40,46,66,.38);
   --sticky-veil: linear-gradient(180deg, rgba(246,244,238,.95) 62%, rgba(246,244,238,0));
 
@@ -2367,13 +2371,22 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent-line); transform: translateY(-2px); }
 .to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
 
-/* ---------- 滚动条 ----------
-   v0.2.5：参照 VS Code、Discord 与 macOS 叠加滚动条——14px 轨道里放一根 8px 的实色胶囊，
-   悬停加粗到 10px、按住再加深，位置一眼可见。不再在 html 上写 scrollbar-width / scrollbar-color：
-   Chromium 121 起只要设置了这两个标准属性（scrollbar-color 还会被所有子元素继承），
-   下面的 ::-webkit-scrollbar 定制就整体失效，退回系统细滚动条。 */
-::-webkit-scrollbar { width: 14px; height: 14px; }
+/* v0.2.8：Radix / Mantine 的胶囊与悬停反馈，保留浏览器原生滚动。
+   根轨道留出原生标题栏；不改变 window 的滚动容器或吸顶/键盘语义。
+   流动背景沿用目标色相，壁纸与关闭背景用中性色，深浅主题分别保证对比度。
+   不设置非 auto 的 scrollbar-width/color，以免 Chromium 覆盖伪元素定制。 */
+:root[data-aqua-background="wallpaper"], :root[data-aqua-enabled="off"] {
+  --scrollbar-hue: 220deg;
+  --scrollbar-saturation: 8%;
+}
+html { scrollbar-gutter: stable; }
+::-webkit-scrollbar { width: 14px; height: 14px; background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+html::-webkit-scrollbar-track, body::-webkit-scrollbar-track {
+  margin-top: calc(var(--desktop-titlebar-height, 32px) + 4px);
+  margin-bottom: 4px;
+}
 ::-webkit-scrollbar-thumb {
   min-height: 3rem;
   border: 3px solid transparent;
@@ -2382,8 +2395,16 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover { border-width: 2px; background: var(--scrollbar-thumb-hover); background-clip: padding-box; }
-::-webkit-scrollbar-thumb:active { border-width: 2px; background: var(--accent); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:active { border-width: 2px; background: var(--scrollbar-thumb-active); background-clip: padding-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
+@media (forced-colors: active) {
+  :root {
+    --scrollbar-track: Canvas;
+    --scrollbar-thumb: CanvasText;
+    --scrollbar-thumb-hover: Highlight;
+    --scrollbar-thumb-active: Highlight;
+  }
+}
 
 /* ---------- 响应式 ---------- */
 @container app (max-width: 77.5rem) {

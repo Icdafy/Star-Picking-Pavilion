@@ -15,19 +15,19 @@ const {
 } = require('../electron/ui-preferences');
 
 const TODAY = '2026-07-23';
-const defaultFavoriteIds = [...CommonLinks.getDefaultFavoriteIds()];
+const defaultFavoriteIds = [];
 const defaultAquaPreferences = Object.freeze({
   aquaMode: 'mica',
-  aquaEnabled: true,
+  aquaEnabled: false,
   aquaBlur: 2,
   aquaFrost: 20,
-  aquaHue: 220,
-  aquaBrightness: 50,
+  aquaHue: 40,
+  aquaBrightness: 42,
   aquaBackground: 'fluid',
   aquaWallpaperBlur: 0,
   aquaWallpaperFrost: 0,
-  aquaWhale: true,
-  aquaCritters: true
+  aquaWhale: false,
+  aquaCritters: false
 });
 
 async function makeDirectory(t) {
@@ -47,14 +47,14 @@ function createStore(directory, overrides = {}) {
 test('default preferences have the complete version 2 shape and are deeply isolated', () => {
   assert.deepEqual(DEFAULT_UI_PREFERENCES, {
     version: 2,
-    theme: 'dark',
+    theme: 'light',
     textScale: 'md',
     ...defaultAquaPreferences,
     view: 'featured',
     domain: '',
     category: '',
     dailyDate: null,
-    linksCategory: CommonLinks.ALL_CATEGORY,
+    linksCategory: '督办计划',
     commonLinksFavorites: defaultFavoriteIds,
     realtime: true,
     closeToTray: false
@@ -284,7 +284,7 @@ test('load treats oversized favorite arrays as corrupt storage', async t => {
 
   const loaded = await store.load();
 
-  assert.deepEqual(loaded.commonLinksFavorites, defaultFavoriteIds);
+  assert.deepEqual(loaded.commonLinksFavorites, [...CommonLinks.getDefaultFavoriteIds()]);
 });
 
 test('update synchronously rejects dense and sparse oversized favorite arrays', async t => {

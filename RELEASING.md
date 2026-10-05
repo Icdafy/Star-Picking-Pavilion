@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.7已正式发布，六资产上传与新目录下载校验完成，最新正式版状态已确认。精确SHA`9a3ca396011409c482cb36f17c8aad8ca4ec442d`的main与release工作流均成功；实际证据见[验证报告](docs/v027-validation.md)与[BLOCKED.md](BLOCKED.md)。以下保留常规发布流程供后续版本参考。
+当前目标版本为 v0.2.8：原始设置与主题滚动条。版本来源、默认状态和实际门禁证据见 [验证报告](docs/v028-validation.md)。仅在精确提交 CI、安装烟测和 Release 资产校验完成后记录正式发布成功。
 
 ## 发布前授权门槛
 
@@ -19,7 +19,7 @@ v0.2.7已正式发布，六资产上传与新目录下载校验完成，最新�
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.2.7
+npm run verify:version -- --tag v0.2.8
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -28,11 +28,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.7 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.7.exe
+npm run verify:version -- --tag v0.2.8 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.8.exe
 ```
 
-v0.2.7 的签名状态预期为 `NotSigned`。
+v0.2.8 的签名状态预期为 `NotSigned`。
 
 **体积不再有上限。** `npm run verify:package` 会打印 ASAR 与安装包的精确字节数供发布记录比对，但不会因为体积失败。
 
@@ -75,25 +75,25 @@ v0.2.7 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.7
-git tag -a v0.2.7 -m "摘星阁 v0.2.7"
-git push origin v0.2.7
+npm run verify:version -- --tag v0.2.8
+git tag -a v0.2.8 -m "摘星阁 v0.2.8"
+git push origin v0.2.8
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.7 Release 应包含：
+v0.2.8 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.7.exe`
-- `Star-Picking-Pavilion-Setup-0.2.7.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.8.exe`
+- `Star-Picking-Pavilion-Setup-0.2.8.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`
 - `THIRD_PARTY_NOTICES.txt`
 
-发布完成后将六项资产下载到work/v027/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
+发布完成后将六项资产下载到work/v028/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
 
 ## 回滚
 

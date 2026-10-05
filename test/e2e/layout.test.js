@@ -24,6 +24,11 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-layout-'));
   const screenshotDir = process.env.SPP_LAYOUT_SCREENSHOT_DIR;
   await fs.promises.copyFile(fixture, path.join(dataDir, 'settings.json'));
+  // 布局/动效矩阵沿用已启用效果的老用户配置；新用户原始状态由 v028-ui 覆盖。
+  await fs.promises.writeFile(path.join(dataDir, 'ui-preferences.json'), JSON.stringify({
+    version: 2,
+    ...require('../../renderer/ui-preference-schema').getLegacyUiPreferences(require('../../renderer/common-links'))
+  }));
   if (screenshotDir) await fs.promises.mkdir(screenshotDir, { recursive: true });
   const app = await electron.launch({
     args: ['.', '--hidden'],
@@ -247,7 +252,7 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   assert.match(lightChrome.titlebarBackdrop, /blur\(12px\)/);
   assert.equal(lightChrome.titlebarBackground, 'none');
   assert.equal(lightChrome.titlebarPointerEvents, 'none');
-  assert.match(lightChrome.scrollbarThumb, /13\s*,\s*148\s*,\s*136/);
+  assert.match(lightChrome.scrollbarThumb, /hsl\(220deg 36% 32%/);
   assert.notEqual(lightChrome.scrollbarTrack, 'transparent');
 
   // 配色预设必须随主题换一整套，而不是深浅主题共用一组发灰的颜色；
@@ -271,7 +276,7 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   assert.match(
     await page.evaluate(() => getComputedStyle(document.documentElement)
       .getPropertyValue('--scrollbar-thumb').trim()),
-    /94\s*,\s*234\s*,\s*212/
+    /hsl\(170deg 36% 76%/
   );
   await page.locator('#aquaPalettePresets [data-aqua-palette="deep-violet"]').click();
   assert.deepEqual(await page.evaluate(() => ({

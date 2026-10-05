@@ -200,7 +200,7 @@ test('oversized sparse favorites have identical safe semantics without custom it
   );
 
   assert.deepEqual(renderer, withoutVersion(electron));
-  assert.deepEqual(renderer.commonLinksFavorites, [...CommonLinks.getDefaultFavoriteIds()]);
+  assert.deepEqual(renderer.commonLinksFavorites, []);
   assert.deepEqual(
     Bootstrap.createUiPreferencePatch(
       'commonLinksFavorites',

@@ -10,7 +10,8 @@
   } else if (root) {
     root.StarPickingPavilionBootstrap = api;
     const storage = api.getSafeStorage(root);
-    const desktopPreferences = root.starPickingPavilion?.preferences;
+    const desktop = root.starPickingPavilion;
+    const desktopPreferences = desktop?.hasStoredPreferences === false ? null : desktop?.preferences;
     api.initializeTheme(storage, root.document, desktopPreferences);
     api.initializeTextScale(storage, root.document, desktopPreferences);
   }
@@ -108,31 +109,25 @@
     if (!commonLinks) throw new TypeError('commonLinks is required');
     if (desktop && desktop.hasStoredPreferences === true) {
       return {
-        preferences: Schema.normalizeUiPreferences(desktop.preferences, commonLinks, { today }),
+        preferences: Schema.normalizeUiPreferences(desktop.preferences, commonLinks, {
+          today, fallback: Schema.getLegacyUiPreferences(commonLinks)
+        }),
         migrationPatch: null
       };
     }
 
     const legacy = readLegacyUiPreferences(storage, commonLinks);
-    if (desktop) {
-      const preferences = Schema.normalizeUiPreferences(
-        {},
-        commonLinks,
-        { today, fallback: legacy }
-      );
-      return {
-        preferences,
-        migrationPatch: cloneUiPreferences(preferences)
-      };
-    }
-
+    const browser = Schema.sanitizeUiPreferencesPatch(
+      readBrowserUiPreferences(storage), commonLinks, { today }
+    );
+    const hasLocalPreferences = Object.keys(browser).length > 0 || Object.keys(legacy).length > 0;
+    const preferences = Schema.normalizeUiPreferences(browser, commonLinks, {
+      today,
+      fallback: hasLocalPreferences ? { ...Schema.getLegacyUiPreferences(commonLinks), ...legacy } : null
+    });
     return {
-      preferences: Schema.normalizeUiPreferences(
-        readBrowserUiPreferences(storage),
-        commonLinks,
-        { today, fallback: legacy }
-      ),
-      migrationPatch: null
+      preferences,
+      migrationPatch: desktop ? cloneUiPreferences(preferences) : null
     };
   }
 
@@ -217,7 +212,7 @@
           );
       } catch { /* localStorage may be unavailable; retain the safe default */ }
     }
-    if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+    if (theme !== 'light' && theme !== 'dark') theme = Schema.INITIAL_UI_PREFERENCES.theme;
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     return theme;
@@ -236,7 +231,7 @@
         if (isValid(stored)) scale = stored;
       } catch { /* localStorage may be unavailable; retain the safe default */ }
     }
-    if (!isValid(scale)) scale = 'md';
+    if (!isValid(scale)) scale = Schema.INITIAL_UI_PREFERENCES.textScale;
     document.documentElement.dataset.uiScale = scale;
     return scale;
   }

@@ -496,6 +496,10 @@ test('real Electron desktop flow is secure, persistent across restart and single
   await firstPage.reload();
   await firstPage.locator('.card-title', { hasText: TEST_ARTICLE_TITLE }).waitFor();
 
+  // 切换回浅色之前先明确选择深色，兼容 v0.2.8 的浅色原始状态。
+  if (await firstPage.locator('html').getAttribute('data-theme') !== 'dark') {
+    await firstPage.locator('#btnTheme').click();
+  }
   await firstPage.locator('#btnTheme').click();
   await firstPage.waitForFunction(() => document.documentElement.dataset.theme === 'light');
 
@@ -528,6 +532,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
   assert.match(savedDailyDate, /^\d{4}-\d{2}-\d{2}$/);
 
   await firstPage.locator('.tab[data-view="links"]').click();
+  await firstPage.locator('.common-links-category[data-links-category="全部"]').click();
   assert.equal(await firstPage.locator('.common-links-card').count(), 14);
 
   const aiCategory = firstPage.locator('.common-links-category[data-links-category="AI"]');

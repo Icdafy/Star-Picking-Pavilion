@@ -25,12 +25,15 @@ test('capital search and native options adapt to both themes; atmosphere off per
  await page.locator('[data-view="settings"]').click();
  const toggle=page.locator('#setAquaEnabled'),reset=page.locator('#btnAquaReset');
  const a=await toggle.boundingBox(),b=await reset.boundingBox();assert.ok(a.x<b.x);
+ if(await toggle.getAttribute('aria-pressed')!=='true')await toggle.click();
  await toggle.click();await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='off');
  assert.equal(await page.locator('.atmosphere').isVisible(),false);
  await page.waitForTimeout(400);await page.reload();await page.waitForSelector('.nav');
  assert.equal(await page.locator('html').getAttribute('data-aqua-enabled'),'off');
  await page.locator('[data-view="settings"]').click();await reset.click();
- await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='on');
+ await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='off');
+ assert.equal(await page.locator('.atmosphere').isVisible(),false);
+ await toggle.click();await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='on');
  assert.equal(await page.locator('.atmosphere').isVisible(),true);
  if(process.env.SPP_LAYOUT_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.SPP_LAYOUT_SCREENSHOT_DIR,'v021-atmosphere.png')});
 });

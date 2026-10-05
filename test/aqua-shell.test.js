@@ -31,9 +31,9 @@ test('流体配色为浅色与深色主题分别提供六组安全预设', () =>
       assert.ok(Object.isFrozen(preset));
     }
   }
-  assert.ok(FLUID_PALETTES.light.some(preset => (
-    preset.hue === DEFAULTS.aquaHue && preset.brightness === DEFAULTS.aquaBrightness
-  )));
+  // 原始设置允许保留任意有效组合，不要求浅色主题的值刚好等于命名预设。
+  assert.strictEqual(DEFAULTS, require('../renderer/ui-preference-schema').DEFAULT_APPEARANCE);
+  assert.ok(FLUID_PALETTES.light.some(preset => preset.hue === DEFAULTS.aquaHue));
   assert.ok(FLUID_PALETTES.dark.some(preset => (
     preset.hue === DEFAULTS.aquaHue && preset.brightness === DEFAULTS.aquaBrightness
   )));
@@ -67,8 +67,9 @@ test('命名预设以目标色相驱动 DSH 基础蓝色，不把目标值误作
 });
 
 test('窗口与内嵌区域的滚动条跟随 Aqua 深浅主题', () => {
-  assert.match(styles, /\[data-theme="dark"\][\s\S]*--scrollbar-thumb:\s*rgba\(94,234,212,\.62\)/);
-  assert.match(styles, /\[data-theme="light"\][\s\S]*--scrollbar-thumb:\s*rgba\(13,148,136,\.68\)/);
+  assert.match(styles, /--scrollbar-hue:\s*var\(--aqua-user-hue/);
+  assert.match(styles, /--scrollbar-thumb:\s*hsl\(var\(--scrollbar-hue\) var\(--scrollbar-saturation\) 76%/);
+  assert.match(styles, /\[data-theme="light"\][\s\S]*--scrollbar-thumb:\s*hsl\(var\(--scrollbar-hue\) var\(--scrollbar-saturation\) 32%/);
   // 标准属性一旦出现（scrollbar-color 还会继承），Chromium 就整体忽略 ::-webkit-scrollbar 定制
   assert.doesNotMatch(styles, /html\s*\{[^}]*scrollbar-(?:color|width)/);
   assert.match(styles, /::-webkit-scrollbar\s*\{\s*width:\s*14px;\s*height:\s*14px;/);

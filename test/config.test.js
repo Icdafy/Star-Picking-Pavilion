@@ -28,6 +28,12 @@ test.after(async () => {
   await fs.promises.rm(dataDir, { recursive: true, force: true });
 });
 
+test('fresh users get the captured 60 minute interval without creating a settings file', () => {
+  assert.equal(fs.existsSync(SETTINGS_PATH), false);
+  assert.equal(loadSettings().collect.intervalMinutes, 60);
+  assert.equal(fs.existsSync(SETTINGS_PATH), false);
+});
+
 test('settings save is atomic and never persists the API key', async () => {
   const settings = loadSettings();
   settings.ai.apiKey = 'sk-plain-must-not-persist';

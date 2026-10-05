@@ -62,6 +62,8 @@ async function open(t) {
   const base = path.join(root,'work','v027','e2e');fs.mkdirSync(base,{recursive:true});
   const profile = fs.mkdtempSync(path.join(base,'profile-')); const anchor=Date.now();
   fs.writeFileSync(path.join(profile,'settings.json'),'{}');seed(profile,anchor);
+  fs.writeFileSync(path.join(profile,'ui-preferences.json'), JSON.stringify({version:2,
+    ...require('../../renderer/ui-preference-schema').getLegacyUiPreferences(require('../../renderer/common-links'))}));
   const app=await launchNative(root,profile);
   t.after(async()=>{await app.close();});
   const page=await app.firstWindow(); const errors=[];page.on('pageerror',e=>errors.push(e.message));

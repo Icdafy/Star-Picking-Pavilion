@@ -6,14 +6,17 @@
    Harness 徽标；它只复用“可调玻璃 + 动态背景 + 低功耗降级”的产品思想。 */
 
 (function exposeAquaShell(root, factory) {
-  const api = factory();
+  const schema = typeof module === 'object' && module.exports
+    ? require('./ui-preference-schema')
+    : root?.StarPickingPavilionUiPreferenceSchema;
+  const api = factory(schema);
   if (typeof module === 'object' && module.exports) {
     module.exports = api;
     return;
   }
   if (!root) return;
   root.AquaShell = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function createAquaShellModule() {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function createAquaShellModule(Schema) {
   const WALLPAPER_KEY = 'star-picking-pavilion.aqua-wallpaper.v1';
   const MAX_WALLPAPER_BYTES = 12 * 1024 * 1024;
   const MAX_WALLPAPER_EDGE = 1920;
@@ -21,19 +24,7 @@
   // DSH 的第一主色 #8AA3D6 本身约为 220°。CSS hue-rotate() 接受的是
   // “旋转量”而设置面板展示的是“目标色相”，两者必须先换算，不能直传。
   const DSH_FLUID_BASE_HUE = 220;
-  const DEFAULTS = Object.freeze({
-    aquaMode: 'mica',
-    aquaBlur: 2,
-    aquaFrost: 20,
-    aquaHue: 220,
-    aquaBrightness: 50,
-    aquaBackground: 'fluid',
-    aquaWallpaperBlur: 0,
-    aquaWallpaperFrost: 0,
-    aquaWhale: true,
-    aquaEnabled: true,
-    aquaCritters: true
-  });
+  const DEFAULTS = Schema.DEFAULT_APPEARANCE;
   const FIELDS = Object.freeze(Object.keys(DEFAULTS));
   const FLUID_PALETTES = Object.freeze({
     light: Object.freeze([
@@ -66,12 +57,13 @@
   function normalizeSettings(raw) {
     const value = raw && typeof raw === 'object' ? raw : {};
     return {
-      aquaMode: value.aquaMode === 'compat' ? 'compat' : 'mica',
+      aquaMode: ['mica', 'compat'].includes(value.aquaMode) ? value.aquaMode : DEFAULTS.aquaMode,
       aquaBlur: clampNumber(value.aquaBlur, 0, 40, DEFAULTS.aquaBlur),
       aquaFrost: clampNumber(value.aquaFrost, 0, 100, DEFAULTS.aquaFrost),
       aquaHue: clampNumber(value.aquaHue, 0, 360, DEFAULTS.aquaHue),
       aquaBrightness: clampNumber(value.aquaBrightness, 0, 100, DEFAULTS.aquaBrightness),
-      aquaBackground: value.aquaBackground === 'wallpaper' ? 'wallpaper' : 'fluid',
+      aquaBackground: ['fluid', 'wallpaper'].includes(value.aquaBackground)
+        ? value.aquaBackground : DEFAULTS.aquaBackground,
       aquaWallpaperBlur: clampNumber(
         value.aquaWallpaperBlur,
         0,

@@ -47,10 +47,10 @@ function formatLocalDate(value) {
   return UiPreferenceSchema.formatLocalDate(value);
 }
 
-function normalizeUiPreferences(raw, { today } = {}) {
+function normalizeUiPreferences(raw, { today, fallback } = {}) {
   return {
     version: UiPreferenceSchema.UI_PREFERENCES_VERSION,
-    ...UiPreferenceSchema.normalizeUiPreferences(raw, CommonLinks, { today })
+    ...UiPreferenceSchema.normalizeUiPreferences(raw, CommonLinks, { today, fallback })
   };
 }
 
@@ -214,7 +214,7 @@ function createUiPreferencesStore({
 
     preferences = normalizeUiPreferences(
       UiPreferenceSchema.migrateStoredUiPreferences(parsed),
-      { today: today() }
+      { today: today(), fallback: UiPreferenceSchema.getLegacyUiPreferences(CommonLinks) }
     );
     storedPreferences = true;
     return clonePreferences(preferences);
