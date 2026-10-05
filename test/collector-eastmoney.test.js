@@ -5,11 +5,27 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseEastmoneySpec, parseApiSpec, buildGuard } = require('../server/collectors/api');
+const { parseEastmoneySpec, parseApiSpec, buildGuard, mapEastmoneyResponse } = require('../server/collectors/api');
 const { sanitizeSourceInput } = require('../server/input-validation');
 
 const seed = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'config', 'sources.default.json'), 'utf8'));
+
+test('东财 JSONP 接受官网高亮字段，空响应与异常结构不能记成成功', () => {
+  const article = { title: '<em>商业航天</em>完成融资', url: 'https://finance.eastmoney.com/a/123.html',
+    content: '火箭公司<em>A轮</em>融资', date: '2026-10-01 12:00:00', mediaName: '公开媒体' };
+  const response = JSON.stringify({ code: 0, result: { cmsArticleWebOld: [article] } });
+  const [row] = mapEastmoneyResponse(`cb(${response});`);
+  assert.equal(row.title, '商业航天完成融资');
+  assert.equal(row.summary, '火箭公司A轮融资');
+  assert.equal(row.publisherId, '公开媒体');
+  assert.equal(row.publishedAt, '2026-10-01T04:00:00.000Z');
+  assert.deepEqual(mapEastmoneyResponse(response), [row]);
+  assert.deepEqual(mapEastmoneyResponse('cb({"code":0,"result":{"cmsArticleWebOld":[]}})'), []);
+  assert.throws(() => mapEastmoneyResponse(''), /空响应/);
+  assert.throws(() => mapEastmoneyResponse('cb({"code":0,"result":{}})'), /结构异常/);
+  assert.throws(() => mapEastmoneyResponse('cb({"code":1,"result":{"cmsArticleWebOld":[]}})'), /结构异常/);
+});
 
 test('eastmoney 地址解析：默认相关性优先 + 时效补充，参数可选', () => {
   assert.deepEqual(parseEastmoneySpec('eastmoney://低空经济'),
@@ -75,11 +91,14 @@ test('种子库只锁定低空经济与商业航天两个领域', () => {
   }
 });
 
-test('种子库显著扩容，且没有重复地址', () => {
+test('种子库保留两行业覆盖与可采集 RSS，移除停用占位且没有重复地址', () => {
   assert.ok(seed.sources.length >= 100, `信源数量 ${seed.sources.length}，扩容不足`);
   assert.ok(seed.sources.filter(s => s.type === 'api').length >= 70, '关键词检索线覆盖不足');
   assert.ok(seed.sources.filter(s => s.type === 'html').length >= 8, '官方一手信源不足');
-  assert.ok(seed.sources.filter(s => s.type === 'rss').length >= 15, 'RSS 信源不足');
+  for (const name of ['中国新闻网·滚动', 'TechCrunch·Space', 'eVTOL Insights']) {
+    assert.ok(seed.sources.some(s => s.type === 'rss' && s.name === name), `${name} 的公开订阅缺失`);
+  }
+  assert.equal(seed.sources.some(s => s.enabled === false), false, '停用信源不能再进入新版目录');
   const urls = new Set();
   for (const source of seed.sources) {
     assert.equal(urls.has(source.url), false, `重复地址 ${source.url}`);

@@ -20,7 +20,7 @@
 
 body {
   box-sizing: border-box;
-  padding-top: var(--desktop-titlebar-height) !important;
+  padding-top: 0 !important;
 }
 
 /* v0.2.5 无缝标题栏：对齐 macOS 统一工具栏、Windows 11「内容延伸进标题栏」以及 Linear、Arc、
@@ -33,7 +33,7 @@ body {
   top: env(titlebar-area-y, 0px);
   left: 0;
   z-index: 149;
-  width: 100%;
+  width: 100vw;
   height: calc(var(--desktop-titlebar-height) + .5rem);
   pointer-events: none;
   background: transparent;
@@ -701,7 +701,7 @@ main { order: 5; width: 100%; }
 /* ---------- 真正的宽屏 Aqua 指挥舱 ---------- */
 @media (min-width: 70rem) {
   :root {
-    --sticky-top: calc(var(--desktop-titlebar-height) + var(--sp-4));
+    --sticky-top: var(--sp-4);
   }
 
   .app-stage {

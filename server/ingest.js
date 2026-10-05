@@ -49,7 +49,7 @@ let windowStart = 0, requests = 0;
 function ingestItems(body, at = Date.now()) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) fail('请求体必须是对象');
   if (!Number.isSafeInteger(body.sourceId) || body.sourceId <= 0) fail('sourceId 须为已创建信源的数字编号');
-  const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(body.sourceId);
+  const source = db.prepare('SELECT * FROM sources WHERE id = ? AND removed_at IS NULL').get(body.sourceId);
   if (!source) throw new HttpError(404, '信源不存在，请先在信源页创建外部导入源');
   if (source.type !== 'external') throw new HttpError(409, '只能向外部导入信源提交内容');
   if (!source.enabled) throw new HttpError(409, '该信源已停用，请启用后再导入');

@@ -114,7 +114,7 @@
           <button data-act="toggle" data-focus-key="src-toggle:${s.id}">${s.enabled ? '停用' : '启用'}</button>
           ${s.type === 'external' ? `<button data-act="import" data-focus-key="src-import:${s.id}"${s.enabled ? '' : ' disabled'}>导入内容</button>` : ''}
           ${health.pausedUntil ? `<button data-act="retry" data-focus-key="src-retry:${s.id}">立即重试</button>` : ''}
-          <button data-act="remove" class="danger" data-focus-key="src-remove:${s.id}"${s.enabled ? '' : ' disabled'}>${s.enabled ? '移出监控' : '已移出监控'}</button>
+          <button data-act="remove" class="danger" data-focus-key="src-remove:${s.id}">移出监控</button>
         </div>
       </div>`;
     }
@@ -163,7 +163,7 @@
           loadSources();
         } else if (btn.dataset.act === 'remove') {
           if (btn.disabled) return;
-          if (!await confirmGlass('确定将该信源移出监控？已采集文章和信源记录都会保留。', { title: '移出信源', okText: '移出监控' })) return;
+          if (!await confirmGlass('确定将该信源移出监控列表？已采集文章及其来源信息都会保留。', { title: '移出信源', okText: '移出监控' })) return;
           await api(`/api/sources/${id}`, { method: 'DELETE' });
           toast('信源已移出监控');
           loadSources();

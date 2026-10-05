@@ -128,7 +128,7 @@ const motion = DomUtils.createMotion({
 });
 
 function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+  document.getElementById('appViewport').scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
 
 // 氛围层空闲暂停：页面隐藏或失焦（document.hidden || !document.hasFocus()）
@@ -788,12 +788,12 @@ Shortcuts.createShortcuts({
 });
 
 // ---------- 滚动态：导航加重、回到顶部 ----------
-// 直接在事件里判定：滚动回调本就在布局之后，读 scrollY 不额外触发重排；
+// 直接在事件里判定：滚动回调本就在布局之后，读 scrollTop 不额外触发重排；
 // 而 requestAnimationFrame 在窗口隐藏（托盘后台运行）时会被暂停，用它反而会漏更新。
 let scrolledState = null;
 let toTopState = null;
 function syncScrollState() {
-  const y = window.scrollY;
+  const y = document.getElementById('appViewport').scrollTop;
   const scrolled = y > 8;
   const showTop = y > 560;
   if (scrolled !== scrolledState) {
@@ -805,7 +805,7 @@ function syncScrollState() {
     $('#toTop').classList.toggle('show', showTop);
   }
 }
-window.addEventListener('scroll', syncScrollState, { passive: true });
+document.getElementById('appViewport').addEventListener('scroll', syncScrollState, { passive: true });
 window.addEventListener('resize', () => { syncNavHeight(); syncTabIndicator(); });
 $('#toTop').addEventListener('click', scrollToTop);
 
@@ -814,7 +814,7 @@ const realtimePoller = RealtimePoller.createRealtimePoller({
   api, state, FEED_VIEWS, toast, preferenceActions,
   refreshStats, loadFeed, scrollToTop,
   document,
-  getScrollY: () => window.scrollY,
+  getScrollY: () => document.getElementById('appViewport').scrollTop,
   elements: { btnRealtime: $('#btnRealtime'), newFlash: $('#newFlash') },
   diff: feedDiffList
 });

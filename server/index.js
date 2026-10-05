@@ -357,8 +357,8 @@ function countStats() {
   const g = (sql, ...params) => db.prepare(sql).get(...params);
   const todayStart = startOfLocalDayIso();
   return {
-    sources: g('SELECT COUNT(*) c FROM sources WHERE enabled=1').c,
-    sourcesTotal: g('SELECT COUNT(*) c FROM sources').c,
+    sources: g('SELECT COUNT(*) c FROM sources WHERE enabled=1 AND removed_at IS NULL').c,
+    sourcesTotal: g('SELECT COUNT(*) c FROM sources WHERE removed_at IS NULL').c,
     articles: g('SELECT COUNT(*) c FROM articles').c,
     today: g('SELECT COUNT(*) c FROM articles WHERE fetched_at >= ?', todayStart).c,
     relevantToday: g('SELECT COUNT(*) c FROM articles WHERE relevant=1 AND fetched_at >= ?', todayStart).c,
@@ -650,12 +650,21 @@ const server = http.createServer(async (req, res) => {
 
       if (p === '/api/sources' && req.method === 'GET') {
         const nowMs = Date.now();
-        return json(res, 200, db.prepare('SELECT * FROM sources ORDER BY tier, id').all()
+        return json(res, 200, db.prepare('SELECT * FROM sources WHERE removed_at IS NULL ORDER BY tier, id').all()
           .map(source => ({ ...source, health: describeHealth(source, nowMs) })));
       }
       if (p === '/api/sources' && req.method === 'POST') {
         const b = await readJsonBody(req);
         const source = sanitizeSourceInput(b);
+        const removed = db.prepare('SELECT id FROM sources WHERE url=? AND removed_at IS NOT NULL').get(source.url);
+        if (removed) {
+          db.prepare(`UPDATE sources SET name=?, type=?, tier=?, domain=?, enabled=?, selector_json=?, note=?,
+            removed_at=NULL, consecutive_errors=0, next_fetch_at=NULL, last_status=NULL WHERE id=?`)
+            .run(source.name, source.type, source.tier, source.domain, source.enabled ? 1 : 0,
+              source.selector ? JSON.stringify(source.selector) : null, source.note, removed.id);
+          invalidateStatsCache();
+          return json(res, 200, { id: removed.id });
+        }
         const r = db.prepare(`INSERT INTO sources (name, type, url, tier, domain, enabled, selector_json, note)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
           source.name, source.type, source.url, source.tier, source.domain,
@@ -666,7 +675,7 @@ const server = http.createServer(async (req, res) => {
       const mSrc = p.match(/^\/api\/sources\/(\d+)$/);
       if (mSrc && req.method === 'PATCH') {
         const b = await readJsonBody(req);
-        const cur = db.prepare('SELECT * FROM sources WHERE id=?').get(Number(mSrc[1]));
+        const cur = db.prepare('SELECT * FROM sources WHERE id=? AND removed_at IS NULL').get(Number(mSrc[1]));
         if (!cur) return json(res, 404, { error: '不存在' });
         const source = sanitizeSourceInput(b, cur);
         db.prepare(`UPDATE sources SET name=?, type=?, url=?, tier=?, domain=?, enabled=?, selector_json=?, note=? WHERE id=?`)
@@ -683,17 +692,16 @@ const server = http.createServer(async (req, res) => {
       if (mSrcRetry && req.method === 'POST') {
         const sourceId = Number(mSrcRetry[1]);
         const changed = db.prepare(
-          'UPDATE sources SET consecutive_errors=0, next_fetch_at=NULL WHERE id=?').run(sourceId).changes;
+          'UPDATE sources SET consecutive_errors=0, next_fetch_at=NULL WHERE id=? AND removed_at IS NULL').run(sourceId).changes;
         if (!changed) return json(res, 404, { error: '信源不存在' });
         return json(res, 200, { ok: true });
       }
       if (mSrc && req.method === 'DELETE') {
         const sourceId = Number(mSrc[1]);
-        const existing = db.prepare('SELECT id FROM sources WHERE id=?').get(sourceId);
-        if (!existing) return json(res, 404, { error: '信源不存在' });
-        db.prepare('UPDATE sources SET enabled=0 WHERE id=?').run(sourceId);
+        const { removeSource } = require('./source-lifecycle');
+        if (!removeSource(sourceId)) return json(res, 404, { error: '信源不存在' });
         invalidateStatsCache();
-        return json(res, 200, { ok: true, disabled: true });
+        return json(res, 200, { ok: true, removed: true });
       }
 
       if (p === '/api/settings' && req.method === 'GET') {

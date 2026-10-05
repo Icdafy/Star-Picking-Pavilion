@@ -7,6 +7,7 @@ const { db, now, insertArticle } = require('../db');
 const { loadSettings } = require('../config');
 const { collectionIntervalMs } = require('../schedule-policy');
 const { isDue, nextFetchAtIso } = require('../source-health');
+const { removeDisabledSources } = require('../source-lifecycle');
 const { structureItem } = require('../ai/normalize');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
@@ -31,7 +32,7 @@ function applySourceMigrations(migrations) {
 
   for (const step of migrations) {
     const current = findByUrl.get(step.from);
-    if (!current) continue;   // 用户已删或本来就没有，不复活
+    if (!current || current.removed_at) continue;   // 用户已删或本来就没有，不复活
 
     if (step.retire) {
       if (!current.enabled) continue;
@@ -82,6 +83,10 @@ function seedSources() {
 
   const migrated = count > 0 ? applySourceMigrations(seed._migrations) : 0;
   if (migrated) console.log(`[collect] 信源迁移（v${seedVersion}）：修正 ${migrated} 个`);
+  if (applied < Number(seed._pruneDisabledBeforeVersion || 0)) {
+    const removed = removeDisabledSources();
+    if (removed) console.log(`[collect] 信源清理（v${seedVersion}）：移除 ${removed} 个停用入口，保留历史来源`);
+  }
 
   const stmt = db.prepare(`INSERT OR IGNORE INTO sources
     (name, type, url, tier, domain, enabled, selector_json, note, intl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -126,7 +131,7 @@ async function collectAll(onProgress, { force = false } = {}) {
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   // 外部源由导入接口接收；不能把每轮的“未请求”伪记为采集成功。
-  const enabled = db.prepare("SELECT * FROM sources WHERE enabled = 1 AND type <> 'external'").all();
+  const enabled = db.prepare("SELECT * FROM sources WHERE enabled = 1 AND removed_at IS NULL AND type <> 'external'").all();
   const startedAt = Date.now();
   const sources = force ? enabled : enabled.filter(source => isDue(source, startedAt));
   const skipped = enabled.length - sources.length;

@@ -123,7 +123,7 @@ test('v027 Electron: filter/search/page, star/copy, incremental identity and rea
   const star=page.locator('#feedList .card [data-act="star"]').first();await star.click();await page.waitForFunction(()=>document.querySelector('#feedList .card [data-act="star"]').getAttribute('aria-pressed')==='true');
   assert.match(await page.locator('#toast').textContent(),/^已星标/);
   await page.locator('#feedList .card [data-act="copy"]').first().click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='已复制标题与链接');
-  await page.evaluate(async()=>{window.scrollTo({top:0,behavior:'instant'});await realtimePoller.pollRealtime();window.__v027First=document.querySelector('#feedList .card');document.querySelector('#searchInput').focus();});
+  await page.evaluate(async()=>{document.getElementById('appViewport').scrollTo({top:0,behavior:'instant'});await realtimePoller.pollRealtime();window.__v027First=document.querySelector('#feedList .card');document.querySelector('#searchInput').focus();});
   seed(profile,anchor,5,-5);
   // A real star write invalidates the server's five-second stats cache.
   await page.evaluate(async()=>{await api('/api/articles/'+document.querySelector('#feedList .card').dataset.id+'/star',{body:{starred:false}});await realtimePoller.pollRealtime();});
@@ -131,10 +131,10 @@ test('v027 Electron: filter/search/page, star/copy, incremental identity and rea
   assert.equal(await page.evaluate(()=>document.activeElement.id),'searchInput');
   const animated=await page.evaluate(()=>[...document.querySelectorAll('#feedList .tl-row')].filter(e=>e.getAnimations().some(a=>a.constructor.name==='Animation'&&a.playState==='running')).map(e=>{const r=e.getBoundingClientRect();return{top:r.top,bottom:r.bottom,visible:r.top<innerHeight&&r.bottom>0};}));
   assert.ok(animated.every(e=>e.visible),`offscreen new rows were animated: ${JSON.stringify(animated)}`);
-  await page.evaluate(()=>{window.scrollTo({top:600,behavior:'instant'});document.querySelectorAll('#feedList .card [data-act="star"]')[2].focus({preventScroll:true});window.__v027Reading={scroll:scrollY,focus:document.activeElement};});
+  await page.evaluate(()=>{document.getElementById('appViewport').scrollTo({top:600,behavior:'instant'});document.querySelectorAll('#feedList .card [data-act="star"]')[2].focus({preventScroll:true});window.__v027Reading={scroll:document.getElementById('appViewport').scrollTop,focus:document.activeElement};});
   seed(profile,anchor,1,-6);
   await page.evaluate(async()=>{await api('/api/articles/'+document.querySelector('#feedList .card').dataset.id+'/star',{body:{starred:true}});await realtimePoller.pollRealtime();});
-  const reading=await page.evaluate(()=>({delta:Math.abs(scrollY-window.__v027Reading.scroll),sameFocus:document.activeElement===window.__v027Reading.focus,banner:!document.querySelector('#newFlash').hidden}));
+  const reading=await page.evaluate(()=>({delta:Math.abs(document.getElementById('appViewport').scrollTop-window.__v027Reading.scroll),sameFocus:document.activeElement===window.__v027Reading.focus,banner:!document.querySelector('#newFlash').hidden}));
   assert.ok(reading.delta<=2);assert.equal(reading.sameFocus,true);assert.equal(reading.banner,true);assert.deepEqual(errors,[]);
 });
 test('v027 Electron: runtime reduced-motion, static terminal state, hidden/resume and appearance off', {timeout:90_000},async t=>{

@@ -6,6 +6,8 @@
 
 ## 1. 分层与模块边界
 
+v0.2.9 的 `#appViewport` 是标题栏下方的实际滚动视口。回顶、吸顶偏移、滚动态和实时阅读位置都以它为准；根窗口不滚动，氛围层与原生标题栏仍使用窗口坐标。
+
 ```
 index.html（Aqua 指挥舱静态外壳，27 条 <script src>，预算已用尽）
 └── app.js —— 组合根
@@ -30,7 +32,7 @@ index.html（Aqua 指挥舱静态外壳，27 条 <script src>，预算已用尽�
     │   ├── daily-view-controller.js    日报 / 周报 / 月报切换、翻期与重生成
     │   ├── intel-views.js              v0.2.0 单一脚本边界：IntelRender（热点、一级市场、刊期版块、
     │   │                               精选标准的纯函数渲染）+ HotViewController + CapitalViewController
-    │   ├── sources-controller.js       信源增删与软停用
+    │   ├── sources-controller.js       信源启停与移出列表（历史文章来源保留）
     │   ├── search-controller.js        检索防抖 + 词库面板
     │   ├── common-links-controller.js  常用网址渲染与焦点恢复
     │   ├── settings-view-controller.js 设置页接线（表单/桌面/归档/备忘）

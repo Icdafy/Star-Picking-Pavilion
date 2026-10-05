@@ -9,7 +9,7 @@ const { _electron: electron } = require('playwright');
 const Schema = require('../../renderer/ui-preference-schema');
 const CommonLinks = require('../../renderer/common-links');
 const root = path.join(__dirname, '../..');
-const screenshots = path.join(root, 'work/v028/screenshots');
+const screenshots = path.join(root, 'work/v029/screenshots');
 const processes = new Map();
 
 async function profile(t) {
@@ -86,14 +86,17 @@ test('v028 scrollbar stays below the title bar, responds to all palettes and pre
   await page.waitForSelector('#aquaPalettePresets button');
   await fs.promises.mkdir(screenshots, { recursive: true });
   const metrics = () => page.evaluate(() => {
-    const html = document.documentElement;
-    const thumb = getComputedStyle(html, '::-webkit-scrollbar-thumb');
-    const track = getComputedStyle(html, '::-webkit-scrollbar-track');
+    const viewport = document.getElementById('appViewport');
+    const thumb = getComputedStyle(viewport, '::-webkit-scrollbar-thumb');
+    const track = getComputedStyle(viewport, '::-webkit-scrollbar-track');
+    const title = viewport.getBoundingClientRect().top;
     return {
-      color: thumb.backgroundColor, top: parseFloat(track.marginTop), bottom: parseFloat(track.marginBottom),
-      title: parseFloat(getComputedStyle(document.body).paddingTop),
-      width: innerWidth, height: innerHeight, contentHeight: html.scrollHeight,
-      minThumb: parseFloat(thumb.minHeight), scroll: scrollY, clientWidth: html.clientWidth
+      color: thumb.backgroundColor, top: title + parseFloat(track.marginTop), bottom: parseFloat(track.marginBottom),
+      title, viewportHeight: viewport.clientHeight,
+      width: innerWidth, height: innerHeight, contentHeight: viewport.scrollHeight,
+      minThumb: parseFloat(thumb.minHeight), scroll: viewport.scrollTop, clientWidth: viewport.clientWidth,
+      titlebarRight: document.querySelector('.desktop-titlebar-liquid-glass').getBoundingClientRect().right,
+      rootWidth: document.documentElement.clientWidth, rootScroll: window.scrollY
     };
   });
   for (const theme of ['light', 'dark']) {
@@ -105,11 +108,14 @@ test('v028 scrollbar stays below the title bar, responds to all palettes and pre
       const value = await metrics();
       assert.ok(value.top >= value.title + 4, `${theme}/${palette}: track intrudes into the title bar`);
       assert.equal(value.width - value.clientWidth, 14);
+      assert.equal(value.titlebarRight, value.width, 'title bar must cover the right scrollbar gutter');
+      assert.equal(value.rootWidth, value.width, 'root scrollbar must not occupy the title bar');
+      assert.equal(value.rootScroll, 0);
       assert.notEqual(value.color, 'rgba(0, 0, 0, 0)');
       colors.add(value.color);
     }
     assert.equal(colors.size, 6, `${theme}: every background palette must change the scrollbar color`);
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.evaluate(() => document.getElementById('appViewport').scrollTo({ top: 0, behavior: 'instant' }));
     const screenshot = await page.screenshot({ path: path.join(screenshots, `scrollbar-${theme}-top.png`) });
     const dimensions = await metrics();
     // Chromium 的窗口滚动条样式来自 body；仅检查 html 的伪元素会漏掉视觉越界。
@@ -133,24 +139,24 @@ test('v028 scrollbar stays below the title bar, responds to all palettes and pre
   const nestedTop = await page.locator('#paletteList').evaluate(node => getComputedStyle(node, '::-webkit-scrollbar-track').marginTop);
   assert.equal(nestedTop, '0px');
   await page.keyboard.press('Escape');
-  await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo({ top: 0, behavior: 'instant' }); });
+  await page.evaluate(() => { document.activeElement?.blur(); document.getElementById('appViewport').scrollTo({ top: 0, behavior: 'instant' }); });
   const drag = await metrics();
   const trackHeight = drag.height - drag.top - drag.bottom;
-  const thumbHeight = Math.max(drag.minThumb, trackHeight * drag.height / drag.contentHeight);
+  const thumbHeight = Math.max(drag.minThumb, trackHeight * drag.viewportHeight / drag.contentHeight);
   await page.mouse.move(drag.width - 7, drag.top + thumbHeight / 2);
   await page.mouse.down();
   await page.mouse.move(drag.width - 7, drag.top + thumbHeight / 2 + 120, { steps: 10 });
   await page.mouse.up();
-  await page.waitForFunction(() => scrollY > 100);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.waitForFunction(() => document.getElementById('appViewport').scrollTop > 100);
+  await page.evaluate(() => document.getElementById('appViewport').scrollTo({ top: 0, behavior: 'instant' }));
   await page.mouse.move(1000, 500);
   await page.mouse.wheel(0, 700);
-  await page.waitForFunction(() => scrollY > 100);
+  await page.waitForFunction(() => document.getElementById('appViewport').scrollTop > 100);
   await page.keyboard.press('Control+End');
-  await page.waitForFunction(() => scrollY + innerHeight >= document.documentElement.scrollHeight - 2);
+  await page.waitForFunction(() => document.getElementById('appViewport').scrollTop + document.getElementById('appViewport').clientHeight >= document.getElementById('appViewport').scrollHeight - 2);
   await page.screenshot({ path: path.join(screenshots, 'scrollbar-dark-bottom.png') });
   await page.keyboard.press('Control+Home');
-  await page.waitForFunction(() => scrollY === 0);
+  await page.waitForFunction(() => document.getElementById('appViewport').scrollTop === 0);
   await page.locator('#setAquaEnabled').click();
   const neutralDark = (await metrics()).color;
   await page.locator('#btnTheme').click();

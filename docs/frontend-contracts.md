@@ -42,11 +42,11 @@
 | GET | `/api/maintenance` | `{ databaseBytes, database, articles, irrelevant, starred, expiring, retentionDays, irrelevantRetentionDays, ...维护快照, scheduler }` |
 | POST | `/api/maintenance/prune` | `{ ok, ...pruneOnce 结果, databaseBytes }` |
 | POST | `/api/maintenance/compact` | `{ ok: !skipped, ...compactOnce 结果 }`；异常时按 `describeDatabaseMaintenanceError` 返回 |
-| GET | `/api/sources` | 信源数组，每条附 `health: describeHealth(...)` |
+| GET | `/api/sources` | 未移除的信源数组，每条附 `health: describeHealth(...)` |
 | POST | `/api/sources` | `{ id }` |
 | PATCH | `/api/sources/:id` | `{ ok }`；不存在 404 `{ error: '不存在' }` |
 | POST | `/api/sources/:id/retry` | `{ ok }`；不存在 404 `{ error: '信源不存在' }` |
-| DELETE | `/api/sources/:id` | 软停用：`{ ok, disabled: true }`（只置 enabled=0，不删行） |
+| DELETE | `/api/sources/:id` | `{ ok, removed: true }`；置 enabled=0 和 removed_at，从列表和计数移除入口，保留历史来源行及文章外键；明确 POST 同一地址可恢复原来源编号 |
 | GET | `/api/settings` | 设置对象，`ai.apiKey` 被剥离、以 `ai._hasKey` 布尔替代 |
 | POST | `/api/settings` | `{ ok, credentialConfigured }` |
 | POST | `/api/settings/test` | `{ ok }` 或 `{ ok: false, error }`（恒 200） |
@@ -77,7 +77,7 @@
 ### 1.4 /api/stats 的 5 秒 TTL 缓存（重点）
 
 - `STATS_CACHE_TTL_MS = 5_000`；缓存对象 `statsCache = { at, counts }`。
-- 计数全部是全表聚合（`countStats()`）：`sources, sourcesTotal, articles, today,
+- 计数由 `countStats()` 聚合，信源排除已移除入口，情报保留历史全表口径：`sources, sourcesTotal, articles, today,
   relevantToday, featuredToday, starred, pending`；响应再合并 `pipeline: getStatus()`
   与 `aiConfigured`（这两项不缓存，始终取最新）。
 - 界面每 18 秒轮询一次；写操作通过 `invalidateStatsCache()` 立即失效缓存，触发点：
@@ -513,7 +513,7 @@ test/feed-controller.test.js）：date-group 新增 data-group-time 属性记录
   `if (isTypingTarget(document.activeElement)) return;` 之前
 - 信源退避：`health.pausedUntil`、`暂停至`、`连续失败 ${health.consecutiveErrors} 次`、
   `data-act="retry"`、`/api/sources/${id}/retry`
-- 信源软停用文案：`移出监控`、`已采集文章和信源记录都会保留`；禁止 `确定删除该信源`
+- 信源移除文案：`移出监控`、`已采集文章及其来源信息都会保留`；停用项也可移除，不暗示会删除历史文章
 - 各错误 toast 文案（逐字）：`AI 配置保存失败：`、`采集设置保存失败：`、`清除密钥失败：`、
   `日报重新生成失败：`、`信源操作失败：`、`反馈保存失败：`、`星标操作失败：`
 

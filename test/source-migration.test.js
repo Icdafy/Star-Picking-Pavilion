@@ -12,7 +12,7 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-migration-'));
 process.env.STAR_PICKING_PAVILION_DATA_DIR = dataDir;
 
 const { db } = require('../server/db');
-const { applySourceMigrations } = require('../server/collectors');
+const { applySourceMigrations, seedSources } = require('../server/collectors');
 const seed = require('../config/sources.default.json');
 
 test.after(() => {
@@ -47,16 +47,13 @@ test('v6 将工信部空壳旧栏目迁移到可静态解析的新版新闻发�
   assert.deepEqual(migration.selector, source.selector);
 });
 
-test('v7 将 36氪 死链 feed 迁移到 RSSHub 快讯路由，老库行保留统计与启停状态', () => {
-  assert.ok(seed._version >= 8, 'v7 迁移步骤必须随后续种子版本保留');
+test('v12 移除 36氪 死链与停用的 RSSHub 入口，老库保留来源与统计', () => {
+  assert.ok(seed._version >= 12);
   const migration = seed._migrations.find(item => item.from === 'https://36kr.com/feed');
   const seeded = seed.sources.find(item => item.url === 'rsshub://36kr/newsflashes');
   assert.ok(migration, '缺少 36氪 迁移步骤');
-  assert.ok(seeded, '种子库缺少迁移目标条目');
-  assert.equal(migration.to, seeded.url);
-  assert.equal(migration.name, seeded.name);
-  // 依赖自建 RSSHub，默认必须停用
-  assert.equal(seeded.enabled, false);
+  assert.equal(seeded, undefined);
+  assert.equal(migration.retire, true);
 
   const id = insertSource({ url: 'https://36kr.com/feed', name: '36氪', type: 'rss' });
   db.prepare('UPDATE sources SET fetch_count=9, item_count=42, consecutive_errors=3 WHERE id=?').run(id);
@@ -65,11 +62,11 @@ test('v7 将 36氪 死链 feed 迁移到 RSSHub 快讯路由，老库行保留�
   assert.equal(applied, 1);
 
   const row = byId(id);
-  assert.equal(row.url, 'rsshub://36kr/newsflashes');
-  assert.equal(row.name, '36氪·快讯');
-  assert.equal(row.type, 'rss', 'relocate 不改类型，rsshub:// 仍走 rss 适配器');
+  assert.equal(row.url, 'https://36kr.com/feed');
+  assert.equal(row.name, '36氪');
+  assert.equal(row.enabled, 0);
   assert.equal(row.item_count, 42, '历史统计保留');
-  assert.equal(row.consecutive_errors, 0, '换地址后退避清零');
+  assert.equal(row.consecutive_errors, 0, '停用后退避清零');
   assert.equal(row.next_fetch_at, null);
 });
 
@@ -155,4 +152,26 @@ test('空迁移清单与非数组输入都安全', () => {
   assert.equal(applySourceMigrations([]), 0);
   assert.equal(applySourceMigrations(undefined), 0);
   assert.equal(applySourceMigrations(null), 0);
+});
+
+test('v029 升级只清理一次停用入口，历史文章、星标和来源外键保持完整', () => {
+  assert.equal(seed.sources.some(source => source.enabled === false), false);
+  const disabled = insertSource({ url: 'https://disabled.test/v029', enabled: 0, name: '自定义停用来源' });
+  const active = insertSource({ url: 'https://active.test/v029', name: '用户启用来源' });
+  const article = db.prepare(`INSERT INTO articles (source_id,title,url,fetched_at,starred)
+    VALUES (?,'历史星标','https://article.test/v029',?,1)`).run(disabled, new Date().toISOString()).lastInsertRowid;
+  db.prepare("INSERT INTO meta(key,value) VALUES ('seedVersion','11') ON CONFLICT(key) DO UPDATE SET value='11'").run();
+  seedSources();
+  assert.ok(byId(disabled).removed_at);
+  assert.equal(byId(active).removed_at, null);
+  assert.equal(byId(active).enabled, 1);
+  const preserved = db.prepare(`SELECT a.starred, a.source_id, s.name FROM articles a JOIN sources s ON s.id=a.source_id WHERE a.id=?`).get(article);
+  assert.equal(preserved.starred, 1);
+  assert.equal(preserved.source_id, disabled);
+  assert.equal(preserved.name, '自定义停用来源');
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM sources WHERE enabled=0 AND removed_at IS NULL').get().c, 0);
+  assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
+  const pausedLater = insertSource({ url: 'https://paused-later.test/v029', enabled: 0 });
+  seedSources();
+  assert.equal(byId(pausedLater).removed_at, null, '同版后续手工停用仍可启用，不应再次批量移除');
 });

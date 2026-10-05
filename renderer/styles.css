@@ -131,9 +131,8 @@
   /* —— 布局（rem：栏宽随字号走，行长与字号的比例才是恒定的）—— */
   --shell: 85rem;
   --gutter: 1rem;
-  /* Electron 的隐藏标题栏覆盖在页面最上方；所有 sticky 壳层必须从它的
-     安全区之后开始，否则向下滚动时会钻进窗口按钮/拖拽区。 */
-  --sticky-top: calc(var(--desktop-titlebar-height, 32px) + .625rem);
+  /* 内容视口已避开原生标题栏；吸顶偏移相对于内容视口计算。 */
+  --sticky-top: .625rem;
   --nav-h: 3.75rem;                                /* 由脚本按实际高度回写（px） */
   --stack-top: calc(var(--sticky-top) + var(--nav-h) + var(--sp-2));
 
@@ -345,11 +344,22 @@
    在这里一次性兜住，比在每条规则后面各补一句 :not([hidden]) 可靠。 */
 [hidden] { display: none !important; }
 
-/* body 不能用 height:100%：sticky 只在包含块内生效，钉死高度会让导航条
-   滚过一屏后就跟着内容滑走。用 min-height 既保证短页面铺满，又让包含块随内容增高。 */
-html { height: 100%; }
+/* 内容视口从原生标题栏下方开始。根窗口不滚动，右侧滚动条不再占用标题栏。 */
+html { height: 100%; overflow: hidden; background: var(--c-bg); }
 body {
   min-height: 100%;
+  container-type: inline-size;
+  container-name: app;
+}
+.app-viewport {
+  position: fixed;
+  inset: var(--desktop-titlebar-height, 32px) 0 0;
+  z-index: 1;
+  min-height: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scroll-behavior: auto;
   container-type: inline-size;
   container-name: app;
 }
@@ -376,8 +386,7 @@ body {
   line-height: 1.75;
   color: var(--c-fg);
   background: var(--c-bg);
-  /* hidden 会把 body 变成一个并不实际滚动的 sticky 容器，导致宽屏侧栏和
-     塔台随页面滚走；clip 同样截断横向溢出，但不建立滚动容器。 */
+  /* 横向溢出不产生额外轨道；内容视口单独负责滚动与吸顶。 */
   overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -553,7 +562,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
 [data-theme="light"] .grain { opacity: .3; }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+  html, .app-viewport { scroll-behavior: auto; }
   .aurora, .stars, .comet, .blob,
   .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot,
   .card-new::before, .breakthrough-pill::after {
@@ -2371,20 +2380,18 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent-line); transform: translateY(-2px); }
 .to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
 
-/* v0.2.8：Radix / Mantine 的胶囊与悬停反馈，保留浏览器原生滚动。
-   根轨道留出原生标题栏；不改变 window 的滚动容器或吸顶/键盘语义。
+/* v0.2.9：内容视口位于标题栏下方，保留原生胶囊、拖拽和键盘滚动。
    流动背景沿用目标色相，壁纸与关闭背景用中性色，深浅主题分别保证对比度。
    不设置非 auto 的 scrollbar-width/color，以免 Chromium 覆盖伪元素定制。 */
 :root[data-aqua-background="wallpaper"], :root[data-aqua-enabled="off"] {
   --scrollbar-hue: 220deg;
   --scrollbar-saturation: 8%;
 }
-html { scrollbar-gutter: stable; }
 ::-webkit-scrollbar { width: 14px; height: 14px; background: transparent; }
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-html::-webkit-scrollbar-track, body::-webkit-scrollbar-track {
-  margin-top: calc(var(--desktop-titlebar-height, 32px) + 4px);
+.app-viewport::-webkit-scrollbar-track {
+  margin-top: 4px;
   margin-bottom: 4px;
 }
 ::-webkit-scrollbar-thumb {

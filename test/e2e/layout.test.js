@@ -117,8 +117,8 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
             };
           }).filter(item => item.left < -1 || item.right > innerWidth + 1);
           return {
-            clientWidth: document.documentElement.clientWidth,
-            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.getElementById('appViewport').clientWidth,
+            scrollWidth: document.getElementById('appViewport').scrollWidth,
             visibleTabs: navTabs.filter(tab => {
               const rect = tab.getBoundingClientRect();
               const style = getComputedStyle(tab);
@@ -161,8 +161,8 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   });
   await page.locator('.tab[data-view="settings"]').click();
   await page.evaluate(() => {
-    document.documentElement.style.scrollBehavior = 'auto';
-    window.scrollTo(0, 2000);
+    document.getElementById('appViewport').style.scrollBehavior = 'auto';
+    document.getElementById('appViewport').scrollTo(0, 2000);
   });
   await page.waitForTimeout(80);
   const sticky = await page.evaluate(() => {
@@ -170,18 +170,18 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     const tower = document.querySelector('.tower');
     const measure = element => ({
       top: element.getBoundingClientRect().top,
-      expectedTop: Number.parseFloat(getComputedStyle(element).top),
+      expectedTop: document.getElementById('appViewport').getBoundingClientRect().top + Number.parseFloat(getComputedStyle(element).top),
       position: getComputedStyle(element).position
     });
     return {
-      scrollY,
-      bodyOverflowX: getComputedStyle(document.body).overflowX,
+      scrollY: document.getElementById('appViewport').scrollTop,
+      bodyOverflowX: getComputedStyle(document.getElementById('appViewport')).overflowX,
       rail: measure(rail),
       tower: measure(tower)
     };
   });
   assert.ok(sticky.scrollY > 500, '设置页必须足够长，sticky 验证才有意义');
-  assert.equal(sticky.bodyOverflowX, 'clip');
+  assert.equal(sticky.bodyOverflowX, 'hidden');
   for (const [name, measured] of Object.entries({ rail: sticky.rail, tower: sticky.tower })) {
     assert.equal(measured.position, 'sticky', `${name} 未启用 sticky`);
     assert.ok(
@@ -207,7 +207,7 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     };
   });
   await page.locator('.tab[data-view="featured"]').click();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => document.getElementById('appViewport').scrollTo(0, 0));
   await page.locator('#btnTheme').click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
   let themeTrace = [];
@@ -311,8 +311,8 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     runway.style.height = '2200px';
     group.append(head, runway);
     list.replaceChildren(group);
-    document.documentElement.style.scrollBehavior = 'auto';
-    window.scrollTo(0, group.offsetTop + 180);
+    document.getElementById('appViewport').style.scrollBehavior = 'auto';
+    document.getElementById('appViewport').scrollTo(0, group.offsetTop + 180);
   });
   await page.waitForTimeout(80);
   const overlap = await page.evaluate(() => {
@@ -324,7 +324,7 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     const glassRect = glass.getBoundingClientRect();
     const glassStyle = getComputedStyle(glass);
     return {
-      titlebarHeight: Number.parseFloat(getComputedStyle(document.body).paddingTop),
+      titlebarHeight: document.getElementById('appViewport').getBoundingClientRect().top,
       towerTop: towerRect.top,
       towerBottom: towerRect.bottom,
       headTop: headRect.top,

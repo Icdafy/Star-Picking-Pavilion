@@ -2,26 +2,27 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.8 · 原始设置与主题滚动条
+## v0.2.9 · 标题栏边界与信源清理
 
-- 新用户使用维护者指定的原始设置：浅色主题、标准字号、背景效果／星鲸／星空关闭、精选首页、实时更新开启、采集间隔 60 分钟；常用网址默认选择“督办计划”，收藏为空。
-- 老用户升级保留本地设置。旧版缺省字段仍沿用旧默认值；浏览器旧设置可迁入桌面配置，空收藏、关闭开关和数值 0 都会保留。
-- 右侧滚动条从标题栏下方开始；14px 轨道中的胶囊滑块随流动背景色相、深浅主题变化，壁纸和关闭背景使用中性色。保留原生拖拽、滚轮、键盘滚动与吸顶布局。
-- 继续提供玻璃、星空、星鲸、双主题与 full/lite/static 档位，已有用户开启的效果不受新默认值影响；没有新增依赖。
+- 标题栏背景完整延展到窗口右边；内容在标题栏下方独立滚动，滚动条从其下方开始，侧栏、工具栏与日期分组保持吸顶。主题配色、原生拖拽、滚轮、键盘和阅读位置继续可用。
+- 信源目录移除 35 个入口：原有 31 个停用项，以及本轮复查持续空结果或不可达的 4 项。保留 186 个信源，新用户目录没有停用占位。
+- 东财搜索对齐官网高亮参数，按主机串行请求并限速，空正文只重试一次；空响应或异常结构不会被记为成功。
+- 升级时一次性清理已有库的停用入口；从监控列表移除后，历史文章、星标、来源归属与采集统计保留。后续手工停用仍可重新启用，也可明确移出列表。
+- 沿用 v0.2.8 原始设置与老用户偏好，不新增依赖。
 
-版本、界面与更新元数据统一为 0.2.8，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。默认状态、设计参考和验证记录见 [验证报告](docs/v028-validation.md)，历史版本见 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.9，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。信源实测与发布验证见 [验证记录](docs/v029-validation.md)，历史版本见 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.8.exe`，双击并按向导安装。v0.2.8 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.9.exe`，双击并按向导安装。v0.2.9 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.8.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.9.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -56,7 +57,7 @@ Get-Content .\SHA256SUMS.txt
 - Ctrl+K 命令面板，中文、拼音与英文别名检索命令；G + 字母切换视图，J / K 移动卡片焦点，O 打开原文、S 星标、C 复制、E 展开关联
 - 模型设置支持内置提供商、自定义 OpenAI / Anthropic 协议接口、获取与选择模型及连接测试；默认使用 DeepSeek V4.1 Flash（`deepseek-flash`）
 
-信源被“移出监控”时只会停用，既有信源记录和历史文章不会被删除。
+信源被“移出监控”时会从列表删除入口并停止采集；历史文章及其来源信息保留，可通过明确提报同一地址重新加入。
 
 ## 捕捉什么、怎么打分
 
@@ -234,7 +235,7 @@ npm run eval:selection -- --gold data/gold.jsonl  # 用自标注样本校准精�
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.2.8 --artifacts
+npm run verify:version -- --tag v0.2.9 --artifacts
 npm run notices
 ```
 

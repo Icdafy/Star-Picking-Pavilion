@@ -12,6 +12,7 @@
 //   ③ 入库守卫：标题与摘要都不沾关键词、也不沾同领域词库的条目直接丢弃，
 //      噪声在进库前就被拦下，既省 AI 预筛的 token，也不占保留期
 const { fetchText } = require('./fetch-util');
+const { setTimeout: delay } = require('node:timers/promises');
 const lexicon = require('../ai/lexicon');
 
 const EASTMONEY_SCHEME = 'eastmoney://';
@@ -68,22 +69,50 @@ function parseEastmoneySpec(url) {
   };
 }
 
-async function fetchPage(keyword, { sort, pageIndex }, settings) {
+// 多条关键词共用一个公开搜索服务，限制同主机并发，避免 HTTP 200 空正文。
+let eastmoneyRequestQueue = Promise.resolve();
+let nextEastmoneyRequestAt = 0;
+function fetchPage(keyword, plan, settings) {
+  const pending = eastmoneyRequestQueue.then(async () => {
+    const remaining = nextEastmoneyRequestAt - Date.now();
+    if (remaining > 0) await delay(remaining);
+    try { return await fetchEastmoneyPage(keyword, plan, settings); }
+    finally { nextEastmoneyRequestAt = Date.now() + 350; }
+  });
+  eastmoneyRequestQueue = pending.catch(() => {});
+  return pending;
+}
+
+async function fetchEastmoneyPage(keyword, { sort, pageIndex }, settings) {
   const param = {
     uid: '', keyword, type: ['cmsArticleWebOld'],
     client: 'web', clientType: 'web', clientVersion: 'curr',
     param: {
       cmsArticleWebOld: {
-        searchScope: 'default', sort, pageIndex, pageSize: PAGE_SIZE, preTag: '', postTag: ''
+        searchScope: 'default', sort, pageIndex, pageSize: PAGE_SIZE, preTag: '<em>', postTag: '</em>'
       }
     }
   };
   const url = 'https://search-api-web.eastmoney.com/search/jsonp?cb=cb&param=' +
     encodeURIComponent(JSON.stringify(param));
-  const raw = await fetchText(url, settings);
-  const body = raw.replace(/^[^(]*\(/, '').replace(/\)\s*$/, '');
-  const parsed = JSON.parse(body);
-  const articles = parsed?.result?.cmsArticleWebOld || [];
+  let raw = await fetchText(url, settings, { headers: { Referer: 'https://so.eastmoney.com/' } });
+  // 部分限流仍返回 200 空正文；只对这一瞬态响应重试一次，异常 JSON 继续报错。
+  if (!raw.trim()) {
+    await delay(1000);
+    raw = await fetchText(url, settings, { headers: { Referer: 'https://so.eastmoney.com/' } });
+  }
+  return mapEastmoneyResponse(raw);
+}
+
+function mapEastmoneyResponse(raw) {
+  const text = String(raw || '').trim();
+  if (!text) throw new Error('东财检索返回空响应');
+  const jsonp = text.match(/^[\w.$]+\s*\(([\s\S]*)\)\s*;?$/);
+  const parsed = JSON.parse(jsonp ? jsonp[1] : text);
+  const articles = parsed?.result?.cmsArticleWebOld;
+  if ((parsed?.code != null && Number(parsed.code) !== 0) || !Array.isArray(articles)) {
+    throw new Error('东财检索返回结构异常：缺少有效 cmsArticleWebOld 数组');
+  }
   return articles.map(a => ({
     title: String(a.title || '').replace(/<[^>]+>/g, '').trim(),
     url: validWebUrl(a.url),
@@ -471,6 +500,7 @@ function parseApiSpec(url) {
 module.exports = {
   fetch,
   parseEastmoneySpec,
+  mapEastmoneyResponse,
   parseApiSpec,
   buildGuard,
   capitalGuard,

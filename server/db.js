@@ -220,6 +220,8 @@ function migrate() {
     db.exec('ALTER TABLE sources ADD COLUMN consecutive_errors INTEGER NOT NULL DEFAULT 0');
   }
   if (!srcCols.has('next_fetch_at')) db.exec('ALTER TABLE sources ADD COLUMN next_fetch_at TEXT');
+  // 删除监控入口时保留来源行，避免历史文章、星标、归档及热度失去归属。
+  if (!srcCols.has('removed_at')) db.exec('ALTER TABLE sources ADD COLUMN removed_at TEXT');
   migrateV020(addCol);
 }
 

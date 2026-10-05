@@ -737,7 +737,7 @@ test('real Electron desktop flow is secure, persistent across restart and single
     link.href = 'javascript:window.__sppJavascriptExecuted=true';
     link.target = '_blank';
     link.textContent = 'unsafe';
-    document.body.append(link);
+    document.getElementById('appViewport').append(link);
   });
   await firstPage.locator('#unsafe-e2e-link').click();
   await waitForTwoAnimationFrames(firstPage);
