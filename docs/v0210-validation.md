@@ -45,6 +45,29 @@ attempt 3 为 880 单元通过、15／17 桌面，领域指示块在原定 450ms
 
 终态修正后本地完整验证为 **881／881 单元、17／17 桌面通过**，fail／cancelled／skip／todo 为 0，桌面耗时 122.95 秒。重建与 1271 包边界、版本验证通过：ASAR 13,403,366 B，候选安装包 99,545,261 B，PE 0.2.10、NotSigned，SHA-256 为 `1f98eb8e5eb7adf5b556ea38b5f000f157fe70dfeb9596476b855d536d70fc8d`。记录为 work/v0210/{unit,e2e,build,package,version}-after-terminal.log 与 candidate-pe-after-terminal.json。
 
-精确提交 main CI、Release 工作流及六项正式附件下载核验尚在执行，完成后补录正式产物结果。本地候选摘要不作为正式 CI 产物摘要。
+精确提交 main CI、Release 工作流及六项正式附件下载核验已完成，正式结果见下文。本地候选摘要不作为正式 CI 产物摘要。
 
 原始证据保存在被忽略的 work/v0210/；测试使用隔离样本与配置，不读取用户数据库，不调用付费模型。新增桌面用例在真实 Electron/Chromium 前台验证，CI 显式选择 full 档以覆盖追光；系统减少动画、lite 与原生隐藏另行验证。
+
+## 正式发布与下载核验
+
+北京时间 2026-10-06 01:22:39 发布 [摘星阁 v0.2.10](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.10)，Release ID 403957876，非 draft、非 prerelease，已通过 /releases/latest 确认为最新正式版。产品提交与远端注释 tag 解引用均为 `c02173065a8263f1aeac070008795b652901bee4`。
+
+此前各次 CI 失败、原样诊断及两次动效修正详见上文；启动延迟根因未宣称定位。最终产品提交的第 1 次完整 main CI 成功。Release 首轮为 880／881 单元通过，既有日报归档接口用例报 server ready timeout，桌面、构建及上传未执行；原样本地该文件 5／5 通过，记录为 release-daily-startup-diagnostic.log。未改变产品、tag、旧程序、超时或判据，同一 tag 的第 2 次完整 Release 工作流成功。首轮原始失败为 work/v0210/release-ci-first.{json,log}。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37344672306) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37345837754) 均完整通过：881／881 单元、17／17 真实桌面（112 布局组合）、0 生产漏洞、47 项声明和 1271 包边界，fail／cancelled／skip／todo 为 0。一次性 Windows 安装、启动、单实例、退出与卸载检查成功，用户数据保留。
+
+六项正式附件重新下载核验，尺寸与 GitHub SHA-256 摘要全部匹配。正式安装器 99,543,243 B，PE 产品／文件版本 0.2.10，签名 NotSigned；SHA-256 为 `a678eadbe6cb2d9c5006ba403c2419dc115adbfbf52e59a829cf2a4fee0fe946`。latest.yml 的版本、文件名、尺寸及两处 SHA-512 均与实际安装器匹配，SBOM 为 CycloneDX 1.6、产品 0.2.10，第三方声明与提交一致。
+
+| 附件 | 字节数 |
+| --- | ---: |
+| latest.yml | 373 |
+| sbom.cdx.json | 81,352 |
+| SHA256SUMS.txt | 106 |
+| Star-Picking-Pavilion-Setup-0.2.10.exe | 99,543,243 |
+| Star-Picking-Pavilion-Setup-0.2.10.exe.blockmap | 105,861 |
+| THIRD_PARTY_NOTICES.txt | 6,347 |
+
+正式 CI 包大小：app.asar: 13412162 bytes (12.79 MiB)；installer: 99543243 bytes (94.93 MiB)。本地候选和正式 CI 的摘要分别记录。本机没有运行安装器。
+
+原始发布证据为 work/v0210/main-ci.{json,log,verified.json}、release-ci.{json,log,verified.json}、remote-tag.txt，以及 work/v0210/published-37345837754-attempt2 内的 Release／latest 元数据、verification.json 与 pe-metadata.json。发布后文档提交只补录结果，正式产品 tag 与附件保持一致。

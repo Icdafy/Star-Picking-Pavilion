@@ -21,3 +21,9 @@ Get-Content .\SHA256SUMS.txt
 ```
 
 正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由既有 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。
+
+## 发布验证
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37344672306) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37345837754) 均完整通过：881／881 单元、17／17 真实桌面（112 布局组合）、0 生产漏洞、47 项声明和 1271 包边界，fail／cancelled／skip／todo 为 0。一次性 Windows 安装、启动、单实例、退出与卸载检查成功，用户数据保留。
+
+六项正式附件重新下载核验，尺寸与 GitHub SHA-256 摘要全部匹配。正式安装器 99,543,243 B，PE 产品／文件版本 0.2.10，签名 NotSigned；SHA-256 为 `a678eadbe6cb2d9c5006ba403c2419dc115adbfbf52e59a829cf2a4fee0fe946`。latest.yml 的版本、文件名、尺寸及两处 SHA-512 均与实际安装器匹配，SBOM 为 CycloneDX 1.6、产品 0.2.10，第三方声明与提交一致。
