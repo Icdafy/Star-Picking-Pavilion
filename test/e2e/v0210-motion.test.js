@@ -104,8 +104,12 @@ test('v0210 Electron: current version, continuous navigation redirection, filter
   assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'featured');
   assert.ok((await page.evaluate(selectedGeometry, '.nav-tabs')).every(delta => delta < 1));
   const domain = page.locator('.domain-pills button[data-domain="aerospace"]');
-  await domain.click(); await page.waitForTimeout(450);
-  assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
+  await domain.click();
+  // Pausing the visual clock must not extend the lifetime or hide the selected state.
+  await page.evaluate(() => document.querySelector('.domain-pills .selection-indicator').getAnimations().forEach(animation => animation.pause()));
+  await page.waitForTimeout(450);
+  const geometry = await page.evaluate(selectedGeometry, '.domain-pills');
+  assert.ok(geometry.every(delta => delta < 1), `domain geometry mismatch: ${JSON.stringify(geometry)}`);
   assert.ok(await page.evaluate(() => [...document.querySelectorAll('.selection-indicator')].every(el =>
     el.getAnimations().every(animation => animation.effect.getKeyframes().every(frame => !('width' in frame) && !('height' in frame))))));
   await native(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(900, 680));
@@ -121,10 +125,25 @@ test('v0210 Electron: current version, continuous navigation redirection, filter
 
 test('v0210 Electron: pointer spotlight, bounded press waves and keyboard actions', { timeout: 90000 }, async t => {
   const { page, errors } = await open(t);
-  const card = page.locator('#feedList .card').first(), bounds = await card.boundingBox();
+  const card = page.locator('#feedList .card').first();
+  // Use the locator's stable hit target: asynchronous stats/banner layout can move a card.
+  await card.hover();
+  const bounds = await card.boundingBox();
   const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
   await page.mouse.move(center.x, center.y);
-  await page.waitForSelector('.surface-glow');
+  try { await page.waitForSelector('.surface-glow'); }
+  catch (error) {
+    const snapshot = await page.evaluate(point => ({
+      tier: document.documentElement.dataset.fxTier,
+      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      focused: document.hasFocus(), hidden: document.hidden,
+      idle: document.body.classList.contains('is-idle'),
+      hit: document.elementFromPoint(point.x, point.y)?.className,
+      card: document.querySelector('#feedList .card')?.getBoundingClientRect().toJSON()
+    }), center);
+    error.message += `\nPointer state: ${JSON.stringify(snapshot)}`;
+    throw error;
+  }
   const before = await page.locator('.surface-glow').evaluate(el => getComputedStyle(el).transform);
   await page.mouse.move(center.x + 90, center.y + 15); await page.waitForTimeout(250);
   assert.notEqual(await page.locator('.surface-glow').evaluate(el => getComputedStyle(el).transform), before);

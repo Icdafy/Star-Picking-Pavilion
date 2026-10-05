@@ -75,6 +75,8 @@
   function createMotion(deps = {}) {
     const { document: doc = null, matchMedia = null, raf = null } = deps || {};
     const win = deps.window || doc?.defaultView;
+    const setTimer = deps.setTimeout || win?.setTimeout?.bind(win);
+    const clearTimer = deps.clearTimeout || win?.clearTimeout?.bind(win);
     const active = new Map();
     let disposed = false;
     let media = null;
@@ -102,6 +104,7 @@
     }
 
     function release(el, record) {
+      if (record.timeout != null) clearTimer?.(record.timeout);
       if (active.get(el) === record) {
         active.delete(el);
         if (record.restoreStyles) settle(el, record.original);
@@ -172,8 +175,13 @@
           easing: preBaked ? 'linear' : SPRING_EASING,
           fill: 'backwards'
         });
-        const record = { animation, original, restoreStyles };
+        const record = { animation, original, restoreStyles, timeout: null };
         active.set(el, record);
+        // 视觉时钟或 finished 回调延迟时，仍按交互时限提交已写入的终态。
+        // 重新定向与环境清理会撤销旧时限，不让旧回调覆盖最新意图。
+        if (typeof setTimer === 'function') record.timeout = setTimer(
+          () => release(el, record), total + (Number(delay) > 0 ? Number(delay) : 0) + 50
+        );
         // 结束后取消动画对象，释放合成层资源；终态已落在 inline style，
         // 取消不产生视觉跳变。rAF 缺失时直接取消，不作资源兜底的依赖，
         // rAF 只是「再等一帧」的可选优化

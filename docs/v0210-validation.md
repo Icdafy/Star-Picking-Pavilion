@@ -39,6 +39,12 @@ static 跳过运动；lite 保留短选择过渡和操作反馈，关闭追光�
 
 光波修正后再次完整本地复验为 **880／880 单元、17／17 桌面通过**，桌面耗时 119.71 秒；新增桌面专项按最终测试代码另跑 **3／3 通过**，含完成 Promise 不返回的故障注入，所有计数 fail／cancelled／skip／todo 为 0。重建后 1271 包边界和版本验证通过，ASAR 13,402,781 B，候选安装包 99,544,909 B，PE 0.2.10、NotSigned，SHA-256 为 `b6d2fdee24233e0dc95f4f5156d4d34592e0c93c9d1b68f9ee99399c5e17261c`。原始记录为 work/v0210/{unit,e2e,motion-e2e,build,package}-after-cleanup.log 与 candidate-pe-after-cleanup.json。
 
+[修正提交 CI 37340116821](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37340116821) 的三次执行均使用 `847b8c8909f5caa69df907b4f2da8daf2085c912`。attempt 1 为 876／880 单元通过，4 个既有后台启动用例报 server ready timeout；原样本地相关测试 17／17 通过。attempt 2 为 880 单元通过、16／17 桌面，既有安全／持久化用例的后台在 20 秒握手超时后约 4 秒才返回就绪，主窗口已关闭；新增动效 3／3 均通过，原样本地该旧桌面链路 1／1 通过。没有调整旧启动程序、超时或测试标准；本地通过不等于已定位 CI 启动延迟根因。
+
+attempt 3 为 880 单元通过、15／17 桌面，领域指示块在原定 450ms 后未达到目标几何，追光用例未观察到装饰节点。日志没有记录运动时钟或当时指针命中对象，不据此断言图形驱动根因。通用运动引擎补充“时长＋延迟＋50ms”终态时限，取消或改向撤销旧计时器；新单元故障注入验证过期回调不能取消最新意图，桌面测试主动暂停指示块运动时钟，仍按原来的几何标准检查归位。追光测试先通过定位器等待卡片稳定命中，再移动指针，并补充失败时的焦点、命中对象和档位诊断；原有视觉反馈断言与超时保持。原始失败为 work/v0210/main-ci-{second,third,fourth}.{json,log}，原样诊断为 startup-diagnostic.log 与 desktop-startup-diagnostic.log。
+
+终态修正后本地完整验证为 **881／881 单元、17／17 桌面通过**，fail／cancelled／skip／todo 为 0，桌面耗时 122.95 秒。重建与 1271 包边界、版本验证通过：ASAR 13,403,366 B，候选安装包 99,545,261 B，PE 0.2.10、NotSigned，SHA-256 为 `1f98eb8e5eb7adf5b556ea38b5f000f157fe70dfeb9596476b855d536d70fc8d`。记录为 work/v0210/{unit,e2e,build,package,version}-after-terminal.log 与 candidate-pe-after-terminal.json。
+
 精确提交 main CI、Release 工作流及六项正式附件下载核验尚在执行，完成后补录正式产物结果。本地候选摘要不作为正式 CI 产物摘要。
 
 原始证据保存在被忽略的 work/v0210/；测试使用隔离样本与配置，不读取用户数据库，不调用付费模型。新增桌面用例在真实 Electron/Chromium 前台验证，CI 显式选择 full 档以覆盖追光；系统减少动画、lite 与原生隐藏另行验证。

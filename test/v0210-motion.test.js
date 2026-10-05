@@ -9,6 +9,7 @@ function fixture() {
   doc.documentElement = { dataset: { fxTier: 'full' } };
   doc.hidden = false;
   const frames = [], properties = {};
+  const timers = new Map(); let sequence = 0;
   let visual = { left: 0, top: 0, width: 100, height: 40 };
   const el = {
     dataset: {},
@@ -22,7 +23,10 @@ function fixture() {
       frames.push(animation); return animation;
     }
   };
-  return { doc, el, frames, properties, motion: createMotion({ document: doc }),
+  return { doc, el, frames, properties, timers, motion: createMotion({ document: doc,
+    setTimeout(fn, ms) { const id = ++sequence; timers.set(id, { fn, ms }); return id; },
+    clearTimeout(id) { timers.delete(id); }
+  }),
     setVisual(value) { visual = value; }
   };
 }
@@ -63,5 +67,19 @@ test('v0210: first layout with zero previous size appears immediately', () => {
   setVisual({ left: 0, top: 0, width: 0, height: 0 });
   assert.equal(motion.retargetIndicator(el, { x: 10, y: 10, width: 80, height: 30 }), null);
   assert.equal(frames.length, 0); assert.equal(el.style.transform, 'translate(10px, 10px)');
+  motion.dispose();
+});
+
+test('v0210: pending browser motion settles by its deadline and a stale deadline cannot cancel new intent', () => {
+  const { el, motion, timers, properties } = fixture();
+  const first = motion.retargetIndicator(el, { x: 0, y: 80, width: 100, height: 40 });
+  const oldDeadline = [...timers.values()][0];
+  assert.equal(oldDeadline.ms, 350);
+  const latest = motion.retargetIndicator(el, { x: 0, y: 160, width: 100, height: 40 });
+  assert.equal(first.playState, 'idle'); assert.equal(timers.size, 1);
+  oldDeadline.fn(); assert.equal(latest.playState, 'running');
+  [...timers.values()][0].fn();
+  assert.equal(latest.playState, 'idle'); assert.equal(timers.size, 0);
+  assert.equal(properties['--ti-y'], '160px');
   motion.dispose();
 });
