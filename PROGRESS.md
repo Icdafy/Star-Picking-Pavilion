@@ -16,6 +16,7 @@
 - 已切换到用户指定分支 codex/v0.2.7-motion；work/v027/ 已由既有 /work/ 规则忽略。
 - 用户已授权公开网址策略、未签名包、通过验证后自动推送 main/tag 与正式 Release。
 - 已完成三轮，最终状态为“未完成、未发布”；正式版本/本地 main/远端 main 未改。docs/v027-validation.md 已写入全部实际命令、红→绿与保留失败、轨迹汇总及证据限制。
+- 续跑复核：候选提交 db7a2c69be562efe941b349852912d5add0e4d3e 已保存；远端 main/最新 Release 未变化，冻结文件未变化。逐项完成条件审计见 docs/v027-completion-audit.md；同一版本/声明边界阻塞仍在，没有开启第四轮。
 
 ## 顺序与续跑
 - [x] 任务 0：基线、契约、三次前台性能与新增红测已实跑；口径及 SHA-256 记录于 docs/v027-motion-plan.md，现已冻结。
