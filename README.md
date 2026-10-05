@@ -8,12 +8,14 @@
 - 保留全部应用功能、221 个内置信源、行业包与提示词、内置字体、图标、测试、构建流程及许可证；升级沿用已有本地数据与设置。
 - 临时验证产物改为本地忽略，历史版本说明统一保留在 [CHANGELOG.md](CHANGELOG.md)。
 
-本版本详情见 [发布说明](RELEASE_NOTES.md)，使用与开发说明如下。
+v0.2.6 历史详情见 [变更日志](CHANGELOG.md)，使用与开发说明如下。
 
 开发分支 `codex/v0.2.7-motion` 正在验证六条交互链：同步主题连点、可中断
 导航、可见新增行错峰、星标/复制反馈、面板归焦与运行中降级。v0.2.7 尚未
-发布，版本字段仍为 0.2.6；验收结果和边界阻塞见 [验证报告](docs/v027-validation.md)
+发布，本地候选版本字段已为 0.2.7；验收结果和剩余阻塞见 [验证报告](docs/v027-validation.md)
 与 [BLOCKED.md](BLOCKED.md)。
+
+本地候选安装器名为 `Star-Picking-Pavilion-Setup-0.2.7.exe`，元数据与界面版本统一为0.2.7；正式发布后通过下面同一 Releases 入口获取。当前公开正式版仍为v0.2.6。
 
 ## 系统要求与安装
 
@@ -238,7 +240,7 @@ npm run eval:selection -- --gold data/gold.jsonl  # 用自标注样本校准精�
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.2.6 --artifacts
+npm run verify:version -- --tag v0.2.7 --artifacts
 npm run notices
 ```
 

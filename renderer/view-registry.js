@@ -90,10 +90,12 @@
       }
       const filters = $('#feedFilters');
       if (filters) filters.style.display = isFeed ? '' : 'none';
-      if (previous && previous !== entry && typeof previous.onLeave === 'function') previous.onLeave();
-      if (entry && typeof entry.onEnter === 'function') entry.onEnter();
+      // 先复位壳层与滚动，再让控制器写入新内容，避免 scrollTo 强制同步
+      // 计算刚插入的整片内容布局（首次字体加载时尤其容易形成长任务）。
       if (typeof refreshStats === 'function') refreshStats();
       if (typeof scrollToTop === 'function') scrollToTop();
+      if (previous && previous !== entry && typeof previous.onLeave === 'function') previous.onLeave();
+      if (entry && typeof entry.onEnter === 'function') entry.onEnter();
     }
 
     // tab 点击 + APG 方向键约定：焦点落在标签上时即选即切

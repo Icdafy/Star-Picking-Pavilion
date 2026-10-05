@@ -2,11 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-当前 v0.2.7 任务在开发分支验收，尚未进入发布：既有只读
-`test/release-readiness.test.js` 锁定 0.2.6，版本生成声明又超出本次写入
-边界。全部必需项通过前不升 tag、不推 main、不创建 Release；详细证据见
-[BLOCKED.md](BLOCKED.md) 与 [验证报告](docs/v027-validation.md)。下文命令仍
-描述已发布的 v0.2.6 流程。本说明不改变任何工作流或发布门禁。
+当前候选目标为v0.2.7。版本测试及生成声明的更新已获续跑授权；全部必需项通过前不推main/tag或创建Release。当前证据见 [验证报告](docs/v027-validation.md) 与 [BLOCKED.md](BLOCKED.md)。以下为v0.2.7待执行的发布步骤，不表示已经发布。
 
 ## 发布前授权门槛
 
@@ -23,7 +19,7 @@
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.2.6
+npm run verify:version -- --tag v0.2.7
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -32,11 +28,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.6 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.6.exe
+npm run verify:version -- --tag v0.2.7 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.7.exe
 ```
 
-v0.2.6 的签名状态预期为 `NotSigned`。
+v0.2.7 的签名状态预期为 `NotSigned`。
 
 **体积不再有上限。** `npm run verify:package` 会打印 ASAR 与安装包的精确字节数供发布记录比对，但不会因为体积失败。
 
@@ -79,19 +75,19 @@ v0.2.6 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.6
-git tag -a v0.2.6 -m "摘星阁 v0.2.6"
-git push origin v0.2.6
+npm run verify:version -- --tag v0.2.7
+git tag -a v0.2.7 -m "摘星阁 v0.2.7"
+git push origin v0.2.7
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.6 Release 应包含：
+v0.2.7 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.6.exe`
-- `Star-Picking-Pavilion-Setup-0.2.6.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.7.exe`
+- `Star-Picking-Pavilion-Setup-0.2.7.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`

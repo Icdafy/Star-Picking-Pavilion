@@ -769,6 +769,11 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 本节描述当前开发分支，发布状态与失败证据见 `docs/v027-validation.md`；
 7.4 中的阶段值与旧演进记录保留供追溯，以本节说明当前变化。
 
+- 导航仍先更新选中态与面板显隐，取消离开面板的运动；onLeave 在
+  onEnter 之前、refreshStats 在 scrollToTop 之前。续跑将壳层刷新与
+  滚动复位提前到控制器写入新内容前，避免 scrollTo 同步计算新内容和
+  首次字体布局；旧视图调度测试与真实导航/焦点回归继续验证结果。
+
 - createMotion 三档默认时长为 light 160ms / medium 260ms / heavy 320ms，
   fadeSlideIn 默认位移 6px，staggerIn 默认步长 25ms，上限八节点（175ms）。
   显式调用参数仍可覆盖，旧依赖行为不变。

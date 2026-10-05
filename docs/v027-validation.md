@@ -1,5 +1,24 @@
 # v0.2.7 候选验证报告：未完成，未发布
 
+## 当前续跑结果（2026-10-05）
+
+用户明确“继续”后，按上一轮列出的必要范围更新目标版本测试/声明、纠正验收环境并继续验证。以下历史章节保留原三轮的失败，不代表当前状态；新环境口径与冻结哈希见 [协议2](v027-protocol-2.md)。
+
+- `npm run test:e2e`：12 pass / 0 fail / 0 skip / 0 todo，原8项、新4项以及原112布局组合全部通过。实际Electron无焦点模拟，确认20/21/30主题奇偶、原生/持久化一致、30导航、Esc归焦、增量/阅读位置、动态减少动画、真实隐藏/恢复和外观关闭持久化。日志 `work/v027/v027-e2e.log`。
+- 原代码在新口径仍4项全红，日志 `v2-red-e2e.log`。候选第一次新口径长任务1/0/1（中位1）失败，原样保存 `after-v2-pre-layout-fix/`；调整滚动复位在控制器写入前执行后，相同冻结协议三次全绿。
+- 新口径旧版导航13.8/13.9/13.9ms，中位13.9；候选8.7/7.6/13.9ms，中位8.7≤15.29且≤20ms。旧版导航长任务0/0/1，中位0；候选0/0/0，中位0。闲置中位旧版7.2、候选7.1ms。真实前台、样本、窗口/DPR/144Hz和full档一致；新轨迹含4倍CPU的lite/static，static有限动画0。
+- package/Windows/build/lock版本与生成声明现为0.2.7；旧测试只同步版本目标，数量和行为判据不减少。`npm run audit:runtime` 为0漏洞；47项声明生成并保存后再生成，`git diff --exit-code -- THIRD_PARTY_NOTICES.txt` 退出0；`verify:version -- --tag v0.2.7` 通过。日志 `v027-{audit,notices-repeat,version}.log`。
+- 版本升级首次单元回归868 pass / 1 fail：Markdown导出页脚仍被旧断言锁定0.2.6。只把目标版本及样本版本同步到0.2.7，保留原失败日志 `v027-unit.log`，全量复跑结果回填进度。
+- 最终 `npm test` 为869 pass / 0 fail / 0 skip / 0 todo，原865加新4全绿，日志 `v027-unit-green.log`。目标版本断言升级后未修改服务器或导出功能。
+- `npm run dist`、`npm run verify:package`、`npm run verify:version -- --tag v0.2.7 --artifacts`均退出0。1270个ASAR条目、13,389,031B；本地安装器99,542,996B，PE文件/产品版本0.2.7，签名NotSigned，SHA256为 `0e0463eb865484f6c94782ee2c86827aa29b634a2e8d4b24550104e5bb2ce5f8`。latest.yml版本、文件名、尺寸一致。仅核验本地候选，未运行本机安装器；CI安装烟测与正式资产仍待完成。日志 `v027-{dist,package,artifact-version}.log` 与 `v027-installer.json`。
+- 另开全新隔离Electron直接观察界面桥版本0.2.7；用实际安装器重算SHA-512，和latest.yml逐字匹配，日志 `v027-ui-and-update-version.log/json`。
+- 六链连续帧补录完成：前后各52段，旧版4096帧、候选4063帧，同数据、双主题、两种尺寸；`work/v027/evidence/compare-v2.html` 按真实起始主题/尺寸匹配并按时间逐帧播放。首次操作后实际帧中位7/11ms，最长307/341ms（首次导航）；不伪称固定帧率或所有操作首帧即时。短反馈在回放中可观察，原frozen-1较迟截图仍保留。抽查窄屏暗色命令面板、浅色确认框和宽屏检索，文字及控件可读，主题20连点四组合均正确。
+- 渲染诊断的局限：full轨迹4s的Layout总时长中位199.131→219.444ms，Paint130.187→128.900ms，UpdateLayoutTree516.719→485.799ms；布局成本有增加，不能宣称全部渲染成本下降。4倍CPU单次lite P95为229→270.9ms，长任务28→21；static为104.1→69.5ms，长任务19→22，有限动画0。此项按冻结口径是附加诊断，不套用full档20ms门槛，也不冒称慢CPU普遍流畅；原始样本及轨迹全部保留。
+- 浏览器UI再次创建超时，备用Computer Use因无法可靠确认当前浏览器URL而中止；遵守停止要求。三个作品实际体验仍缺失。main/tag/正式Release与CI安装烟测尚未执行，不能标记目标完成。
+- 本地完成提交前审计相对bcf9beb的32个授权路径，无用户数据/二进制/日志或凭证模式；package/lock只有版本字段变动，4个旧测试逐字只替换版本，release-readiness保留旧断言并增加新版说明检查。只推指定开发分支运行现有CI与一次性Windows安装烟测，不把候选分支CI冒充精确main SHA门禁。
+
+## 原三轮历史结果（保留失败证据）
+
 日期：2026-10-05。任务书来自本次 goal 附件；一个 agent，三轮实现已用完。
 开发分支：`codex/v0.2.7-motion`。起点、本地 main 与远端 main 均为
 `bcf9beb2ca13ca73214735c103185f9de103b6af`。本报告记录实际结果，失败不豁免。
