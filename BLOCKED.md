@@ -2,7 +2,7 @@
 
 ## 2026-10-05 续跑状态
 
-当前发布硬阻塞是三件参考作品的实际体验仍为0/3。Computer Use工具本轮因“could not determine the current browser URL on Windows with enough confidence to enforce policy”停止；已停止该通道，不绕过检查或假称看过。恢复浏览器控制后才能完成这项任务。main精确SHA CI/tag/Release/六资产下载核验因此仍未执行，目标未完成，不能发布或标记完成。
+当前硬阻塞：无。参考作品实际体验已完成3/3，Codex浏览器实际操作与截图覆盖Linear导航与归焦、Rauno局部标签反馈、Lusion动态3D及菜单层次，详见docs/v027-motion-plan.md。早前Windows备用通道因无法可靠识别URL停止的记录保留，没有绕过检查或假称看过。最终main精确SHA CI/tag/Release/六资产下载核验继续执行；这些发布步骤完成前目标仍未完成。
 
 其余技术门禁当前已通过：候选5e04d436c940a45fadbec0346ac15a0759d4e320的开发分支CI [37292639190](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37292639190)全成功，869/12、0生产漏洞、声明零差异、1270包边界和一次性Windows安装/启动/单实例/卸载均通过，用户数据保留。最新本机冻结性能导航中位7.4ms、长任务0、真实前台全部有效，当前包和元数据校验通过。这是开发分支候选CI，不能代替最终main或release门禁。
 

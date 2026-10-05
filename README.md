@@ -2,32 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.6 · 仓库瘦身与完整发布
+## v0.2.7 · 连贯交互与阅读反馈
 
-- 清理 47 个无运行、测试或构建引用的旧截图、临时差异文件、旧代码副本、IDE 配置及已完成的设计／实施草稿，移除约 7.84 MiB。
-- 保留全部应用功能、221 个内置信源、行业包与提示词、内置字体、图标、测试、构建流程及许可证；升级沿用已有本地数据与设置。
-- 临时验证产物改为本地忽略，历史版本说明统一保留在 [CHANGELOG.md](CHANGELOG.md)。
+- 主题快速连点按最后意图同步生效；导航立即显示选中状态，面板转场可打断。
+- 检索、筛选、分页与实时增量保持正确请求上下文；阅读中的新情报提示保留滚动位置和焦点，只对可见新增行错峰入场。
+- 星标、复制和Toast提供等待与完成反馈；命令面板、词库、确认框关闭后归焦，运行中减少动画及隐藏状态及时清理运动。
+- 沿用玻璃、星空、星鲸、双主题和full/lite/static档位，保留应用功能、内置信源、字体与本地数据格式；没有新增依赖。
 
-v0.2.6 历史详情见 [变更日志](CHANGELOG.md)，使用与开发说明如下。
-
-开发分支 `codex/v0.2.7-motion` 正在验证六条交互链：同步主题连点、可中断
-导航、可见新增行错峰、星标/复制反馈、面板归焦与运行中降级。v0.2.7 尚未
-发布，本地候选版本字段已为 0.2.7；验收结果和剩余阻塞见 [验证报告](docs/v027-validation.md)
-与 [BLOCKED.md](BLOCKED.md)。
-
-本地候选安装器名为 `Star-Picking-Pavilion-Setup-0.2.7.exe`，元数据与界面版本统一为0.2.7；正式发布后通过下面同一 Releases 入口获取。当前公开正式版仍为v0.2.6。
+版本、界面与更新元数据统一为0.2.7，正式资产以[GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases)为准。实际验证、前后回放与性能采样限制见[验证报告](docs/v027-validation.md)，历史版本见[变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.6.exe`，双击并按向导安装。v0.2.6 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.7.exe`，双击并按向导安装。v0.2.7 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.6.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.7.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

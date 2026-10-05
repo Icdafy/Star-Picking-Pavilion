@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-当前候选目标为v0.2.7。版本测试及生成声明的更新已获续跑授权；全部必需项通过前不推main/tag或创建Release。当前证据见 [验证报告](docs/v027-validation.md) 与 [BLOCKED.md](BLOCKED.md)。以下为v0.2.7待执行的发布步骤，不表示已经发布。
+当前发布目标为v0.2.7。版本测试及生成声明的更新已获续跑授权；本地技术验收、开发分支CI及三件参考作品实际体验已完成。最终main精确SHA CI成功后才能推注释tag，由既有release工作流公开资产；当前证据见[验证报告](docs/v027-validation.md)与[BLOCKED.md](BLOCKED.md)。文档中的目标版本不代替远端发布状态核验。
 
 ## 发布前授权门槛
 
@@ -93,7 +93,7 @@ v0.2.7 Release 应包含：
 - `sbom.cdx.json`
 - `THIRD_PARTY_NOTICES.txt`
 
-发布完成后下载到新的临时目录，按 `SHA256SUMS.txt` 重新校验并执行一次安装、启动、单实例、退出和卸载烟测。
+发布完成后将六项资产下载到work/v027/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
 
 ## 回滚
 

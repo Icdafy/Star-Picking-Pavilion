@@ -1,4 +1,4 @@
-# 摘星阁 v0.2.7（候选，尚未发布）
+# 摘星阁 v0.2.7
 
 本版让导航、信息流和快捷操作更及时，并修复主题快速连点的状态覆盖。玻璃、星空、星鲸和双主题沿用，升级保留全部本地数据和设置。
 
@@ -8,11 +8,13 @@
 - **快捷操作与焦点**：星标/复制提供等待与完成反馈；Toast可打断；命令面板、词库和确认框Esc归焦，第二次确认不会继承上次OK。
 - **运行中降载**：减少动画、静态档、隐藏和失焦及时清理有限动画；真实前台恢复可继续交互。外观关闭设置可持久化。
 
-全部门禁结果和前后演示见 [验证报告](docs/v027-validation.md)。技术候选5e04d43的开发分支Windows CI全部通过，含869单元、12桌面和一次性安装/启动/单实例/卸载。参考作品真实体验及最终main精确SHA CI/Release尚未完成，当前公开正式版仍为v0.2.6；此候选记录不表示最终验收全部通过或已发布。
+技术验证：869项单元/集成、12项真实桌面回归（原112布局组合）全绿，fail/skip/todo均0；生产审计0漏洞、47项第三方声明零差异、1270项包边界检查通过。一次性Windows CI验证安装、启动、单实例、关闭、卸载及用户数据保留。本机没有运行安装器。
+
+同机真实前台、full档、1440×920、DPR1、144Hz、相同90条样本/30张卡片，三次导航rAF间隔P95中位数为旧版13.9ms→本版7.4ms，均满足≤20ms与同机基线110%；超过50ms长任务中位数0→0。该结果是调度采样，不代表所有GPU或慢CPU设备；绘制总成本有小幅增加。六条交互的双主题/双尺寸前后连续帧回放、红→绿与完整限制见[验证报告](docs/v027-validation.md)。实际体验Linear、Rauno和Lusion的映射见[交互计划](docs/v027-motion-plan.md)。
 
 ## v0.2.7 安装包与发布策略
 
-候选安装器为 Star-Picking-Pavilion-Setup-0.2.7.exe。沿用未签名策略，签名状态应为NotSigned；Windows SmartScreen可能提示未知发布者。正式资产仅通过既有GitHub Actions门禁发布，安装前核对SHA256SUMS.txt。安装/启动/单实例/卸载仅在一次性Windows CI中验证，本机不运行安装烟测。
+安装器为 Star-Picking-Pavilion-Setup-0.2.7.exe。沿用未签名策略，签名状态为NotSigned；Windows SmartScreen可能提示未知发布者。正式资产仅通过既有GitHub Actions门禁发布，安装前核对SHA256SUMS.txt。安装/启动/单实例/卸载仅在一次性Windows CI中验证，本机不运行安装烟测。
 
 ```powershell
 Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.7.exe
@@ -38,7 +40,7 @@ Get-Content .\SHA256SUMS.txt
 
 发布前本地验证：865 项单元／集成测试及 8 项真实 Electron 测试全部通过，生产依赖审计为 0 个漏洞。实时复查 190 个启用信源，187 个返回内容、0 个请求失败；「东财检索·沃飞长空」「东财检索·傲势科技」「东财检索·腾盾科技」本轮返回 0 条，因此 `audit:sources --strict` 未通过全非空门槛。这三条入口继续保留，未将空结果视为成功。
 
-## 下载与校验
+### v0.2.6 历史下载与校验
 
 安装包：`Star-Picking-Pavilion-Setup-0.2.6.exe`。此版本尚未代码签名，Windows SmartScreen 可能提示未知发布者；签名状态预期为 NotSigned。请核对 SHA256SUMS.txt 后安装。
 
