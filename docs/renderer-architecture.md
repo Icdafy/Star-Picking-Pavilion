@@ -165,6 +165,8 @@ app.js 未达「约 300 行」的最终形态，差额主体是组合根理应�
 基础设施（toast/api/主题/缩放/偏好持久化/视图注册与启动序列）；在脚本
 预算封顶的约束下不再强行外移，避免为凑行数制造职责漂移的碎片模块。
 
+v0.2.10 高频运动集中在既有 dom-utils.js：createMotion.retargetIndicator 用当前视觉矩形实现可中断的 FLIP；createInteractionMotion 负责选择组、触压光波与局部追光。监听采用委托，小型选择组局部观察，指针追光仅 full 档开放且静止停止 RAF。两者均经依赖注入，减少动画／隐藏／失焦落终态，pagehide 释放。版本徽标读取 Desktop.version，网页回退 GET /api/version，两处来源均为 package.json；没有新增脚本或依赖。实测见 [v0.2.10 验证记录](./v0210-validation.md)。
+
 阶段 4 测试基座：test/helpers/mini-dom.js（零依赖最小 DOM，含从 index.html
 正则抽取并解析真实 <template> 的 templateFromHtml），支撑模板填充与
 diff 调和的行为级断言（test/feed-diff.test.js）；perf-guard 整表赋值

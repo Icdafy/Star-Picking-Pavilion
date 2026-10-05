@@ -231,10 +231,43 @@
       return limited.length;
     }
 
+    // FLIP：在改向前捕获实际视觉位置，尺寸一次落定，只插值 transform。
+    // 连点时从正在播放的帧继续，不从上一个目标重新起跑。
+    function retargetIndicator(el, { x, y, width, height, immediate = false } = {}) {
+      if (!el?.style || !width || !height) return null;
+      const target = `${x},${y},${width},${height}`;
+      if (!immediate && el.dataset?.motionTarget === target) return null;
+      const before = el.getBoundingClientRect?.();
+      cancel(el);
+      el.style.transition = 'none';
+      el.style.transformOrigin = '0 0';
+      el.style.setProperty('--ti-x', `${x}px`);
+      el.style.setProperty('--ti-y', `${y}px`);
+      el.style.setProperty('--ti-w', `${width}px`);
+      el.style.setProperty('--ti-h', `${height}px`);
+      el.style.setProperty('--ti-o', '1');
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      if (el.dataset) el.dataset.motionTarget = target;
+      if (immediate || shouldSkip() || !before?.width || !before?.height) return null;
+      const after = el.getBoundingClientRect?.();
+      if (!after?.width || !after?.height) return null;
+      const dx = before.left - after.left, dy = before.top - after.top;
+      const sx = before.width / after.width, sy = before.height / after.height;
+      const frames = Array.from({ length: SPRING_SAMPLES + 1 }, (_, i) => {
+        const t = i / SPRING_SAMPLES, remaining = 1 - springProgress(t);
+        return {
+          offset: t,
+          transform: `translate(${x + dx * remaining}px, ${y + dy * remaining}px) scale(${1 + (sx - 1) * remaining}, ${1 + (sy - 1) * remaining})`
+        };
+      });
+      return spring(el, { keyframes: frames, duration: fxTier() === 'lite' ? 180 : 300 });
+    }
+
     return Object.freeze({
       spring,
       fadeSlideIn,
       staggerIn,
+      retargetIndicator,
       cancel,
       cancelAll,
       cancelTree,
@@ -250,11 +283,181 @@
     });
   }
 
+  // 高频交互的装饰层；委托监听，不为每张卡片安装事件或常驻 RAF。
+  function createInteractionMotion({ document: doc, window: win, motion } = {}) {
+    if (!doc || !win || !motion || !win.MutationObserver) return Object.freeze({ dispose() {} });
+    const reduced = win.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const cleanups = [], groups = [], waves = new Map();
+    const controlSelector = 'button:not(:disabled):not([aria-disabled="true"])';
+    const surfaceSelector = '.card, .common-links-card';
+    let disposed = false, glow = null, surface = null, rect = null, frame = null;
+    let x = 0, y = 0, targetX = 0, targetY = 0, lastTime = 0;
+    let velocityX = 0, velocityY = 0;
+    const canMove = () => !disposed && !doc.hidden && !reduced?.matches
+      && doc.documentElement.dataset.fxTier !== 'static'
+      && (typeof doc.hasFocus !== 'function' || doc.hasFocus());
+    const full = () => canMove() && doc.documentElement.dataset.fxTier === 'full';
+    function listen(target, event, handler, options) {
+      target?.addEventListener?.(event, handler, options);
+      cleanups.push(() => target?.removeEventListener?.(event, handler, options));
+    }
+    function clearWave(button) {
+      const wave = waves.get(button);
+      if (!wave) return;
+      waves.delete(button);
+      try { wave.animation?.cancel(); } catch {}
+      wave.node.remove();
+      button.classList.remove('motion-wave-host');
+      if (wave.positioned) button.classList.remove('motion-control');
+    }
+    function press(button, event) {
+      if (!canMove() || !button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+      clearWave(button);
+      if (waves.size >= 4) clearWave(waves.keys().next().value);
+      const bounds = button.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      const node = doc.createElement('span');
+      node.className = 'press-wave'; node.setAttribute('aria-hidden', 'true');
+      const keyboard = !event || event.type === 'keydown';
+      node.style.left = `${keyboard ? bounds.width / 2 : event.clientX - bounds.left}px`;
+      node.style.top = `${keyboard ? bounds.height / 2 : event.clientY - bounds.top}px`;
+      const positioned = win.getComputedStyle(button).position === 'static';
+      if (positioned) button.classList.add('motion-control');
+      button.classList.add('motion-wave-host');
+      button.appendChild(node);
+      const wave = { node, positioned, animation: null };
+      waves.set(button, wave);
+      try {
+        wave.animation = node.animate([
+          { transform: 'translate(-50%, -50%) scale(.25)', opacity: .24 },
+          { transform: `translate(-50%, -50%) scale(${Math.max(bounds.width, bounds.height) / 18})`, opacity: 0 }
+        ], { duration: 420, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+        wave.animation.finished.then(() => { if (waves.get(button) === wave) clearWave(button); })
+          .catch(() => { if (waves.get(button) === wave) clearWave(button); });
+      } catch { clearWave(button); }
+    }
+    function clearGlow() {
+      motion.cancel(glow);
+      if (frame != null) win.cancelAnimationFrame(frame);
+      frame = null; lastTime = 0; velocityX = 0; velocityY = 0;
+      glow?.remove(); surface?.classList.remove('motion-surface');
+      glow = null; surface = null; rect = null;
+    }
+    function tick(now) {
+      frame = null;
+      if (!full() || !surface?.isConnected || !glow) { clearGlow(); return; }
+      // 有限步长防止长帧后弹簧发散；运动停止即释放帧循环。
+      const elapsed = lastTime ? Math.min((now - lastTime) / 1000, .032) : 1 / 60;
+      lastTime = now;
+      const steps = Math.max(1, Math.ceil(elapsed / .008));
+      const dt = elapsed / steps;
+      for (let i = 0; i < steps; i += 1) {
+        velocityX += ((targetX - x) * 600 - velocityX * 42) * dt;
+        velocityY += ((targetY - y) * 600 - velocityY * 42) * dt;
+        x += velocityX * dt; y += velocityY * dt;
+      }
+      const settled = Math.abs(targetX - x) + Math.abs(targetY - y) < .3
+        && Math.abs(velocityX) + Math.abs(velocityY) < 2;
+      if (settled) { x = targetX; y = targetY; velocityX = 0; velocityY = 0; lastTime = 0; }
+      glow.style.transform = `translate(${x - 90}px, ${y - 90}px)`;
+      if (!settled) frame = win.requestAnimationFrame(tick);
+    }
+    function onOver(event) {
+      if (!full() || event.pointerType === 'touch') return;
+      const next = event.target.closest?.(surfaceSelector);
+      if (!next || next === surface) return;
+      clearGlow(); surface = next; rect = next.getBoundingClientRect();
+      surface.classList.add('motion-surface');
+      glow = doc.createElement('span'); glow.className = 'surface-glow';
+      glow.setAttribute('aria-hidden', 'true'); surface.appendChild(glow);
+      x = targetX = event.clientX - rect.left; y = targetY = event.clientY - rect.top;
+      glow.style.transform = `translate(${x - 90}px, ${y - 90}px)`;
+      motion.spring(glow, { from: { opacity: '0' }, to: { opacity: '1' }, duration: 180 });
+    }
+    function onMove(event) {
+      if (!surface) onOver(event);
+      if (!surface || !rect || !full()) return;
+      targetX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+      targetY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+      if (frame == null) frame = win.requestAnimationFrame(tick);
+    }
+    function onOut(event) {
+      if (surface && !surface.contains(event.relatedTarget)) {
+        motion.cancel(glow); clearGlow();
+      }
+    }
+    function syncGroup(record, immediate = false) {
+      if (disposed || record.busy) return;
+      const { group, indicator } = record;
+      const selected = [...group.children].find(node => node.matches?.('button.active'));
+      if (!selected || !selected.offsetWidth || !selected.offsetHeight) return;
+      record.busy = true;
+      if (indicator.parentNode !== group) group.appendChild(indicator);
+      motion.retargetIndicator(indicator, {
+        x: selected.offsetLeft, y: selected.offsetTop,
+        width: selected.offsetWidth, height: selected.offsetHeight, immediate
+      });
+      record.busy = false;
+    }
+    // 只观察小型选择控件，信息流的全量 DOM 不进入 MutationObserver。
+    const groupNodes = doc.querySelectorAll('.domain-pills, #hotDomains, #capitalDomains, #capitalTabs, #periodSwitch, #catChips');
+    for (const group of groupNodes) {
+      const indicator = doc.createElement('span');
+      indicator.className = 'selection-indicator'; indicator.setAttribute('aria-hidden', 'true');
+      group.classList.add('motion-segmented');
+      const record = { group, indicator, busy: false };
+      groups.push(record); syncGroup(record, true);
+      const observer = new win.MutationObserver(mutations => {
+        if (mutations.some(m => m.type === 'attributes'
+          || [...m.addedNodes, ...m.removedNodes].some(n => n !== indicator && n.nodeType === 1 && !n.matches?.('.press-wave')))) syncGroup(record);
+      });
+      observer.observe(group, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+      cleanups.push(() => observer.disconnect());
+    }
+    function syncSizes() { for (const record of groups) syncGroup(record, true); }
+    const resize = win.ResizeObserver ? new win.ResizeObserver(syncSizes) : null;
+    groups.forEach(({ group }) => resize?.observe(group));
+    doc.fonts?.ready?.then(() => { if (!disposed) syncSizes(); }).catch(() => {});
+    function settleEnvironment() {
+      if (!full()) { motion.cancel(glow); clearGlow(); }
+      if (!canMove()) { for (const button of waves.keys()) clearWave(button); }
+      syncSizes();
+    }
+    const environment = new win.MutationObserver(settleEnvironment);
+    environment.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier'] });
+    listen(doc, 'pointerdown', event => { if (event.button === 0) press(event.target.closest?.(controlSelector), event); }, { passive: true });
+    listen(doc, 'keydown', event => {
+      if (!event.repeat && (event.key === 'Enter' || event.key === ' ')) press(event.target.closest?.(controlSelector), event);
+    });
+    listen(doc, 'pointerover', onOver, { passive: true });
+    listen(doc, 'pointermove', onMove, { passive: true });
+    listen(doc, 'pointerout', onOut, { passive: true });
+    listen(doc, 'scroll', () => { motion.cancel(glow); clearGlow(); }, { passive: true, capture: true });
+    listen(doc, 'visibilitychange', settleEnvironment);
+    listen(win, 'blur', settleEnvironment);
+    listen(win, 'resize', () => { clearGlow(); syncSizes(); }, { passive: true });
+    listen(reduced, 'change', settleEnvironment);
+    return Object.freeze({
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        motion.cancel(glow); clearGlow();
+        for (const button of waves.keys()) clearWave(button);
+        cleanups.splice(0).forEach(cleanup => cleanup());
+        resize?.disconnect(); environment.disconnect();
+        for (const { group, indicator } of groups) {
+          motion.cancel(indicator); indicator.remove(); group.classList.remove('motion-segmented');
+        }
+      }
+    });
+  }
+
   return Object.freeze({
     escapeHTML,
     safeHttpUrl,
     findFocusKey,
     restoreFocusByKey,
-    createMotion
+    createMotion,
+    createInteractionMotion
   });
 });

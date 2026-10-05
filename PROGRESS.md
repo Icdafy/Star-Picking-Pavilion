@@ -1,3 +1,9 @@
+# v0.2.10 当前状态
+
+版本标识与动效实现完成。本地 880／880 单元、17／17 真实桌面（含 112 布局组合）、0 生产漏洞、47 项声明及 1271 包边界通过。候选安装器 99,545,024 B、PE 0.2.10、NotSigned，元数据一致。正在提交并执行精确提交 main CI 与既有 Release 门禁，尚未正式发布；证据见 [docs/v0210-validation.md](docs/v0210-validation.md)。用户已明确授权推送及更新 Release。
+
+---
+
 # v0.2.9 当前状态
 
 标题栏已延展至窗口右边，正文在标题栏下方独立滚动；已清理 35 个信源入口，保留 186 个且严格复查全有内容、0 空结果、0 失败。旧库升级移除停用入口，保留历史文章及来源归属。最新正式版 [v0.2.9](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.9) 已发布：精确提交 `a3c8152a8b6a957963b4190d1c2e686d2299b10d` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37328372503) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37329530254) 首次执行全部通过，均为 876 单元、14 桌面（112 布局）、0 漏洞、1271 包边界；一次性 Windows 安装／启动／单实例／退出／卸载成功，用户数据保留。六项正式附件重新下载校验一致，安装器 99,540,524 B、PE 版本 0.2.9、NotSigned，更新元数据匹配。详见 [验证记录](docs/v029-validation.md)。

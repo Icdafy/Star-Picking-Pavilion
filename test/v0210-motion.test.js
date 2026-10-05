@@ -1,0 +1,67 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { createMotion } = require('../renderer/dom-utils');
+
+function fixture() {
+  const doc = new EventTarget();
+  doc.documentElement = { dataset: { fxTier: 'full' } };
+  doc.hidden = false;
+  const frames = [], properties = {};
+  let visual = { left: 0, top: 0, width: 100, height: 40 };
+  const el = {
+    dataset: {},
+    style: { setProperty(name, value) { properties[name] = value; } },
+    getBoundingClientRect: () => ({ ...visual }),
+    animate(keyframes, options) {
+      let reject;
+      const animation = { keyframes, options, playState: 'running', finished: new Promise((_, r) => { reject = r; }),
+        cancel() { this.playState = 'idle'; reject(new Error('cancelled')); }
+      };
+      frames.push(animation); return animation;
+    }
+  };
+  return { doc, el, frames, properties, motion: createMotion({ document: doc }),
+    setVisual(value) { visual = value; }
+  };
+}
+
+test('v0210: selection redirection cancels the old trajectory without accumulating animations', () => {
+  const { el, motion, frames, properties } = fixture();
+  const first = motion.retargetIndicator(el, { x: 0, y: 80, width: 100, height: 40 });
+  const second = motion.retargetIndicator(el, { x: 0, y: 160, width: 100, height: 40 });
+  assert.equal(first.playState, 'idle'); assert.equal(second.playState, 'running');
+  assert.equal(properties['--ti-y'], '160px');
+  assert.equal(frames.filter(a => a.playState === 'running').length, 1);
+  assert.ok(second.keyframes.every(frame => Object.keys(frame).every(key => ['offset', 'transform'].includes(key))));
+  motion.dispose();
+});
+
+test('v0210: a settled selection and repeated size notification do not replay motion', () => {
+  const { el, motion, frames } = fixture();
+  const target = { x: 20, y: 10, width: 100, height: 40 };
+  motion.retargetIndicator(el, target);
+  assert.equal(motion.retargetIndicator(el, target), null);
+  assert.equal(frames.length, 1);
+  motion.retargetIndicator(el, { ...target, immediate: true });
+  assert.equal(frames[0].playState, 'idle'); assert.equal(frames.length, 1);
+  motion.dispose();
+});
+
+test('v0210: static selection commits its geometry without allocating an animation', () => {
+  const { el, motion, doc, frames, properties } = fixture();
+  doc.documentElement.dataset.fxTier = 'static';
+  assert.equal(motion.retargetIndicator(el, { x: 12, y: 34, width: 90, height: 30 }), null);
+  assert.equal(properties['--ti-x'], '12px'); assert.equal(properties['--ti-h'], '30px');
+  assert.equal(el.style.transform, 'translate(12px, 34px)'); assert.equal(frames.length, 0);
+  motion.dispose();
+});
+
+test('v0210: first layout with zero previous size appears immediately', () => {
+  const { el, motion, frames, setVisual } = fixture();
+  setVisual({ left: 0, top: 0, width: 0, height: 0 });
+  assert.equal(motion.retargetIndicator(el, { x: 10, y: 10, width: 80, height: 30 }), null);
+  assert.equal(frames.length, 0); assert.equal(el.style.transform, 'translate(10px, 10px)');
+  motion.dispose();
+});

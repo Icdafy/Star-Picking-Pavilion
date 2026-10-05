@@ -349,7 +349,10 @@ body {
   background: linear-gradient(115deg, var(--accent-soft), transparent 60%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%), 0 0 1rem var(--accent-ring);
   font: 700 var(--t-2xs)/1 var(--font-ui);
-  letter-spacing: .12em;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .tower {
@@ -896,7 +899,6 @@ main { order: 5; width: 100%; }
   .command-rail { padding: var(--sp-3); }
   .rail-brand { padding: 0 .2rem var(--sp-2); }
   .rail-brand .brand-text p,
-  .brand-badge,
   .rail-section-label,
   .rail-footer small { display: none; }
   .nav { margin-top: var(--sp-2); gap: var(--sp-1); }
@@ -971,3 +973,58 @@ main { order: 5; width: 100%; }
 [data-fx-tier="static"] .aqua-fluid-canvas { opacity: .32; }
 [data-fx-tier="static"] .aqua-particle-whale { opacity: .08; }
 [data-fx-tier="static"] .aqua-critter { animation: none; }
+
+/* v0.2.10：选择轨迹、局部追光与触压反馈。只移动装饰层，正文和命中区域保持稳定。 */
+.motion-segmented { position: relative; isolation: isolate; }
+.motion-segmented > button { position: relative; z-index: 1; font-weight: 600; }
+.motion-segmented > button.active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.selection-indicator {
+  position: absolute; top: 0; left: 0; z-index: 0;
+  width: var(--ti-w, 0); height: var(--ti-h, 0);
+  transform: translate(var(--ti-x, 0), var(--ti-y, 0));
+  transform-origin: 0 0;
+  border-radius: 99px;
+  background: var(--active-bg);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
+  opacity: var(--ti-o, 0);
+  pointer-events: none;
+}
+:is(#catChips, #capitalTabs, #periodSwitch) > .selection-indicator {
+  background: var(--flag-soft); border-color: var(--flag-line);
+}
+.motion-control { position: relative; }
+.motion-wave-host { overflow: hidden; }
+.press-wave {
+  position: absolute; width: 36px; height: 36px; z-index: 2;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, currentColor, transparent 70%);
+  transform: translate(-50%, -50%); opacity: 0;
+}
+.motion-surface { overflow: hidden; }
+.surface-glow {
+  position: absolute; top: 0; left: 0; width: 180px; height: 180px;
+  z-index: 0; pointer-events: none;
+  background: radial-gradient(circle, var(--accent-soft), transparent 70%);
+  opacity: 0;
+}
+.card[data-domain="aerospace"] > .surface-glow { background: radial-gradient(circle, var(--second-soft), transparent 70%); }
+.card.is-featured > .surface-glow { background: radial-gradient(circle, var(--flag-soft), transparent 70%); }
+@supports (transition-timing-function: linear(0, 1)) {
+  :root:not([data-fx-tier="static"]) {
+    --spring-light: linear(0, .26 12%, .66 28%, .91 44%, 1.02 62%, 1.01 80%, 1);
+  }
+}
+:root[data-fx-tier="static"] :is(.press-wave, .surface-glow),
+body.is-idle :is(.press-wave, .surface-glow) { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .press-wave, .surface-glow { display: none; }
+}
+@media (forced-colors: active) {
+  .selection-indicator, .surface-glow, .press-wave { display: none; }
+  .motion-segmented > button.active { background: Highlight; color: HighlightText; border-color: Highlight; }
+}

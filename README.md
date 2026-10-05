@@ -2,27 +2,27 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.9 · 标题栏边界与信源清理
+## v0.2.10 · 版本标识与流畅动效
 
-- 标题栏背景完整延展到窗口右边；内容在标题栏下方独立滚动，滚动条从其下方开始，侧栏、工具栏与日期分组保持吸顶。主题配色、原生拖拽、滚轮、键盘和阅读位置继续可用。
-- 信源目录移除 35 个入口：原有 31 个停用项，以及本轮复查持续空结果或不可达的 4 项。保留 186 个信源，新用户目录没有停用占位。
-- 东财搜索对齐官网高亮参数，按主机串行请求并限速，空正文只重试一次；空响应或异常结构不会被记为成功。
-- 升级时一次性清理已有库的停用入口；从监控列表移除后，历史文章、星标、来源归属与采集统计保留。后续手工停用仍可重新启用，也可明确移出列表。
-- 沿用 v0.2.8 原始设置与老用户偏好，不新增依赖。
+- 左上角名称旁显示当前版本 `v0.2.10`，直接读取应用元数据；以后发版自动同步。
+- 导航与领域、分类、一级市场分区、日报周期的选择块连续滑动，连点时从当前视觉位置改向，尺寸变化通过缩放过渡。
+- 鼠标按下与键盘触发都有短促光波，控件使用更自然的触压回弹；信息卡与常用网址卡提供随指针移动的柔光。
+- 主题、缩放、阅读位置、键盘操作与既有功能继续可用；减少动画时直接呈现选中状态，低功耗关闭追光，窗口隐藏时释放动效。
+- 参考 Apple、Motion 与 Linear 的官方设计资料，在现有原生 JS / WAAPI 架构内实现，无新增依赖。
 
-版本、界面与更新元数据统一为 0.2.9，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。信源实测与发布验证见 [验证记录](docs/v029-validation.md)，历史版本见 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.10，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0210-validation.md)，历史版本见 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.9.exe`，双击并按向导安装。v0.2.9 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.10.exe`，双击并按向导安装。v0.2.10 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.9.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.10.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

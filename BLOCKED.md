@@ -1,3 +1,9 @@
+# v0.2.10 当前状态
+
+本地验证无阻塞：880 单元、17 桌面（112 布局）、0 生产漏洞及 1271 包边界均通过。正式发布仍待精确提交 main CI、既有 Release 工作流与六项附件下载核验；尚未发布。记录见 [docs/v0210-validation.md](docs/v0210-validation.md)。用户已明确授权推送及更新 Release。
+
+---
+
 # v0.2.9 发布状态
 
 无发布硬阻塞。最新正式版 [v0.2.9](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.9) 已发布；精确提交 `a3c8152a8b6a957963b4190d1c2e686d2299b10d` 的 main CI 与既有 Release 工作流首次执行全部通过，876／876 单元、14／14 桌面、0 生产漏洞、1271 包边界及一次性 Windows 安装／卸载成功。六项附件已在新目录重新下载，GitHub 摘要、校验文件、PE 版本和更新元数据完全匹配。信源严格复查 186／186 通过；详见 [验证记录](docs/v029-validation.md)。历史 CI 首窗口前退出风险未宣称根治，下方保留历史记录。

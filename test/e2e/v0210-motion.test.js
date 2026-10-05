@@ -1,0 +1,180 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const net = require('node:net');
+const { spawn, spawnSync } = require('node:child_process');
+const { chromium } = require('playwright');
+const root = path.join(__dirname, '../..');
+const evidence = path.join(root, 'work/v0210/e2e');
+
+async function open(t) {
+  fs.mkdirSync(evidence, { recursive: true });
+  const profile = fs.mkdtempSync(path.join(evidence, 'profile-'));
+  fs.writeFileSync(path.join(profile, 'settings.json'), '{}');
+  fs.writeFileSync(path.join(profile, 'ui-preferences.json'), JSON.stringify({ version: 2,
+    ...require('../../renderer/ui-preference-schema').getLegacyUiPreferences(require('../../renderer/common-links')) }));
+  const seed = spawnSync(process.execPath, ['-e', `
+    const {db,closeDatabase}=require('./server/db');
+    const source=Number(db.prepare("INSERT INTO sources(name,type,url,tier,domain) VALUES('v0210 隔离样本','rss','https://motion-fixture.example/feed','T2','aerospace')").run().lastInsertRowid);
+    const insert=db.prepare('INSERT INTO articles(source_id,title,url,fetched_at,published_at,relevant,featured,analyzed,domain,quality_score,ai_summary) VALUES(?,?,?,?,?,1,1,1,?,88,?)');
+    db.exec('BEGIN');for(let i=0;i<12;i++){const date=new Date(Date.now()-i*60000).toISOString();const title='动效隔离样本 '+i+'：航天产业技术进展';
+      const id=Number(insert.run(source,title,'https://motion-fixture.example/v0210/'+i,date,date,i%2?'lowaltitude':'aerospace','虚构样本，仅用于交互验证。').lastInsertRowid);
+      db.prepare('INSERT INTO articles_fts(rowid,title,summary) VALUES(?,?,?)').run(id,title,'交互验证');}db.exec('COMMIT');closeDatabase();
+  `], { cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: profile }, encoding: 'utf8' });
+  assert.equal(seed.status, 0, seed.stderr);
+  const port = await new Promise(resolve => { const server = net.createServer(); server.listen(0, '127.0.0.1', () => {
+    const port = server.address().port; server.close(() => resolve(port));
+  }); });
+  const wrapper = path.join(profile, 'native.cjs');
+  fs.writeFileSync(wrapper, `const electron=require('electron');
+    process.on('uncaughtException',e=>{console.error(e);electron.app.exit(1)});
+    process.on('message',async m=>{try{process.send({id:m.id,result:await eval('('+m.expression+')')(electron,m.arg)});}catch(e){process.send({id:m.id,error:e.stack});}});
+    require(${JSON.stringify(path.join(root, 'electron/main.js'))});`);
+  const child = spawn(require('electron'), [wrapper, '--hidden', `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1'], {
+    cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_TEST_DATA_DIR: profile,
+      STAR_PICKING_PAVILION_NO_SCHEDULER: '1', STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE: '1' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc']
+  });
+  let output = '', sequence = 0, browser;
+  const pending = new Map();
+  child.stdout.on('data', data => output += data); child.stderr.on('data', data => output += data);
+  child.on('message', message => { const call = pending.get(message.id); if (!call) return;
+    pending.delete(message.id); clearTimeout(call.timer); message.error ? call.reject(new Error(message.error)) : call.resolve(message.result);
+  });
+  const native = (fn, arg) => new Promise((resolve, reject) => {
+    const id = ++sequence;
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error('Native IPC timeout: ' + output)); }, 15000);
+    pending.set(id, { resolve, reject, timer }); child.send({ id, expression: fn.toString(), arg });
+  });
+  t.after(async () => {
+    if (browser) await browser.close().catch(() => {});
+    if (child.exitCode === null && child.connected) await native(({ app }) => { setTimeout(() => app.quit(), 30); return true; }).catch(() => {});
+    if (child.exitCode === null) await new Promise(resolve => { child.once('exit', resolve); setTimeout(() => { if (child.exitCode === null) child.kill(); resolve(); }, 5000).unref(); });
+    fs.writeFileSync(path.join(profile, 'native.log'), output);
+  });
+  const started = Date.now();
+  while (true) {
+    if (child.exitCode !== null || Date.now() - started > 20000) throw new Error('Native launch failed: ' + output);
+    try { if ((await fetch(`http://127.0.0.1:${port}/json/version`)).ok) break; } catch {}
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { noDefaults: true });
+  const context = browser.contexts()[0], page = context.pages()[0] || await context.waitForEvent('page');
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.waitForSelector('#feedList .card[data-id]');
+  await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
+    win.setContentSize(1440, 920); win.setAlwaysOnTop(true); win.show(); win.focus(); win.webContents.focus();
+  });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.waitForFunction(() => document.hasFocus() && !document.hidden);
+  // Exercise full enhancements even on the two-core CI runner; no API or render interception.
+  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
+  await page.waitForTimeout(500);
+  return { page, native, profile, errors };
+}
+
+const selectedGeometry = selector => {
+  const group = document.querySelector(selector);
+  const selected = group.querySelector('button.active').getBoundingClientRect();
+  const indicator = group.querySelector('.selection-indicator, .tab-indicator').getBoundingClientRect();
+  return ['left', 'top', 'width', 'height'].map(key => Math.abs(selected[key] - indicator[key]));
+};
+
+test('v0210 Electron: current version, continuous navigation redirection, filters and resize', { timeout: 90000 }, async t => {
+  const { page, native, errors } = await open(t);
+  const version = require('../../package.json').version;
+  assert.equal(await page.locator('#appVersion').textContent(), 'v' + version);
+  assert.equal(await page.evaluate(async () => (await (await fetch('/api/version')).json()).version), version);
+  assert.equal(await page.locator('#appVersion').isVisible(), true);
+  await page.evaluate(() => document.querySelector('.tab[data-view="links"]').click());
+  await page.waitForTimeout(70);
+  const continuity = await page.evaluate(() => {
+    const indicator = document.querySelector('.tab-indicator');
+    const before = indicator.getBoundingClientRect();
+    document.querySelector('.tab[data-view="all"]').click();
+    const after = indicator.getBoundingClientRect();
+    return { delta: Math.abs(before.top - after.top) + Math.abs(before.left - after.left),
+      running: indicator.getAnimations().filter(a => a.playState === 'running').length };
+  });
+  assert.ok(continuity.delta < 2, JSON.stringify(continuity)); assert.equal(continuity.running, 1);
+  await page.evaluate(() => { for (let i = 0; i < 30; i++) document.querySelector(`.tab[data-view="${i % 2 ? 'featured' : 'links'}"]`).click(); });
+  await page.waitForTimeout(450);
+  assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'featured');
+  assert.ok((await page.evaluate(selectedGeometry, '.nav-tabs')).every(delta => delta < 1));
+  const domain = page.locator('.domain-pills button[data-domain="aerospace"]');
+  await domain.click(); await page.waitForTimeout(450);
+  assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
+  assert.ok(await page.evaluate(() => [...document.querySelectorAll('.selection-indicator')].every(el =>
+    el.getAnimations().every(animation => animation.effect.getKeyframes().every(frame => !('width' in frame) && !('height' in frame))))));
+  await native(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(900, 680));
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#appVersion').isVisible(), true);
+  assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
+  const tab = page.locator('.tab[data-view="featured"]'); await tab.focus();
+  await page.keyboard.press('ArrowRight'); assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'hot');
+  await page.waitForTimeout(450);
+  assert.ok((await page.evaluate(selectedGeometry, '.nav-tabs')).every(delta => delta < 1));
+  assert.deepEqual(errors, []);
+});
+
+test('v0210 Electron: pointer spotlight, bounded press waves and keyboard actions', { timeout: 90000 }, async t => {
+  const { page, errors } = await open(t);
+  const card = page.locator('#feedList .card').first(), bounds = await card.boundingBox();
+  const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  await page.mouse.move(center.x, center.y);
+  await page.waitForSelector('.surface-glow');
+  const before = await page.locator('.surface-glow').evaluate(el => getComputedStyle(el).transform);
+  await page.mouse.move(center.x + 90, center.y + 15); await page.waitForTimeout(250);
+  assert.notEqual(await page.locator('.surface-glow').evaluate(el => getComputedStyle(el).transform), before);
+  assert.equal(await page.locator('.surface-glow').count(), 1);
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => applyTheme(theme, { persist: false }), theme);
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: path.join(evidence, `v0210-${theme}.png`) });
+  }
+  await page.mouse.move(4, 80); assert.equal(await page.locator('.surface-glow').count(), 0);
+  await page.evaluate(() => {
+    const buttons = ['btnTheme', 'btnRealtime', 'btnPalette', 'btnLexicon', 'btnRefresh'];
+    for (let i = 0; i < 40; i++) document.getElementById(buttons[i % buttons.length]).dispatchEvent(new PointerEvent('pointerdown',
+      { bubbles: true, button: 0, pointerType: 'mouse', clientX: 600, clientY: 100 }));
+  });
+  assert.ok(await page.locator('.press-wave').count() <= 4);
+  await page.waitForTimeout(600); assert.equal(await page.locator('.press-wave').count(), 0);
+  const button = page.locator('#btnRealtime'); await button.focus();
+  const active = await button.getAttribute('aria-pressed'); await page.keyboard.press('Enter');
+  assert.notEqual(await button.getAttribute('aria-pressed'), active);
+  assert.equal(await page.locator('#btnRealtime .press-wave').count(), 1);
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('.press-wave, .motion-wave-host').count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', { timeout: 90000 }, async t => {
+  const { page, native, errors } = await open(t);
+  await page.locator('#feedList .card').first().hover();
+  await page.locator('#btnRealtime').focus(); await page.keyboard.press('Enter');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForFunction(() => document.documentElement.dataset.fxTier === 'static');
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.press-wave, .surface-glow').count(), 0);
+  await page.evaluate(() => document.querySelector('.domain-pills button[data-domain="aerospace"]').click());
+  await page.waitForTimeout(50);
+  assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('.selection-indicator, .tab-indicator')].reduce((n, el) => n + el.getAnimations().length, 0)), 0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
+  await page.waitForTimeout(100);
+  await page.locator('#feedList .card').first().hover();
+  await native(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
+  await page.waitForFunction(() => document.hidden && !document.hasFocus());
+  assert.equal(await page.locator('.press-wave, .surface-glow').count(), 0);
+  await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); win.webContents.focus(); });
+  await page.waitForFunction(() => document.hasFocus() && !document.hidden);
+  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'lite'; });
+  await page.locator('#feedList .card').first().hover(); assert.equal(await page.locator('.surface-glow').count(), 0);
+  await page.evaluate(() => interactionMotion.dispose());
+  assert.equal(await page.locator('.selection-indicator, .motion-segmented, .press-wave, .surface-glow').count(), 0);
+  assert.deepEqual(errors, []);
+});

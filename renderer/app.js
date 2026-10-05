@@ -126,6 +126,8 @@ const motion = DomUtils.createMotion({
   matchMedia: window.matchMedia ? query => window.matchMedia(query) : null,
   raf: callback => requestAnimationFrame(callback)
 });
+const interactionMotion = DomUtils.createInteractionMotion({ document, window, motion });
+window.addEventListener('pagehide', () => interactionMotion.dispose(), { once: true });
 
 function scrollToTop() {
   document.getElementById('appViewport').scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
@@ -825,6 +827,16 @@ UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill') });
 
 // ---------- 启动 ----------
 async function start() {
+  // 桌面预加载桥与网页 API 都读取 package.json；每次发布无需另改界面标签。
+  const showVersion = version => {
+    if (!/^\d+\.\d+\.\d+$/.test(String(version || ''))) return;
+    const badge = $('#appVersion');
+    badge.textContent = `v${version}`;
+    badge.setAttribute('aria-label', `当前版本 v${version}`);
+    badge.hidden = false;
+  };
+  if (Desktop?.version) showVersion(Desktop.version);
+  else api('/api/version').then(info => showVersion(info.version)).catch(() => {});
   applyTheme(state.theme, { persist: false });
   applyTextScale(state.textScale, { persist: false });
   setDomain(state.domain, { persist: false, load: false });

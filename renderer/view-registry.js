@@ -41,6 +41,13 @@
       const active = $('.tab.active');
       const bar = $('.tab-indicator');
       if (!active || !bar) return;
+      if (typeof motion?.retargetIndicator === 'function') {
+        motion.retargetIndicator(bar, {
+          x: active.offsetLeft, y: active.offsetTop,
+          width: active.offsetWidth, height: active.offsetHeight
+        });
+        return;
+      }
       bar.style.setProperty('--ti-x', `${active.offsetLeft}px`);
       bar.style.setProperty('--ti-y', `${active.offsetTop}px`);
       bar.style.setProperty('--ti-w', `${active.offsetWidth}px`);

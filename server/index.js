@@ -494,6 +494,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, result);
       }
 
+      if (p === '/api/version' && req.method === 'GET') return json(res, 200, { version: packageJson.version });
       if (p === '/api/feed' && req.method === 'GET') return json(res, 200, queryFeed(u.searchParams));
       if (p === '/api/stats' && req.method === 'GET') return json(res, 200, getStats());
       if (p === '/api/categories') return json(res, 200, CATEGORIES);
