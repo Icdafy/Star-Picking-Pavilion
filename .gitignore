@@ -18,3 +18,19 @@ dist/package-verification.json
 Star-Picking-Pavilion/
 .superpowers/
 docs/design/**/*.png
+
+# Local tools, downloaded references and disposable validation data.
+/.qoder/
+/work/
+/.installer-smoke-*/
+/DSH-Transparent-UI-Plugin-*/
+
+# Only reproducible application branding belongs in build/.
+/build/*
+!/build/icon.ico
+!/build/icon.png
+!/build/make-icon.py
+
+# Completed implementation plans and design prompts are available in Git history.
+/docs/design/
+/docs/superpowers/
