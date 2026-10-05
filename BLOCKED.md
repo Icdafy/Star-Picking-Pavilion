@@ -2,7 +2,11 @@
 
 ## 2026-10-05 续跑状态
 
-当前硬阻塞：无。参考作品实际体验已完成3/3，Codex浏览器实际操作与截图覆盖Linear导航与归焦、Rauno局部标签反馈、Lusion动态3D及菜单层次，详见docs/v027-motion-plan.md。早前Windows备用通道因无法可靠识别URL停止的记录保留，没有绕过检查或假称看过。最终main精确SHA CI/tag/Release/六资产下载核验继续执行；这些发布步骤完成前目标仍未完成。
+当前发布硬阻塞：最终main CI尚未通过。首次main提交65b3f8d9eaafc7fcf9f66a3500945332286baa7b的CI run37302344612为869单元通过、桌面11/12；原有v021-ui在app.firstWindow前遭遇进程关闭，原布局与新增4项通过。后续门禁未运行，未推tag；失败日志/result.json保留，原因未定位，不改旧测试/超时或吞掉失败。将原样诊断并对包含此失败记录的最终main提交完整复验。
+
+原样本地v021诊断1/1通过、fail/skip/todo0（v027-main-v021-diagnostic.log）；没有改测试、electron/server或默认超时，本地不复现不等于已定位/修复。失败与诊断都将随文档提交，完整精确SHA CI仍是硬要求。
+
+参考作品实际体验已完成3/3，Codex浏览器实际操作与截图覆盖Linear导航与归焦、Rauno局部标签反馈、Lusion动态3D及菜单层次，详见docs/v027-motion-plan.md。早前Windows备用通道因无法可靠识别URL停止的记录保留，没有绕过检查或假称看过。发布步骤完成前目标仍未完成。
 
 其余技术门禁当前已通过：候选5e04d436c940a45fadbec0346ac15a0759d4e320的开发分支CI [37292639190](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37292639190)全成功，869/12、0生产漏洞、声明零差异、1270包边界和一次性Windows安装/启动/单实例/卸载均通过，用户数据保留。最新本机冻结性能导航中位7.4ms、长任务0、真实前台全部有效，当前包和元数据校验通过。这是开发分支候选CI，不能代替最终main或release门禁。
 

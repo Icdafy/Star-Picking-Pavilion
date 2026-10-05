@@ -2,13 +2,17 @@
 
 ## 当前续跑结果（2026-10-05）
 
+正式main首次CI [37302344612](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37302344612)对应精确提交65b3f8d9eaafc7fcf9f66a3500945332286baa7b，869单元通过、桌面11/12，skip/todo0；原有v021-ui在app.firstWindow前报`Target page, context or browser has been closed`，原112布局和新增4项全部通过。后续生产审计/声明/构建/安装门禁未执行。原始v027-main-ci-failed.log/result.json保留；产品/测试/构建等与已通过开发分支CI的5e04d43零差异，不能据此断言根因已定位。未修改旧测试、默认超时、产品或判据；诊断后重新执行包含此失败记录的最终main精确提交CI。
+
+原样本地诊断命令`node --test test/e2e/v021-ui.test.js`退出0：tests/pass1、fail/cancelled/skipped/todo0，27.58s，日志v027-main-v021-diagnostic.log。原测试和electron/server启动代码只读不变；CI日志未提供退出进程的stderr，暂不能区分启动握手失败或其他进程退出原因。没有把本地不复现当作根因修复，完整main和release门禁仍须重新验证。
+
 候选精确提交 `5e04d436c940a45fadbec0346ac15a0759d4e320` 的开发分支 [Windows CI 37292639190](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37292639190)全部成功，耗时10m12s。原始 `v027-final-ci.log` / `v027-final-ci-result.json` 直接记录 `# tests 869 / # pass 869 / # fail 0 / # skipped 0 / # todo 0` 和 `# tests 12 / # pass 12 / # fail 0 / # skipped 0 / # todo 0`，包含原112布局组合。生产审计 `found 0 vulnerabilities`，47项声明再生成Git零差异；构建、1270条包边界通过。CI ASAR13,399,011B、安装器99,541,227B，与本地构建分别保留，不混用哈希。一次性Windows的原始烟测输出为：`Installed, launched, checked single-instance, closed and uninstalled v0.2.7; user data retained.` 本机没有执行安装器或伪设CI=true。
 
 红→绿链：首次候选CI d735815的10/12失败已保留；确认观测改为等待Promise解析后仍严格false，阅读通知流内59px导致600→659，修复后CPU4诊断600→600、焦点保留，当前完整本地与CI12/12通过。一次本地恢复后即时动画断言失败原因未定位，诊断和后续全量本地/CI均通过；风险记录仍在，不声称根因已解决或吞掉失败。
 
 参考作品实际体验已完成3/3：2026-10-05在Codex浏览器实际操作Linear导航菜单与Esc归焦、Rauno Flashlight Tabs选中反馈，以及Lusion动态3D与菜单层次；实际页面状态和截图确认，映射及观测限制见[交互计划](v027-motion-plan.md)。早前超时/URL识别停止的失败记录保留，没有绕过检查或虚构先行调研。Raycast是额外尝试，不计入三项。
 
-本轮只整理正式版本文档，产品与验收未变；当前main仍bcf9beb、v0.2.7 tag不存在、最新正式版v0.2.6（draft=false/prerelease=false）。下一步对提交对象审计后快进main，等待精确SHA CI，再推注释tag，仅由既有release工作流发布，最后下载六资产核验。当前没有硬阻塞；发布步骤完成前目标仍未完成，不把开发分支CI当作正式发布门禁。
+本轮只整理正式版本与失败记录文档，产品与验收未变；当前main已为65b3f8d，首次CI失败，v0.2.7 tag不存在、最新正式版v0.2.6（draft=false/prerelease=false）。提交诊断记录后对最终main精确SHA完整复验，通过后再推注释tag，仅由既有release工作流发布，最后下载六资产核验。当前发布阻塞是最终main CI未通过；不把开发分支CI当作正式发布门禁。
 
 当前产品最新冻结性能口径三次全部通过：导航8.2/7.2/7.4ms，中位7.4ms（旧版13.9、110%上限15.29、绝对上限20）；超过50ms长任务0/0/0、中位0未增加。闲置7.1/7.2/7.1、中位7.1≤7.92。full档/1440×920/DPR1/144Hz/90条样本/30张首屏一致，原生每50ms和页面每帧前台校验全成立。日志 `v027-final-measure-foreground.log`、原始 `after-v2/`、摘要 `v027-final-perf-summary.json`。首次最新重测因原生失焦退出1，整次无效，不计入三次中位；失败日志 `v027-final-measure.log`、目录 `after-v2-invalid-focus-1/`完整保留。先前有效8.7ms样本封存在 `after-v2-pre-reading-fix/`，没有覆盖或改变冻结脚本及阈值。
 
