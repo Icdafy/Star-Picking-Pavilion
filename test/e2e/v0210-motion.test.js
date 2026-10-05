@@ -148,6 +148,25 @@ test('v0210 Electron: pointer spotlight, bounded press waves and keyboard action
   assert.equal(await page.locator('#btnRealtime .press-wave').count(), 1);
   await page.waitForTimeout(600);
   assert.equal(await page.locator('.press-wave, .motion-wave-host').count(), 0);
+  // Fault injection: the browser renders the native animation, but its completion
+  // promise remains pending. Cleanup must remain bounded without that callback.
+  await page.evaluate(() => {
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = original.apply(this, args);
+      if (this.classList.contains('press-wave')) {
+        animation.finished.catch(() => {});
+        Object.defineProperty(animation, 'finished', { value: new Promise(() => {}) });
+      }
+      return animation;
+    };
+    try { document.getElementById('btnRealtime').dispatchEvent(new PointerEvent('pointerdown',
+      { bubbles: true, button: 0, pointerType: 'mouse', clientX: 850, clientY: 90 })); }
+    finally { Element.prototype.animate = original; }
+  });
+  assert.equal(await page.locator('#btnRealtime .press-wave').count(), 1);
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('.press-wave, .motion-wave-host').count(), 0);
   assert.deepEqual(errors, []);
 });
 

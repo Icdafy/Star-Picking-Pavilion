@@ -305,6 +305,7 @@
       const wave = waves.get(button);
       if (!wave) return;
       waves.delete(button);
+      win.clearTimeout(wave.timeout);
       try { wave.animation?.cancel(); } catch {}
       wave.node.remove();
       button.classList.remove('motion-wave-host');
@@ -325,7 +326,7 @@
       if (positioned) button.classList.add('motion-control');
       button.classList.add('motion-wave-host');
       button.appendChild(node);
-      const wave = { node, positioned, animation: null };
+      const wave = { node, positioned, animation: null, timeout: null };
       waves.set(button, wave);
       try {
         wave.animation = node.animate([
@@ -334,6 +335,9 @@
         ], { duration: 420, easing: 'cubic-bezier(.16, 1, .3, 1)' });
         wave.animation.finished.then(() => { if (waves.get(button) === wave) clearWave(button); })
           .catch(() => { if (waves.get(button) === wave) clearWave(button); });
+        // 渲染时钟暂停或完成回调延迟时也有 500ms 的资源寿命上限。
+        // 正常完成先清理；替换、减少动画、失焦和销毁都撤销此计时器。
+        wave.timeout = win.setTimeout(() => { if (waves.get(button) === wave) clearWave(button); }, 500);
       } catch { clearWave(button); }
     }
     function clearGlow() {
