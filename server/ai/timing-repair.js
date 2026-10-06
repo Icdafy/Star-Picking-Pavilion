@@ -14,6 +14,7 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
       AND (timing_repair_at IS NULL OR julianday(timing_repair_at)<julianday('now','-1 hour'))
     ORDER BY starred DESC, featured DESC, id DESC LIMIT 200`).all();
   let attempted = 0, repaired = 0;
+  let budgetPaused = false;
   for (const row of rows) {
     if (attempted >= limit) break;
     const timing = timingFields(row);
@@ -47,12 +48,20 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
         timing_repair_version=?,timing_repair_error=NULL WHERE id=?`)
         .run(JSON.stringify(events),primaryEventKey(events),events[0].date,REPAIR_VERSION,row.id);
       repaired++;
-    } catch {
+    } catch (error) {
+      if (error?.budgetExceeded) {
+        // 熔断没有发出请求，不占失败次数，也不把一小时退避留给下一个可用窗口。
+        database.prepare('UPDATE articles SET timing_repair_attempts=?,timing_repair_at=?,timing_repair_error=? WHERE id=?')
+          .run(row.timing_repair_attempts, row.timing_repair_at, row.timing_repair_error, row.id);
+        attempted--;
+        budgetPaused = true;
+        break;
+      }
       // Do not persist remote provider payloads (which can contain credentials).
       database.prepare('UPDATE articles SET timing_repair_error=? WHERE id=?')
         .run('补提取未完成；保留原分析，最多尝试两次',row.id);
     }
   }
-  return { attempted, repaired };
+  return { attempted, repaired, ...(budgetPaused ? { budgetPaused: true } : {}) };
 }
 module.exports = { repairTiming, REPAIR_VERSION };

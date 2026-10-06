@@ -126,6 +126,19 @@ function completionBody(content, { finishReason = 'stop', reasoning = null } = {
   });
 }
 
+for (const api of ['openai-completions', 'anthropic-messages']) {
+  test(`${api}: the overall timeout cancels a long Retry-After wait`, async () => {
+    let calls = 0;
+    const started = Date.now();
+    await assert.rejects(chat([{ role: 'user', content: 'test' }], {
+      settings: { ai: { ...settings().ai, api } },
+      fetchImpl: async () => { calls++; return stubResponse({ status: 429, retryAfter: '30', body: '{}' }); }
+    }), error => error.name === 'AbortError');
+    assert.equal(calls, 1);
+    assert.ok(Date.now() - started < 5000, 'a one-second deadline must interrupt the thirty-second delay');
+  });
+}
+
 test('AI client rejects an unsafe stored base URL before sending the credential', async () => {
   let calls = 0;
   await assert.rejects(chat([{ role: 'user', content: 'test' }], {
@@ -192,7 +205,7 @@ test('M2: Retry-After header overrides the default backoff', async () => {
 test('M2: retries are capped — persistent 503 surfaces as an error after 3 attempts', async () => {
   let calls = 0;
   await assert.rejects(chat([{ role: 'user', content: 'test' }], {
-    settings: settings(),
+    settings: { ai: { ...settings().ai, requestTimeoutMs: 5000 } },
     model: 'example',
     fetchImpl: async () => { calls++; return stubResponse({ status: 503, body: 'unavailable' }); }
   }), /HTTP 503/);

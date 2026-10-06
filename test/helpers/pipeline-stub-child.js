@@ -590,7 +590,51 @@ async function scenarioHistoricalTiming() {
   closeDatabase();await stopStub(stub);return out;
 }
 
+async function scenarioEarlyFailureDrain() {
+  let scored = 0, siblingDone = false, understandingDone = false;
+  const stub = await startStub(async ({ kind }) => {
+    if (kind === 'prefilter') return ok({ results: [{ i: 0, rel: true, d: 'B' }] });
+    if (kind === 'scoring' && ++scored === 1) return ok({ invalid: true });
+    await new Promise(resolve => setTimeout(resolve, kind === 'understand' ? 450 : 300));
+    if (kind === 'understand') understandingDone = true;
+    else siblingDone = true;
+    return ok(VALID_SCORING);
+  });
+  writeSettings(stub.baseUrl);
+  const { db, closeDatabase } = require(serverModule('db'));
+  const { analyzePending } = require(serverModule('ai', 'pipeline'));
+  const sourceId = insertSource(db, '任务收束', 'T1');
+  const id = insertArticle(db, sourceId, RELEVANT_TITLES[0], '火箭完成回收试验。');
+  db.prepare("UPDATE articles SET content_status='ok', content_text='火箭完成回收试验。' WHERE id=?").run(id);
+  await analyzePending(null, 10);
+  const out = { siblingDone, understandingDone, analyzed: articleRow(db, id).analyzed };
+  closeDatabase();
+  await stopStub(stub);
+  return out;
+}
+
+async function scenarioTimingRepairBudget() {
+  const stub = await startStub(() => ok({ events: [] }));
+  writeSettings(stub.baseUrl);
+  const { db, closeDatabase } = require(serverModule('db'));
+  const { analyzePending } = require(serverModule('ai', 'pipeline'));
+  const { buckets } = require(serverModule('ai', 'receipts'));
+  const { loadSelection } = require(serverModule('industry'));
+  const sourceId = insertSource(db, '日期预算', 'T1');
+  const id = insertArticle(db, sourceId, RELEVANT_TITLES[0], '火箭完成回收试验。');
+  db.prepare("UPDATE articles SET analyzed=1,relevant=1,featured=1,content_text='火箭完成回收试验。',content_status='ok' WHERE id=?").run(id);
+  db.prepare('INSERT INTO model_usage(bucket,calls) VALUES (?,?)').run(buckets().hour, loadSelection().budget.maxCallsPerHour);
+  const result = await analyzePending(null, 10);
+  const row = articleRow(db, id);
+  const out = { calls: stub.requests.length, attempts: row.timing_repair_attempts, repair: result.timingRepair };
+  closeDatabase();
+  await stopStub(stub);
+  return out;
+}
+
 const SCENARIOS = {
+  'early-failure-drain': scenarioEarlyFailureDrain,
+  'timing-repair-budget': scenarioTimingRepairBudget,
   'historical-timing': scenarioHistoricalTiming,
   'full-happy': scenarioFullHappy,
   'prefilter-invalid-json': scenarioPrefilterInvalidJson,

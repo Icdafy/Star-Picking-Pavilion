@@ -335,18 +335,20 @@ async function enhanceLeads({ settings }) {
   try {
     const daily = getDaily(today);
     if (daily && !daily.corrupt && daily.leadSource === 'factual' && daily.totals?.relevant > 0) {
+      const before = db.prepare('SELECT content_json FROM daily_reports WHERE date = ?').get(today)?.content_json;
       daily.lead = await rewriteLead(daily, settings, '日报');
       daily.leadSource = 'model';
-      db.prepare('UPDATE daily_reports SET content_json = ? WHERE date = ?').run(JSON.stringify(daily), today);
-      rewritten++;
+      rewritten += db.prepare('UPDATE daily_reports SET content_json = ? WHERE date = ? AND content_json = ?')
+        .run(JSON.stringify(daily), today, before ?? null).changes;
     }
     for (const [kind, key] of [['weekly', periodKeyOf('weekly')], ['weekly', previousPeriodKey('weekly')], ['monthly', periodKeyOf('monthly')]]) {
       const issue = generatePeriod(kind, key);
       if (issue.leadSource !== 'factual' || !issue.totals?.relevant) continue;
+      const before = db.prepare('SELECT content_json FROM period_reports WHERE kind = ? AND period_key = ?').get(kind, key)?.content_json;
       issue.lead = await rewriteLead(issue, settings, kind === 'weekly' ? '周报' : '月报');
       issue.leadSource = 'model';
-      db.prepare('UPDATE period_reports SET content_json = ? WHERE kind = ? AND period_key = ?').run(JSON.stringify(issue), kind, issue.key);
-      rewritten++;
+      rewritten += db.prepare('UPDATE period_reports SET content_json = ? WHERE kind = ? AND period_key = ? AND content_json = ?')
+        .run(JSON.stringify(issue), kind, issue.key, before ?? null).changes;
     }
   } catch (error) {
     if (!error?.budgetExceeded) console.warn('[reports] 导语改写失败:', error.message);

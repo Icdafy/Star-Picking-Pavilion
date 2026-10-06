@@ -2,24 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.19 · 报告日期位置微调
+## v0.2.20 · 后端可靠性与完整检索
 
-- **日期轻微上移**：情报日志“报告概况”中的日期导航稍微上移，使日期更接近横幅上下边缘之间的中间位置，左右方向标随日期保持同轴对齐。
-- **刊期与显示适配**：日报、周报、月报共用调整，宽窄窗口、四档界面缩放及浅色、深色主题同步适配。横幅尺寸、日期字号和报告功能沿用，无新增依赖。
+- **采集与分析**：整轮任务去重并与定时任务／维护协调，最终归组状态和退出等待完整；采集间隔保存后立即生效。
+- **入库与检索**：信源批次和全文索引原子提交，在途请求遵守信源最新配置；完整命中集先筛选后分页，短词也能搜索中文标题、实体和主体公司。
+- **模型与刊物**：共享相同在途付费调用，预算原子扣减并覆盖日期补提取，重试等待遵守超时；模型端点禁止跳转，失败响应释放连接，异步导语保留随后重新生成的新报告。
+- **兼容与保留**：无新增依赖，保留已有情报、星标、归档、密钥与设置；双主题、界面缩放和现有动效继续适用。
 
-版本、界面与更新元数据统一为 0.2.19，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与发布验证见 [验证记录](docs/v0219-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.20，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。审查范围与设计来源见 [后端审查](docs/v0220-backend-audit.md)，实现与发布验证见 [验证记录](docs/v0220-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.19.exe`，双击并按向导安装。v0.2.19 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.20.exe`，双击并按向导安装。v0.2.20 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.19.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.20.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

@@ -14,6 +14,20 @@ const childPath = path.join(__dirname, 'helpers', 'pipeline-stub-child.js');
 
 // 场景子进程启动成本不低，同一场景的多个断言面共享一次运行结果
 const scenarioCache = new Map();
+
+test('a failed score leaves the pipeline busy until both sibling model requests finish', () => {
+  const result = runScenario('early-failure-drain', { withKey: true });
+  assert.equal(result.siblingDone, true);
+  assert.equal(result.understandingDone, true);
+  assert.equal(result.analyzed, 0);
+});
+
+test('timing repair obeys the same paid-call budget as scoring', () => {
+  const result = runScenario('timing-repair-budget', { withKey: true });
+  assert.equal(result.calls, 0);
+  assert.equal(result.attempts, 0);
+  assert.equal(result.repair.budgetPaused, true);
+});
 function runScenario(scenario, options = {}) {
   const cacheKey = scenario;
   if (scenarioCache.has(cacheKey)) return scenarioCache.get(cacheKey);

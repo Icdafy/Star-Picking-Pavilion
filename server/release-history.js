@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { fetch: undiciFetch } = require('undici');
-const { readBoundedBody } = require('./collectors/fetch-util');
+const { readBoundedBody, cancelBody } = require('./collectors/fetch-util');
 
 const REPOSITORY = 'Icdafy/Star-Picking-Pavilion';
 const RELEASES_URL = `https://github.com/${REPOSITORY}/releases`;
@@ -56,7 +56,10 @@ async function fetchReleases({ fetchImpl = undiciFetch, signal } = {}) {
       headers: { 'User-Agent': 'Star-Picking-Pavilion', Accept: 'application/vnd.github+json' },
       redirect: 'error', signal
     });
-    if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
+    if (!response.ok) {
+      await cancelBody(response);
+      throw new Error(`GitHub HTTP ${response.status}`);
+    }
     const data = JSON.parse((await readBoundedBody(response, MAX_CACHE_BYTES)).toString('utf8'));
     if (!Array.isArray(data)) throw new Error('GitHub 更新日志格式无效');
     items.push(...data);

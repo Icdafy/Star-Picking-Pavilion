@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 
-const { fetchText } = require('../server/collectors/fetch-util');
+const { fetchText, readBoundedBody } = require('../server/collectors/fetch-util');
 
 const settings = { collect: { requestTimeoutMs: 1000, userAgent: 'test-agent' } };
 
@@ -43,6 +43,28 @@ test('collector fetch bounds declared and streamed response sizes', async () => 
     }),
     /8.*字节|过大/
   );
+});
+
+test('HTTP errors and declared oversize responses cancel their unread body', async () => {
+  for (const kind of ['http-error', 'oversize', 'invalid-redirect']) {
+    let cancelled = false;
+    const reply = response({ contentLength: kind === 'oversize' ? 99 : 1, url: kind === 'invalid-redirect' ? 'file:///private' : undefined });
+    reply.body.cancel = async () => { cancelled = true; };
+    if (kind === 'http-error') { reply.ok = false; reply.status = 503; }
+    await assert.rejects(fetchText('https://example.com/test', settings, { maxResponseBytes: 8, fetchImpl: async () => reply }));
+    assert.equal(cancelled, true, kind);
+  }
+});
+
+test('streamed oversize cancels a real readable stream and releases its reader', async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    pull(controller) { controller.enqueue(new Uint8Array(9)); },
+    cancel() { cancelled = true; }
+  });
+  await assert.rejects(readBoundedBody({ headers: new Headers(), body }, 8), /过大/);
+  assert.equal(cancelled, true);
+  assert.equal(body.locked, false);
 });
 
 test('collector fetch decodes bounded responses and rejects non-web URLs', async () => {

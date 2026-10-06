@@ -9,6 +9,7 @@ const { collectionIntervalMs } = require('../schedule-policy');
 const { isDue, nextFetchAtIso } = require('../source-health');
 const { removeDisabledSources } = require('../source-lifecycle');
 const { structureItem } = require('../ai/normalize');
+const { settleAll } = require('../async-work');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
@@ -108,20 +109,32 @@ async function collectSource(source, settings) {
   if (!adapter) throw new Error(`未知信源类型: ${source.type}`);
   const items = await adapter.fetch(source, settings);
   const cutoff = Date.now() - settings.collect.keepDays * 86400e3;
-  let added = 0;
-  for (const it of items) {
-    if (!it.title || !it.url) continue;
-    if (it.publishedAt && new Date(it.publishedAt).getTime() < cutoff) continue;
-    // 结构化 + 清洗放在入库之前：脏标题一旦落库，后面的预筛、聚类和去重
-    // 全都要带着它算，而清洗本身是纯代码，越早做越省事。
-    const structured = structureItem(it, {
-      sourceName: source.name,
-      domain: source.domain === 'both' ? null : source.domain
-    });
-    if (!structured) continue;
-    if (insertArticle({ sourceId: source.id, ...structured })) added++;
-  }
-  return { fetched: items.length, added };
+  return withTransaction(() => {
+    // 请求期间用户可能停用、移除或改写信源；旧响应不能继续进入新配置。
+    const current = db.prepare('SELECT enabled, removed_at, url, type, selector_json FROM sources WHERE id=?').get(source.id);
+    if (!current?.enabled || current.removed_at || current.url !== source.url
+      || current.type !== source.type || current.selector_json !== source.selector_json) {
+      return { fetched: items.length, added: 0, skipped: true };
+    }
+    let added = 0;
+    for (const it of items) {
+      if (!it.title || !it.url) continue;
+      if (it.publishedAt && new Date(it.publishedAt).getTime() < cutoff) continue;
+      // 结构化 + 清洗放在入库之前：脏标题一旦落库，后面的预筛、聚类和去重
+      // 全都要带着它算，而清洗本身是纯代码，越早做越省事。
+      const structured = structureItem(it, {
+        sourceName: source.name,
+        domain: source.domain === 'both' ? null : source.domain
+      });
+      if (!structured) continue;
+      if (insertArticle({ sourceId: source.id, ...structured })) added++;
+    }
+    db.prepare(`UPDATE sources SET last_fetch_at=?, last_status='ok',
+      fetch_count=fetch_count+1, item_count=item_count+?,
+      consecutive_errors=0, next_fetch_at=NULL WHERE id=?`)
+      .run(now(), added, source.id);
+    return { fetched: items.length, added };
+  });
 }
 
 // 采集全部启用信源（带并发限制）
@@ -144,26 +157,27 @@ async function collectAll(onProgress, { force = false } = {}) {
       const started = Date.now();
       try {
         const r = await collectSource(source, settings);
-        db.prepare(`UPDATE sources SET last_fetch_at=?, last_status='ok',
-          fetch_count=fetch_count+1, item_count=item_count+?,
-          consecutive_errors=0, next_fetch_at=NULL WHERE id=?`)
-          .run(now(), r.added, source.id);
         results.push({ source: source.name, ...r, ms: Date.now() - started });
         onProgress && onProgress({ source: source.name, ...r });
       } catch (e) {
         const msg = String(e.message || e).slice(0, 200);
         const consecutive = (Number(source.consecutive_errors) || 0) + 1;
-        db.prepare(`UPDATE sources SET last_fetch_at=?, last_status=?,
+        const recorded = db.prepare(`UPDATE sources SET last_fetch_at=?, last_status=?,
           fetch_count=fetch_count+1, error_count=error_count+1,
-          consecutive_errors=?, next_fetch_at=? WHERE id=?`)
+          consecutive_errors=?, next_fetch_at=? WHERE id=? AND enabled=1 AND removed_at IS NULL
+            AND url=? AND type=? AND selector_json IS ?`)
           .run(now(), 'error: ' + msg, consecutive,
-            nextFetchAtIso(consecutive, intervalMs, Date.now()), source.id);
+            nextFetchAtIso(consecutive, intervalMs, Date.now()), source.id, source.url, source.type, source.selector_json);
+        if (!recorded.changes) {
+          results.push({ source: source.name, added: 0, skipped: true });
+          continue;
+        }
         results.push({ source: source.name, error: msg, consecutiveErrors: consecutive });
         onProgress && onProgress({ source: source.name, error: msg, consecutiveErrors: consecutive });
       }
     }
   }
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  await settleAll(Array.from({ length: CONCURRENCY }, worker));
   return { results, skipped };
 }
 

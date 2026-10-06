@@ -5,6 +5,10 @@ const { fetch: undiciFetch } = require('undici');
 
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 
+async function cancelBody(response) {
+  try { await response?.body?.cancel?.(); } catch {}
+}
+
 function requireWebUrl(value) {
   let url;
   try { url = new URL(value); } catch { throw new Error('采集地址不是有效 URL'); }
@@ -15,8 +19,13 @@ function requireWebUrl(value) {
 }
 
 async function readBoundedBody(response, maxResponseBytes) {
+  if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0) {
+    await cancelBody(response);
+    throw new Error('响应大小上限无效');
+  }
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxResponseBytes) {
+    await cancelBody(response);
     throw new Error(`HTTP 响应过大，不得超过 ${maxResponseBytes} 字节`);
   }
   if (!response.body) return Buffer.alloc(0);
@@ -26,7 +35,6 @@ async function readBoundedBody(response, maxResponseBytes) {
     const chunk = Buffer.from(rawChunk);
     total += chunk.length;
     if (total > maxResponseBytes) {
-      try { await response.body.cancel?.(); } catch {}
       throw new Error(`HTTP 响应过大，不得超过 ${maxResponseBytes} 字节`);
     }
     chunks.push(chunk);
@@ -68,8 +76,12 @@ async function fetchText(url, settings, options = {}) {
       redirect: 'follow',
       signal: ctrl.signal
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    requireWebUrl(res.url || target);
+    if (!res.ok) {
+      await cancelBody(res);
+      throw new Error(`HTTP ${res.status}`);
+    }
+    try { requireWebUrl(res.url || target); }
+    catch (error) { await cancelBody(res); throw error; }
     const buf = await readBoundedBody(res, maxResponseBytes);
     return decodeBuffer(buf, res.headers.get('content-type') || '');
   } finally {
@@ -91,4 +103,4 @@ function decodeBuffer(buf, contentType) {
   return buf.toString('utf8');
 }
 
-module.exports = { MAX_RESPONSE_BYTES, fetchText, readBoundedBody };
+module.exports = { MAX_RESPONSE_BYTES, fetchText, readBoundedBody, cancelBody };

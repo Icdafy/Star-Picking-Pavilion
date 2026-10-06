@@ -64,10 +64,10 @@
   - `featured`：`featured = 1` 且 `relevant = 1`；
   - `all`：`relevant IS NULL OR relevant = 1`；
   - `starred`：`starred = 1`，按 `COALESCE(starred_at, fetched_at) DESC, a.id DESC` 排序，**不做事件簇折叠**。
-  - 其余视图按 `COALESCE(published_at, fetched_at) DESC, a.id DESC` 排序。
+  - 其余视图按 `COALESCE(event_date, published_at, fetched_at) DESC, a.id DESC` 排序。
   - `domain` 筛选同时包含该领域与 `both`（跨领域条目两边都该看见）。
 - 其余视图做事件簇折叠：`cluster_id IS NULL OR a.id = c.main_article_id`。
-- 检索：≥3 字走 FTS5 trigram（LIMIT 500），失败或短词降级 LIKE（`%` `_` `\` 需转义）。
+- 检索：≥3 字走 FTS5 trigram，FTS 语法错误或短词降级到全文影子表的 LIKE（`%` `_` `\` 需转义），均覆盖中文标题、实体和主体公司；在完整命中集上过滤、事件折叠、排序后分页，词库计数复用同一条件，不再预截取 500 条。
 - 单条形状 `articleRow`：`id, title, url, summary, reason, image, publishedAt, fetchedAt,
   domain, category, quality, heat, featured, scores, tags, source, tier, clusterId, clusterSize,
   breakthroughScore, breakthroughBonus, breakthroughSignals, scoringVersion, entities, topics,

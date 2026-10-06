@@ -6,7 +6,7 @@
 //     超过就抛 BudgetExceededError，资料保持待分析，下一个窗口继续，不写任何终态。
 // 回执只存模型的原始 JSON 结论，不存 Key、不存请求头；保留 30 天后随清理删除。
 const crypto = require('node:crypto');
-const { db, now } = require('../db');
+const { db, now, withTransaction } = require('../db');
 const { loadSelection } = require('../industry');
 
 class BudgetExceededError extends Error {
@@ -36,17 +36,20 @@ const bumpUsage = db.prepare(`INSERT INTO model_usage (bucket, calls) VALUES (?,
 // 先占额度再发请求：并发的三个评分 worker 同时打过来，也不会一起越过上限
 function reserveCall(nowMs = Date.now(), budget = loadSelection().budget) {
   const { hour, day } = buckets(nowMs);
-  const hourCalls = readUsage.get(hour)?.calls || 0;
-  if (hourCalls >= budget.maxCallsPerHour) throw new BudgetExceededError('hour', budget.maxCallsPerHour);
-  const dayCalls = readUsage.get(day)?.calls || 0;
-  if (dayCalls >= budget.maxCallsPerDay) throw new BudgetExceededError('day', budget.maxCallsPerDay);
-  bumpUsage.run(hour);
-  bumpUsage.run(day);
+  return withTransaction(() => {
+    const hourCalls = readUsage.get(hour)?.calls || 0;
+    if (hourCalls >= budget.maxCallsPerHour) throw new BudgetExceededError('hour', budget.maxCallsPerHour);
+    const dayCalls = readUsage.get(day)?.calls || 0;
+    if (dayCalls >= budget.maxCallsPerDay) throw new BudgetExceededError('day', budget.maxCallsPerDay);
+    bumpUsage.run(hour);
+    bumpUsage.run(day);
+  });
 }
 
 const readReceipt = db.prepare('SELECT response_json FROM model_receipts WHERE receipt_key = ?');
 const writeReceipt = db.prepare(`INSERT INTO model_receipts (receipt_key, task, response_json, created_at)
   VALUES (?, ?, ?, ?) ON CONFLICT(receipt_key) DO UPDATE SET response_json = excluded.response_json, created_at = excluded.created_at`);
+const inFlight = new Map();
 
 // call() 返回已解析、已校验的对象。只有校验通过的结果才落回执——
 // 半截 JSON 存下来会让之后每一次重试都拿到同一份坏结果。
@@ -59,10 +62,19 @@ async function withReceipt({ task, keyParts, call, validate = value => value != 
       if (validate(cached)) return { value: cached, cached: true };
     } catch {}
   }
-  reserveCall();
-  const value = await call();
-  if (validate(value)) writeReceipt.run(key, task, JSON.stringify(value), now());
-  return { value, cached: false };
+  if (inFlight.has(key)) {
+    const result = await inFlight.get(key);
+    return { ...result, shared: true };
+  }
+  const operation = (async () => {
+    reserveCall();
+    const value = await call();
+    if (validate(value)) writeReceipt.run(key, task, JSON.stringify(value), now());
+    return { value, cached: false };
+  })();
+  inFlight.set(key, operation);
+  try { return await operation; }
+  finally { inFlight.delete(key); }
 }
 
 function usageSnapshot(nowMs = Date.now()) {

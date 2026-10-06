@@ -5,6 +5,7 @@
 const { validateAiBaseUrl } = require('../http-security');
 const { readBoundedBody } = require('../collectors/fetch-util');
 const { fetch: undiciFetch } = require('undici');
+const { setTimeout: delay } = require('node:timers/promises');
 
 const { VISION_MODEL } = require('./model-policy');
 const { KEYLESS_PLACEHOLDER } = require('./model-catalog');
@@ -24,8 +25,8 @@ const PARAM_ERROR_400 = /thinking|unknown parameter|unsupported|invalid.{0,24}pa
 // 内容审核拒绝：服务端因内容主动拒绝，不是请求参数的问题，删参重发只会再撞一次墙
 const MODERATION_400 = /moderation|content[ _-]?filter|safety|敏感|违规|审核/i;
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms, signal) {
+  return delay(ms, undefined, { signal });
 }
 
 // Retry-After 可能是秒数，也可能是 HTTP 日期；统一换算成毫秒并封顶
@@ -79,6 +80,7 @@ async function chat(messages, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      redirect: 'error',
       signal: ctrl.signal
     });
     let attempt = 0;
@@ -92,7 +94,7 @@ async function chat(messages, {
       } catch (error) {
         if (ctrl.signal.aborted || attempt >= MAX_RETRIES) throw error;
         attempt += 1;
-        await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+        await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
       if (res.status === 400) {
@@ -122,7 +124,7 @@ async function chat(messages, {
           throw new Error(`${label} HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
         }
         attempt += 1;
-        await sleep(waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1));
+        await sleep(waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
       const raw = (await readBoundedBody(res, maxResponseBytes)).toString('utf8');
@@ -212,19 +214,19 @@ async function anthropicChat(messages, { settings, model, temperature, maxTokens
       let res;
       try {
         res = await fetchImpl(anthropicUrl(baseUrl, 'messages'), {
-          method: 'POST', headers: anthropicHeaders(apiKey), body, signal: ctrl.signal
+          method: 'POST', headers: anthropicHeaders(apiKey), body, redirect: 'error', signal: ctrl.signal
         });
       } catch (error) {
         if (ctrl.signal.aborted || attempt >= MAX_RETRIES) throw error;
         attempt += 1;
-        await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+        await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
       const raw = (await readBoundedBody(res, maxResponseBytes)).toString('utf8');
       if ((RETRYABLE_STATUS.has(res.status) || res.status === 529) && attempt < MAX_RETRIES) {
         const waitMs = retryAfterMs(res.headers?.get ? res.headers.get('retry-after') : null);
         attempt += 1;
-        await sleep(waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1));
+        await sleep(waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
       if (!res.ok) throw new Error(`${label} HTTP ${res.status}: ${raw.slice(0, 200)}`);
@@ -260,6 +262,7 @@ async function discoverModels({ baseUrl, api = 'openai-completions', apiKey = ''
     const res = await fetchImpl(url, {
       method: 'GET',
       headers: anthropic ? anthropicHeaders(apiKey) : { Accept: 'application/json', ...bearer(apiKey) },
+      redirect: 'error',
       signal: ctrl.signal
     });
     const raw = (await readBoundedBody(res, maxResponseBytes)).toString('utf8');

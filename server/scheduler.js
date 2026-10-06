@@ -23,6 +23,11 @@ let collectRunning = false;
 let analyzeRunning = false;
 let pruneRunning = false;
 let compactRunning = false;
+let pipelinePromise = null;
+let pipelineRunning = false;
+let schedulerStopping = false;
+let lastPipeline = null;
+let activeSchedule = null;
 let lastRun = null;        // 最近一次采集摘要
 let lastAnalyzeAt = null;  // 最近一次分析循环时间
 let lastPrune = null;      // 最近一次数据保留清理摘要
@@ -40,7 +45,9 @@ const cronTasks = new Set();
 // ---------- 数据保留清理 ----------
 // 单轮有删除上限，剩余部分继续清，避免首次在大库上一次性长时间持锁
 function pruneOnce(trigger = 'cron') {
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
+  if (collectRunning || analyzeRunning || pipelineRunning) return { skipped: true, reason: 'busy' };
   if (pruneRunning) return { skipped: true, reason: '清理进行中' };
   pruneRunning = true;
   try {
@@ -70,6 +77,8 @@ function pruneOnce(trigger = 'cron') {
 
 // ---------- 数据库深度压缩 ----------
 function compactOnce(trigger = 'manual', { mode = trigger === 'manual' ? 'manual' : 'auto' } = {}) {
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
+  if (pipelineRunning) return { skipped: true, reason: 'busy' };
   if (collectRunning || analyzeRunning || pruneRunning || compactRunning) {
     return { skipped: true, reason: 'busy' };
   }
@@ -97,7 +106,9 @@ function compactOnce(trigger = 'manual', { mode = trigger === 'manual' ? 'manual
 
 // ---------- 采集一次 ----------
 // force：手动触发时忽略失败退避，把暂停中的信源也重试一遍
-async function collectOnce(trigger = 'cron', { force = false } = {}) {
+async function collectOnce(trigger = 'cron', { force = false, pipeline = false } = {}) {
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
+  if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (collectRunning) return { skipped: true, reason: '采集进行中' };
   collectRunning = true;
@@ -121,16 +132,20 @@ async function collectOnce(trigger = 'cron', { force = false } = {}) {
 }
 
 // ---------- 分析一批（实时循环调用）----------
-async function analyzeOnce(trigger = 'loop', limit = 60) {
+async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = {}) {
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
+  if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (analyzeRunning) return { skipped: true };
   analyzeRunning = true;
   try {
     const r = await analyzePending(null, limit);
     lastAnalyzeAt = new Date().toISOString();
+    if (schedulerStopping) return r;
     const settings = loadSettings();
     // 归组：新判完的资料挂到事件上（或开新事件），热度信号随之写入
     const group = await groupPending({ settings });
+    if (schedulerStopping) return { ...r, group };
     // 事件级合并：同一批次各自开出的同一事件在这里并成一条（有新归组时才跑）
     if (group.processed > 0) {
       const consolidated = await consolidateStories({ settings }).catch(e => { console.warn('[stories]', e.message); return { merged: 0 }; });
@@ -148,10 +163,10 @@ async function analyzeOnce(trigger = 'loop', limit = 60) {
       lastHotAt = Date.now();
     }
     // 花钱的编辑工作（事件综述、导语改写）节流到每 15 分钟一次
-    if (settings.ai.apiKey && !r.budgetPaused && Date.now() - lastEditorialAt > 15 * 60e3) {
+    if (!schedulerStopping && settings.ai.apiKey && !r.budgetPaused && Date.now() - lastEditorialAt > 15 * 60e3) {
       lastEditorialAt = Date.now();
       await digestStories({ settings }).catch(e => console.warn('[stories]', e.message));
-      await enhanceLeads({ settings }).catch(e => console.warn('[reports]', e.message));
+      if (!schedulerStopping) await enhanceLeads({ settings }).catch(e => console.warn('[reports]', e.message));
     }
     return { ...r, group };
   } finally {
@@ -160,19 +175,49 @@ async function analyzeOnce(trigger = 'loop', limit = 60) {
 }
 
 // ---------- 手动全量：采集 → 抽干分析 → 聚类（立即采集分析按钮）----------
-async function runPipeline(trigger = 'manual') {
-  if (compactRunning) return { skipped: true, reason: 'maintenance' };
-  await collectOnce(trigger, { force: trigger === 'manual' });
+function runPipeline(trigger = 'manual') {
+  if (schedulerStopping) return Promise.resolve({ skipped: true, reason: 'stopping' });
+  if (pipelinePromise) return pipelinePromise;
+  if (compactRunning) return Promise.resolve({ skipped: true, reason: 'maintenance' });
+  pipelineRunning = true;
+  const started = Date.now();
+  pipelinePromise = (async () => {
+    try {
+      // 等当前小批次结束；整轮持锁后，定时器不会抢入下一批。
+      while (collectRunning || analyzeRunning || pruneRunning) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      const result = await executePipeline(trigger);
+      lastPipeline = { at: new Date().toISOString(), trigger, ms: Date.now() - started, ok: !result.skipped, ...result };
+      return result;
+    } catch (error) {
+      lastPipeline = { at: new Date().toISOString(), trigger, ms: Date.now() - started, ok: false };
+      throw error;
+    } finally {
+      pipelineRunning = false;
+      pipelinePromise = null;
+    }
+  })();
+  return pipelinePromise;
+}
+
+async function executePipeline(trigger) {
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
+  await collectOnce(trigger, { force: trigger === 'manual', pipeline: true });
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   let total = 0;
   // 抽干：反复分析直到没有 analyzed=0（每批 200）
   for (let pass = 0; pass < 12; pass++) {
-    const r = await analyzeOnce(trigger, 200);
+    const r = await analyzeOnce(trigger, 200, { pipeline: true });
+    if (schedulerStopping) return { skipped: true, reason: 'stopping' };
     if (r.skipped) break;
     total += r.analyzed || 0;
     if (!r.analyzed) break;
   }
   await groupPending({ settings: loadSettings(), limit: 1000 });
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   await consolidateStories({ settings: loadSettings() }).catch(e => console.warn('[stories]', e.message));
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   const rescore = rescoreAfterClustering();
   computeHotRanking();
   lastHotAt = Date.now();
@@ -180,18 +225,32 @@ async function runPipeline(trigger = 'manual') {
   return { ...lastRun, analyzed: total, rescored: rescore.changed };
 }
 
+function refreshSchedulerSettings() {
+  if (!schedulerStarted || schedulerStopping) return false;
+  const settings = loadSettings();
+  const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
+  const analyzeMs = Math.max(20, settings.collect.analyzeIntervalSeconds || 75) * 1000;
+  if (activeSchedule?.collectionIntervalMs === intervalMs && activeSchedule?.analysisIntervalMs === analyzeMs) return false;
+  if (collectTimer) clearInterval(collectTimer);
+  if (analyzeTimer) clearInterval(analyzeTimer);
+  collectTimer = setInterval(() => collectOnce('timer').catch(e => console.error('[collect]', e)), intervalMs);
+  analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeMs);
+  activeSchedule = { collectionIntervalMs: intervalMs, analysisIntervalMs: analyzeMs };
+  return true;
+}
+
 function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
+  schedulerStopping = false;
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   const interval = intervalMs / 60_000;
   const analyzeSec = Math.max(20, settings.collect.analyzeIntervalSeconds || 75);
 
   // 采集循环（setInterval 保证 60 分钟以上及非整除分钟的间隔仍准确）
-  collectTimer = setInterval(() => collectOnce('timer').catch(e => console.error('[collect]', e)), intervalMs);
+  refreshSchedulerSettings();
   // 分析循环（秒级，setInterval 自调度；锁防重入）
-  analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeSec * 1000);
   // 日报（每天定点纯代码生成）
   cronTasks.add(cron.schedule(`0 ${settings.dailyReportHour ?? 8} * * *`, () => {
     try { generateDaily(); console.log('[daily] 日报已生成'); }
@@ -231,7 +290,7 @@ function startScheduler() {
 }
 
 function stopScheduler() {
-  if (!schedulerStarted) return;
+  schedulerStopping = true;
   schedulerStarted = false;
   if (collectTimer) clearInterval(collectTimer);
   if (analyzeTimer) clearInterval(analyzeTimer);
@@ -241,6 +300,7 @@ function stopScheduler() {
   analyzeTimer = null;
   startupTimer = null;
   pruneTimer = null;
+  activeSchedule = null;
   for (const task of cronTasks) {
     task.stop?.();
     task.destroy?.();
@@ -250,17 +310,22 @@ function stopScheduler() {
 }
 
 async function waitForSchedulerIdle() {
-  while (collectRunning || analyzeRunning || pruneRunning || compactRunning) {
+  while (collectRunning || analyzeRunning || pruneRunning || compactRunning || pipelineRunning) {
     await new Promise(resolve => setTimeout(resolve, 25));
   }
 }
 
 module.exports = {
   startScheduler, stopScheduler, waitForSchedulerIdle,
+  refreshSchedulerSettings,
   runPipeline, collectOnce, analyzeOnce, pruneOnce, compactOnce,
   getStatus: () => ({
-    running: collectRunning || analyzeRunning || pruneRunning || compactRunning,
+    running: collectRunning || analyzeRunning || pruneRunning || compactRunning || pipelineRunning,
     schedulerStarted,
+    schedulerStopping,
+    pipelineRunning,
+    activeSchedule,
+    lastPipeline,
     collectRunning,
     analyzeRunning,
     pruneRunning,

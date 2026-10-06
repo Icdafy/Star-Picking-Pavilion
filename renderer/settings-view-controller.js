@@ -271,7 +271,7 @@
     $('#btnSaveCollect').addEventListener('click', async () => {
       try {
         await settingsForm.saveCollect();
-        toast('采集设置已保存（间隔重启后生效，RSSHub 立即生效）');
+        toast('采集设置已保存，采集间隔与 RSSHub 已生效');
       } catch (error) {
         toast('采集设置保存失败：' + error.message, true);
       }

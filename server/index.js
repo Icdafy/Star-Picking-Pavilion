@@ -17,7 +17,8 @@ const { encodeWordDocument } = require('./export/word');
 const reports = require('./ai/reports');
 const { buildDailyBundle, serializeJsonl } = require('./archive/daily-bundle');
 const {
-  runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
+  runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus,
+  refreshSchedulerSettings
 } = require('./scheduler');
 const {
   databaseStorageSnapshot,
@@ -44,6 +45,7 @@ const releaseHistory = createReleaseHistoryService({
   dataDir: DATA_DIR
 });
 const { resolveStaticFile } = require('./static-files');
+const { articleSearch } = require('./article-search');
 const { closeHttpServerGracefully } = require('./http-close');
 const { localDateString, startOfLocalDayIso, clampPublishedAt } = require('./date-time');
 const { createSettingsUpdateCoordinator } = require('./settings-persistence');
@@ -269,16 +271,11 @@ function articleRow(r, scoring, nowMs) {
   };
 }
 
-// LIKE 里的通配符必须转义，否则用户检索 "100%" 之类会被当成模式匹配
-function escapeLikePattern(value) {
-  return value.replace(/[\\%_]/g, character => `\\${character}`);
-}
-
 // 导出一次要覆盖整份收藏夹或整屏筛选结果，不能只给界面翻页用的 30 条
 const FEED_PAGE_SIZE = 30;
 const EXPORT_MAX_ITEMS = 200;
 
-function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
+function queryFeed(q, { size = FEED_PAGE_SIZE, likeSearch = false } = {}) {
   const scoring = loadScoring();
   const nowMs = Date.now();
   const { view, domain, category, search, page, company } = parseFeedQuery(q, CATEGORIES);
@@ -300,31 +297,9 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
   if (domain) { where.push('(a.domain = ? OR a.domain = \'both\')'); params.push(domain); }
   if (category) { where.push('a.category = ?'); params.push(category); }
 
-  let idFilter = '';
-  if (search) {
-    // ≥3 字用 FTS5 trigram，短词降级 LIKE
-    let ids;
-    if ([...search].length >= 3) {
-      try {
-        // 与短词 LIKE 降级同口径：前置 analyzed >= 1，待分析条目（还没有可检索正文）
-        // 两条检索路径的可见性必须一致，否则搜 2 字与搜 3 字会得到不同的条目集
-        ids = db.prepare(`SELECT a.id FROM articles_fts
-          JOIN articles a ON a.id = articles_fts.rowid
-          WHERE articles_fts MATCH ? AND a.analyzed >= 1 LIMIT 500`)
-          .all(`"${search.replace(/"/g, '""')}"`).map(r => r.id);
-      } catch { ids = null; }
-    }
-    if (!ids) {
-      const pattern = `%${escapeLikePattern(search)}%`;
-      // 短词降级 LIKE 无法走全文索引：前置 analyzed >= 1 可走 idx_articles_analyzed，
-      // 避免每次短词检索都全表扫描（待分析条目此时也还没有可检索的正文）
-      ids = db.prepare(`SELECT id FROM articles
-        WHERE analyzed >= 1 AND (title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\') LIMIT 500`)
-        .all(pattern, pattern).map(r => r.id);
-    }
-    if (!ids.length) return { items: [], page, hasMore: false };
-    idFilter = `AND a.id IN (${ids.join(',')})`;
-  }
+  const filter = articleSearch(search, { like: likeSearch });
+  where.push(`(${filter.sql})`);
+  params.push(...filter.params);
 
   // 事件簇折叠：簇内只返回主条。星标视图例外——用户收藏的是某一条具体报道，
   // 若它恰好不是簇主条，折叠会让它从自己的收藏夹里消失。
@@ -334,17 +309,24 @@ function queryFeed(q, { size = FEED_PAGE_SIZE } = {}) {
     FROM articles a
     JOIN sources s ON s.id = a.source_id
     LEFT JOIN clusters c ON c.id = a.cluster_id
-    WHERE ${where.join(' AND ') || '1=1'} ${idFilter} ${extraWhere}
+    WHERE ${where.join(' AND ') || '1=1'} ${extraWhere}
       ${collapseClusters ? 'AND (a.cluster_id IS NULL OR a.id = c.main_article_id)' : ''}
     ORDER BY ${order}
     LIMIT ${SIZE + 1} OFFSET ${page * SIZE}`;
 
   let rows;
-  if (view === 'starred') {
-    // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
-    rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
-  } else {
-    rows = db.prepare(buildSql('COALESCE(a.event_date, a.published_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
+  try {
+    if (view === 'starred') {
+      // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
+      rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
+    } else {
+      rows = db.prepare(buildSql('COALESCE(a.event_date, a.published_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
+    }
+  } catch (error) {
+    if (search && !likeSearch && [...search].length >= 3 && /fts5|MATCH|syntax error/i.test(error.message)) {
+      return queryFeed(q, { size, likeSearch: true });
+    }
+    throw error;
   }
 
   const items = rows.map(r => articleRow(r, scoring, nowMs));
@@ -408,34 +390,19 @@ function invalidateStatsCache() {
 const LEXICON_COUNT_TTL_MS = 60_000;
 let lexiconCache = null;
 
-function matchingArticleIds(surface) {
-  if ([...surface].length >= 3) {
-    try {
-      // 与 queryFeed 的 FTS 路径同口径：前置 analyzed >= 1，
-      // 词库面板计数与点进去能看到的卡片数才不会对不上
-      return db.prepare(`SELECT a.id AS id FROM articles_fts
-        JOIN articles a ON a.id = articles_fts.rowid
-        WHERE articles_fts MATCH ? AND a.analyzed >= 1 LIMIT 500`)
-        .all(`"${surface.replace(/"/g, '""')}"`).map(row => row.id);
-    } catch { /* 词里含 FTS 语法字符时降级 LIKE */ }
-  }
-  const pattern = `%${escapeLikePattern(surface)}%`;
-  // 与 queryFeed 的 LIKE 降级同口径：前置 analyzed >= 1 让扫描能走索引
-  return db.prepare(
-    `SELECT id FROM articles WHERE analyzed >= 1
-      AND (title LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\') LIMIT 500`)
-    .all(pattern, pattern).map(row => row.id);
-}
-
-function countVisible(ids) {
-  if (!ids.length) return 0;
+function countVisible(surface, like = false) {
+  const filter = articleSearch(surface, { like });
   // 与「全部动态」同口径：判为无关的不算，事件簇只算主条
-  return db.prepare(`
+  try { return db.prepare(`
     SELECT COUNT(*) c FROM articles a
     LEFT JOIN clusters c ON c.id = a.cluster_id
-    WHERE a.id IN (${ids.join(',')})
+    WHERE (${filter.sql})
       AND (a.relevant IS NULL OR a.relevant = 1)
-      AND (a.cluster_id IS NULL OR a.id = c.main_article_id)`).get().c;
+      AND (a.cluster_id IS NULL OR a.id = c.main_article_id)`).get(...filter.params).c;
+  } catch (error) {
+    if (!like && [...surface].length >= 3 && /fts5|MATCH|syntax error/i.test(error.message)) return countVisible(surface, true);
+    throw error;
+  }
 }
 
 // 逐个匹配面单独计数，挑出结果最多的那一个作为这个词的检索式。
@@ -447,7 +414,7 @@ function countVisible(ids) {
 function resolveTermQuery(surfaces) {
   let best = { query: surfaces[0], count: -1 };
   for (const surface of surfaces) {
-    const count = countVisible(matchingArticleIds(surface));
+    const count = countVisible(surface);
     if (count > best.count) best = { query: surface, count };
   }
   return { query: best.query, count: Math.max(0, best.count) };
@@ -616,6 +583,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (p === '/api/collect' && req.method === 'POST') {
+        if (getStatus().schedulerStopping) return json(res, 503, { error: '服务正在退出' });
+        if (getStatus().pipelineRunning) return json(res, 202, { started: false, running: true });
         invalidateStatsCache();
         runPipeline('manual').catch(e => console.error(e));
         return json(res, 202, { started: true });
@@ -739,6 +708,7 @@ const server = http.createServer(async (req, res) => {
         const b = await readJsonBody(req);
         traceCredentialIpc('settings-body-read');
         const update = await settingsUpdateCoordinator.submit(b);
+        refreshSchedulerSettings();
         return json(res, 200, { ok: true, credentialConfigured: !!update.apiKey });
       }
       if (p === '/api/settings/test' && req.method === 'POST') {

@@ -2,10 +2,17 @@
   "source": "https://github.com/Icdafy/Star-Picking-Pavilion/releases",
   "items": [
     {
+      "tag": "v0.2.20",
+      "name": "摘星阁 v0.2.20",
+      "publishedAt": null,
+      "body": "# 摘星阁 v0.2.20\n\n本版深入检查采集、模型分析、SQLite 入库、检索、出刊、维护与退出流程，修复可复现的并发和数据一致性问题，并将成熟后端的任务去重、完整收束与连接释放做法应用到现有本地架构。\n\n- **采集分析更稳**：重复“立即采集分析”共用同一轮任务；定时分析、维护与整轮任务协调执行，最终归组仍显示进行中；退出后不接收新任务，等待在途任务收束。\n- **设置立即生效**：保存采集间隔后直接替换原定时器，下一轮按新间隔运行，无需重启；有效采集／分析间隔与最近整轮结果可从本地状态接口查看。\n- **入库完整与信源一致**：同一信源批次的文章、全文索引和成功计数原子提交，失败整体回滚。请求途中停用、移除或改写信源时，旧响应不再入库或改写新配置的健康状态。\n- **检索完整**：取消筛选前 500 条截断，完整命中集按当前筛选、事件折叠和时间排序后分页；短词也可检索中文标题、实体和主体公司，词库命中数与实际卡片一致。\n- **模型调用与预算**：相同在途任务共享一次付费调用；并行评分失败后等待其余请求结束；小时／日额度原子扣减，日期补提取遵守同一预算，熔断不消耗补提取次数；长 Retry-After 等待受整次请求超时约束。\n- **模型端点与网络资源**：模型调用和模型列表请求不跟随 HTTP 跳转；失败、超大及非法目标响应释放连接，持续运行时避免未读响应积压。\n- **刊物并发保护**：后台改写导语仅回填原快照，用户随后重新生成的日报、周报、月报不会被旧结果覆盖。\n- **兼容与保留**：已有情报、星标、归档、模型密钥与个人设置保留；浅色、深色主题、缩放、减少动画设置和原有动效继续适用，无新增依赖。审查范围、设计来源、复现与验证见 [v0.2.20 后端审查记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0220-backend-audit.md)和[验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0220-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.20.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者。请核对 `SHA256SUMS.txt` 后安装。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.20.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由既有 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.20"
+    },
+    {
       "tag": "v0.2.19",
       "name": "摘星阁 v0.2.19",
-      "publishedAt": null,
-      "body": "# 摘星阁 v0.2.19\n\n本版仅微调情报日志“报告概况”横幅中的日期位置。\n\n- **日期轻微上移**：情报日志“报告概况”中的日期导航稍微上移，使日期更接近横幅上下边缘之间的中间位置，左右方向标随日期保持同轴对齐。\n- **刊期与显示适配**：日报、周报、月报共用调整，宽窄窗口、四档界面缩放及浅色、深色主题同步适配。横幅尺寸、日期字号和报告功能沿用，无新增依赖。\n- **兼容与保留**：浅色、深色主题、减少动画及低功耗设置继续适用；已有情报、星标、归档、模型密钥与个人设置保留。\n\n实现与验证见 [v0.2.19 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0219-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.19.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者。请核对 `SHA256SUMS.txt` 后安装。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.19.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由既有 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "publishedAt": "2026-10-06T14:05:57.000Z",
+      "body": "# 摘星阁 v0.2.19\r\n\r\n本版仅微调情报日志“报告概况”横幅中的日期位置。\r\n\r\n- **日期轻微上移**：情报日志“报告概况”中的日期导航稍微上移，使日期更接近横幅上下边缘之间的中间位置，左右方向标随日期保持同轴对齐。\r\n- **刊期与显示适配**：日报、周报、月报共用调整，宽窄窗口、四档界面缩放及浅色、深色主题同步适配。横幅尺寸、日期字号和报告功能沿用，无新增依赖。\r\n- **兼容与保留**：浅色、深色主题、减少动画及低功耗设置继续适用；已有情报、星标、归档、模型密钥与个人设置保留。\r\n\r\n实现与验证见 [v0.2.19 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0219-validation.md)。\r\n\r\n## 安装与校验\r\n\r\n下载 `Star-Picking-Pavilion-Setup-0.2.19.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者。请核对 `SHA256SUMS.txt` 后安装。\r\n\r\n```powershell\r\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.19.exe\r\nGet-Content .\\SHA256SUMS.txt\r\n```\r\n\r\n正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由既有 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。\r\n",
       "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.19"
     },
     {
