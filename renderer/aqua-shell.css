@@ -984,6 +984,7 @@ main { order: 5; width: 100%; }
 }
 .motion-surface { overflow: hidden; isolation: isolate; }
 .motion-surface::before { opacity: 0; }
+.page-banner > .surface-light { position: absolute; inset: 0; z-index: 0; }
 .surface-light {
   position: absolute; inset: 0; z-index: -1;
   border-radius: inherit; overflow: hidden; pointer-events: none; opacity: 0;
@@ -1095,6 +1096,7 @@ body.is-idle :is(.press-wave, .surface-light, .control-aura) { display: none; }
 .release-current { padding: .1rem .45rem; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); font-size: var(--t-xs); font-weight: 500; }
 .release-entry time { flex: 0 0 auto; color: var(--c-fg-faint); font-size: var(--t-xs); }
 .release-chevron { color: var(--c-fg-dim); font-size: var(--t-lg); }
+.release-chevron { transition: transform 260ms var(--spring-light); }
 .release-entry[open] .release-chevron { transform: rotate(180deg); }
 .release-body { border-top: 1px solid var(--glass-border); padding: var(--sp-5); overflow-wrap: anywhere; line-height: 1.85; }
 .release-body :is(p, ul, pre, h4) { margin: 0 0 1rem; }

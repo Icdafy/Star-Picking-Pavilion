@@ -105,7 +105,17 @@
       if (entry && typeof entry.onEnter === 'function') entry.onEnter();
       // 页头文字分层入场；复用现有引擎，隐藏、失焦和减少动画时直接落定。
       const copy = entry?.tab ? $(entry.tab)?.querySelectorAll?.('[data-banner-reveal]') : null;
-      if (typeof motion?.fadeSlideIn === 'function') {
+      if (typeof motion?.revealText === 'function') {
+        motion.revealText(copy);
+        const art = entry?.tab ? $(entry.tab)?.querySelector?.('.banner-art') : null;
+        if (art) {
+          const base = doc?.defaultView?.getComputedStyle(art);
+          const transform = base?.transform || 'translateY(-50%) rotate(-25deg)';
+          motion.spring(art, { from: { transform: `${transform} scale(.86) rotate(-8deg)`, opacity: '0' },
+            to: { transform, opacity: base?.opacity || '.38' },
+            duration: doc?.documentElement?.dataset?.fxTier === 'lite' ? 180 : 560, restoreStyles: true });
+        }
+      } else if (typeof motion?.fadeSlideIn === 'function') {
         [...(copy || [])].forEach((node, i) => motion.fadeSlideIn(node, {
           distance: 8, duration: 440, delay: i * 55, restoreStyles: true
         }));

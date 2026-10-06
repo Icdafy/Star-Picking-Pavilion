@@ -161,7 +161,8 @@
       lexiconToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       lexiconToggle.classList.toggle('is-on', open);
       if (open) {
-        motion?.fadeSlideIn?.(lexiconPanel, { duration: 220, distance: 6, restoreStyles: true });
+        if (motion?.unfold) motion.unfold(lexiconPanel);
+        else motion?.fadeSlideIn?.(lexiconPanel, { duration: 220, distance: 6, restoreStyles: true });
         loadLexicon();
         lexiconFilter.focus();
       }

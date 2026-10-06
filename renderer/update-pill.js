@@ -7,7 +7,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.UpdatePill = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createUpdatePillModule() {
-  function createUpdatePill({ desktop, pill, progress, live } = {}) {
+  function createUpdatePill({ desktop, pill, progress, live, motion } = {}) {
     if (!desktop || typeof desktop.onUpdateStatus !== 'function' || !pill) return null;
     const arc = pill.querySelector('[data-update-arc]');
     const icon = pill.querySelector('[data-update-icon]');
@@ -17,6 +17,7 @@
     let updState = 'idle', updateVersion = '', lastAnnouncement = '';
     function render({ status, version, percent, message } = {}) {
       if (!states.includes(status)) return;
+      const previous = updState;
       updState = status;
       if (version) updateVersion = String(version);
       const busy = ['checking', 'available', 'downloading', 'installing'].includes(status);
@@ -56,6 +57,13 @@
           : 'M10 3v9m-3-3 3 3 3-3M4 13v3h12v-3');
       }
       if (caption) caption.textContent = ({ checking: '检查', downloading: '下载', downloaded: '重启', installing: '安装', error: '重试', current: '最新' })[status] || '更新';
+      if (status !== previous) {
+        motion?.revealText?.([caption].filter(Boolean));
+        if (icon && !determinate && status !== 'error') motion?.spring?.(icon, {
+          from: { transform: 'translateY(-3px) scale(.84)', opacity: '0' },
+          to: { transform: 'none', opacity: '1' }, duration: 260, restoreStyles: true
+        });
+      }
       if (progress) {
         progress.hidden = status !== 'downloading';
         if (determinate) progress.setAttribute('aria-valuenow', String(amount));

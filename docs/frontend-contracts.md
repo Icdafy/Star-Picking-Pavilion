@@ -911,3 +911,13 @@ v0.2.5 说明（预算不变：CSS ≈ 292,300 B ≤ 292 KiB，脚本 27/27，�
 #updatePill 移入 .rail-footer，保留 SVG 和文本子节点，仅按状态改变属性。#updateProgress 提供确定进度，#updateStatus 按 10% 分段播报。手动检查 IPC 仅接受当前窗口 sender，并由协调器阻止并发、下载／安装中检查及 30 秒内重复请求。安装仍经 send 请求、仅在主进程 downloaded 状态启用，先优雅关闭后端再启动 NSIS。
 
 环形进度以 SVG pathLength=100 对应百分比，未知进度复用 spin。低功耗和减少动画停止旋转，static 停止过渡，后台暂停，高对比度保留可见轨道。292 KiB、27 脚本、20 关键帧及滤镜预算保持不变。
+
+## v0.2.17 动效与主题更新珠
+
+#updatePill 保留固定圆形命中范围，尺寸从 2.75rem 增至 3.25rem；SVG viewBox=52，半径 23，描边 3.4。新增 .update-core 独立承载图标与数字，跟随外观色相生成的 --update-accent／--update-ink 在深浅主题中具有不同亮度，前景随主题立即切换。外环保持真实百分比，内芯的跟手 translate 与状态 transform 动画独立；选择跟手对象必须明确优先 .update-core，不能用按 DOM 顺序选到 .update-ring 的组合选择器。
+
+DomUtils.createMotion 增加 revealText、unfold、layoutChange：文字最多六个语义层，保留完整中文；展开一次提交布局，对最多八个可见邻项通过 transform 做 FLIP，不做 height／width tween；局部裁切使用 clipPath，结束／取消必须恢复原 CSS。相同元素的双帧 spring 被打断时先采集当前视觉帧，旧回调不得覆盖新状态。五维图形通过 scaleX 填充，数值不参与动画计算。static 立即落定，lite 缩短语义过渡。
+
+交互装饰继续委托监听与按需单个 RAF：最多两个表面和两个控件，页头星轨、内芯与图标提供小幅跟随，命中范围及正文不移动。离开／移除／禁用／滚动／后台／销毁都清理装饰及临时 translate；触摸与 forced-colors 不启用追光。滚入只观察九个静态设置章节，未入场内容仍然可见。details 立即改变原生 open 状态，Enter 与 Escape 沿用浏览器语义；dialog／popover 清理必须核对实际 open 状态，防止旧 close／toggle 事件影响重新打开的层。
+
+维持 292 KiB、27 脚本、20 关键帧及 10 处玻璃滤镜的现有预算。新增断言归属 test/v0217-motion.test.js、test/e2e/v0217-motion.test.js，原 160 布局、48 刊期、32 更新入口矩阵保留。专项附加 96 组配色／材质／缩放检查，文字对比度 ≥4.5、环形前景对比度 ≥3。

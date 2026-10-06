@@ -150,8 +150,9 @@
       if (!Array.isArray(keyframes) || !keyframes.length) return null;
       const last = keyframes[keyframes.length - 1] || {};
       const style = {};
-      if ('transform' in last) style.transform = last.transform;
-      if ('opacity' in last) style.opacity = last.opacity;
+      for (const name of ['transform', 'opacity', 'clipPath']) {
+        if (name in last) style[name] = last[name];
+      }
       return Object.keys(style).length ? style : null;
     }
 
@@ -162,6 +163,12 @@
     // 保证，动画结束不留 fill 锁住合成层
     function spring(el, { keyframes, from, to, duration, stiffness = 'medium', delay = 0, restoreStyles = false } = {}) {
       if (!el) return null;
+      // 连续改向先读当前合成帧，再释放旧动画；弹窗连开和状态切换不会重跳首帧。
+      let visual;
+      if (active.has(el) && from && typeof win?.getComputedStyle === 'function') {
+        const computed = win.getComputedStyle(el);
+        visual = Object.fromEntries(Object.keys(from).map(name => [name, computed[name]]));
+      }
       cancel(el);
       const preset = MOTION_STIFFNESS[stiffness] || MOTION_STIFFNESS.medium;
       const total = Number(duration) > 0 ? Number(duration) : preset.duration;
@@ -176,7 +183,7 @@
         return null;
       }
       const preBaked = Array.isArray(keyframes) && keyframes.length >= 2;
-      const frames = preBaked ? keyframes : [from || {}, endStyle || {}];
+      const frames = preBaked ? keyframes : [visual || from || {}, endStyle || {}];
       try {
         settle(el, endStyle);
         const animation = el.animate(frames, {
@@ -249,6 +256,61 @@
       return limited.length;
     }
 
+    // 文字按语义层次入场，保留完整可选中文和读屏顺序，不拆成字粒子。
+    function revealText(els) {
+      const lite = fxTier() === 'lite';
+      const nodes = Array.from(els || []).slice(0, 6);
+      nodes.forEach((el, index) => {
+        const distance = lite ? 5 : el.matches?.('h1, h2, h3') ? 14 : 8;
+        spring(el, {
+          from: { transform: `translateY(${distance}px)`, opacity: '0' },
+          to: { transform: 'none', opacity: '1' },
+          duration: lite ? 180 : 420, delay: index * (lite ? 20 : 45), restoreStyles: true
+        });
+      });
+      return nodes.length;
+    }
+
+    function unfold(el) {
+      const animation = spring(el, {
+        from: { transform: 'translateY(-8px)', opacity: '0', clipPath: 'inset(0 0 100% 0)' },
+        to: { transform: 'none', opacity: '1', clipPath: 'inset(0)' },
+        duration: fxTier() === 'lite' ? 160 : 280, restoreStyles: true
+      });
+      Array.from(el?.querySelectorAll?.('.dim-bar > i') || []).slice(0, STAGGER_LIMIT).forEach((bar, index) => {
+        spring(bar, { from: { transform: 'scaleX(0)' }, to: { transform: 'none' },
+          duration: 320, delay: index * 25, restoreStyles: true });
+      });
+      return animation;
+    }
+
+    // 展开高度只提交一次；相邻可见元素用 FLIP 补偿位移，避免逐帧改变布局。
+    // 捕获现有动画的视觉位置使连点改向连续；最多八项，不扫描整条信息流。
+    function layoutChange(root, mutate, content) {
+      if (typeof mutate !== 'function') return;
+      const bounds = [];
+      if (!shouldSkip()) {
+        let next = root?.nextElementSibling;
+        while (next && bounds.length < STAGGER_LIMIT) {
+          const rect = next.getBoundingClientRect();
+          if (rect.height && rect.top < (win?.innerHeight || Infinity) && rect.bottom > 0) bounds.push([next, rect]);
+          else if (rect.top >= (win?.innerHeight || Infinity)) break;
+          next = next.nextElementSibling;
+        }
+      }
+      mutate();
+      const changes = bounds.map(([node, before]) => {
+        cancel(node);
+        return [node, before.top - node.getBoundingClientRect().top];
+      });
+      for (const [node, delta] of changes) {
+        if (Math.abs(delta) < .5) continue;
+        spring(node, { from: { transform: `translateY(${delta}px)` },
+          to: { transform: 'none' }, duration: fxTier() === 'lite' ? 180 : 320, restoreStyles: true });
+      }
+      if (content && !content.hidden && content.getBoundingClientRect?.().height) unfold(content);
+    }
+
     // FLIP：在改向前捕获实际视觉位置，尺寸一次落定，只插值 transform。
     // 连点时从正在播放的帧继续，不从上一个目标重新起跑。
     function retargetIndicator(el, { x, y, width, height, immediate = false } = {}) {
@@ -296,6 +358,9 @@
       spring,
       fadeSlideIn,
       staggerIn,
+      revealText,
+      unfold,
+      layoutChange,
       retargetIndicator,
       cancel,
       cancelAll,
@@ -319,13 +384,14 @@
     const forcedColors = win.matchMedia?.('(forced-colors: active)');
     const cleanups = [], groups = [], waves = new Map();
     const controlSelector = 'button:not(:disabled):not([aria-disabled="true"])';
-    const hoverSelector = '.tab, .pill, .chip, .icon-btn, .btn-primary, .btn-ghost, .rt-toggle, .card-act, .common-links-category';
-    const surfaceSelector = '.card, .common-links-card';
+    const hoverSelector = '.tab, .pill, .chip, .icon-btn, .btn-icon, .btn-primary, .btn-ghost, .rt-toggle, .card-act, .common-links-category, .update-pill';
+    const surfaceSelector = '.card, .common-links-card, .page-banner';
     const surfaces = new Map(), controls = new Map();
+    const isUnavailable = element => element.disabled || (element.getAttribute('aria-disabled') === 'true' && !element.matches('.update-pill'));
     // 只在存在追光时监听节点移除，每次检查最多四个目标；不扫描内容树。
     const detached = new win.MutationObserver(() => {
       for (const records of [surfaces, controls]) for (const element of records.keys()) {
-        if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true') removeLight(records, element);
+        if (!element.isConnected || isUnavailable(element)) removeLight(records, element);
       }
     });
     let disposed = false, surface = null, control = null, frame = null, lastTime = 0;
@@ -381,6 +447,7 @@
       if (!record) return;
       win.clearTimeout(record.timeout);
       record.node.remove();
+      record.follower?.style.removeProperty('translate');
       element.classList.remove(record.kind === 'surface' ? 'motion-surface' : 'motion-hover-host');
       records.delete(element);
       if (surface === element) surface = null;
@@ -435,6 +502,8 @@
         const node = makeSpan(kind === 'surface' ? 'surface-light' : 'control-aura', element);
         record = { kind, node, rect: element.getBoundingClientRect(), alpha: 0, targetAlpha: 1,
           x: axis(), y: axis(), haloX: axis(), haloY: axis(), magnetX: axis(), magnetY: axis(), timeout: null };
+        record.follower = kind === 'surface' ? element.querySelector('.banner-art')
+          : element.querySelector('.update-core') || element.querySelector('.tab-glyph') || element.querySelector(':scope > svg');
         if (kind === 'surface') {
           record.halo = makeSpan('surface-halo', node);
           record.glow = makeSpan('surface-glow', node);
@@ -472,7 +541,7 @@
       let moving = false;
       // 每帧先完成当前两个命中区域的几何读取，再写装饰层；不扫描信息流。
       for (const records of [surfaces, controls]) for (const [element, record] of records) {
-        if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true') {
+        if (!element.isConnected || isUnavailable(element)) {
           removeLight(records, element); continue;
         }
         if (record.dirty && record.targetAlpha) {
@@ -488,6 +557,10 @@
           advance(record.haloX, elapsed, 360, 34), advance(record.haloY, elapsed, 360, 34),
           advance(record.magnetX, elapsed, 700, 38), advance(record.magnetY, elapsed, 700, 38)].every(Boolean);
         record.node.style.opacity = record.alpha.toFixed(3);
+        if (record.follower) {
+          const weight = record.kind === 'surface' ? 2.5 : .6;
+          record.follower.style.translate = `${(record.magnetX.position * weight).toFixed(2)}px ${(record.magnetY.position * weight).toFixed(2)}px`;
+        }
         if (record.kind === 'surface') {
           record.glow.style.transform = `translate(${record.x.position - 160}px, ${record.y.position - 160}px)`;
           record.halo.style.transform = `translate(${record.haloX.position - 220}px, ${record.haloY.position - 220}px)`;
@@ -504,8 +577,8 @@
       if (event.pointerType === 'touch') { clearGlow(); return; }
       if (!full()) return;
       const nextSurface = event.target.closest?.(surfaceSelector) || null;
-      const nextControl = event.target.closest?.(controlSelector);
-      const hoverControl = nextControl?.matches(hoverSelector) ? nextControl : null;
+      const nextControl = event.target.closest?.('button:not(:disabled)');
+      const hoverControl = nextControl && !isUnavailable(nextControl) && nextControl.matches(hoverSelector) ? nextControl : null;
       if (nextSurface !== surface) { leave(surfaces, surface); surface = nextSurface; }
       if (hoverControl !== control) { leave(controls, control); control = hoverControl; }
       if (surface) enter(surfaces, surface, event, 'surface');
@@ -561,6 +634,42 @@
     }
     const environment = new win.MutationObserver(settleEnvironment);
     environment.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier'] });
+    // 原生 details、dialog 和 popover 保留浏览器的键盘、焦点及关闭语义。
+    listen(doc, 'click', event => {
+      const summary = event.target.closest?.('details > summary');
+      if (!summary || event.target.closest('a, button, input, select, textarea') || event.defaultPrevented) return;
+      const details = summary.parentElement;
+      if (!details.matches('.release-entry, .models-customized')) return;
+      event.preventDefault();
+      motion.layoutChange(details, () => { details.open = !details.open; }, details.querySelector('.release-body, .models-customized-body'));
+    });
+    for (const layer of doc.querySelectorAll('dialog, [popover]')) {
+      listen(layer, 'toggle', event => {
+        const isOpen = layer.open || layer.matches(':popover-open');
+        if (!isOpen) { motion.cancelTree(layer); return; }
+        if (event.newState !== 'open') return;
+        motion.spring(layer, { from: { transform: 'translateY(-8px) scale(.97)', opacity: '0' },
+          to: { transform: 'none', opacity: '1' }, duration: 240, restoreStyles: true });
+        motion.revealText(layer.querySelectorAll('h3, .palette-group'));
+      });
+      listen(layer, 'close', () => { if (!layer.open) motion.cancelTree(layer); });
+    }
+    // 仅观察九个静态设置章节；未触发时内容始终可读，不将全量信息流挂观察器。
+    const revealed = new WeakSet();
+    const scrollReveal = win.IntersectionObserver ? new win.IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting && entry.target.getBoundingClientRect().height && !revealed.has(entry.target));
+      visible.slice(0, STAGGER_LIMIT).forEach((entry, index) => {
+        revealed.add(entry.target);
+        motion.fadeSlideIn(entry.target, { distance: 10, duration: 300, delay: index * 35, restoreStyles: true });
+      });
+    }, { root: doc.getElementById('appViewport'), threshold: .08 }) : null;
+    const chapters = doc.querySelectorAll('[data-settings-section]');
+    chapters.forEach(chapter => scrollReveal?.observe(chapter));
+    cleanups.push(() => {
+      scrollReveal?.disconnect();
+      chapters.forEach(chapter => motion.cancelTree(chapter));
+      doc.querySelectorAll('dialog, [popover]').forEach(layer => motion.cancelTree(layer));
+    });
     listen(doc, 'pointerdown', event => { if (event.button === 0) press(event.target.closest?.(controlSelector), event); }, { passive: true });
     listen(doc, 'keydown', event => {
       if (!event.repeat && (event.key === 'Enter' || event.key === ' ')) press(event.target.closest?.(controlSelector), event);

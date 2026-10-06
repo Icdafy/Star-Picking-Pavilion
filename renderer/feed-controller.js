@@ -30,7 +30,7 @@
     // 批 4 卡片交互依赖（均可选：不注入则不接线交互层）
     toast, refreshStats, copyText, runTermSearch, safeUrl, timeAgo,
     // v0.2.0：主体公司标签直达一级市场的公司档案（可选）
-    openCompany, getSearchIntent
+    openCompany, getSearchIntent, motion
   } = {}) {
     if (typeof api !== 'function' || !state || typeof esc !== 'function'
       || !DomUtils || !format || !card || !diff
@@ -243,7 +243,9 @@
         const dimsBtn = e.target.closest('.dims-toggle');
         if (dimsBtn) {
           const card = dimsBtn.closest('.card');
-          dimsBtn.setAttribute('aria-expanded', String(card.classList.toggle('expanded')));
+          const toggle = () => dimsBtn.setAttribute('aria-expanded', String(card.classList.toggle('expanded')));
+          if (motion?.layoutChange) motion.layoutChange(card.closest('.tl-row') || card, toggle, card.querySelector('.dims'));
+          else toggle();
           return;
         }
         const tgl = e.target.closest('.cluster-toggle');
@@ -274,8 +276,12 @@
         }
         const card = e.target.closest('.card');
         if (card && !e.target.closest('a, button')) {
-          const expanded = card.classList.toggle('expanded');
-          card.querySelector('.dims-toggle')?.setAttribute('aria-expanded', String(expanded));
+          const toggle = () => {
+            const expanded = card.classList.toggle('expanded');
+            card.querySelector('.dims-toggle')?.setAttribute('aria-expanded', String(expanded));
+          };
+          if (motion?.layoutChange) motion.layoutChange(card.closest('.tl-row') || card, toggle, card.querySelector('.dims'));
+          else toggle();
         }
       });
     }

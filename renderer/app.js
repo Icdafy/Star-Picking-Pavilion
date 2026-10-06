@@ -434,7 +434,7 @@ const feedController = FeedController.createFeedController({
   renderSearchContext: () => searchController.renderSearchContext(),
   // 批 4：卡片交互层（toggleStar + 点击委托）随工厂接线；
   // runTermSearch 来自后面装配的检索控制器，用闭包懒解析
-  toast, refreshStats, safeUrl, timeAgo,
+  toast, refreshStats, safeUrl, timeAgo, motion,
   copyText,
   runTermSearch: term => searchController.runTermSearch(term),
   openCompany: id => openCompany(id),
@@ -848,7 +848,7 @@ const realtimePoller = RealtimePoller.createRealtimePoller({
 const { setRealtime } = realtimePoller;
 
 // ---------- 工作区更新按钮 ----------
-UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill'), progress: $('#updateProgress'), live: $('#updateStatus') });
+UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill'), progress: $('#updateProgress'), live: $('#updateStatus'), motion });
 
 // ---------- 启动 ----------
 async function start() {
