@@ -62,7 +62,7 @@ function makeDocument(execCommandResult = true) {
   };
 }
 
-function createController({ clipboard = true, clipboardThrows = false, apiImpl, state = {} } = {}) {
+function createController({ clipboard = true, clipboardThrows = false, apiImpl, state = {}, getReportSelection } = {}) {
   const toasts = [];
   const document = makeDocument();
   const ctrl = createExportController({
@@ -70,7 +70,7 @@ function createController({ clipboard = true, clipboardThrows = false, apiImpl, 
     toast: (msg, isError) => toasts.push({ msg, isError: !!isError }),
     state: Object.assign({ view: 'all', dailyDate: '2026-08-09' }, state),
     navigator: clipboard ? { clipboard: { writeText: async () => { if (clipboardThrows) throw new Error('denied'); } } } : {},
-    document
+    document, getReportSelection
   });
   return { ctrl, toasts, document };
 }
@@ -142,4 +142,18 @@ test('导出按钮接线在元素存在时挂上点击', () => {
   return listeners.click().then(() => {
     assert.ok(toasts.some(msg => /已复制/.test(msg)));
   });
+});
+
+test('report exports follow the displayed weekly/monthly key and reject loading selections', () => {
+  for (const kind of ['weekly', 'monthly']) {
+    const key = kind === 'weekly' ? '2025-W03' : '2025-01';
+    const { ctrl } = createController({ getReportSelection: () => ({ kind, key }) });
+    const params = ctrl.exportParams('daily', 'doc');
+    assert.equal(params.get('kind'), kind);
+    assert.equal(params.get('key'), key);
+    assert.equal(params.get('format'), 'doc');
+    assert.equal(params.has('date'), false);
+  }
+  const { ctrl } = createController({ getReportSelection: () => null });
+  assert.throws(() => ctrl.exportParams('daily', 'markdown'), /加载完成/);
 });

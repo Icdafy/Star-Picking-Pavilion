@@ -323,11 +323,13 @@ function confirmGlass(message, { title = '请确认', okText = '确定' } = {}) 
 // navigator/document 经依赖注入，导出按钮随工厂一并接线
 const exportController = ExportController.createExportController({
   api, toast, state, navigator, document,
+  getReportSelection: () => dailyViewController.getSelection(),
   elements: {
     btnCopyFeed: $('#btnCopyFeed'),
     btnExportFeed: $('#btnExportFeed'),
     btnCopyDaily: $('#btnCopyDaily'),
-    btnExportDaily: $('#btnExportDaily')
+    btnExportDaily: $('#btnExportDaily'),
+    dailyExportMenu: $('#dailyExportMenu')
   }
 });
 const { runExport, copyText } = exportController;
@@ -503,6 +505,7 @@ const dailyViewController = DailyViewController.createDailyViewController({
     periods: $('#periodSwitch'),
     copy: $('#btnCopyDaily'),
     exportButton: $('#btnExportDaily'),
+    exportMenu: $('#dailyExportMenu'),
     onCompany: openCompany,
     body: $('#dailyBody'),
     date: $('#dailyDate'),
@@ -736,6 +739,7 @@ const VIEW_ALIASES = {
 const VIEW_GO_KEYS = Object.fromEntries(Object.entries(Shortcuts.GO_KEYS).map(([key, view]) => [view, key]));
 const exportKind = () => (FEED_VIEWS.includes(state.view) ? 'feed' : state.view === 'daily' ? 'daily' : null);
 function paletteCommands() {
+  const reportName = { daily: '日报', weekly: '周报', monthly: '月报' }[dailyViewController.getSelection()?.kind] || '报告';
   const views = $$('.tab').map((tab, index) => {
     const view = tab.dataset.view;
     const go = VIEW_GO_KEYS[view];
@@ -755,8 +759,8 @@ function paletteCommands() {
     { id: 'theme', label: '切换浅色 / 深色主题', keys: ['Alt', 'T'], aliases: ['zhuti', 'zt', 'theme', 'dark', 'light', '深色', '浅色', '宣纸白', '深空夜航'], run: () => toggleTheme() },
     { id: 'search', label: '聚焦检索框', keys: ['/'], aliases: ['jiansuo', 'js', 'sousuo', 'search'], run: () => { $('#searchInput').focus(); $('#searchInput').select(); } },
     { id: 'lexicon', label: '打开核心词库', keys: ['Alt', 'K'], aliases: ['ciku', 'ck', 'lexicon', '词库'], run: () => setLexiconOpen(true) },
-    { id: 'copy', label: state.view === 'daily' ? '复制整份日报' : '复制当前列表', keys: ['Alt', 'C'], aliases: ['fuzhi', 'fz', 'copy'], available: () => Boolean(exportKind()), run: () => runExport(exportKind(), 'text', 'copy') },
-    { id: 'export', label: state.view === 'daily' ? '导出日报为 Markdown' : '导出当前列表为 Markdown', aliases: ['daochu', 'dc', 'export', 'md', 'markdown'], available: () => Boolean(exportKind()), run: () => runExport(exportKind(), 'markdown', 'download') },
+    { id: 'copy', label: state.view === 'daily' ? `复制整份${reportName}` : '复制当前列表', keys: ['Alt', 'C'], aliases: ['fuzhi', 'fz', 'copy'], available: () => Boolean(exportKind()), run: () => runExport(exportKind(), 'text', 'copy') },
+    { id: 'export', label: state.view === 'daily' ? `导出${reportName}为 Markdown` : '导出当前列表为 Markdown', aliases: ['daochu', 'dc', 'export', 'md', 'markdown'], available: () => Boolean(exportKind()), run: () => runExport(exportKind(), 'markdown', 'download') },
     { id: 'add-source', label: '提报信源', aliases: ['tibaoxinyuan', 'tbxy', 'add source', '新增信源', '添加信源'], run: () => { switchView('sources'); $('#btnAddSource').click(); } },
     { id: 'add-company', label: '收录公司', aliases: ['shoulugongsi', 'slgs', 'add company', '新增公司', '添加公司'], run: () => { switchView('capital'); $('#btnAddCompany').click(); } },
     { id: 'zoom-in', label: '放大界面', keys: ['Ctrl', '+'], aliases: ['fangda', 'fd', 'zoom in', 'suofang'], run: () => stepTextScale(1) },

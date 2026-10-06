@@ -1,3 +1,9 @@
+# v0.2.15 发布状态
+
+情报日志日期居中放大、三种刊期共享操作与 .md／原生 .doc 导出已实现。正在执行本地完整回归和既有 GitHub 发布门禁；正式 Release 与六资产核验尚未完成。详见 [本版验证](docs/v0215-validation.md)。
+
+---
+
 # v0.2.14 发布状态
 
 [v0.2.14](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.14) 已发布为最新正式版。热点与情报日志统一页头、紧凑报告概况、一级市场六分区导航及带标签筛选完成。

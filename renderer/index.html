@@ -242,18 +242,23 @@
         <button class="btn-primary btn-compact" id="btnCopyDaily" type="button"
           title="把整份日报复制成纯文本，直接贴进微信群或邮件">复制日报</button>
         <button class="btn-ghost btn-compact" id="btnExportDaily" type="button"
-          title="把整份日报存成 Markdown 文件">导出 .md</button>
+          title="把整份日报存成文件" popovertarget="dailyExportMenu">导出文件 ▾</button>
+        <div id="dailyExportMenu" class="report-export-menu" popover="auto" role="group" aria-label="报告导出格式">
+          <button class="btn-ghost btn-compact" type="button" data-report-format="markdown">.md</button>
+          <button class="btn-ghost btn-compact" type="button" data-report-format="doc">.doc</button>
+        </div>
         <button class="btn-ghost btn-compact" id="dailyRegen" type="button">重新生成</button>
       </div>
     </header>
     <section class="daily-head glass" aria-label="报告概况" aria-busy="true">
       <div class="daily-overview-heading">
-        <div class="daily-title"><p class="daily-overview-label">报告概况 <span class="banner-tag" id="dailyState">正在读取</span></p><h3 id="dailyDate">–</h3><p id="dailySub" role="status" aria-live="polite">正在读取本期报告…</p></div>
+        <div class="daily-title"><p class="daily-overview-label">报告概况 <span class="banner-tag" id="dailyState">正在读取</span></p><p id="dailySub" class="sr-only" role="status" aria-live="polite">正在读取本期报告…</p></div>
         <div class="daily-date-controls" role="group" aria-label="切换报告日期">
           <button class="btn-icon" id="dailyPrev" type="button" aria-label="前一天"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 4 L6.5 10 L12.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="btn-icon" id="dailyNext" type="button" aria-label="后一天"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4 L13.5 10 L7.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
+      <h3 id="dailyDate">–</h3>
       <dl class="daily-metrics" id="dailyMetrics" aria-label="报告统计"><div><dt>精选情报</dt><dd>–</dd></div><div><dt>低空经济</dt><dd>–</dd></div><div><dt>商业航天</dt><dd>–</dd></div></dl>
     </section>
     <div id="dailyBody"></div>

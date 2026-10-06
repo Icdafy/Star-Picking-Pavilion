@@ -188,7 +188,7 @@ test('界面展示后端的安全错误消息并捕获设置保存失败', () =>
   assert.match(settingsFormController, /删除失败：/);
   assert.match(settingsFormController, /切换失败：/);
   assert.match(settingsViewSource, /采集设置保存失败：/);
-  assert.match(dailyViewSource, /日报重新生成失败：/);
+  assert.match(dailyViewSource, /重新生成失败：/);
   assert.match(sourcesControllerSource, /信源操作失败：/);
   assert.match(settingsViewSource, /反馈保存失败：/);
 });

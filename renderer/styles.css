@@ -3,25 +3,21 @@
 :root {
   --scrollbar-hue: var(--aqua-user-hue, 40deg);
   --scrollbar-saturation: 36%;
-  /* —— 字体 ——
-     一条字体栈同时管住两种文字：Times New Roman 只覆盖拉丁字母、数字与
-     西文标点，汉字在它里面查不到字形，会顺着栈落到思源黑体上。 */
+  /* 西文使用 Times New Roman，汉字回退思源黑体。 */
   --font-latin: 'Times New Roman', 'Nimbus Roman', 'Liberation Serif';
   --font-hans: 'Source Han Sans SC', 'Noto Sans SC', 'Source Han Sans CN',
                'Microsoft YaHei', sans-serif;
   --font-sans: var(--font-latin), var(--font-hans);
-  /* 下面四个是角色名，如今都指向同一条栈。保留角色名，是为了将来若要重新
-     区分某一层，只改这一处即可，而不必回去翻六十多条规则。 */
+  /* 角色字体共用字栈。 */
   --font-display: var(--font-sans);   /* 标题、导航、数据大字 */
   --font-ui: var(--font-sans);        /* 控件、标签、元信息 */
   --font-body: var(--font-sans);      /* 摘要、研判、说明 */
   --font-mono: var(--font-sans);      /* 数字与代码：TNR 的数字本身就是等宽的 */
 
-  /* —— 界面缩放档位倍率（由 <html data-ui-scale> 覆写）—— */
+  /* 界面倍率由 data-ui-scale 覆写。 */
   --ui-scale: 1;
 
-  /* —— 字号阶梯（rem，随根字号一起缩放）——
-     基准 1rem ≈ 16–18.5px，整体较 v2 上抬约一档半，长时间阅读不费眼。 */
+  /* rem 字号跟随根字号缩放。 */
   --t-2xs: .75rem;      /* 12px＠16 —— 极小标签，仅用于角标 */
   --t-xs: .8125rem;     /* 13px */
   --t-sm: .875rem;      /* 14px */
@@ -32,7 +28,7 @@
   --t-2xl: 1.875rem;    /* 30px */
   --t-3xl: 2.25rem;     /* 36px */
 
-  /* —— 间距阶梯（rem，与字号同源：字放大时留白同比例变宽）—— */
+  /* 间距同比例缩放。 */
   --sp-1: .25rem;
   --sp-2: .5rem;
   --sp-3: .75rem;
@@ -68,13 +64,10 @@
   --spring-light: cubic-bezier(.3, 1.2, .4, 1);
   --spring-medium: cubic-bezier(.22, .9, .3, 1);
   --spring-heavy: cubic-bezier(.2, .8, .3, 1);
-  /* v7：sticky 日期标题薄纱的模糊强度，供 date-head 统一引用（两主题同值） */
+  /* 两主题共享日期标题的薄纱模糊。 */
   --veil-blur: blur(6px);
 
-  /* —— v6.5 语义令牌 ——
-     焦点环：outline 简写值，键盘可见焦点的统一口径；
-     状态色：成功/警示/危险各随主题走，取值沿用已验证对比度的主题色。
-     阴影阶梯 --shadow-sm/md/lg 与玻璃分层令牌分主题定义于下方两块。 */
+  /* 焦点、状态色、阴影和玻璃材质使用主题语义令牌。 */
   --focus-ring: 2px solid var(--accent);
   --state-success: var(--c-green);
   --state-warn: var(--flag);
@@ -1623,17 +1616,20 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .period-switch .chip { border-style: solid; border-color: transparent; min-width: 3.5rem; }
 .period-switch .chip.active { color: var(--accent-ink); background: var(--active-bg); border-color: var(--accent-line); }
 .daily-toolbar .daily-actions { margin-left: auto; }
-.daily-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .9fr); align-items: center; gap: var(--sp-2) var(--sp-6); padding: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-4); background: linear-gradient(110deg, var(--accent-soft), transparent 55%), var(--glass-bg-soft); }
-.daily-overview-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.daily-head { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr); align-items: center; gap: var(--sp-2) var(--sp-3); min-height: calc(6.715rem + 2px); padding: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-4); background: linear-gradient(110deg, var(--accent-soft), transparent 55%), var(--glass-bg-soft); }
+.daily-overview-heading { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
 .daily-title { flex: 1; min-width: 0; }
 .daily-overview-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--c-fg-dim); font-size: var(--t-xs); margin-bottom: .25rem; }
-.daily-title h3 { font: 700 var(--t-lg)/1.4 var(--font-display); overflow-wrap: anywhere; }
+#dailyDate { font: 700 var(--t-2xl)/1.3 var(--font-display); text-align: center; overflow-wrap: anywhere; min-width: 0; margin: 0; }
+.daily-date-range { white-space: nowrap; }
 .daily-date-controls { display: flex; gap: var(--sp-2); flex-shrink: 0; }
-#dailySub { font-size: var(--t-xs); color: var(--c-fg-dim); margin: .25rem 0 0; }
 .daily-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin: 0; padding-left: var(--sp-5); border-left: 1px solid var(--glass-border); }
 .daily-metrics > div + div { border-left: 1px solid var(--glass-border); padding-left: var(--sp-3); }
 .daily-metrics dt { color: var(--c-fg-dim); font-size: var(--t-xs); }
 .daily-metrics dd { margin: .125rem 0 0; color: var(--accent-ink); font: 700 var(--t-xl)/1.3 var(--font-mono); font-variant-numeric: tabular-nums; }
+#btnExportDaily { anchor-name: --report-export; }
+.report-export-menu { position-anchor: --report-export; position-area: bottom span-left; justify-self: end; margin: .375rem 0 0; padding: .25rem; min-width: 7rem; overflow: clip; border: 1px solid var(--glass-border); border-radius: var(--radius-sm); background: var(--glass-bg-deep); color: var(--c-fg); box-shadow: var(--shadow-sm); }
+.report-export-menu button { display: block; width: 100%; text-align: left; }
 
 .daily-section {
   margin-bottom: var(--sp-5);
@@ -2423,8 +2419,10 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   .storage-total { grid-column: 1 / -1; }
   .lexicon-panel { padding: var(--sp-3); max-height: min(30rem, calc(100vh - 6rem)); }
   .lexicon-body { gap: var(--sp-3); }
-  .daily-head { grid-template-columns: 1fr; }
-  .daily-metrics { border-left: 0; border-top: 1px solid var(--glass-border); padding: var(--sp-2) 0 0; }
+  .daily-head { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; min-height: calc(11.285rem + 2px); }
+  .daily-overview-heading { flex-direction: row; align-items: center; justify-content: space-between; align-self: start; }
+  .daily-head #dailyDate { position: absolute; left: 50%; top: 50%; width: calc(100% - 2.5rem); transform: translate(-50%, -50%); }
+  .daily-metrics { align-self: end; border-left: 0; border-top: 1px solid var(--glass-border); padding: var(--sp-2) 0 0; }
 }
 
 /* 最窄窗口收紧弹窗，报告操作整行显示。 */

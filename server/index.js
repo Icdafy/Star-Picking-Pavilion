@@ -13,6 +13,8 @@ const { seedSources } = require('./collectors');
 const { describeHealth } = require('./source-health');
 const { countExpiring, getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
 const exportMarkdown = require('./export/markdown');
+const { encodeWordDocument } = require('./export/word');
+const reports = require('./ai/reports');
 const { buildDailyBundle, serializeJsonl } = require('./archive/daily-bundle');
 const {
   runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus
@@ -575,14 +577,23 @@ const server = http.createServer(async (req, res) => {
           version: packageJson.version,
           homepage: packageJson.homepage
         };
-        if (request.kind === 'daily') {
-          const report = getDaily(request.date);
+        if (request.kind !== 'feed') {
+          let report;
+          try {
+            report = request.kind === 'daily' ? getDaily(request.date) : reports.generatePeriod(request.kind, request.key);
+          } catch (error) {
+            if (error?.status === 400) throw new HttpError(400, error.message);
+            throw error;
+          }
+          const label = { daily: '日报', weekly: '周报', monthly: '月报' }[request.kind];
+          const content = exportMarkdown.renderDaily(report, branding);
           return json(res, 200, {
             filename: exportMarkdown.exportFilename(
-              `${packageJson.productName}-情报日报`, report.date, request.format),
-            count: report.total,
+              `${packageJson.productName}-情报${label}`, report.date || report.key, request.format),
+            count: report.total ?? report.totals.featured,
             format: request.format,
-            content: exportMarkdown.renderDaily(report, branding)
+            ...(request.format === 'doc' ? { encoding: 'base64', mimeType: 'application/msword' } : {}),
+            content: request.format === 'doc' ? encodeWordDocument(content).toString('base64') : content
           });
         }
         const { view, search } = request.feed;

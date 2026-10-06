@@ -44,7 +44,7 @@ function makeGuard() {
 // 与 format-utils 相同的本地日历工具（行为级等价，直接引用真模块）
 const format = require('../renderer/format-utils');
 
-function createController({ report = 'fail', regen = 'ok', guard = makeGuard() } = {}) {
+function createController({ report = 'fail', regen = 'ok', guard = makeGuard(), apiImpl } = {}) {
   const listeners = {};
   const elements = {
     body: { innerHTML: '', addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn); } },
@@ -56,6 +56,7 @@ function createController({ report = 'fail', regen = 'ok', guard = makeGuard() }
     overview: { attributes: {}, setAttribute(k, v) { this.attributes[k] = v; } },
     copy: { disabled: false },
     exportButton: { disabled: false },
+    periods: { querySelectorAll: () => [], addEventListener: (t, fn) => { elements.periodClick = fn; } },
     prev: { addEventListener: (t, fn) => { elements.prevClick = fn; } },
     next: { addEventListener: (t, fn) => { elements.nextClick = fn; } },
     regen: { disabled: false, classes: new Set(),
@@ -69,6 +70,7 @@ function createController({ report = 'fail', regen = 'ok', guard = makeGuard() }
   const ctrl = createDailyViewController({
     api: async (url, opts) => {
       requests.push([url, opts]);
+      if (apiImpl) return apiImpl(url, opts);
       if (url.startsWith('/api/daily/regenerate')) {
         if (regen === 'fail') throw new Error('生成失败');
         return {};
@@ -112,7 +114,7 @@ test('加载日报渲染分区与条目，落 state 与日期栏', async () => {
   assert.equal(elements.date.textContent, '2026 / 08 / 08');
   assert.match(elements.body.innerHTML, /daily-section glass/);
   assert.match(elements.body.innerHTML, /safe:u/);
-  assert.match(elements.sub.textContent, /^生成于 /);
+  assert.equal(elements.sub.textContent, '');
   assert.doesNotMatch(elements.sub.textContent, /条精选|低空经济|商业航天/, '概况文字不重复独立统计');
   assert.deepEqual(elements.metricValues.map(node => node.textContent), ['2', '1', '1']);
   assert.equal(elements.overview.attributes['aria-busy'], 'false');
@@ -172,6 +174,7 @@ test('shiftDaily 向前翻并持久化，向后越过今天则不动', async () 
 
 test('重新生成失败 toast 文案并复原按钮', async () => {
   const { ctrl, toasts, elements } = createController({ report: SAMPLE, regen: 'fail' });
+  await ctrl.loadDaily('2026-08-08');
   await elements.regenClick();
   assert.deepEqual(toasts, [['日报重新生成失败：生成失败', true]]);
   assert.equal(elements.regen.disabled, false);
@@ -179,7 +182,64 @@ test('重新生成失败 toast 文案并复原按钮', async () => {
 
 test('重新生成成功后 toast 并重载当日日报', async () => {
   const env = createController({ report: SAMPLE });
+  await env.ctrl.loadDaily('2026-08-08');
   await env.elements.regenClick();
   assert.ok(env.toasts.some(([m]) => m === '日报已重新生成'));
   assert.ok(env.requests.some(([url]) => url === '/api/daily/regenerate'));
+});
+
+function periodResponse(kind, key = kind === 'weekly' ? '2025-W03' : '2025-01') {
+  return { keys: [key], report: { kind, key, label: key, finished: true, totals: { featured: 1, stories: 2, deals: 3 }, sections: [] } };
+}
+const choose = (env, kind) => env.elements.periodClick({ target: { closest: () => ({ dataset: { period: kind } }) } });
+
+for (const kind of ['weekly', 'monthly']) test(`${kind} keeps all actions enabled and regenerates the selected issue`, async () => {
+  const env = createController({ apiImpl: async url => url.includes('/regenerate') ? {} : periodResponse(kind) });
+  await choose(env, kind);
+  const key = periodResponse(kind).report.key;
+  assert.deepEqual(env.ctrl.getSelection(), { kind, key });
+  assert.equal(env.elements.copy.textContent, kind === 'weekly' ? '复制周报' : '复制月报');
+  assert.equal(env.elements.copy.disabled, false);
+  assert.equal(env.elements.exportButton.disabled, false);
+  assert.equal(env.elements.regen.disabled, false);
+  await env.elements.regenClick();
+  assert.deepEqual(env.requests.find(([url]) => url === '/api/reports/regenerate')[1].body, { kind, key });
+  assert.ok(env.toasts.some(([text]) => text === `${kind === 'weekly' ? '周报' : '月报'}已重新生成`));
+});
+
+test('switching periods during regeneration cannot reload or overwrite the newly selected report', async () => {
+  let finish;
+  const env = createController({ apiImpl: async url => {
+    if (url.includes('/regenerate')) return new Promise(resolve => { finish = resolve; });
+    return periodResponse(new URL(url, 'http://localhost').searchParams.get('kind'));
+  } });
+  await choose(env, 'weekly');
+  const pending = env.elements.regenClick();
+  await choose(env, 'monthly');
+  const before = env.requests.length;
+  finish({}); await pending;
+  assert.equal(env.requests.length, before, 'old regeneration must not start a fresh load');
+  assert.deepEqual(env.ctrl.getSelection(), { kind: 'monthly', key: '2025-01' });
+  assert.equal(env.elements.date.textContent, '2025-01');
+});
+
+test('report actions reject regeneration while a load has no current selection', async () => {
+  const env = createController({ report: SAMPLE });
+  await env.elements.regenClick();
+  assert.equal(env.requests.length, 0);
+  const pending = env.ctrl.loadDaily('2026-08-08');
+  assert.equal(env.ctrl.getSelection(), null);
+  assert.equal(env.elements.regen.disabled, true);
+  await pending;
+});
+
+test('a report that fails during rendering clears its export selection and disables actions', async () => {
+  const report = JSON.parse(JSON.stringify(SAMPLE));
+  report.report.sections = '损坏的缓存结构';
+  const env = createController({ report });
+  await env.ctrl.loadDaily('2026-08-08');
+  assert.equal(env.ctrl.getSelection(), null);
+  assert.equal(env.elements.copy.disabled, true);
+  assert.equal(env.elements.exportButton.disabled, true);
+  assert.equal(env.elements.regen.disabled, true);
 });

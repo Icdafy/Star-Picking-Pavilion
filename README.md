@@ -2,28 +2,28 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.14 · 统一页头与紧凑工作区
+## v0.2.15 · 情报日志与文件导出
 
-- 热点、情报日志补齐统一页头，与精选、全部动态、星标、一级市场等页面使用同样的栏目、标题、说明和星轨装饰。
-- 报告概况收紧上下留白、缩小日期字号，日期和生成信息与三项统计整齐对齐，窄窗口自然分行，移除重复统计文字。
-- 一级市场六个分区等宽排列，用途说明与领域、时间、标的范围、搜索分层展示；支持方向键移动焦点、Enter / Space 激活，不适用的时间条件显示范围说明。
-- 日报、周报、月报切换与复制、导出、重新生成保留；文字和星轨动效继续支持低功耗、减少动画及后台暂停。
+- 报告概况保持原横幅尺寸，日期居中放大，删除“生成于”时间；统计、状态与日期／期号导航保留。
+- 日报、周报、月报均支持复制与重新生成，按钮和操作使用当前选中的日期或期号。
+- “导出文件”下拉提供 `.md`、`.doc`，导出本期完整内容；Word 使用原生二进制格式，生成与下载均在本机完成，无需安装 Office。
+- 下拉菜单支持键盘、Escape 和外部点击关闭；文字和星轨动效继续支持低功耗、减少动画及后台暂停。
 - 深浅主题、窄窗口、界面缩放与键盘操作继续适用；原有情报、星标、归档、模型密钥和个人设置保留。
 - 应用内更新日志与 GitHub 发布说明同步，无新增运行依赖、脚本标签或动画关键帧。
 
-版本、界面与更新元数据统一为 0.2.14，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0214-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.15，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0215-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.14.exe`，双击并按向导安装。v0.2.14 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.15.exe`，双击并按向导安装。v0.2.15 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.14.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.15.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -41,7 +41,7 @@ Get-Content .\SHA256SUMS.txt
 - SQLite FTS5 全文检索（含中文标题、实体与主体公司）
 - 日报、周报、月报，实时增量提示与可选的 08:00 自动保存研究归档
 - 星标留存与「星标」视图，收藏的情报永久豁免数据保留清理
-- 日报与信息流可复制为纯文本、导出为 Markdown，单条可复制标题与链接
+- 日报、周报、月报可复制为纯文本、导出为 Markdown 或 Word（.doc）；信息流可复制为纯文本、导出为 Markdown，单条可复制标题与链接
 - RSS、网页、公开 API 与 RSSHub 信源管理
 - 可选的 AI 判断与写作（V4.1 Flash 图文分析，支持提供该模型的兼容服务）；无密钥时整条链降级为词库启发式，热点、公司与融资抽取照常可用
 - 付费调用回执复用与每小时 / 每天预算熔断；`npm run eval:selection` 用自标注样本校准门槛

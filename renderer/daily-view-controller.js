@@ -24,20 +24,26 @@
     // v0.2.0：日报之外还有周报、月报（刊期不写入偏好，每次进入默认看日报）
     const period = { kind: 'daily', keys: { weekly: null, monthly: null }, lists: { weekly: [], monthly: [] } };
     const names = { daily: '日报', weekly: '周报', monthly: '月报' };
+    let selection = null;
+    let regenerating = false;
     const metricNames = () => period.kind === 'daily' ? ['精选情报', '低空经济', '商业航天'] : ['精选情报', '热点事件', '资本事件'];
 
     function reportLoading() {
+      selection = null;
+      elements.exportMenu?.hidePopover?.();
       elements.overview?.setAttribute('aria-busy', 'true');
       elements.date.textContent = `正在读取${names[period.kind]}…`;
       elements.sub.textContent = '正在读取本期报告…';
       if (elements.reportState) elements.reportState.textContent = '正在读取';
       metricNames().forEach((label, i) => { if (elements.metricLabels?.[i]) elements.metricLabels[i].textContent = label; });
       for (const node of elements.metricValues || []) node.textContent = '–';
-      for (const node of [elements.prev, elements.next, elements.copy, elements.exportButton]) if (node) node.disabled = true;
+      for (const node of [elements.prev, elements.next, elements.copy, elements.exportButton, elements.regen]) if (node) node.disabled = true;
     }
 
     function reportReady(report) {
       const daily = period.kind === 'daily';
+      selection = daily ? { kind: 'daily', date: report.date } : { kind: period.kind, key: report.key };
+      elements.sub.textContent = '';
       const labels = metricNames();
       const values = daily ? [report.total, report.byDomain.lowaltitude, report.byDomain.aerospace]
         : [report.totals.featured, report.totals.stories, report.totals.deals];
@@ -47,12 +53,15 @@
       });
       if (elements.reportState) elements.reportState.textContent = daily ? '日报' : report.finished ? '已定稿' : '本期进行中';
       elements.overview?.setAttribute('aria-busy', 'false');
-      for (const node of [elements.copy, elements.exportButton]) if (node) node.disabled = !daily;
+      for (const node of [elements.copy, elements.exportButton]) if (node) node.disabled = false;
+      if (elements.regen) elements.regen.disabled = regenerating;
       if (elements.prev) elements.prev.disabled = !daily && period.lists[period.kind].indexOf(report.key) >= period.lists[period.kind].length - 1;
       if (elements.next) elements.next.disabled = daily ? report.date >= localDateString() : period.lists[period.kind].indexOf(report.key) <= 0;
     }
 
     function reportFailed() {
+      selection = null;
+      for (const node of [elements.copy, elements.exportButton, elements.regen]) if (node) node.disabled = true;
       elements.overview?.setAttribute('aria-busy', 'false');
       elements.date.textContent = `${names[period.kind]}暂不可用`;
       elements.sub.textContent = '报告未能加载，可在下方重试。';
@@ -65,10 +74,11 @@
         button.classList.toggle('active', on);
         button.setAttribute('aria-pressed', String(on));
       }
-      // 复制与导出目前只覆盖日报
-      for (const control of [elements.copy, elements.exportButton, elements.regen]) {
-        if (control) control.hidden = period.kind !== 'daily';
+      if (elements.copy) {
+        elements.copy.textContent = `复制${names[period.kind]}`;
+        elements.copy.title = `把整份${names[period.kind]}复制成纯文本，直接贴进微信群或邮件`;
       }
+      if (elements.exportButton) elements.exportButton.title = `把整份${names[period.kind]}存成文件`;
       if (elements.schedule) elements.schedule.textContent = { daily: '每日 08:00 出刊', weekly: '每周一出刊', monthly: '每月 1 日出刊' }[period.kind];
       elements.prev?.setAttribute?.('aria-label', period.kind === 'daily' ? '前一天' : '前一期');
       elements.next?.setAttribute?.('aria-label', period.kind === 'daily' ? '后一天' : '后一期');
@@ -89,7 +99,8 @@
         period.keys[kind] = r.key;
         period.lists[kind] = data.keys || [];
         elements.date.textContent = r.label;
-        elements.sub.textContent = `生成于 ${new Date(r.generatedAt).toLocaleString('zh-CN')}`;
+        const range = /^(.*?)(（.*）)$/.exec(r.label);
+        if (range) elements.date.innerHTML = `${esc(range[1])} <span class="daily-date-range">${esc(range[2])}</span>`;
         reportReady(r);
         const html = render ? render.issueBlocks(r) : '';
         body.innerHTML = html || `<div class="empty-state glass"><div class="es-icon">尚 无 刊 期</div><p>这一期还没有可收录的精选与热点。</p></div>`;
@@ -122,8 +133,6 @@
         state.dailyDate = r.date;
         state.dailyDates = data.dates;
         elements.date.textContent = r.date.replace(/-/g, ' / ');
-        elements.sub.textContent =
-          `生成于 ${new Date(r.generatedAt).toLocaleTimeString('zh-CN')}`;
         reportReady(r);
         const before = render ? render.issueBlocks(r, { parts: ['lead', 'hot'] }) : '';
         const after = render ? render.issueBlocks(r, { parts: ['deals', 'portfolio', 'companies', 'breakthroughs'] }) : '';
@@ -168,7 +177,7 @@
       const button = event.target.closest('[data-period]');
       if (!button || !['daily', 'weekly', 'monthly'].includes(button.dataset.period)) return;
       period.kind = button.dataset.period;
-      reload();
+      return reload();
     });
 
     // 周报、月报按期号前后翻：期号列表由服务端给出（新 → 旧）
@@ -177,42 +186,48 @@
       const index = list.indexOf(period.keys[period.kind]);
       const next = list[index - step];
       if (index < 0 || !next) return;
-      loadPeriod(period.kind, next);
+      return loadPeriod(period.kind, next);
     }
 
     function shiftDaily(days) {
-      if (period.kind !== 'daily') { shiftPeriod(days); return; }
+      if (period.kind !== 'daily') return shiftPeriod(days);
       const cur = state.dailyDate ? parseLocalDate(state.dailyDate) : new Date();
       cur.setDate(cur.getDate() + days);
       const d = localDateString(cur);
       if (d > localDateString()) return;
       state.dailyDate = d;
       preferenceActions.remember('dailyDate', d);
-      loadDaily(d);
+      return loadDaily(d);
     }
 
     if (elements.prev) elements.prev.addEventListener('click', () => shiftDaily(-1));
     if (elements.next) elements.next.addEventListener('click', () => shiftDaily(1));
     if (elements.regen) {
       elements.regen.addEventListener('click', async () => {
+        if (!selection || regenerating) return;
+        const target = { ...selection };
+        const label = names[target.kind];
         const btn = elements.regen;
+        regenerating = true;
         btn.disabled = true;
         btn.classList.add('is-busy');
         try {
-          await api('/api/daily/regenerate', { body: { date: state.dailyDate } });
-          toast('日报已重新生成');
-          loadDaily(state.dailyDate);
+          await api(target.kind === 'daily' ? '/api/daily/regenerate' : '/api/reports/regenerate',
+            { body: target.kind === 'daily' ? { date: target.date } : { kind: target.kind, key: target.key } });
+          toast(`${label}已重新生成`);
+          if (selection && JSON.stringify(selection) === JSON.stringify(target)) await reload();
         } catch (error) {
-          toast('日报重新生成失败：' + error.message, true);
+          toast(`${label}重新生成失败：` + error.message, true);
         } finally {
-          btn.disabled = false;
+          regenerating = false;
+          btn.disabled = !selection;
           btn.classList.remove('is-busy');
         }
       });
     }
 
     syncPeriodSwitch();
-    return Object.freeze({ loadDaily, shiftDaily, reload });
+    return Object.freeze({ loadDaily, shiftDaily, reload, getSelection: () => selection && { ...selection } });
   }
 
   return Object.freeze({ createDailyViewController });

@@ -1,14 +1,15 @@
 'use strict';
-// 情报导出 —— 把日报和信息流渲染成可以直接贴进微信群、周报或笔记的文本。
+// 情报导出 —— 日报、周报、月报和信息流的完整内容与安全原文链接。
 // 纯函数，不碰数据库：调用方负责取数，这里只负责排版，因此可以逐条断言。
 //
-// 两种格式共用同一份结构（标题 / 概要 / 分组 / 条目），只在序列化时分叉：
+// 共用同一份结构（标题 / 概要 / 分组 / 条目），只在序列化时分叉：
 //   markdown —— 保留链接语法与层级，适合贴进 Markdown 笔记与仓库
 //   text     —— 纯文本，链接单独成行，适合贴进微信群与邮件
+//   doc      —— 同一份纯文本交给 word.js 编码成 Word 二进制文档
 
 const DOMAIN_NAMES = { lowaltitude: '低空经济', aerospace: '商业航天' };
 const EXPORT_VERSION = require('../../package.json').version;
-const FORMATS = new Set(['markdown', 'text']);
+const FORMATS = new Set(['markdown', 'text', 'doc']);
 // 只转义行内有语义的字符：标题里出现 [] 或 * 时不转义会把链接和强调撑破，
 // 而 # - . 之类只在行首有语义，本模块每一行都自带前缀（`# `/`> `/`N. `/`   - `），
 // 连带转义它们只会把 2026-07-25 写成 2026\-07\-25，白白劣化可读性。
@@ -70,13 +71,13 @@ function describeEntry(item) {
   if (domain) parts.push(domain);
   const category = flatten(item.category);
   if (category) parts.push(category);
-  const quality = Number(item.quality ?? item.quality_score);
+  const quality = Number(item.quality ?? item.quality_score ?? item.score);
   if (Number.isFinite(quality)) parts.push(`质量分 ${Math.round(quality)}`);
-  const clusterSize = Number(item.clusterSize ?? item.cluster_size);
+  const clusterSize = Number(item.clusterSize ?? item.cluster_size ?? item.storySize);
   if (Number.isFinite(clusterSize) && clusterSize > 1) {
     parts.push(`${clusterSize} 篇关联报道`);
   }
-  const breakthroughBonus = Number(item.breakthroughBonus ?? item.breakthrough_bonus);
+  const breakthroughBonus = Number(item.breakthroughBonus ?? item.breakthrough_bonus ?? item.breakthroughScore);
   if (Number.isFinite(breakthroughBonus) && breakthroughBonus > 0) {
     parts.push(`技术突破 +${Math.round(breakthroughBonus * 10) / 10}`);
   }
@@ -86,7 +87,7 @@ function describeEntry(item) {
 }
 
 function entryLines(item, index, format) {
-  const title = flatten(item.title) || '（无标题）';
+  const title = flatten(item.titleZh || item.title_zh || item.title) || '（无标题）';
   const url = markdownLinkTarget(item.url);
   const plainUrl = safeUrl(item.url);
   const meta = describeEntry(item).join(' · ');
@@ -157,10 +158,38 @@ function footerLine({ productName, homepage } = {}) {
 function renderDaily(report, options = {}) {
   const format = normalizeFormat(options.format);
   const name = flatten(options.productName) || '摘星阁';
-  const sections = Array.isArray(report?.sections) ? report.sections : [];
+  const sections = [];
+  const kind = report?.kind || 'daily';
+  const label = { daily: '日报', weekly: '周报', monthly: '月报' }[kind] || '日报';
+  if (report?.lead) sections.push({ title: report.leadSource === 'model' ? '主编导语' : '本期概览', items: [{ title: report.lead }] });
+  if (report?.hot?.length) sections.push({ title: '热点事件', items: report.hot.map(hot => ({
+    title: hot.title, url: hot.representative?.url, domain: hot.domain,
+    source: (hot.sources || []).join('、'),
+    summary: [hot.digest, `${hot.participants || 0} 个独立信源 · ${hot.reports || 0} 篇报道`].filter(Boolean).join(' · ')
+  })) });
+  for (const section of Array.isArray(report?.sections) ? report.sections : []) {
+    sections.push({ title: flatten(section?.category), items: Array.isArray(section?.items) ? section.items : [] });
+  }
+  if (report?.deals?.length) sections.push({ title: '一级市场 · 融资与资本事件', items: report.deals.map(deal => ({
+    title: `${deal.companyName || '未披露公司'} · ${deal.round || '未披露轮次'}`,
+    url: deal.article?.url || deal.url, source: deal.article?.source, domain: deal.domain,
+    summary: [deal.amountText, deal.date && `日期 ${deal.date}`, deal.investors?.length && `投资方：${deal.investors.join('、')}`,
+      deal.leadInvestors?.length && `领投方：${deal.leadInvestors.join('、')}`, deal.status].filter(Boolean).join(' · ')
+  })) });
+  if (report?.deals?.length && report?.investors?.length) sections.push({ title: '活跃机构', items: report.investors.map(investor => ({
+    title: investor.name, summary: `${investor.deals || 0} 起资本事件 · ${investor.leads || 0} 次领投`
+  })) });
+  for (const company of report?.portfolio || []) sections.push({
+    title: `我的关注 · ${company.name}（${Number(company.watch) === 2 ? '被投' : '关注'}）`, items: company.items || []
+  });
+  if (report?.companies?.length) sections.push({ title: '公司声量榜', items: report.companies.slice(0, 12).map(company => ({
+    title: company.name, domain: company.domain,
+    summary: `${company.participants || 0} 个信源 · ${company.reports || 0} 篇 · 精选 ${company.featured || 0} 条`
+  })) });
+  if (report?.breakthroughs?.length) sections.push({ title: '技术突破', items: report.breakthroughs });
   const byDomain = report?.byDomain || {};
   const summary = [
-    `共 ${Number(report?.total) || 0} 条精选`
+    `共 ${Number(report?.total ?? report?.totals?.featured) || 0} 条精选`
     + ` · 低空经济 ${Number(byDomain.lowaltitude) || 0} 条`
     + ` · 商业航天 ${Number(byDomain.aerospace) || 0} 条`
   ];
@@ -168,13 +197,10 @@ function renderDaily(report, options = {}) {
   if (generatedAt) summary.push(`生成于 ${generatedAt}`);
 
   return serialize({
-    title: `${name} · 情报日报 ${flatten(report?.date)}`,
+    title: `${name} · 情报${label} ${flatten(kind === 'daily' ? report?.date : report?.label || report?.key)}`,
     summary,
-    sections: sections.map(section => ({
-      title: flatten(section?.category),
-      items: Array.isArray(section?.items) ? section.items : []
-    })),
-    emptyHint: '该日期没有达到精选阈值的情报。',
+    sections,
+    emptyHint: kind === 'daily' ? '该日期没有达到精选阈值的情报。' : '本期没有达到精选阈值的情报。',
     footer: footerLine(options)
   }, format);
 }
@@ -245,7 +271,7 @@ function renderArticles(items, options = {}) {
 function exportFilename(label, stamp, format) {
   const safeLabel = flatten(label).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-') || 'export';
   const safeStamp = flatten(stamp).replace(/[^0-9A-Za-z-]/g, '');
-  const extension = normalizeFormat(format) === 'markdown' ? 'md' : 'txt';
+  const extension = { markdown: 'md', text: 'txt', doc: 'doc' }[normalizeFormat(format)];
   return `${[safeLabel, safeStamp].filter(Boolean).join('-')}.${extension}`;
 }
 

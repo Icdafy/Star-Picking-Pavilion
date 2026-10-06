@@ -1,3 +1,9 @@
+# v0.2.15 发布状态
+
+情报日志日期居中放大、三种刊期共享操作与 .md／原生 .doc 导出已实现。正在执行本地完整回归和既有 GitHub 发布门禁；正式 Release 与六资产核验尚未完成。详见 [本版验证](docs/v0215-validation.md)。
+
+---
+
 # v0.2.14 发布状态
 
 无发布阻塞。[v0.2.14](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.14) 已为最新正式版；精确产品提交 `5979a49e6f57f7e1e42fd135c394b655fff0a8b9` 的 main 与 Release 完整门禁首次通过，892 单元、21 桌面（160 布局）、0 生产漏洞、1273 包边界与一次性 Windows 安装／卸载验证成功。六附件的摘要、PE 版本、更新元数据及发布后实网同步／离线恢复均核验一致。

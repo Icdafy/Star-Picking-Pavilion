@@ -9,7 +9,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.ExportController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createExportControllerModule() {
-  function createExportController({ api, toast, state, navigator, document, elements = {} } = {}) {
+  function createExportController({ api, toast, state, navigator, document, elements = {}, getReportSelection = null } = {}) {
     if (typeof api !== 'function' || typeof toast !== 'function' || !state || !navigator || !document) {
       throw new TypeError('export controller requires api, toast, state, navigator and document dependencies');
     }
@@ -37,9 +37,10 @@
 
     // 内容安全策略是 default-src 'self'，因此不能借助任何外部服务落盘；
     // blob: 由页面自己生成，配合 a[download] 完成一次纯本地的另存为。
-    function downloadText(filename, text) {
+    function downloadText(filename, text, { encoding, mimeType } = {}) {
       // 带 BOM：Windows 记事本按 UTF-8 打开中文，不会显示成乱码
-      const blob = new Blob([`\ufeff${text}`], { type: 'text/plain;charset=utf-8' });
+      const content = encoding === 'base64' ? Uint8Array.from(atob(text), byte => byte.charCodeAt(0)) : `\ufeff${text}`;
+      const blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -53,7 +54,11 @@
     function exportParams(kind, format) {
       const params = new URLSearchParams({ kind, format });
       if (kind === 'daily') {
-        if (state.dailyDate) params.set('date', state.dailyDate);
+        const report = getReportSelection ? getReportSelection() : { kind: 'daily', date: state.dailyDate };
+        if (!report) throw new Error('请等待本期报告加载完成');
+        params.set('kind', report.kind);
+        if (report.kind === 'daily' && report.date) params.set('date', report.date);
+        else if (report.key) params.set('key', report.key);
         return params;
       }
       params.set('view', state.view);
@@ -71,7 +76,7 @@
           toast(copied ? `已复制 ${result.count} 条到剪贴板` : '复制失败，请手动选择文本', !copied);
           return;
         }
-        downloadText(result.filename, result.content);
+        downloadText(result.filename, result.content, result);
         toast(`已导出 ${result.count} 条到 ${result.filename}`);
       } catch (error) {
         toast('导出失败：' + error.message, true);
@@ -81,7 +86,12 @@
     if (elements.btnCopyFeed) elements.btnCopyFeed.addEventListener('click', () => runExport('feed', 'text', 'copy'));
     if (elements.btnExportFeed) elements.btnExportFeed.addEventListener('click', () => runExport('feed', 'markdown', 'download'));
     if (elements.btnCopyDaily) elements.btnCopyDaily.addEventListener('click', () => runExport('daily', 'text', 'copy'));
-    if (elements.btnExportDaily) elements.btnExportDaily.addEventListener('click', () => runExport('daily', 'markdown', 'download'));
+    elements.dailyExportMenu?.addEventListener('click', event => {
+      const button = event.target.closest('[data-report-format]');
+      if (!button || !['markdown', 'doc'].includes(button.dataset.reportFormat)) return;
+      elements.dailyExportMenu.hidePopover();
+      return runExport('daily', button.dataset.reportFormat, 'download');
+    });
 
     return Object.freeze({ copyText, downloadText, exportParams, runExport });
   }

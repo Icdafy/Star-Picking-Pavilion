@@ -9,8 +9,8 @@ const SOURCE_TIERS = new Set(['T1', 'T1.5', 'T2']);
 const SOURCE_DOMAINS = new Set(['both', 'lowaltitude', 'aerospace']);
 const FEED_VIEWS = new Set(['featured', 'all', 'starred']);
 const FEED_DOMAINS = new Set(['lowaltitude', 'aerospace']);
-const EXPORT_KINDS = new Set(['daily', 'feed']);
-const EXPORT_FORMATS = new Set(['markdown', 'text']);
+const EXPORT_KINDS = new Set(['daily', 'weekly', 'monthly', 'feed']);
+const EXPORT_FORMATS = new Set(['markdown', 'text', 'doc']);
 
 function badRequest(message) {
   throw new HttpError(400, message);
@@ -146,6 +146,12 @@ function parseExportQuery(query, categories) {
   const format = query.get('format') || 'markdown';
   if (!EXPORT_FORMATS.has(format)) badRequest('不支持的导出格式');
   if (kind === 'daily') return { kind, format, date: sanitizeDate(query.get('date')) };
+  if (kind === 'weekly' || kind === 'monthly') {
+    const key = query.get('key') || null;
+    if (key && !(kind === 'weekly' ? /^\d{4}-W\d{2}$/ : /^\d{4}-\d{2}$/).test(key)) badRequest('期号无效');
+    return { kind, format, key };
+  }
+  if (format === 'doc') badRequest('信息流导出格式须为 markdown 或 text');
   return { kind, format, feed: parseFeedQuery(query, categories) };
 }
 

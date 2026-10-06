@@ -205,6 +205,15 @@ async function handleIntelRoute({ req, res, url, json, readJsonBody, queryFeed }
     return true;
   }
 
+  if (p === '/api/reports/regenerate' && method === 'POST') {
+    const body = await readJsonBody(req);
+    if (!['weekly', 'monthly'].includes(body?.kind)) throw new HttpError(400, '刊期类型须为 weekly 或 monthly');
+    if (typeof body.key !== 'string' || !(body.kind === 'weekly' ? /^\d{4}-W\d{2}$/ : /^\d{4}-\d{2}$/).test(body.key)) throw new HttpError(400, '期号无效');
+    const report = await guard(() => reports.generatePeriod(body.kind, body.key, { overwrite: true }));
+    json(res, 200, { report });
+    return true;
+  }
+
   if (p === '/api/industry' && method === 'GET') {
     json(res, 200, industryInfo());
     return true;

@@ -39,7 +39,7 @@ test('native workspace banners, compact journal, market filters and motion prefe
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.waitForFunction(() => document.documentElement.dataset.fxTier !== 'static');
   await page.waitForFunction(() => document.hasFocus());
-  const shots = path.join(root, 'work/v0214/screenshots');
+  const shots = path.join(root, 'work/v0215/workspace-regression-screenshots');
   fs.mkdirSync(shots, { recursive: true });
   const titles = { featured: '精选情报', all: '让每一条信号，都进入视野', starred: '摘下的星，留给下一次判断',
     capital: '一级市场雷达', releases: '每一次进步，都有迹可循', links: '常用网址，即刻可达',
@@ -77,7 +77,7 @@ test('native workspace banners, compact journal, market filters and motion prefe
     assert.deepEqual(layout, { periods: true, actions: true, below: true, separate: true });
     const overview = await page.locator('.daily-head').boundingBox();
     assert.ok(overview.height <= (width === 1440 ? 115 : 180), `compact overview at ${width}: ${overview.height}px`);
-    assert.match(await page.locator('#dailySub').textContent(), /^生成于 /);
+    assert.equal(await page.locator('#dailySub').textContent(), '');
     assert.doesNotMatch(await page.locator('#dailySub').textContent(), /条精选|低空经济|商业航天/);
     overviewGeometry.push({ width, theme, height: overview.height });
     await page.screenshot({ path: path.join(shots, `daily-${width}-${theme}.png`) });
@@ -90,7 +90,7 @@ test('native workspace banners, compact journal, market filters and motion prefe
     const filters = await page.locator('.intel-filters').boundingBox(), tabRow = await page.locator('#capitalTabs').boundingBox();
     assert.ok(filters.y > tabRow.y + tabRow.height, 'filters must sit below market navigation');
   }
-  fs.writeFileSync(path.join(root, 'work/v0214/overview-geometry.json'), JSON.stringify(overviewGeometry, null, 2));
+  fs.writeFileSync(path.join(root, 'work/v0215/workspace-overview-geometry.json'), JSON.stringify(overviewGeometry, null, 2));
   // Manual tab activation keeps remote content stable while keyboard focus moves.
   await page.locator('#capitalTab-overview').focus();
   await page.keyboard.press('ArrowRight');
@@ -138,9 +138,9 @@ test('native workspace banners, compact journal, market filters and motion prefe
     await page.waitForFunction(() => document.querySelector('.daily-head').getAttribute('aria-busy') === 'false');
     assert.equal(await page.locator(`#periodSwitch [data-period="${kind}"]`).getAttribute('aria-pressed'), 'true');
     assert.deepEqual(await page.locator('#dailyMetrics dt').allTextContents(), kind === 'daily' ? ['精选情报', '低空经济', '商业航天'] : ['精选情报', '热点事件', '资本事件']);
-    assert.equal(await page.locator('#btnCopyDaily').isVisible(), kind === 'daily');
-    assert.equal(await page.locator('#btnExportDaily').isVisible(), kind === 'daily');
-    assert.equal(await page.locator('#dailyRegen').isVisible(), kind === 'daily');
+    assert.equal(await page.locator('#btnCopyDaily').isVisible(), true);
+    assert.equal(await page.locator('#btnExportDaily').isVisible(), true);
+    assert.equal(await page.locator('#dailyRegen').isVisible(), true);
     assert.equal(await page.locator('#dailyPrev').getAttribute('aria-label'), kind === 'daily' ? '前一天' : '前一期');
     assert.match(await page.locator('#dailySchedule').textContent(), kind === 'daily' ? /08:00/ : kind === 'weekly' ? /每周一/ : /每月 1 日/);
     await page.screenshot({ path: path.join(shots, `journal-${kind}-800-dark.png`) });
