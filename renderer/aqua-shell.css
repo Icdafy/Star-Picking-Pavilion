@@ -383,8 +383,12 @@ body {
 }
 
 main { order: 5; width: 100%; }
-.rail-footer,
 .rail-section-label { display: none; }
+.rail-footer { order: 2; display: flex; align-items: center; gap: .7rem; width: min(var(--shell), calc(100% - 2 * var(--gutter))); margin: 0 auto; padding: .25rem var(--sp-7); color: var(--c-fg-dim); }
+.rail-footer-copy { display: flex; flex-direction: column; min-width: 0; }
+.rail-footer strong { font-size: var(--t-sm); font-weight: 650; white-space: nowrap; }
+.rail-footer small { color: var(--c-fg-faint); font-size: var(--t-xs); white-space: nowrap; }
+@media (max-width: 69.99rem) { .rail-footer:has(.update-pill[hidden]) { display: none; } }
 .tab-glyph { display: none; }
 
 /* ---------- 工作区页头：分层标题与轨道微动效 ---------- */
@@ -803,16 +807,16 @@ main { order: 5; width: 100%; }
 
   .rail-footer {
     order: 0;
+    width: 100%;
     display: flex;
     align-items: center;
-    gap: .7rem;
+    gap: .5rem;
     flex: 0 0 auto;
     margin-top: var(--sp-4);
-    padding: .75rem .65rem .15rem;
+    padding: .75rem 0 .15rem;
     border-top: 1px solid var(--rail-line);
     color: var(--c-fg-dim);
   }
-  .rail-footer > span:last-child { display: flex; flex-direction: column; min-width: 0; }
   .rail-footer strong { font-size: var(--t-sm); font-weight: 650; }
   .rail-footer small { color: var(--c-fg-faint); font-size: var(--t-xs); white-space: nowrap; }
   .rail-live-dot {

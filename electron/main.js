@@ -42,6 +42,7 @@ const {
 } = require('./appearance-wallpaper');
 const {
   createPublicUpdateSupport,
+  createUpdateCheckCoordinator,
   createUpdateInstallCoordinator,
   publicVersionFromPackage,
   publicVersionFromUpdateInfo
@@ -57,6 +58,7 @@ let latestUpdateStatus = null;
 let autoUpdateInitialized = false;
 let autoUpdateTimer = null;
 let updateInstallCoordinator = null;
+let updateCheckCoordinator = null;
 let backendReady = false;
 let quitAfterShutdown = false;
 let desktopShutdownPromise = null;
@@ -416,6 +418,13 @@ function setupAutoUpdate() {
     setQuitReady: ready => { quitAfterShutdown = ready; },
     reportStatus: sendUpdateStatus
   });
+  updateCheckCoordinator = createUpdateCheckCoordinator({
+    autoUpdater,
+    getStatus: () => latestUpdateStatus?.status,
+    reportStatus: sendUpdateStatus
+  });
+  autoUpdater.on('checking-for-update', () => sendUpdateStatus('checking'));
+  autoUpdater.on('update-not-available', () => sendUpdateStatus('current', { version: publicAppVersion }));
   autoUpdater.on('update-available', i => sendUpdateStatus('available', {
     version: publicVersionFromUpdateInfo(i)
   }));
@@ -432,14 +441,18 @@ function setupAutoUpdate() {
   }));
   // 之后每 6 小时再查一次
   autoUpdateTimer = setInterval(() => {
-    autoUpdater.checkForUpdates().catch(error => sendUpdateStatus('error', {
-      message: String(error?.message || error)
-    }));
+    updateCheckCoordinator.check();
   }, 6 * 3600 * 1000);
 }
 
+ipcMain.handle('update:check', event => {
+  if (event.sender !== win?.webContents) return { started: false, reason: 'forbidden' };
+  return updateCheckCoordinator?.check() || { started: false, reason: 'updater-unavailable' };
+});
+
 // 安装是终止应用的单向操作，使用 send/on 避免窗口销毁让 invoke Promise 误报失败。
-ipcMain.on('update:install', () => {
+ipcMain.on('update:install', event => {
+  if (event.sender !== win?.webContents) return;
   if (latestUpdateStatus?.status !== 'downloaded') return;
   updateInstallCoordinator?.install(latestUpdateStatus.version);
 });

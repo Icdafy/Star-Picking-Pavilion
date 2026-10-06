@@ -55,10 +55,7 @@
   --ease-out: cubic-bezier(.16, 1, .3, 1);
   --ease-spring: cubic-bezier(.34, 1.4, .44, 1);
 
-  /* —— v7 液态玻璃动效令牌 ——
-     时长补两档：snap 给开关/按压这类即时小反馈，glide 给浮层与光斑的大面积缓过渡。
-     弹性曲线三档按位移幅度分层：light 轻快微弹（胶囊、图标等小控件），
-     medium 标准液态弹（浮层悬停、玻璃基元的默认档），heavy 沉稳大弹性（大幅位移强调动画）。 */
+  /* —— v7 液态玻璃动效令牌 —— */
   --dur-snap: 160ms;
   --dur-glide: 280ms;
   --spring-light: cubic-bezier(.3, 1.2, .4, 1);
@@ -91,8 +88,7 @@
 [data-theme="dark"] {
   --c-bg: #04060e;
   --c-bg-deep: #02030a;
-  /* v0.2.3 可读性：正文说明原 #a9b5d4 在半透明玻璃与流体背景上偏灰，提到 #d3dbef；
-     辅助文字原 #7d8ab0 提到 #a8b3cf，深底上 ≥ 7:1 / ≥ 4.5:1 */
+  /* 深色玻璃上的正文与标签使用较亮墨色。 */
   --c-fg: #f3f6fe;
   --c-fg-dim: #d3dbef;
   --c-fg-faint: #a8b3cf;
@@ -196,8 +192,7 @@
 [data-theme="light"] {
   --c-bg: #f6f4ee;
   --c-bg-deep: #efece3;
-  /* v0.2.3 可读性：旧墨色 #1d2536 / #515c74 / #646e86 叠在半透明玻璃与暖色流体上发灰，
-     整体加深一档；12–14px 的标签大量使用 faint，取值在最浅的纸面上也 ≥ 7:1 */
+  /* 浅色玻璃上的正文与标签使用较深墨色。 */
   --c-fg: #0c1220;
   --c-fg-dim: #2c3548;
   --c-fg-faint: #465066;
@@ -282,11 +277,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* hidden 属性的 display:none 来自浏览器默认样式表，优先级最低——只要某个类规则
-   写了 display（本页有 .update-pill / .search-context / .tab-count / .lexicon-panel
-   四处），它就会被盖掉，于是「本该藏起来」的元素变成一个空盒子挂在界面上：
-   检索框左边一颗空胶囊、导航下一条空青条、星标标签后一个空角标。
-   在这里一次性兜住，比在每条规则后面各补一句 :not([hidden]) 可靠。 */
+/* 防止组件的 display 规则覆盖原生 hidden 状态。 */
 [hidden] { display: none !important; }
 
 /* 内容视口从原生标题栏下方开始。根窗口不滚动，右侧滚动条不再占用标题栏。 */
@@ -311,10 +302,7 @@ body {
 html { color-scheme: dark; scroll-behavior: smooth; }
 [data-theme="light"] { color-scheme: light; }
 
-/* 根字号是整套排版唯一的标尺。clamp 让它随窗口宽度在 15–18.5px 之间连续变化：
-   窄窗不至于挤，宽屏也不至于字小得散在一片留白里；再乘上用户选的档位
-   --ui-scale。因为字号、间距、圆角、栏宽全是 rem，这一个数变了，
-   整份界面是等比例缩放，而不是「字变大了但盒子没跟上」。 */
+/* 根字号是整套排版唯一的标尺。clamp 让它随窗口宽度在 15–18.5px 之间连续变化 */
 html {
   font-size: calc(clamp(15px, 14px + .15625vw, 18.5px) * var(--ui-scale));
 }
@@ -376,9 +364,7 @@ body {
 /* v6.5：禁用态统一用光标说「不可操作」，透明度与 pointer-events 由各组件自定 */
 button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; }
 
-/* v6.5：aria-pressed=true 的视觉兜底。:where 零特异性，已有选中态类名的
-   组件（.scale-option / .star-toggle.is-on / .chip.active 等）全部盖得过它，
-   只接住「脚本只写了 aria-pressed 没补类名」的场景 */
+/* :where 提供低优先级的按下态，保留组件自身的选中样式。 */
 :where([aria-pressed="true"]) {
   color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft);
 }
@@ -428,9 +414,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 @keyframes drift-a { to { transform: translate(-70px, 50px) scale(1.12); } }
 @keyframes drift-b { to { transform: translate(60px, -45px) scale(1.08); } }
 
-/* v5：偶发的流星。夜航氛围的最后一块拼图——不是持续存在的装饰，
-   而是「偶尔抬头正好看见」的那种东西：16 秒一轮，真正可见的窗口不到 2 秒。
-   只在深空主题出现；宣纸白是白天，白天没有流星。 */
+/* v5：偶发的流星。夜航氛围的最后一块拼图——不是持续存在的装饰 */
 .comet {
   position: absolute; top: 14%; left: 78%;
   width: 2px; height: 2px; border-radius: 50%;
@@ -468,10 +452,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 [data-theme="light"] .stars { display: none; }
 @keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
 
-/* v7 液态玻璃：氛围层的液态光斑——两枚缓漂的柔光团，给玻璃浮层提供
-   「可折射的光源」。用元素自身的 CSS filter 柔化，不占毛玻璃滤镜预算；
-   定位全部取 inset 安全的百分比，位移幅度小，不造成横向溢出。
-   动画仅此一组（blob-drift），两枚光斑错相复用。 */
+/* 两枚错相光斑共用 blob-drift；CSS filter 不增加背景滤镜层。 */
 .blob {
   position: absolute; border-radius: 50%;
   filter: blur(70px); will-change: transform;
@@ -494,9 +475,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   to { transform: translate3d(48px, -36px, 0) scale(1.12); }
 }
 
-/* v6.5：页面隐藏或失焦（document.hidden || !document.hasFocus()）时暂停
-   氛围层动画，class 由脚本阶段挂到 body；逐层声明而非暂停父级，
-   animation-play-state 不会从父元素继承 */
+/* 隐藏或失焦时逐个暂停氛围层；animation-play-state 不继承。 */
 body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .blob { animation-play-state: paused; }
 
 .grain {
@@ -520,14 +499,10 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
   }
 }
 
-/* ---------- 玻璃基元（浮层专用） ----------
-   v7 液态化：悬停时借 spring 曲线微浮起（仅 transform/box-shadow，
-   不触发布局）；::before 顶光升级为宽镜面光带，::after 补内顶光/边缘折射。 */
+/* ---------- 玻璃基元（浮层专用） ---------- */
 .glass {
   position: relative;
-  /* v0.2.3：自成层叠上下文，下面两枚装饰伪元素才能以 z-index:-1 退到文字之下。
-     此前它们是定位元素、默认画在正文之上：宣纸白的内顶光是 65% 白，
-     卡片上沿 1/4（品牌名、卡片标题、首行正文）整片被刷灰——「字不够深」的主因。 */
+  /* v0.2.3：自成层叠上下文，下面两枚装饰伪元素才能以 z-index:-1 退到文字之下。 */
   isolation: isolate;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
@@ -554,10 +529,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
 }
 
 /* ---------- 塔台状态栏 ---------- */
-/* 顶栏靠内容换行，而不是靠像素断点。放大缩放档位时窗口宽度没变、里面的东西
-   却大了一圈，写死 px 的断点这时候是不会触发的——于是「监控信源」这类标签会
-   被从中间断开成两行。让标签不许断词、顶栏允许换行，挤不下时整块下沉到次行，
-   任何档位下都成立。 */
+/* 顶栏随内容换行，宽度与交互目标使用 rem 随缩放同步变化。 */
 .tower {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-7);
   padding: var(--sp-5) var(--sp-7) var(--sp-3);
@@ -683,8 +655,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
    滚动正文之上的浮层，透过去就没法读了。与提报信源的对话框同样处理：给足底色。 */
 [data-theme="dark"] .lexicon-panel { background: linear-gradient(165deg, rgba(20,28,58,.97), rgba(10,16,38,.98)); }
 [data-theme="light"] .lexicon-panel { background: linear-gradient(168deg, rgba(255,255,255,.98), rgba(252,250,244,.97)); }
-/* v6：面板从顶栏下方浮出——与对话框同源的入场，收起仍是瞬时（Esc/外点不该拖泥带水）。
-   开合态走 .is-open 类（由 setLexiconOpen 维护），不写 :not([hidden]) 补丁规则 */
+/* v6：面板从顶栏下方浮出——与对话框同源的入场，收起仍是瞬时（Esc/外点不该拖泥带水）。 */
 .lexicon-panel.is-open { animation: none; }
 .lexicon-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
 .lexicon-head h3 {
@@ -786,10 +757,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
   background: linear-gradient(135deg, var(--accent-soft), transparent);
   color: var(--accent-ink); font-weight: 700;
 }
-/* v5：主按钮悬停时的缎面扫光——动作按钮里最重的那一档，
-   指尖扫过像绸面反了一下光。
-   v6.5：位移从 left 改为 transform（百分比折算到自身宽度：
-   left -70%/130% ≡ translateX(-156%)/289%），不再逐帧触发布局 */
+/* v5：主按钮悬停时的缎面扫光——动作按钮里最重的那一档 */
 .btn-primary::after {
   content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
   background: linear-gradient(100deg, transparent, var(--sheen), transparent);
@@ -1044,24 +1012,39 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .rt-toggle.active { color: var(--accent-ink); border-color: var(--accent-line); }
 .rt-toggle.active .rt-dot { background: var(--c-green); box-shadow: 0 0 8px var(--c-green); animation: pulse 2.2s ease-in-out infinite; }
 
-/* 自动更新提示胶囊 */
+/* 工作区更新按钮：SVG 定量环，未知进度复用 spin。 */
 .update-pill {
-  display: inline-flex; align-items: center; gap: .375rem;
-  font-family: var(--font-ui); font-size: var(--t-base); cursor: default;
-  padding: .5rem var(--sp-3); border-radius: 99px;
-  border: 1px solid var(--second-line); color: var(--second-ink);
-  background: linear-gradient(135deg, var(--second-soft), transparent);
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              background var(--dur) var(--ease), transform var(--dur-snap) var(--spring-light);
+  position: relative; display: grid; place-items: center; flex: 0 0 auto;
+  width: 2.75rem; height: 2.75rem; margin-left: auto; padding: 0; border-radius: 50%;
+  border: 1px solid var(--accent-line); color: var(--accent-ink); cursor: pointer;
+  background: linear-gradient(145deg, var(--glass-bg-deep), var(--accent-soft));
+  box-shadow: inset 0 1px 0 var(--sheen), 0 2px 8px var(--accent-ring);
+  transition: transform 240ms var(--spring-light), box-shadow 240ms var(--ease), color 180ms var(--ease), border-color 180ms var(--ease);
 }
-.update-pill.ready {
-  cursor: pointer; font-weight: 700;
-  border-color: var(--flag-line); color: var(--flag-ink);
-  background: var(--pill-feat-bg);
-  animation: pulse 2.2s ease-in-out infinite;
-}
-.update-pill.ready:hover { transform: translateY(-1px); }
+.update-pill:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 var(--sheen), 0 4px 14px var(--accent-ring); }
+.update-pill:active { transform: scale(.94); }
+.update-pill[aria-disabled="true"] { cursor: progress; transform: none; }
+.update-ring { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 2.2; transform: rotate(-90deg); }
+.update-track { stroke: var(--accent-ink); opacity: .13; }
+.update-arc { stroke: currentColor; stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 420ms var(--ease); }
+.update-pill[data-indeterminate="true"] .update-ring { animation: spin 1.2s linear infinite; }
+.update-icon { width: 1rem; height: 1rem; margin-top: -.65rem; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform 240ms var(--spring-light); }
+.update-pill.ready:hover .update-icon { transform: rotate(-25deg); }
+.update-value { margin-top: -.6rem; font: 700 .7rem/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.update-caption { position: absolute; bottom: .45rem; font: 650 .55rem/1 var(--font-ui); }
+.update-pill.ready { border-color: var(--flag-line); color: var(--flag-ink); background: var(--pill-feat-bg); }
 .update-pill.error { color: var(--danger-ink); border-color: var(--danger-line); background: var(--danger-soft); }
+body.is-idle .update-ring { animation-play-state: paused !important; }
+:is([data-fx-tier="lite"], [data-fx-tier="static"]) .update-ring { animation: none !important; }
+[data-fx-tier="static"] :is(.update-pill, .update-arc, .update-icon) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .update-ring { animation: none !important; }
+  .update-pill, .update-arc, .update-icon { transition: none !important; }
+}
+@media (forced-colors: active) {
+  .update-pill { color: ButtonText; background: ButtonFace; border-color: ButtonText; box-shadow: none; }
+  .update-arc, .update-track { stroke: ButtonText; forced-color-adjust: none; }
+}
 
 /* 「N 条新情报」可点横幅 */
 /* 覆盖阅读区且不占流内高度，避免通知出现时滚动锚定把 scrollY 推移。 */
@@ -1081,10 +1064,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .new-flash:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px var(--accent-glow); }
 @keyframes flash-in { from { opacity: 0; transform: translateY(-8px); } }
 
-/* 实时新到达卡片的高亮淡出（样式预留：阶段 4 增量插入会给新卡挂 .card-new）。
-   v6.5：改为 ::before 覆盖层的 opacity 淡出——领域色渐变压边亮一下再退场，
-   不再动画 border-color / box-shadow；不加 forwards，动画结束自然回到
-   基底 opacity 0，悬停压边不受影响 */
+/* 实时新到达卡片的高亮淡出（样式预留：阶段 4 增量插入会给新卡挂 .card-new）。 */
 .card-new::before { animation: card-flash 2.6s var(--ease-out); }
 @keyframes card-flash { from { opacity: 1; } }
 
@@ -1164,9 +1144,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* —— 卡片 —— */
 .feed-list { display: flex; flex-direction: column; }
 
-/* v4：卡片是「内容层」，落回近实底色、去掉逐卡的 backdrop-filter。
-   一是观感——半透明卡叠半透明底让文字发脏；二是性能——长列表每张卡
-   都做一次 24px 高斯模糊，滚动时合成层压力不小。 */
+/* v4：卡片是「内容层」，落回近实底色、去掉逐卡的 backdrop-filter。 */
 .card {
   padding: var(--sp-4) var(--sp-5) var(--sp-3);
   border-radius: var(--radius-lg);
@@ -1189,16 +1167,11 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   box-shadow: var(--card-shadow-lift);
 }
 @keyframes card-in { from { opacity: 0; transform: translateY(12px); } }
-/* 评审修复：命中错峰入场（diff 新建行，feed-card staggerCreated 挂标）的行
-   入场整体交给行级运动引擎，这里据此关掉行内卡片的 CSS 入场，避免祖孙
-   两层 transform 叠加、步长不同步导致入场轨迹错乱；屏外新行与复用行
-   直接呈现终态，独立整表模板的 CSS 入场保持原样 */
+/* 新建行由 staggerCreated 错峰入场，避免与容器入场叠加。 */
 .stagger-in .card { animation: none; }
 .motion-reused .card { animation: none; }
 
-/* v5：悬停时浮起的渐变压边。用 mask 把 1px 的渐变描边「挖」出来——
-   不占布局、不改盒模型，鼠标离开时整层淡出，比换 border-color 更有光泽。
-   压边的颜色跟着领域走：低空经济泛青、商业航天泛靛、精选泛旗标橙。 */
+/* mask 仅保留 1px 的悬停渐变描边。 */
 .card::before {
   content: ''; position: absolute; inset: -1px; z-index: 1;
   border-radius: calc(var(--radius-lg) + 1px);
@@ -1410,9 +1383,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   font-weight: 700;
   white-space: nowrap;
 }
-/* v5：技术突破是全站价值最高的标记，配唯一的常驻动效——
-   一道缎面扫光每 4 秒掠过一次，其余时间它和别的胶囊一样安静。
-   v6.5：同主按钮口径，扫光位移改走 transform 合成层 */
+/* 技术突破标识共用受低功耗和减少动画约束的强调动效。 */
 .breakthrough-pill::after {
   content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
   background: linear-gradient(100deg, transparent, var(--sheen), transparent);
@@ -1616,13 +1587,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .period-switch .chip { border-style: solid; border-color: transparent; min-width: 3.5rem; }
 .period-switch .chip.active { color: var(--accent-ink); background: var(--active-bg); border-color: var(--accent-line); }
 .daily-toolbar .daily-actions { margin-left: auto; }
-.daily-head { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr); align-items: center; gap: var(--sp-2) var(--sp-3); min-height: calc(6.715rem + 2px); padding: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-4); background: linear-gradient(110deg, var(--accent-soft), transparent 55%), var(--glass-bg-soft); }
-.daily-overview-heading { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
-.daily-title { flex: 1; min-width: 0; }
+.daily-head { position: relative; display: grid; grid-template-columns: minmax(0, 2.35fr) minmax(0, 1fr); align-items: center; gap: var(--sp-2) var(--sp-3); min-height: calc(6.715rem + 2px); padding: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-4); background: linear-gradient(110deg, var(--accent-soft), transparent 55%), var(--glass-bg-soft); }
+.daily-overview-heading { position: relative; align-self: stretch; min-width: 0; }
+.daily-title { position: absolute; top: 0; left: 0; min-width: 0; }
 .daily-overview-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--c-fg-dim); font-size: var(--t-xs); margin-bottom: .25rem; }
 #dailyDate { font: 700 var(--t-2xl)/1.3 var(--font-display); text-align: center; overflow-wrap: anywhere; min-width: 0; margin: 0; }
 .daily-date-range { white-space: nowrap; }
-.daily-date-controls { display: flex; gap: var(--sp-2); flex-shrink: 0; }
+.daily-date-controls { position: absolute; inset: 0; display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem; align-items: center; gap: var(--sp-3); }
 .daily-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin: 0; padding-left: var(--sp-5); border-left: 1px solid var(--glass-border); }
 .daily-metrics > div + div { border-left: 1px solid var(--glass-border); padding-left: var(--sp-3); }
 .daily-metrics dt { color: var(--c-fg-dim); font-size: var(--t-xs); }
@@ -2212,8 +2183,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 }
 [data-theme="light"] .glass-dialog { background: linear-gradient(168deg, rgba(255,255,255,.97), rgba(252,250,244,.95)); }
 [data-theme="dark"] .glass-dialog { background: linear-gradient(165deg, rgba(20,28,58,.94), rgba(10,16,38,.96)); }
-/* v0.2.3：打开与关闭都有过渡——@starting-style 给出进场起点，display / overlay 以
-   allow-discrete 延后切换，关闭时先淡出缩回再离开顶层；替代原先只管打开的 dialog-in 关键帧 */
+/* @starting-style 提供入场起点，discrete 过渡保持退出期间可见。 */
 .glass-dialog {
   opacity: 0; transform: translateY(10px) scale(.97);
   transition: opacity var(--dur) var(--ease), transform var(--dur-glide) var(--spring-medium),
@@ -2237,9 +2207,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 /* v6：主题化确认框——破坏性操作的最后一道关卡，替代与设计语言脱节的系统原生灰窗 */
 .confirm-dialog { width: 24rem; }
 
-/* v0.2.4 命令面板（Ctrl+K）—— 参照 Linear / Raycast：贴近上方三分之一处弹出，
-   一行大输入框 + 分组结果 + 右侧快捷键键帽；高亮行只换底色与左缘色条，不做位移。
-   复用 .glass-dialog 的材质与开合过渡，不新增关键帧与滤镜。 */
+/* v0.2.4 命令面板（Ctrl+K）—— 参照 Linear / Raycast：贴近上方三分之一处弹出 */
 .command-palette {
   width: min(42rem, 94vw); padding: 0; margin-top: 12vh; overflow: hidden;
   display: flex; flex-direction: column; max-height: min(76vh, 36rem);
@@ -2329,9 +2297,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent-line); transform: translateY(-2px); }
 .to-top:active { transform: scale(.92); transition: transform var(--dur-snap) var(--spring-light); }
 
-/* v0.2.9：内容视口位于标题栏下方，保留原生胶囊、拖拽和键盘滚动。
-   流动背景沿用目标色相，壁纸与关闭背景用中性色，深浅主题分别保证对比度。
-   不设置非 auto 的 scrollbar-width/color，以免 Chromium 覆盖伪元素定制。 */
+/* v0.2.9：内容视口位于标题栏下方，保留原生胶囊、拖拽和键盘滚动。 */
 :root[data-aqua-background="wallpaper"], :root[data-aqua-enabled="off"] {
   --scrollbar-hue: 220deg;
   --scrollbar-saturation: 8%;
@@ -2420,8 +2386,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   .lexicon-panel { padding: var(--sp-3); max-height: min(30rem, calc(100vh - 6rem)); }
   .lexicon-body { gap: var(--sp-3); }
   .daily-head { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; min-height: calc(11.285rem + 2px); }
-  .daily-overview-heading { flex-direction: row; align-items: center; justify-content: space-between; align-self: start; }
-  .daily-head #dailyDate { position: absolute; left: 50%; top: 50%; width: calc(100% - 2.5rem); transform: translate(-50%, -50%); }
+  .daily-overview-heading { position: static; }
+  .daily-title { top: var(--sp-2); left: var(--sp-5); }
+  .daily-date-controls { inset: 0 var(--sp-5); }
   .daily-metrics { align-self: end; border-left: 0; border-top: 1px solid var(--glass-border); padding: var(--sp-2) 0 0; }
 }
 
@@ -2435,11 +2402,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   .daily-actions { width: 100%; justify-content: center; }
 }
 
-/* ---------- 液态玻璃阶段 3：主题切换平滑过渡 ----------
-   applyTheme 写 data-theme 前给 body 挂临时 theme-transition 类，
-   结束后移除（约 320ms 后由 app.js 定时器摘下）。只过渡三个颜色族
-   属性，避免常驻全表 transition 拖累滚动； reduced 偏好由上方既有
-   全局 1ms 兜底覆盖，且 app.js 在 reduced 偏好下不挂此类 */
+/* ---------- 液态玻璃阶段 3：主题切换平滑过渡 ---------- */
 body.theme-transition,
 body.theme-transition :is(.glass, .card, .tab, .pill, .chip, .btn-icon, .btn-ghost, .btn-primary, .lexicon-panel, .toast, input, select, textarea) {
   transition: color 260ms var(--ease), background-color 260ms var(--ease), border-color 260ms var(--ease) !important;
@@ -2464,9 +2427,7 @@ body.theme-transition :is(.glass, .card, .tab, .pill, .chip, .btn-icon, .btn-gho
 .card-score-group { flex-wrap: wrap; justify-content: flex-end; }
 .ce-list small { display: block; font-size: .8em; line-height: 1.6; overflow-wrap: anywhere; }
 
-/* ---------- v0.2.3 模型设置（形制照搬 DeepSeek Harness Models 页） ----------
-   提供商行 = 卡片材质；编辑卡 = 内嵌底槽色；密钥状态点：绿 = 已配置、红 = 缺失、蓝 = 本机免密钥；
-   「添加模型提供商」是列表最后一格的虚线占位（地点而非命令）；分段控件滑块只走 transform。 */
+/* ---------- v0.2.3 模型设置（形制照搬 DeepSeek Harness Models 页） ---------- */
 .models-card { grid-column: 1 / -1; }
 .models-section { display: flex; flex-direction: column; gap: var(--sp-3); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -97,7 +97,33 @@ function createUpdateInstallCoordinator({
   });
 }
 
+function createUpdateCheckCoordinator({ autoUpdater, getStatus, reportStatus, now = Date.now } = {}) {
+  let checking = false, lastCheck = -Infinity;
+  async function check() {
+    if (checking || ['checking', 'available', 'downloading', 'downloaded', 'installing'].includes(getStatus?.())) {
+      return { started: false, reason: 'busy' };
+    }
+    if (!autoUpdater || typeof autoUpdater.checkForUpdates !== 'function') {
+      return { started: false, reason: 'updater-unavailable' };
+    }
+    if (now() - lastCheck < 30_000) return { started: false, reason: 'throttled' };
+    checking = true;
+    lastCheck = now();
+    reportStatus?.('checking');
+    try {
+      await autoUpdater.checkForUpdates();
+      return { started: true };
+    } catch (error) {
+      const message = String(error?.message || error);
+      reportStatus?.('error', { message });
+      return { started: false, reason: 'check-failed', message };
+    } finally { checking = false; }
+  }
+  return Object.freeze({ check });
+}
+
 module.exports = {
+  createUpdateCheckCoordinator,
   createUpdateInstallCoordinator,
   comparePublicVersions,
   createPublicUpdateSupport,

@@ -94,7 +94,7 @@
 - `app:get-version` → 面向用户的公开 `version` 字符串（来自 `build.buildVersion`，不暴露 electron-updater 内部比较号）
 - `preferences:get` → `{ preferences, hasStoredPreferences }`
 
-### 2.2 invoke 通道（15 个）
+### 2.2 invoke 与 send 通道
 
 | 前端方法 | 通道 |
 | --- | --- |
@@ -112,7 +112,8 @@
 | `setDailyArchiveEnabled(enabled)` | `daily-archive:set-enabled`（参数 `{ enabled }`） |
 | `saveCurrentDailyArchive()` | `daily-archive:save-current` |
 | `retryDailyArchives()` | `daily-archive:retry` |
-| `installUpdate()` | `update:install` |
+| `checkForUpdates()` | `update:check`（invoke） |
+| `installUpdate()` | `update:install`（send） |
 
 所有 invoke 返回值都经 `cloneAndFreeze()` 深冻结后交给渲染层。
 
@@ -123,7 +124,7 @@ IPC payload 只接受 plain object 或 null-prototype object；读取损坏资�
 ### 2.3 on 通道
 
 - `update:status`：经 `onUpdateStatus(cb)` 订阅；payload 状态为
-  `available / downloading / downloaded / error`。
+  `idle / checking / current / available / downloading / downloaded / installing / error`。
 
 ### 2.4 双全局别名约束（重要）
 
@@ -902,3 +903,11 @@ v0.2.5 说明（预算不变：CSS ≈ 292,300 B ≤ 292 KiB，脚本 27/27，�
 一级市场 #capitalTabs 使用六个等宽分区，面板 #capitalBody 以 aria-labelledby 关联当前分区。方向键／Home／End 只移动焦点，Enter／Space 原生点击激活；只有当前焦点入口参与顺序 Tab。#capitalTabHint 解释当前用途，领域、时间、标的范围、搜索带可见标签。#capitalDays 在公司热度与公司库禁用并隐藏，#capitalTimeNote 解释适用范围；热度实际周期由既有 API 响应在内容中展示。切换分区保留所有筛选，公司档案隐藏整组搜索标签。
 
 沿用 160 项布局组合与原交互元素边界精度，原样式 292 KiB、脚本 27、关键帧 20 与滤镜预算均不变。v0.2.14 实测与发布证据见 [验证记录](v0214-validation.md)。
+
+## v0.2.16 日期与更新入口
+
+报告日期和 #dailyPrev／#dailyNext 同处 .daily-date-controls，日期在左右等宽按钮之间居中。宽屏导航区域为统计左侧的整块空间；窄屏在原高度内分行。既有横幅高度、报告操作、请求竞态与日期边界继续适用。
+
+#updatePill 移入 .rail-footer，保留 SVG 和文本子节点，仅按状态改变属性。#updateProgress 提供确定进度，#updateStatus 按 10% 分段播报。手动检查 IPC 仅接受当前窗口 sender，并由协调器阻止并发、下载／安装中检查及 30 秒内重复请求。安装仍经 send 请求、仅在主进程 downloaded 状态启用，先优雅关闭后端再启动 NSIS。
+
+环形进度以 SVG pathLength=100 对应百分比，未知进度复用 spin。低功耗和减少动画停止旋转，static 停止过渡，后台暂停，高对比度保留可见轨道。292 KiB、27 脚本、20 关键帧及滤镜预算保持不变。

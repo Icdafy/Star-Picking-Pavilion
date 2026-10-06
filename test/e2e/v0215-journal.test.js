@@ -9,7 +9,7 @@ const { launchNativeElectron } = require('./native-electron.cjs');
 const { readWord } = require('../helpers/read-word.cjs');
 const { localDateString } = require('../../renderer/format-utils');
 const root = path.join(__dirname, '../..');
-const output = path.join(root, 'work/v0215/native-exports');
+const output = path.join(root, 'work/v0216/native-exports');
 
 test('journal preserves its banner and supports native copy, file menus, downloads and regeneration for every period', { timeout: 100_000 }, async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-v0215-journal-'));
@@ -64,14 +64,18 @@ test('journal preserves its banner and supports native copy, file menus, downloa
         await page.locator(`#periodSwitch [data-period="${kind}"]`).click(); await ready();
         const result = await page.evaluate(() => {
           const head = document.querySelector('.daily-head').getBoundingClientRect(), date = document.getElementById('dailyDate').getBoundingClientRect();
-          return { height: head.height, centerX: Math.abs(date.x + date.width / 2 - head.x - head.width / 2),
+          const navigation = document.querySelector('.daily-date-controls').getBoundingClientRect();
+          const previous = document.getElementById('dailyPrev').getBoundingClientRect(), next = document.getElementById('dailyNext').getBoundingClientRect();
+          return { height: head.height, centerX: Math.abs(date.x + date.width / 2 - navigation.x - navigation.width / 2),
             centerY: Math.abs(date.y + date.height / 2 - head.y - head.height / 2),
+            navigationAligned: previous.right <= date.left && date.right <= next.left && Math.abs(previous.y + previous.height / 2 - date.y - date.height / 2) < 1 && Math.abs(next.y + next.height / 2 - date.y - date.height / 2) < 1,
             font: parseFloat(getComputedStyle(document.getElementById('dailyDate')).fontSize), root: parseFloat(getComputedStyle(document.documentElement).fontSize),
             overflow: document.getElementById('appViewport').scrollWidth > document.getElementById('appViewport').clientWidth + 1,
             hasTimestamp: document.querySelector('.daily-head').textContent.includes('生成于') };
         });
         assert.ok(Math.abs(result.height - baseline[width][index]) <= 1, `${width}/${theme}/${scale}/${kind}: banner changed height ${result.height}`);
-        assert.ok(result.centerX < 1 && result.centerY < 1, `${kind} date must be at the center`);
+        assert.ok(result.centerX < 1 && result.centerY < 1, `${kind} date must be at the center of the navigation space`);
+        assert.equal(result.navigationAligned, true, `${kind} arrows must flank and vertically align with the date`);
         assert.ok(result.font >= result.root * 1.87, 'date is 50% larger than the old 1.25rem size');
         assert.equal(result.overflow, false); assert.equal(result.hasTimestamp, false);
         assert.equal(await page.locator('#btnCopyDaily').textContent(), `复制${names[kind]}`);

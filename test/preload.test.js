@@ -206,9 +206,12 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   assert.deepEqual(ipcCalls.at(-1), ['invoke', 'daily-archive:retry']);
 
   let payload;
+  await api.checkForUpdates();
+  assert.deepEqual(ipcCalls.at(-1), ['invoke', 'update:check']);
   api.onUpdateStatus(value => { payload = value; });
   updateListener({}, { status: 'downloaded' });
-  assert.deepEqual(payload, { status: 'downloaded' });
+  assert.deepEqual(JSON.parse(JSON.stringify(payload)), { status: 'downloaded' });
+  assert.equal(Object.isFrozen(payload), true);
   api.installUpdate();
   assert.deepEqual(ipcCalls.at(-1), ['send', 'update:install']);
 });

@@ -59,8 +59,9 @@ const desktopApi = Object.freeze({
   retryDailyArchives: () => ipcRenderer
     .invoke('daily-archive:retry')
     .then(cloneAndFreeze),
-  // 主进程推送更新状态：available / downloading / downloaded / error
-  onUpdateStatus: cb => ipcRenderer.on('update:status', (_e, payload) => cb(payload)),
+  // 主进程推送检查、下载、安装及错误状态。
+  onUpdateStatus: cb => ipcRenderer.on('update:status', (_e, payload) => cb(cloneAndFreeze(payload))),
+  checkForUpdates: () => ipcRenderer.invoke('update:check').then(cloneAndFreeze),
   // 渲染层请求「重启并安装更新」
   installUpdate: () => ipcRenderer.send('update:install')
 });

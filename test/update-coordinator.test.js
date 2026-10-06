@@ -1,5 +1,7 @@
 'use strict';
 
+const { createUpdateCheckCoordinator } = require('../electron/update-coordinator');
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
@@ -9,6 +11,41 @@ const {
   publicVersionFromPackage,
   publicVersionFromUpdateInfo
 } = require('../electron/update-coordinator');
+
+test('manual update checks reject duplicates, active downloads and rapid retries', async () => {
+  let finish, stamp = 0, status = 'idle', count = 0;
+  const coordinator = createUpdateCheckCoordinator({
+    autoUpdater: { checkForUpdates: () => { count++; return new Promise(resolve => { finish = resolve; }); } },
+    getStatus: () => status, now: () => stamp, reportStatus: value => { status = value; }
+  });
+  const pending = coordinator.check();
+  assert.equal(status, 'checking');
+  assert.deepEqual(await coordinator.check(), { started: false, reason: 'busy' });
+  status = 'current'; finish(); assert.deepEqual(await pending, { started: true });
+  assert.deepEqual(await coordinator.check(), { started: false, reason: 'throttled' });
+  stamp = 30_000;
+  for (const value of ['available', 'downloading', 'downloaded', 'installing']) {
+    status = value;
+    assert.deepEqual(await coordinator.check(), { started: false, reason: 'busy' });
+  }
+  status = 'error'; const retried = coordinator.check(); status = 'current'; finish();
+  assert.deepEqual(await retried, { started: true }); assert.equal(count, 2);
+});
+
+test('update checks report network failures and can retry after the request interval', async () => {
+  let status = 'idle', stamp = 0, fails = true;
+  const errors = [];
+  const coordinator = createUpdateCheckCoordinator({
+    autoUpdater: { checkForUpdates: async () => { if (fails) throw new Error('network offline'); status = 'current'; } },
+    getStatus: () => status, now: () => stamp,
+    reportStatus: (value, detail) => { status = value; if (detail) errors.push(detail.message); }
+  });
+  assert.deepEqual(await coordinator.check(), { started: false, reason: 'check-failed', message: 'network offline' });
+  assert.equal(status, 'error'); assert.deepEqual(errors, ['network offline']);
+  stamp = 30_000; fails = false; assert.deepEqual(await coordinator.check(), { started: true });
+  assert.equal(status, 'current');
+  assert.deepEqual(await createUpdateCheckCoordinator().check(), { started: false, reason: 'updater-unavailable' });
+});
 
 test('update status and installed app expose one public version', () => {
   assert.equal(publicVersionFromUpdateInfo({

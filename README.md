@@ -2,32 +2,31 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.15 · 情报日志与文件导出
+## v0.2.16 · 日期导航与环形更新按钮
 
-- 报告概况保持原横幅尺寸，日期居中放大，删除“生成于”时间；统计、状态与日期／期号导航保留。
-- 日报、周报、月报均支持复制与重新生成，按钮和操作使用当前选中的日期或期号。
-- “导出文件”下拉提供 `.md`、`.doc`，导出本期完整内容；Word 使用原生二进制格式，生成与下载均在本机完成，无需安装 Office。
-- 下拉菜单支持键盘、Escape 和外部点击关闭；文字和星轨动效继续支持低功耗、减少动画及后台暂停。
-- 深浅主题、窄窗口、界面缩放与键盘操作继续适用；原有情报、星标、归档、模型密钥和个人设置保留。
-- 应用内更新日志与 GitHub 发布说明同步，无新增运行依赖、脚本标签或动画关键帧。
+- **报告概况排版**：保持既有横幅尺寸，日期居中放在“精选情报”统计左侧的可用区域，上一期与下一期按钮分列日期两旁。日报、周报、月报共享布局，报告状态及统计保留。
+- **工作区更新按钮**：更新入口移至左侧“本地情报工作区”右侧；窄窗口在品牌下方保留工作区入口。点击检查更新，失败可重试；下载完成后点击重启安装。
+- **环形下载进度**：按钮内的 SVG 环与百分比显示真实下载进度；检查或未知进度使用旋转短弧，下载完成切换为“重启”。鼠标悬停与键盘焦点可查看版本和状态。
+- **动效与可访问性**：环形进度平滑过渡，轻抬悬停与按压反馈沿用现有配色；减少动画、低功耗及后台暂停继续适用。明确提供按钮名称、进度数值及分段状态播报，避免重复下载和重复安装。
+- **兼容与保留**：浅色、深色主题、四档缩放、宽窄窗口及三种刊期继续适用；已有情报、星标、归档、模型密钥与设置保留。无新增依赖、脚本标签或动画关键帧。
 
-版本、界面与更新元数据统一为 0.2.15，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0215-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.16，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0216-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.15.exe`，双击并按向导安装。v0.2.15 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.16.exe`，双击并按向导安装。v0.2.16 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.15.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.16.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
-两处 SHA-256 必须完全一致。自动更新只从本项目的 GitHub Releases 检查；下载完成后，应用右上角会提示重启安装。
+两处 SHA-256 必须完全一致。自动更新只从本项目的 GitHub Releases 检查；下载完成后，“本地情报工作区”右侧的更新按钮会提示重启安装。
 
 ## 主要功能
 

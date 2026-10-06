@@ -847,8 +847,8 @@ const realtimePoller = RealtimePoller.createRealtimePoller({
 });
 const { setRealtime } = realtimePoller;
 
-// ---------- 自动更新提示（批 2 拆入 renderer/update-pill.js） ----------
-UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill') });
+// ---------- 工作区更新按钮 ----------
+UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill'), progress: $('#updateProgress'), live: $('#updateStatus') });
 
 // ---------- 启动 ----------
 async function start() {
