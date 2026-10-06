@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-本次候选版本为 v0.2.19，仅微调报告概况日期位置。实现与验证见 [本版验证](docs/v0219-validation.md)，发布后补录完整门禁及六项公开附件核验结果。
+[v0.2.19](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.19) 已通过 main 与 tag Release 完整门禁，六项公开附件下载核验及应用发布记录同步完成。完整结果见 [本版验证](docs/v0219-validation.md)，以下流程继续适用于后续发版。
 
 ## 发布前授权门槛
 

@@ -1,3 +1,15 @@
+# v0.2.19 发布状态
+
+[v0.2.19](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.19) 已发布为最新正式版，情报日志报告概况日期导航轻微上移，横幅尺寸保持。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37473543388) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37474638450) 对提交 `7aff1fb6b795b5fa49bac7a3c42e1a575ed80c52` 完整通过：913 项单元、24 项真实桌面、0 生产漏洞、47 项第三方声明、1,274 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。发布工作流和门禁保持。
+
+发布时间 2026-10-06T14:05:57Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 两处 SHA-512、文件名及尺寸、SBOM 和第三方声明。正式安装器 99,592,074 B、0.2.19、NotSigned，SHA-256 为 `4b9149361371bdeef96563ee671e37eec97d9ee6014deb2121871d652c225504`。应用匿名实网同步 47 条更新日志，本版正文、发布时间及离线缓存恢复与公开 Release 一致。
+
+完整证据见 [本版验证](docs/v0219-validation.md)。
+
+---
+
 # v0.2.18 发布状态
 
 [v0.2.18](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.18) 已发布为最新正式版：更新按钮仅在有待安装的新版本时显示，报告日期导航下移并与标题分行，顶栏搜索焦点边框贴合外层圆角。

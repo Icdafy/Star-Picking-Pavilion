@@ -1,6 +1,6 @@
 # v0.2.19 实现与发布验证
 
-验证日期：2026-10-06。目标仓库 Icdafy/Star-Picking-Pavilion，目标版本 0.2.19。
+验证日期：2026-10-06。目标仓库 Icdafy/Star-Picking-Pavilion，目标版本 0.2.19。[v0.2.19](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.19) 已发布为最新正式版，完整门禁及六项公开附件核验完成。
 
 ## 实现
 
@@ -20,10 +20,23 @@
 
 ## 发布状态
 
-尚未推送本版 tag；main CI 完整通过后触发原 Release 工作流，再核验六项公开附件。
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37473543388) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37474638450) 对提交 `7aff1fb6b795b5fa49bac7a3c42e1a575ed80c52` 完整通过：913 项单元、24 项真实桌面、0 生产漏洞、47 项第三方声明、1,274 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。发布工作流和门禁保持。
+
+发布时间 2026-10-06T14:05:57Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 两处 SHA-512、文件名及尺寸、SBOM 和第三方声明。正式安装器 99,592,074 B、0.2.19、NotSigned，SHA-256 为 `4b9149361371bdeef96563ee671e37eec97d9ee6014deb2121871d652c225504`。应用匿名实网同步 47 条更新日志，本版正文、发布时间及离线缓存恢复与公开 Release 一致。
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `f068323b1a174a4cebbac6be219380d34ef81d61b1b9cad01a4f5c97f37423dd` |
+| sbom.cdx.json | 81,352 | `a6ec0821e73e516119c7fbb5791ffdfbfed257594a5ddf99a3935336f51300c0` |
+| SHA256SUMS.txt | 106 | `361203ad27a052586075b4077af6ae60ae71d4dfaefd6afe4f673a908df9d0f8` |
+| Star-Picking-Pavilion-Setup-0.2.19.exe | 99,592,074 | `4b9149361371bdeef96563ee671e37eec97d9ee6014deb2121871d652c225504` |
+| Star-Picking-Pavilion-Setup-0.2.19.exe.blockmap | 105,828 | `633ccde1de753c374801621be6b0f76abb1b492dfca3a37f8aaa37635680b8ed` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `baf9e61ac0026fcab731bbfb12455dfa9050ad739e78d480d3d7ef0958f40d1b` |
+
+发布证据位于 work/v0219：main-ci.log／result.json／verified.json、release.log／result.json／verified.json、tag-verification.txt、release.json、latest-release.json、published-assets/、published-verification.json、published-installer.json、published-sync-verification.json。
 
 main 首轮为 913／913 单元、22／24 桌面：原有 layout 矩阵在主题绑定阶段出现 Electron 主进程执行上下文销毁，原有 v0211 动效采样没有观察到核心层领先光晕层超过 5px 的瞬态。日期导航及报告导出专项通过。两项原样本地补验 2／2 通过，43.56 秒。同一提交重跑为 913／913 单元、23／24 桌面，layout 通过，仍仅有旧动效采样失败。两轮失败日志、结果和补验记录均保留；首轮窗口执行上下文失败的原因尚未定位。
 
 两轮动效失败各只捕获四帧，后续间隔约 125ms。隔离复现将观察器的首次采样延迟 450ms，后续采样间隔设为 125ms：原实现漏掉瞬态而失败。测试现在先取得首帧，再执行第二次真实原生鼠标移动，采样上限由 300ms 延至 1000ms；正常及同一粗粒度观察器验证通过，核心领先光晕 >5px、核心与轮廓差 <0.1px、正文与命中区不移动等原断言及 90 秒用例时限均保留。应用代码仍只修改日期对齐，动效引擎未更改。
 
-采样复现证据为 slow-before.log、slow-after.log、motion-sampling.log；两轮 CI 证据为 main-ci-first.log／result.json、main-ci-second.log／result.json，原样本地补验为 failed-checks-local.log。修正后的完整动效文件 5／5 通过，32.58 秒；新提交 CI 验证进行中。原始帧位置记录保存在 layer-frames.json。
+采样复现证据为 slow-before.log、slow-after.log、motion-sampling.log；两轮 CI 证据为 main-ci-first.log／result.json、main-ci-second.log／result.json，原样本地补验为 failed-checks-local.log。修正后的完整动效文件 5／5 通过，32.58 秒；修正后提交的 main CI 及 Release 完整验证均通过。原始帧位置记录保存在 layer-frames.json。
