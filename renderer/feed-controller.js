@@ -17,6 +17,11 @@
   const VIEW_EXPORT_LABEL = Object.freeze({
     featured: '精选', all: '全部动态', starred: '星标'
   });
+  const BANNERS = Object.freeze({
+    featured: ['CURATED SIGNALS · 精选研判', '精选情报', '从低空与航天的万千信号中，筛出值得深读与研判的线索。', '判断先行 · 信源可溯'],
+    all: ['SIGNAL STREAM · 全部动态', '让每一条信号，都进入视野', '沿着时间线追踪行业脉动，用领域、分类与检索找到下一条重要线索。', '全量追踪 · 持续更新'],
+    starred: ['SAVED INTELLIGENCE · 星标收藏', '摘下的星，留给下一次判断', '将值得反复阅读的情报留在这里，让关注与思考逐渐积累成自己的星图。', '长期留存 · 随时回看']
+  });
 
   function createFeedController({
     api, state, esc, DomUtils, format, card, diff,
@@ -51,6 +56,9 @@
       // 分页追加不能并发，否则两批结果会交错；整表重载则以最后一次请求为准，
       // 这样在加载途中切换领域/分类不会被静默丢弃。
       if (!reset && state.loading) return;
+      const banner = BANNERS[state.view];
+      if (banner) [elements.heroKicker, elements.heroTitle, elements.heroDescription, elements.heroTag]
+        .forEach((node, i) => { if (node) node.textContent = banner[i]; });
       const request = feedRequestGuard.begin();
       const context = () => [state.view, state.domain, state.category, state.q].join('\u0000');
       const requestedContext = context();

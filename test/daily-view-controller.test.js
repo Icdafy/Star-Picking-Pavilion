@@ -50,6 +50,12 @@ function createController({ report = 'fail', regen = 'ok', guard = makeGuard() }
     body: { innerHTML: '', addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn); } },
     date: { textContent: '' },
     sub: { textContent: '' },
+    metricLabels: Array.from({ length: 3 }, () => ({ textContent: '' })),
+    metricValues: Array.from({ length: 3 }, () => ({ textContent: '旧统计' })),
+    reportState: { textContent: '' },
+    overview: { attributes: {}, setAttribute(k, v) { this.attributes[k] = v; } },
+    copy: { disabled: false },
+    exportButton: { disabled: false },
     prev: { addEventListener: (t, fn) => { elements.prevClick = fn; } },
     next: { addEventListener: (t, fn) => { elements.nextClick = fn; } },
     regen: { disabled: false, classes: new Set(),
@@ -107,6 +113,9 @@ test('加载日报渲染分区与条目，落 state 与日期栏', async () => {
   assert.match(elements.body.innerHTML, /daily-section glass/);
   assert.match(elements.body.innerHTML, /safe:u/);
   assert.match(elements.sub.textContent, /2 条精选/);
+  assert.deepEqual(elements.metricValues.map(node => node.textContent), ['2', '1', '1']);
+  assert.equal(elements.overview.attributes['aria-busy'], 'false');
+  assert.equal(elements.copy.disabled, false);
 });
 
 test('空分区给出「今日无风」空态', async () => {
@@ -122,6 +131,10 @@ test('加载失败给出带重试按钮的错误态', async () => {
   await ctrl.loadDaily('2026-08-08');
   assert.match(elements.body.innerHTML, /信 号 中 断/);
   assert.match(elements.body.innerHTML, /data-act="retry-daily"/);
+  assert.deepEqual(elements.metricValues.map(node => node.textContent), ['–', '–', '–']);
+  assert.equal(elements.reportState.textContent, '读取失败');
+  assert.equal(elements.overview.attributes['aria-busy'], 'false');
+  assert.equal(elements.copy.disabled, true);
 });
 
 test('启发式降级无 AI 分数时分数字段兜底为「—」而非 NaN', async () => {
@@ -137,9 +150,12 @@ test('竞态守卫过期时不写 DOM', async () => {
   const guard = makeGuard();
   const { ctrl, elements, guard: g } = createController({ report: SAMPLE, guard });
   const pending = ctrl.loadDaily('2026-08-08');
+  assert.equal(elements.overview.attributes['aria-busy'], 'true');
+  assert.deepEqual(elements.metricValues.map(node => node.textContent), ['–', '–', '–']);
   guard.invalidate();
   await pending;
   assert.ok(!/daily-section/.test(elements.body.innerHTML));
+  assert.deepEqual(elements.metricValues.map(node => node.textContent), ['–', '–', '–'], 'expired response must not restore stale counts');
 });
 
 test('shiftDaily 向前翻并持久化，向后越过今天则不动', async () => {

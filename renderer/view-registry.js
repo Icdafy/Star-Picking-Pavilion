@@ -103,6 +103,13 @@
       if (typeof scrollToTop === 'function') scrollToTop();
       if (previous && previous !== entry && typeof previous.onLeave === 'function') previous.onLeave();
       if (entry && typeof entry.onEnter === 'function') entry.onEnter();
+      // 页头文字分层入场；复用现有引擎，隐藏、失焦和减少动画时直接落定。
+      const copy = entry?.tab ? $(entry.tab)?.querySelectorAll?.('[data-banner-reveal]') : null;
+      if (typeof motion?.fadeSlideIn === 'function') {
+        [...(copy || [])].forEach((node, i) => motion.fadeSlideIn(node, {
+          distance: 8, duration: 440, delay: i * 55, restoreStyles: true
+        }));
+      }
     }
 
     // tab 点击 + APG 方向键约定：焦点落在标签上时即选即切

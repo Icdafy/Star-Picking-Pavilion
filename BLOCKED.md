@@ -1,3 +1,11 @@
+# v0.2.13 发布状态
+
+无实现阻塞。新版横幅、文字与星轨动效、情报日志工具栏及报告概况已完成，892 单元与 21 真实 Electron（160 布局组合）全过。候选包及 1273 包边界、版本和十二项 ASAR 比对通过；正式发布及一次性 Windows 安装／卸载验证仍待 CI 门禁完成。
+
+实网信源严格复查未通过：183／186 返回内容，东财检索·穿越者为空，巨潮资讯·深市公告与泰伯网·空天资讯请求失败。本版没有改变信源或采集逻辑，失败实证保留于 work/v0213/source-audit.{log,json}。过程和正式状态见 [docs/v0213-validation.md](docs/v0213-validation.md)。
+
+---
+
 # v0.2.12 发布状态
 
 无发布阻塞。[v0.2.12](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.12) 已作为最新正式版发布，[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37419711923) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37420427051/attempts/2) 对产品提交 `e8c5ca1d99efccae32c3de34c73c58c00ad728c8` 最终完整通过：892 单元、20 真实桌面（128 布局）、0 生产漏洞、1273 包边界及一次性 Windows 安装／卸载验证成功，用户数据保留。六附件下载后的摘要、版本和自动更新元数据均匹配；应用内正文与公开 Release 一致，发布后实网同步和缓存恢复通过。

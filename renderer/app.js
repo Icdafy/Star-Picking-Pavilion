@@ -444,6 +444,10 @@ const feedController = FeedController.createFeedController({
     btnCopyFeed: $('#btnCopyFeed'),
     btnExportFeed: $('#btnExportFeed'),
     feedToolbarNote: $('#feedToolbarNote'),
+    heroKicker: $('#feedHeroKicker'),
+    heroTitle: $('#feedHeroTitle'),
+    heroDescription: $('#feedHeroDescription'),
+    heroTag: $('#feedHeroTag'),
     feedSentinel: $('#feedSentinel')
   },
   IntersectionObserver: window.IntersectionObserver
@@ -500,6 +504,11 @@ const dailyViewController = DailyViewController.createDailyViewController({
     body: $('#dailyBody'),
     date: $('#dailyDate'),
     sub: $('#dailySub'),
+    overview: $('#viewDaily .daily-head'),
+    reportState: $('#dailyState'),
+    schedule: $('#dailySchedule'),
+    metricLabels: $$('#dailyMetrics dt'),
+    metricValues: $$('#dailyMetrics dd'),
     prev: $('#dailyPrev'),
     next: $('#dailyNext'),
     regen: $('#dailyRegen')

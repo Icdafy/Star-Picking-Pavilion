@@ -223,7 +223,6 @@ button.deal-company:hover { color: var(--accent-ink); }
 .add-company-form select { font: inherit; }
 
 /* ---------- 刊期：日报 / 周报 / 月报 ---------- */
-.period-switch { display: inline-flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); }
 .issue-lead { padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-5); }
 .issue-kicker { font-size: var(--t-xs); letter-spacing: .16em; color: var(--accent-ink); font-weight: 800; }
 .issue-lead p { font-size: var(--t-md); line-height: 1.85; margin-top: var(--sp-2); color: var(--c-fg); }

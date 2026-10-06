@@ -186,13 +186,14 @@
   </section>
 
   <section id="viewFeed" class="view" role="tabpanel">
-    <header class="feed-hero">
-      <div>
-        <p class="feed-hero-kicker">ORBITAL INTELLIGENCE · 今日星图</p>
-        <h2 data-aqua-greeting>探索未至之境</h2>
-        <p>把低空与航天的散落信号，收拢成一条可追溯、可研判的情报航线。</p>
+    <header class="feed-hero page-banner glass" id="feedHero" aria-labelledby="feedHeroTitle">
+      <div class="banner-copy">
+        <p class="banner-kicker" id="feedHeroKicker" data-banner-reveal>CURATED SIGNALS · 精选研判</p>
+        <h2 class="view-title" id="feedHeroTitle" data-banner-reveal>精选情报</h2>
+        <p class="banner-description" id="feedHeroDescription" data-banner-reveal>从低空与航天的万千信号中，筛出值得深读与研判的线索。</p>
       </div>
-      <div class="feed-hero-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="banner-aside"><span class="banner-tag" id="feedHeroTag">判断先行 · 信源可溯</span><span class="banner-caption" data-aqua-greeting>探索未至之境</span></div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
     <div class="search-context" id="searchContext" role="status" aria-live="polite" hidden></div>
     <div class="feed-banner" id="feedBanner" hidden></div>
@@ -219,38 +220,47 @@
   </section>
 
   <section id="viewDaily" class="view" role="tabpanel" hidden>
-    <div class="period-switch glass" id="periodSwitch" role="group" aria-label="刊期">
-      <button class="chip active" type="button" data-period="daily" aria-pressed="true">日报</button>
-      <button class="chip" type="button" data-period="weekly" aria-pressed="false">周报</button>
-      <button class="chip" type="button" data-period="monthly" aria-pressed="false">月报</button>
-    </div>
-    <div class="daily-head glass">
-      <button class="btn-icon" id="dailyPrev" aria-label="前一天"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 4 L6.5 10 L12.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="daily-title">
-        <h2 id="dailyDate">–</h2>
-        <p id="dailySub">日报每天 08:00 · 周报每周一 · 月报每月 1 日</p>
+    <header class="daily-toolbar glass" aria-label="情报日志工具栏">
+      <div class="daily-tool-context"><span class="banner-kicker" data-banner-reveal>INTELLIGENCE JOURNAL</span><h2>情报日志</h2></div>
+      <div class="period-switch" id="periodSwitch" role="group" aria-label="刊期">
+        <button class="chip active" type="button" data-period="daily" aria-pressed="true">日报</button>
+        <button class="chip" type="button" data-period="weekly" aria-pressed="false">周报</button>
+        <button class="chip" type="button" data-period="monthly" aria-pressed="false">月报</button>
       </div>
-      <button class="btn-icon" id="dailyNext" aria-label="后一天"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4 L13.5 10 L7.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="daily-actions">
+      <span class="daily-schedule" id="dailySchedule">每日 08:00 出刊</span>
+      <div class="daily-actions" role="group" aria-label="报告操作">
         <button class="btn-primary btn-compact" id="btnCopyDaily" type="button"
           title="把整份日报复制成纯文本，直接贴进微信群或邮件">复制日报</button>
         <button class="btn-ghost btn-compact" id="btnExportDaily" type="button"
           title="把整份日报存成 Markdown 文件">导出 .md</button>
-        <button class="btn-ghost btn-compact" id="dailyRegen">重新生成</button>
+        <button class="btn-ghost btn-compact" id="dailyRegen" type="button">重新生成</button>
       </div>
-    </div>
+    </header>
+    <section class="daily-head glass" aria-label="报告概况" aria-busy="true">
+      <div class="daily-overview-heading">
+        <div class="daily-title"><p class="banner-kicker">报告概况 <span class="banner-tag" id="dailyState">正在读取</span></p><h2 id="dailyDate" data-banner-reveal>–</h2></div>
+        <div class="daily-date-controls" role="group" aria-label="切换报告日期">
+          <button class="btn-icon" id="dailyPrev" type="button" aria-label="前一天"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 4 L6.5 10 L12.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="btn-icon" id="dailyNext" type="button" aria-label="后一天"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4 L13.5 10 L7.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      <p id="dailySub" role="status" aria-live="polite">正在读取本期报告…</p>
+      <dl class="daily-metrics" id="dailyMetrics" aria-label="报告统计"><div><dt>精选情报</dt><dd>–</dd></div><div><dt>低空经济</dt><dd>–</dd></div><div><dt>商业航天</dt><dd>–</dd></div></dl>
+    </section>
     <div id="dailyBody"></div>
   </section>
 
   <section id="viewCapital" class="view" role="tabpanel" hidden>
-    <header class="intel-hero intel-hero-compact glass">
-      <div>
-        <p class="intel-kicker">PRIMARY MARKET · 一级市场雷达</p>
-        <h2 class="view-title">被投与潜在标的，一处看全</h2>
-        <p>融资、上市、订单、试验与人事动态均抽取自公开报道并附原文链接；上市公司定增、债权融资与合资设立单独归类，不混入一级市场统计。</p>
+    <header class="page-banner glass" aria-labelledby="capitalHeroTitle">
+      <div class="banner-copy">
+        <p class="banner-kicker" data-banner-reveal>PRIMARY MARKET · 资本与企业</p>
+        <h2 class="view-title" id="capitalHeroTitle" data-banner-reveal>一级市场雷达</h2>
+        <p class="banner-description" data-banner-reveal>追踪融资、订单与企业成长，让被投与潜在标的的每一步都有据可循。</p>
       </div>
-      <button class="btn-primary btn-compact" id="btnAddCompany" type="button" aria-controls="addCompanyForm">+ 收录公司</button>
+      <div class="banner-aside"><span class="banner-tag">关注标的 · 看见成长</span><button class="btn-primary btn-compact" id="btnAddCompany" type="button" aria-controls="addCompanyForm">+ 收录公司</button></div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
+    <p class="intel-note">动态均附公开原文；上市公司定增、债权融资与合资设立单独归类，不计入一级市场融资统计。</p>
     <form class="glass card-pad add-company-form" id="addCompanyForm" hidden>
       <h3>收录公司 <span class="muted">收录后会自动关联近 180 天的历史报道</span></h3>
       <div class="field-row">
@@ -293,16 +303,17 @@
   </section>
 
   <section id="viewReleases" class="view" role="tabpanel" hidden>
-    <header class="intel-hero glass release-hero">
-      <div>
-        <p class="intel-kicker">RELEASE NOTES · 版本足迹</p>
-        <h2 class="view-title">更新日志</h2>
-        <p>每一次改进，都有迹可循。历次版本说明在这里集中呈现。</p>
+    <header class="page-banner glass release-hero" aria-labelledby="releaseHeroTitle">
+      <div class="banner-copy">
+        <p class="banner-kicker" data-banner-reveal>RELEASE NOTES · 版本足迹</p>
+        <h2 class="view-title" id="releaseHeroTitle" data-banner-reveal>每一次进步，都有迹可循</h2>
+        <p class="banner-description" data-banner-reveal>从第一颗星到今天的星图，回看摘星阁每一次更新与改进。</p>
       </div>
-      <div class="btn-row">
+      <div class="banner-aside"><span class="banner-tag">更新日志 · 持续进化</span><div class="btn-row">
         <button class="btn-ghost btn-compact" id="btnSyncReleases" type="button">同步日志</button>
         <a class="btn-ghost btn-compact" href="https://github.com/Icdafy/Star-Picking-Pavilion/releases" target="_blank" rel="noopener noreferrer">GitHub Releases ↗</a>
-      </div>
+      </div></div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
     <div class="release-toolbar">
       <label class="field release-search"><span class="sr-only">搜索更新日志</span><input id="releaseSearch" type="search" placeholder="搜索版本号或更新内容…" aria-label="搜索更新日志" maxlength="100"></label>
@@ -312,12 +323,13 @@
   </section>
 
   <section id="viewLinks" class="view" role="tabpanel" hidden>
-    <header class="common-links-head glass">
-      <div>
-        <p class="common-links-kicker">云幄 · 常用网址</p>
-        <h2 class="view-title">让常用系统安静、有序、即刻可达</h2>
-        <p>统一收纳督办计划、项目投资、财税办公、综合办公、合同印鉴与 AI 工具入口。</p>
+    <header class="common-links-head page-banner glass" aria-labelledby="linksHeroTitle">
+      <div class="banner-copy">
+        <p class="banner-kicker" data-banner-reveal>QUICK ACCESS · 云幄 · 常用网址</p>
+        <h2 class="view-title" id="linksHeroTitle" data-banner-reveal>常用网址，即刻可达</h2>
+        <p class="banner-description" data-banner-reveal>从项目投资到日常办公，让每一个常用入口都有自己的位置。</p>
       </div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
       <div class="common-links-summary" aria-label="网址数量">
         <strong id="commonLinksCount">14</strong>
         <span>个常用入口</span>
@@ -330,10 +342,11 @@
   </section>
 
   <section id="viewSources" class="view" role="tabpanel" hidden>
-    <div class="src-head">
-      <h2 class="view-title">信源监控台</h2>
-      <button class="btn-primary" id="btnAddSource">+ 提报信源</button>
-    </div>
+    <header class="src-head page-banner glass" aria-labelledby="sourcesHeroTitle">
+      <div class="banner-copy"><p class="banner-kicker" data-banner-reveal>SOURCE NETWORK · 信号网络</p><h2 class="view-title" id="sourcesHeroTitle" data-banner-reveal>信源监控台</h2><p class="banner-description" data-banner-reveal>让每一条情报有源可查，持续掌握采集网络的运行状态。</p></div>
+      <div class="banner-aside"><span class="banner-tag">追溯源头 · 持续采集</span><button class="btn-primary btn-compact" id="btnAddSource" type="button">+ 提报信源</button></div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
+    </header>
     <div class="src-toolbar glass">
       <div class="src-summary" id="sourcesSummary" aria-live="polite"></div>
       <div class="src-filters">
@@ -352,7 +365,11 @@
   </section>
 
   <section id="viewSettings" class="view" role="tabpanel" hidden>
-    <h2 class="view-title">设置</h2>
+    <header class="page-banner glass" aria-labelledby="settingsHeroTitle">
+      <div class="banner-copy"><p class="banner-kicker" data-banner-reveal>YOUR WORKSPACE · 专属工作台</p><h2 class="view-title" id="settingsHeroTitle" data-banner-reveal>让摘星阁，更合你的习惯</h2><p class="banner-description" data-banner-reveal>从模型与采集，到阅读与界面氛围，为每一天的研判找到舒适节奏。</p></div>
+      <div class="banner-aside"><span class="banner-tag">设置 · 九个章节</span><span class="banner-caption">按你的节奏运行</span></div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
+    </header>
     <div class="settings-layout">
       <nav class="settings-nav glass" id="settingsNav" aria-label="设置章节">
         <p class="settings-nav-label">快速定位</p>

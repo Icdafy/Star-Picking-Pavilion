@@ -888,3 +888,9 @@ v0.2.5 说明（预算不变：CSS ≈ 292,300 B ≤ 292 KiB，脚本 27/27，�
 - `config/release-history.json` 包含 GitHub 39 个历史正式版本及本版说明；本版正文必须与 `RELEASE_NOTES.md` 一致。构建、版本校验和单元测试均检查此约定。
 - 设置九章顺序由静态导航 `data-settings-target` 与卡片 `data-settings-section` 保持一致；实际滚动容器为 `#appViewport`，`aria-current=location` 仅标识当前章节。导航点击不改 URL／偏好；键盘点击把焦点交给标题，鼠标点击保留目录焦点。
 - 日志控制器并入既有 `intel-views.js` 边界，设置导航并入 `settings-view-controller.js`，页面脚本仍为 27 条。样式／关键帧／滤镜预算沿用；CSS 的 CRLF 最坏口径为 298,334 B，低于 292 KiB 的 299,008 B。
+
+### v0.2.13 工作区页头与日志横幅
+
+八个页头共用 `.page-banner`：`.banner-copy` 放栏目、主标题及说明，右侧保留状态／操作／网址计数，`.banner-art` 为 aria-hidden 的轨道装饰。三种信息流共用面板但由 feed-controller 按 state.view 同步各自文案。时段问候在次级文字中显示；矮窗口不隐藏页头。文字分层入场复用运动引擎，轨道和轻闪复用 sweep／twinkle，lite／static 和减少动画停止持续运动，后台暂停，系统强制颜色隐藏装饰。
+
+`.daily-toolbar` 同时容纳 #periodSwitch 与复制／导出／重新生成；`.daily-head` 紧随其后，独立展示日期、状态、生成信息、日期导航及 #dailyMetrics。日报使用精选和两领域统计，周／月报使用精选、热点及资本事件。读取时清除旧值、禁用日期与导出，失败显示恢复提示；竞态守卫阻止过期响应回填。日报专属操作范围沿用。布局矩阵覆盖十个视图、四窗口、四缩放共 160 个组合，断言精度沿用。CSS CRLF 最坏口径 298,936 B，脚本 27、关键帧 20，预算未上调。

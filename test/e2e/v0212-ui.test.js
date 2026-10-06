@@ -63,7 +63,7 @@ test('v0212 native navigation, category cancellation, release history and settin
 
   await page.locator('[data-view="releases"]').click();
   await page.waitForFunction(() => document.querySelectorAll('#releaseList details').length >= 40);
-  assert.equal(await page.locator('[data-release-tag="v0.2.12"]').getAttribute('open'), '');
+  assert.equal(await page.locator(`[data-release-tag="v${require('../../package.json').version}"]`).getAttribute('open'), '');
   assert.match(await page.locator('[data-release-tag="v0.2.12"]').textContent(), /设置快捷导航/);
   assert.match(await page.locator('[data-release-tag="v0.0.2"]').textContent(), /摘星阁|版本/);
   await page.locator('#releaseSearch').fill('v0.1.0.2');
