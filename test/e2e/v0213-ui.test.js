@@ -184,5 +184,5 @@ test('native workspace banners, compact journal, market filters and motion prefe
   assert.equal(await page.locator('#feedHeroTitle').evaluate(node => getComputedStyle(node).opacity), '1');
   await page.emulateMedia({ forcedColors: 'active' });
   assert.equal(await page.locator('#feedHero .banner-art').isVisible(), false);
-  fs.writeFileSync(path.join(root, 'work/v0214/banner-motion.json'), JSON.stringify({ tier, frames }, null, 2));
+  fs.writeFileSync(path.join(root, 'work/v0215/workspace-banner-motion.json'), JSON.stringify({ tier, frames }, null, 2));
 });
