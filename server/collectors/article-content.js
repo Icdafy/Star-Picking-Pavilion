@@ -2,6 +2,7 @@
 const cheerio = require('cheerio');
 const { publicUrl, fetchPage } = require('./public-web');
 const { looseDateIso } = require('./loose-date');
+const { networkAccess } = require('../network-access');
 
 function extractContent(html, url) {
   const $ = cheerio.load(html);
@@ -50,11 +51,15 @@ function reprintSource(text) {
   return m ? m[1].trim() : '';
 }
 
-async function enrichArticle(article) {
+async function enrichArticle(article, { network = networkAccess, fetchPageImpl = fetchPage } = {}) {
+  // 补抓历史新闻正文也遵守海外等待；调用方可能只有数据库原始行，没有联表 intl。
+  const intl = article.intl != null ? Boolean(article.intl) : article.source_id
+    ? Boolean(require('../db').db.prepare('SELECT intl FROM sources WHERE id=?').get(article.source_id)?.intl) : false;
+  if (intl && !(await network.detect()).available) return { text: '', images: [], status: 'network-wait' };
   try {
     const page = new URL(article.url).hostname === 'mp.weixin.qq.com'
       ? { html: await require('./wechat').pacedPage(article.url), url: article.url }
-      : await fetchPage(article.url, { withUrl: true });
+      : await fetchPageImpl(article.url, { withUrl: true });
     const { html } = page;
     if (isAccessChallenge(html)) throw new Error('访问验证，停止正文抓取');
     const content = extractContent(html, page.url);

@@ -20,23 +20,25 @@
 
 网络专项验证大陆不可达时不请求海外源、强制采集不能绕过网络判断、恢复后采集、国内源继续运行、跳过不累计失败或退避、没有海外源时不调用探针；并覆盖 CN 出口实际可访问、IP 查询失败、非 CN 但没有连通性、200 登录页／302 跳转、缓存／并发／强制刷新、检测超时、脱敏与环境／Windows 系统代理解析。
 
+最后复核补齐历史海外资料的正文和配图等待：正文补抓从原始行关联到真实信源 intl 标记；不可达时零正文请求，国内正文照常，恢复后可补抓。分析入口同时避免海外配图请求，不把正文等待永久当作处理完成。新增专项通过后最终单元增至 963；产品补充提交另走完整 main CI，发布只采用最终通过提交。
+
 翻译专项验证外文及中英混合待译、中文专名混排、中文与名称校验、缺项／错序／重复／未译／名称丢失拒绝、无模型与预算暂停保留队列、失败延迟、回执复用与预算只扣一次、事务写入中文和全文索引、原文及星标保留、旧外文展示字段与事件标题更新、海外导入走相同队列。真实模型 HTTP 路径使用隔离的本地兼容测试服务，未调用用户的付费密钥，不能据此宣称每家在线模型的语言质量已逐条实测。
 
 真实 Electron 专项使用主入口、后端、预加载和原生 IPC，验证新信源 intl 提交、启停后仍保留标记、中性等待状态、待译数量、中文标题与摘要、名称保留、普通流隐藏未译内容且星标保留中文提示。双主题与 800／1440 宽度截图无横向溢出，并人工查看截图。未拦截应用 API 或伪造网络成功来通过桌面断言。
 
 ## 本地完整验证
 
-- 单元与集成：962／962，20.92 秒（补齐待译检索口径后的最终运行）。
+- 单元与集成：963／963，21.14 秒（补齐海外正文／配图等待后的最终运行）。
 - 真实 Electron：25／25，278.19 秒，含既有 160 组窗口／缩放／视图布局，以及主题、动效、三种刊期、设置、更新、凭据、重启和单实例验证。
 - fail／cancelled／skipped／todo 全为 0。
 - 生产依赖审计：0 漏洞；无新增依赖，第三方声明 47 项。
 - 版本、短版本、构建版本、界面与更新元数据统一为 0.2.21，内置更新日志 49 条，本版正文与发布说明一致。
-- 包边界：1,279 项 ASAR，13,685,491 B；最终候选安装器 99,603,564 B。
+- 包边界：1,279 项 ASAR，13,686,376 B；最终候选安装器 99,604,002 B。
 - 候选 PE 产品／文件版本 0.2.21、NotSigned；latest.yml 版本、文件名、尺寸及两处 SHA-512 与实际安装器一致。
 
-最终本地候选 SHA-256：`7623fa5253c04c574d6d3a85b57fa80de02f683ea203735341067ac5a47c64b1`。先前候选的摘要和文件保留在 candidate-pe.json；最终候选为 candidate-pe-final.json。正式构建从 CI 发布提交生成，正式附件摘要以公开下载结果为准。
+最终本地候选 SHA-256：`25a2b4ead5e1560c45792c8188841362f31500205061b36f33119d576718cfed`。先前候选摘要保留在 candidate-pe.json 与 candidate-pe-final.json；最终候选信息为 candidate-pe-release.json。正式构建从 CI 发布提交生成，正式附件摘要以公开下载结果为准。
 
-本地证据：sources-before.json、sources-after-first.json、sources-after.json、existing-content.json、candidate-sites.json、lp-probe.json、selector-fixes-initial.json／selector-fixes.json、focused-final.log、translation-upgrade-final.log、desktop-sources.log、unit-final.log、unit-verified.log、electron-complete.log、runtime-audit.log、notices.log、releases-sync.log、build.log／build-final.log、package-verification-final.log、version-artifacts-final.log、candidate-pe-final.json、candidate-update-metadata.json 及 screenshots/。
+本地证据：sources-before.json、sources-after-first.json、sources-after.json、existing-content.json、candidate-sites.json、lp-probe.json、selector-fixes-initial.json／selector-fixes.json、focused-final.log、translation-upgrade-final.log、desktop-sources.log、unit-final.log、unit-verified.log、unit-release-candidate.log、electron-complete.log、electron-sources-final.log、runtime-audit.log、notices.log、releases-sync.log、build-release-candidate.log、package-verification-release.log、version-artifacts-release.log、candidate-pe-release.json、candidate-update-metadata.json 及 screenshots/。
 
 ## 发布状态
 

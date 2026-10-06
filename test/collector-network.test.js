@@ -53,6 +53,23 @@ test('离线和大陆受限网络完全跳过海外请求，手动采集也不�
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
+test('历史海外新闻的正文补抓同样静默等待，国内正文不受影响', async () => {
+  const { enrichArticle } = require('../server/collectors/article-content');
+  const source = Number(db.prepare("INSERT INTO sources(name,url,type,intl) VALUES('海外正文','https://example.test/body-source','rss',1)").run().lastInsertRowid);
+  let calls = 0;
+  const fetchPageImpl = async url => { calls++; return { html: '<article><h1>火箭试飞</h1><p>完成测试。</p></article>', url }; };
+  const network = { detect: async () => ({ available: false }) };
+  const waiting = await enrichArticle({ source_id: source, url: 'https://example.test/news' }, { network, fetchPageImpl });
+  assert.equal(waiting.status, 'network-wait');
+  assert.equal(calls, 0);
+  const domestic = await enrichArticle({ intl: 0, url: 'https://example.test/domestic' }, { network, fetchPageImpl });
+  assert.equal(domestic.status, 'ok');
+  assert.equal(calls, 1);
+  const restored = await enrichArticle({ source_id: source, url: 'https://example.test/news' }, { network: { detect: async () => ({ available: true }) }, fetchPageImpl });
+  assert.equal(restored.status, 'ok');
+  assert.equal(calls, 2);
+});
+
 test('没有启用海外源时不进行 IP 或可达性请求', async () => {
   db.exec('UPDATE sources SET enabled=0');
   const result = await collectAll(null, { network: { snapshot: () => ({ state: 'unknown' }), detect: () => { throw new Error('unexpected network request'); } } });

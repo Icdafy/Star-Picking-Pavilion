@@ -37,6 +37,7 @@ const { reserveCall } = require('./receipts');
 const { clampPublishedAt } = require('../date-time');
 const { settleAll } = require('../async-work');
 const { translatePending, validateChineseText, NAMES } = require('./translation');
+const { networkAccess } = require('../network-access');
 
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 const ANALYSIS_VERSION = 3;
@@ -167,8 +168,11 @@ function refreshCleaning(rows) {
 
 // 正文与图片：评分和理解都要读正文；只抓一次，结果落库
 async function ensureContent(article, settings) {
+  if (article.intl && !(await networkAccess.detect()).available) return { status: 'network-wait', images: [] };
   if (!article.content_status) {
     const content = await enrichArticle(article);
+    // 网络恢复后可再补正文，不把等待状态永久当作正文已处理。
+    if (content.status === 'network-wait') return { status: 'network-wait', images: [] };
     article.content_text = content.text || article.content_text || '';
     article.content_status = content.status;
     article.publisher_id = content.publisherId || article.publisher_id || null;
