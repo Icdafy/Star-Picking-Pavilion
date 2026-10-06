@@ -41,9 +41,10 @@ test('browser-only pages have no update control', () => {
 
 test('the button retains its structure and renders real progress, ready and installing states', async () => {
   const f = fixture();
-  assert.equal(f.pill.hidden, false);
+  assert.equal(f.pill.hidden, true);
   assert.equal(f.pill.getAttribute('aria-label'), '检查更新');
   f.status({ status: 'available', version: '0.6.0' });
+  assert.equal(f.pill.hidden, false);
   assert.equal(f.pill.dataset.indeterminate, 'true');
   f.status({ status: 'downloading', percent: 42 });
   assert.equal(f.value.textContent, '42%');
@@ -83,6 +84,8 @@ test('progress clamps numbers and shows an indeterminate arc for unknown progres
 test('manual checks lock duplicate clicks and retain newer IPC results', async () => {
   let resolve, count = 0;
   const f = fixture({ checkForUpdates: () => { count++; return new Promise(done => { resolve = done; }); } });
+  f.status({ status: 'available', version: '0.6.0' });
+  f.status({ status: 'error', message: '下载失败' });
   const pending = f.pill.dispatch('click');
   await f.pill.dispatch('click'); assert.equal(count, 1);
   assert.equal(f.ctrl.status, 'checking');
@@ -95,6 +98,8 @@ test('manual checks lock duplicate clicks and retain newer IPC results', async (
 test('failed checks support retry, reset tooltips, and recover from rejected IPC', async () => {
   let fail = true;
   const f = fixture({ checkForUpdates: async () => { if (fail) throw new Error('网络不可达'); return { started: true }; } });
+  f.status({ status: 'available', version: '0.6.0' });
+  f.status({ status: 'error', message: '下载失败' });
   await f.pill.dispatch('click');
   assert.equal(f.ctrl.status, 'error'); assert.match(f.pill.title, /网络不可达/);
   assert.equal(f.pill.classList.has('error'), true);
@@ -103,6 +108,28 @@ test('failed checks support retry, reset tooltips, and recover from rejected IPC
   f.status({ status: 'current', version: '0.6.0' });
   assert.equal(f.pill.title, '已是最新版本 0.6.0');
   assert.equal(f.caption.textContent, '最新');
+  assert.equal(f.pill.hidden, true);
+});
+
+test('the update control appears only for a pending update and disappears when current', () => {
+  const f = fixture();
+  for (const status of ['idle', 'checking', 'error', 'current']) {
+    f.status({ status, version: '0.5.0' });
+    assert.equal(f.pill.hidden, true, `${status} must stay hidden before an update is detected`);
+    if (status === 'error') assert.equal(f.live.textContent, '更新检查暂时不可用', 'do not announce an invisible retry action');
+  }
+  for (const status of ['available', 'downloading', 'error', 'checking', 'downloaded', 'installing']) {
+    f.status({ status, version: '0.6.0', percent: 100 });
+    assert.equal(f.pill.hidden, false, `${status} must retain the pending update entry`);
+  }
+  f.status({ status: 'current', version: '0.6.0' });
+  assert.equal(f.pill.hidden, true, '100% downloaded is not the same as installed and current');
+  assert.equal(f.progress.hidden, true);
+  f.status({ status: 'checking' });
+  f.status({ status: 'error', message: '检查失败' });
+  assert.equal(f.pill.hidden, true, 'a later background check does not restore an obsolete update entry');
+  f.status({ status: 'available', version: '0.7.0' });
+  assert.equal(f.pill.hidden, false, 'a future update restores the same control');
 });
 
 test('progress announcements update at 10% intervals without suppressing visible progress', () => {

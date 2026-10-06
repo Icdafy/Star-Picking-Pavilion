@@ -14,12 +14,14 @@
     const value = pill.querySelector('[data-update-value]');
     const caption = pill.querySelector('[data-update-caption]');
     const states = ['idle', 'checking', 'current', 'available', 'downloading', 'downloaded', 'installing', 'error'];
-    let updState = 'idle', updateVersion = '', lastAnnouncement = '';
+    let updState = 'idle', updateVersion = '', lastAnnouncement = '', pendingUpdate = false;
     function render({ status, version, percent, message } = {}) {
       if (!states.includes(status)) return;
       const previous = updState;
       updState = status;
       if (version) updateVersion = String(version);
+      if (['available', 'downloading', 'downloaded', 'installing'].includes(status)) pendingUpdate = true;
+      else if (status === 'current') pendingUpdate = false;
       const busy = ['checking', 'available', 'downloading', 'installing'].includes(status);
       const raw = typeof percent === 'number' ? percent : NaN;
       const known = Number.isFinite(raw);
@@ -31,10 +33,11 @@
         available: `发现新版本 ${updateVersion}，准备下载…`,
         downloading: `下载更新${updateVersion ? ` ${updateVersion}` : ''}${known ? ` ${amount}%` : '…'}`,
         downloaded: `重启安装 ${updateVersion}`, installing: `正在重启安装${updateVersion ? ` ${updateVersion}` : ''}…`,
-        error: '更新失败，点击重试'
+        error: pendingUpdate ? '更新失败，点击重试' : '更新检查暂时不可用'
       };
       const label = labels[status];
-      pill.hidden = false;
+      // 检查过程保持安静；发现更新后保留下载、重试和重启入口，安装完成才隐藏。
+      pill.hidden = !pendingUpdate;
       pill.dataset.state = status;
       pill.dataset.indeterminate = String(busy && !determinate);
       pill.classList.toggle('error', status === 'error');
@@ -57,7 +60,7 @@
           : 'M10 3v9m-3-3 3 3 3-3M4 13v3h12v-3');
       }
       if (caption) caption.textContent = ({ checking: '检查', downloading: '下载', downloaded: '重启', installing: '安装', error: '重试', current: '最新' })[status] || '更新';
-      if (status !== previous) {
+      if (status !== previous && !pill.hidden) {
         motion?.revealText?.([caption].filter(Boolean));
         if (icon && !determinate && status !== 'error') motion?.spring?.(icon, {
           from: { transform: 'translateY(-3px) scale(.84)', opacity: '0' },

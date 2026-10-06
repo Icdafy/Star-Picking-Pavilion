@@ -67,14 +67,18 @@ test('journal preserves its banner and supports native copy, file menus, downloa
           const navigation = document.querySelector('.daily-date-controls').getBoundingClientRect();
           const previous = document.getElementById('dailyPrev').getBoundingClientRect(), next = document.getElementById('dailyNext').getBoundingClientRect();
           return { height: head.height, centerX: Math.abs(date.x + date.width / 2 - navigation.x - navigation.width / 2),
-            centerY: Math.abs(date.y + date.height / 2 - head.y - head.height / 2),
+            centerY: Math.abs(date.y + date.height / 2 - navigation.y - navigation.height / 2),
+            labelGap: Math.min(previous.top, next.top, date.top) - document.querySelector('.daily-overview-label').getBoundingClientRect().bottom,
+            dateFits: date.top >= navigation.top - 1 && date.bottom <= navigation.bottom + 1 && date.bottom <= head.bottom - 1,
             navigationAligned: previous.right <= date.left && date.right <= next.left && Math.abs(previous.y + previous.height / 2 - date.y - date.height / 2) < 1 && Math.abs(next.y + next.height / 2 - date.y - date.height / 2) < 1,
             font: parseFloat(getComputedStyle(document.getElementById('dailyDate')).fontSize), root: parseFloat(getComputedStyle(document.documentElement).fontSize),
             overflow: document.getElementById('appViewport').scrollWidth > document.getElementById('appViewport').clientWidth + 1,
             hasTimestamp: document.querySelector('.daily-head').textContent.includes('生成于') };
         });
         assert.ok(Math.abs(result.height - baseline[width][index]) <= 1, `${width}/${theme}/${scale}/${kind}: banner changed height ${result.height}`);
-        assert.ok(result.centerX < 1 && result.centerY < 1, `${kind} date must be at the center of the navigation space`);
+        assert.ok(result.centerX < 1 && result.centerY < 1, `${kind} date must be centered in the navigation space: ${JSON.stringify(result)}`);
+        assert.ok(result.labelGap >= result.root * .2, `${kind} navigation must leave room below the overview label: ${JSON.stringify(result)}`);
+        assert.equal(result.dateFits, true, `${kind} navigation must fit below the title within the banner: ${JSON.stringify(result)}`);
         assert.equal(result.navigationAligned, true, `${kind} arrows must flank and vertically align with the date`);
         assert.ok(result.font >= result.root * 1.87, 'date is 50% larger than the old 1.25rem size');
         assert.equal(result.overflow, false); assert.equal(result.hasTimestamp, false);

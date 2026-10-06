@@ -16,7 +16,8 @@ test('workspace update button retains its position, real IPC, progress and motio
   const app = await launchNativeElectron(root, profile);
   t.after(async () => { await app.close(); await fs.promises.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
   const page = await app.firstWindow();
-  await page.waitForSelector('#updatePill:not([hidden])');
+  await page.waitForFunction(() => document.getElementById('updatePill')?.dataset.state === 'idle');
+  assert.equal(await page.locator('#updatePill').isVisible(), false);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await app.evaluate(({ BrowserWindow, ipcMain }) => {
     const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); win.webContents.focus();
@@ -27,6 +28,14 @@ test('workspace update button retains its position, real IPC, progress and motio
     await app.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.send('update:status', value), payload);
     await page.waitForFunction(value => document.getElementById('updatePill').dataset.state === value, payload.status);
   };
+  await status({ status: 'checking' });
+  assert.equal(await page.locator('#updatePill').isVisible(), false);
+  await status({ status: 'current', version: '0.2.18' });
+  assert.equal(await page.locator('#updatePill').isVisible(), false);
+  await status({ status: 'error', message: '检查失败' });
+  assert.equal(await page.locator('#updatePill').isVisible(), false);
+  await status({ status: 'available', version: '0.2.19' });
+  assert.equal(await page.locator('#updatePill').isVisible(), true);
   const geometry = [];
   for (const [width, height] of [[800, 600], [1080, 680], [1440, 920], [1920, 1080]]) {
     await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(...size), [width, height]);
@@ -70,6 +79,7 @@ test('workspace update button retains its position, real IPC, progress and motio
     { status: 'downloading', percent: 0 }, { status: 'downloading', percent: 55 }, { status: 'downloading', percent: 100 },
     { status: 'downloaded', version: '0.2.17' }, { status: 'error', message: '网络测试错误' }]) {
     await status(payload);
+    assert.equal(await page.locator('#updatePill').isVisible(), payload.status !== 'current');
     await page.screenshot({ path: path.join(output, `${payload.status}-${payload.percent ?? ''}.png`) });
     assert.equal(await page.locator('#updatePill').evaluate(node => node === globalThis.__updateButtonNode && node.querySelector('.update-arc') === globalThis.__updateArcNode), true);
   }

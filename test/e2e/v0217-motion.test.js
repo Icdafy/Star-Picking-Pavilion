@@ -55,6 +55,8 @@ test('v0217 native desktop: theme contrast, spring tracking, semantic reveals, d
     })).catch(error => ({ error: error.message })), null, 2));
   });
 
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('update:status', { status: 'available', version: '0.2.19' }));
+  await page.waitForSelector('#updatePill:not([hidden])');
   const colors = [];
   for (const theme of ['light', 'dark']) for (const palette of require('../../renderer/aqua-shell').FLUID_PALETTES[theme]) {
     for (const mode of ['mica', 'compat']) for (const scale of ['sm', 'md', 'lg', 'xl']) {

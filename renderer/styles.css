@@ -607,6 +607,11 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
   background: none; border: none; outline: none; color: var(--c-fg);
   font-size: var(--t-base); width: 100%; min-width: 0; font-family: var(--font-ui);
 }
+/* 焦点环沿外层搜索条的圆角绘制，覆盖 intel.css 的通用输入框描边。 */
+.searchbox input:focus-visible { outline: none; }
+@media (forced-colors: active) {
+  .searchbox:focus-within { outline: var(--focus-ring); outline-offset: 2px; }
+}
 .searchbox input::placeholder { color: var(--c-fg-faint); }
 .searchbox input::-webkit-search-cancel-button { display: none; }
 
@@ -1595,12 +1600,12 @@ body.is-idle .update-ring { animation-play-state: paused !important; }
 .period-switch .chip.active { color: var(--accent-ink); background: var(--active-bg); border-color: var(--accent-line); }
 .daily-toolbar .daily-actions { margin-left: auto; }
 .daily-head { position: relative; display: grid; grid-template-columns: minmax(0, 2.35fr) minmax(0, 1fr); align-items: center; gap: var(--sp-2) var(--sp-3); min-height: calc(6.715rem + 2px); padding: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-4); background: linear-gradient(110deg, var(--accent-soft), transparent 55%), var(--glass-bg-soft); }
-.daily-overview-heading { position: relative; align-self: stretch; min-width: 0; }
-.daily-title { position: absolute; top: 0; left: 0; min-width: 0; }
-.daily-overview-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--c-fg-dim); font-size: var(--t-xs); margin-bottom: .25rem; }
+.daily-overview-heading { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .25rem; align-self: stretch; min-width: 0; }
+.daily-title { min-width: 0; }
+.daily-overview-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--c-fg-dim); font-size: var(--t-xs); margin: 0; }
 #dailyDate { font: 700 var(--t-2xl)/1.3 var(--font-display); text-align: center; overflow-wrap: anywhere; min-width: 0; margin: 0; }
-.daily-date-range { white-space: nowrap; }
-.daily-date-controls { position: absolute; inset: 0; display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem; align-items: center; gap: var(--sp-3); }
+.daily-date-range { white-space: nowrap; font-size: .65em; }
+.daily-date-controls { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem; align-items: center; gap: var(--sp-3); min-width: 0; }
 .daily-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin: 0; padding-left: var(--sp-5); border-left: 1px solid var(--glass-border); }
 .daily-metrics > div + div { border-left: 1px solid var(--glass-border); padding-left: var(--sp-3); }
 .daily-metrics dt { color: var(--c-fg-dim); font-size: var(--t-xs); }
@@ -2397,9 +2402,6 @@ body.is-idle .update-ring { animation-play-state: paused !important; }
   .lexicon-panel { padding: var(--sp-3); max-height: min(30rem, calc(100vh - 6rem)); }
   .lexicon-body { gap: var(--sp-3); }
   .daily-head { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; min-height: calc(11.285rem + 2px); }
-  .daily-overview-heading { position: static; }
-  .daily-title { top: var(--sp-2); left: var(--sp-5); }
-  .daily-date-controls { inset: 0 var(--sp-5); }
   .daily-metrics { align-self: end; border-left: 0; border-top: 1px solid var(--glass-border); padding: var(--sp-2) 0 0; }
 }
 
