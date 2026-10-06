@@ -1,10 +1,10 @@
 # v0.2.13 发布状态
 
-候选已实现工作区八个页头横幅、文字与星轨动效、情报日志统一工具栏及其下方独立报告概况。版本和发布说明、41 条内置日志及第三方声明已同步为 0.2.13。完整本地回归为 892／892 单元、21／21 真实 Electron（160 布局组合），无失败、取消或跳过；36 张双主题／宽窄截图已复核。生产依赖审计 0 漏洞。
+[v0.2.13](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.13) 已作为最新正式版发布：工作区八个页头横幅、文字分层入场与星轨动效、情报日志统一工具栏及其下方独立报告概况完成，双主题与宽窄窗口适配。
 
-本地 Windows 候选包构建及 1273 包边界通过，十二项生产文件与 ASAR 逐字节一致，PE／包内／更新版本均为 0.2.13、NotSigned。ASAR 13,590,704 B，安装器 99,582,467 B，SHA-256 为 `22fed2504ac3bc112d8d593f78d6fe0aaf045671b6aac623b1f942b75542ffac`。即将进入既有 CI／tag 发布门禁，尚未创建正式 Release。本机不运行安装器。实网信源 183／186 返回内容，1 空、2 请求失败，未修改采集逻辑，具体证据与发布状态见 [docs/v0213-validation.md](docs/v0213-validation.md)。
+[分支 CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37427473304)、[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37428438472) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37428443597) 对产品提交 `f8d1b66d8ebabb9171dadc583d3313d4cecc0990` 全部通过：892 单元、21 真实 Electron（160 布局组合）、0 生产漏洞、47 项声明零差异、1273 包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。六项正式附件重新下载核验，摘要、PE 版本与更新元数据全部一致。安装器 99,580,204 B、0.2.13、NotSigned，SHA-256 为 `e5264dc3ac9d586fc7a37c0111a54b169b4b970926cd11b5c0ce64d7d270cfa2`。
 
-分支 CI 首轮单元 892 全过、桌面 20／21，新横幅测试未观察到标题位移，后续发布门禁未执行。测试改为原生 click 边界采样、明确 no-preference 场景和真实焦点，产品实现及原断言不变；本地专项采到 73 帧／58 个不同位置并通过。正在以修正后的测试重跑完整 CI，失败日志与原因未确定的事实继续保留。
+发布后应用匿名实网同步 41 条日志与离线缓存恢复成功。无发布阻塞。首轮分支动效观测失败、修正与最终成功均保留；实网信源 183／186 返回内容，1 空、2 请求失败，严格复查未通过。完整证据见 [docs/v0213-validation.md](docs/v0213-validation.md)。收尾仅更新文档，产品与发布 tag 一致。
 
 ---
 

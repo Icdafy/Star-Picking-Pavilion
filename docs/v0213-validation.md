@@ -26,7 +26,7 @@ CSS 按 Windows CRLF 最坏口径共 298,936 B，低于既有 292 KiB／299,008 
 
 ## 最终本地回归与信源
 
-最终完整单元与集成回归 892／892（16.14 秒），完整真实 Electron 回归 21／21（196.36 秒），fail／cancelled／skip／todo 全为 0，包含 160 个布局组合。原始输出为 work/v0213/unit-final.log、e2e-first.log。36 张最终主题／宽窄截图已逐类型复核，报告统计、右侧操作、独立概况和标题文字可见，无重叠或横向溢出。
+观测修正后的最终完整单元与集成回归 892／892（14.60 秒），完整真实 Electron 回归 21／21（194.68 秒），fail／cancelled／skip／todo 全为 0，包含 160 个布局组合。原始输出为 work/v0213/unit-click-final.log、e2e-click-final.log。36 张最终主题／宽窄截图已逐类型复核，报告统计、右侧操作、独立概况和标题文字可见，无重叠或横向溢出。
 
 实网信源复查 186 项中 183 返回内容、1 项为空（东财检索·穿越者）、2 项请求失败（巨潮资讯·深市公告、泰伯网·空天资讯，fetch failed）。严格信源复查未通过，保留失败记录，不删源或调整门禁掩盖结果。本版没有修改信源目录与采集逻辑；原始证据为 work/v0213/source-audit.{log,json}。
 
@@ -34,7 +34,7 @@ CSS 按 Windows CRLF 最坏口径共 298,936 B，低于既有 292 KiB／299,008 
 
 本地候选包构建成功，1273 项包边界通过，app.asar 为 13,590,704 B，安装包为 99,582,467 B。十二项生产文件与 ASAR 逐字节一致，包内版本、PE 文件／产品版本与更新元数据均为 0.2.13，签名 NotSigned；安装器 SHA-256 为 `22fed2504ac3bc112d8d593f78d6fe0aaf045671b6aac623b1f942b75542ffac`。证据为 work/v0213/build.log、package-audit.log、candidate-metadata.json、candidate-asar.json。补充比对工具首次对三层 ASAR 路径使用正斜杠，Windows 库未识别，改为本机路径分隔符后全部通过；包中该文件本来完整存在。
 
-当前候选已完成完整本地验证，将进入既有 CI／tag 发布门禁，尚未创建 v0.2.13 tag 或正式 Release。安装／启动／单实例／退出／卸载烟测仅在一次性 Windows CI 执行，本机不运行安装器。
+本地候选产物仅作开发验证；正式产物由下述 tag 工作流独立生成。安装／启动／单实例／退出／卸载烟测仅在一次性 Windows CI 执行，本机不运行安装器。
 
 ### 分支 CI 首轮与动效观测修正
 
@@ -42,4 +42,25 @@ CSS 按 Windows CRLF 最坏口径共 298,936 B，低于既有 292 KiB／299,008 
 
 将新测试的真实帧采样放在原生 click 事件边界，消除“控制点击后，再经 CDP 请求启动采样”的观测间隙；明确设置 no-preference 动画场景并核验真实焦点，随后继续测试减少动画。保留大于两个不同真实位置的原断言、500 ms 采样时长和全部几何／统计检查。补充输出首尾帧、焦点、档位及不同位置数量，不修改动画实现、时长、产品配置或性能预算。首轮没有采样帧记录，不能仅凭失败断言确定其具体原因。
 
-修正后本地专项通过（34.97 秒），73 个真实帧中有 58 个不同位置，标题从 8 px／opacity 0 到 0 px／opacity 1，真实前台且 full 档。原始输出为 work/v0213/ui-click-capture.log，更新的帧记录为 banner-motion.json。后续将按新测试重新执行完整门禁。
+修正后本地专项通过（34.97 秒），73 个真实帧中有 58 个不同位置，标题从 8 px／opacity 0 到 0 px／opacity 1，真实前台且 full 档。原始输出为 work/v0213/ui-click-capture.log，更新的帧记录为 banner-motion.json。随后的完整本地回归采到 74 帧／59 个不同位置；三个远端完整门禁结果见下节。
+
+## 正式发布与下载核验
+
+[v0.2.13](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.13) 已于 2026-10-06T07:21:35Z 发布为最新正式版，draft=false、prerelease=false。注释 tag 对象为 `d792ce446f68a03607fde14d4122f2d795517b7e`，解引用为产品提交 `f8d1b66d8ebabb9171dadc583d3313d4cecc0990`，推送时远端 main 同时指向该产品提交。[分支 CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37427473304)、[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37428438472) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37428443597) 对该精确提交均首次完整通过：892／892 单元、21／21 真实 Electron（160 布局组合），fail／cancelled／skip／todo 全为 0，生产依赖审计 0 漏洞、47 项声明零差异、1273 包边界。一次性 Windows 安装、启动、单实例、退出和卸载成功，用户数据保留。这里的首次指该最终提交；上一提交的分支失败继续保留于上节。
+
+六项正式附件重新下载至新的隔离目录 `F:\摘星阁\work\v0213\published-20261006072215204`，文件尺寸与 GitHub SHA-256 摘要逐项一致，安装器校验同时匹配 SHA256SUMS.txt。正式安装器 99,580,204 B，PE 文件／产品版本 0.2.13，NotSigned；latest.yml 版本、路径、尺寸及两处 SHA-512 均与实际安装器匹配，SBOM 为 CycloneDX 1.6／产品 0.2.13，第三方声明统一行尾后与发布 tag 内容完全一致。
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `c157031addadaea044c8f4cf0aeefef8d44227f1077d58bf591c7bd449f41174` |
+| sbom.cdx.json | 81352 | `93002f3f0cb84773b6f376e54bc54294043744571a1678cb22c8651d97331149` |
+| SHA256SUMS.txt | 106 | `603afd357b3c7aa35d3a9e2f79ed12a2ad861383d30f1553b9eff872662a22e4` |
+| Star-Picking-Pavilion-Setup-0.2.13.exe | 99580204 | `e5264dc3ac9d586fc7a37c0111a54b169b4b970926cd11b5c0ce64d7d270cfa2` |
+| Star-Picking-Pavilion-Setup-0.2.13.exe.blockmap | 105990 | `1491d4eb239aeba440296b7d0b3b44c5f2c89b7ff466c6ee147372c0881f53b9` |
+| THIRD_PARTY_NOTICES.txt | 6347 | `6e76ef9ba1d64f1b5de01dc3f859b0574dd39909818e3c25941985c3f45ee86e` |
+
+公开 Release 正文、本版内置记录与 RELEASE_NOTES.md 一致。发布后按原应用服务、默认超时和匿名实网请求成功同步全部 41 条正式记录，本版发布时间更新为 2026-10-06T07:21:35.000Z；新缓存保存成功，离线重建服务恢复的全部记录及 lastSyncedAt 逐项一致。实网与离线验证无本轮失败。
+
+下载核验首轮在第三方声明逐字节对比本地工作树时失败：发布附件为 6,347 B，本地为 6,387 B。对照发布 tag 的 Git 对象并统一 CRLF／LF 后，正文及标准化 SHA-256 完全相同，差异只在行尾。校验工具改为按 tag 内容比较行尾规范化后的正文；全部六附件的原始字节、尺寸与 GitHub SHA-256 摘要依然逐项校验。首轮输出保存在 published-assets.log，后续为 published-assets-verified.log，行尾证据为下载目录中的 notice-line-ending.verification.json。未修改或覆盖任何正式附件。
+
+证据为 work/v0213/{branch,main,release}-ci.{json,log,verified.json}、publication-refs.json、published.verification.json、隔离下载目录中的 release.json、latest-release.json、verification.json、pe-metadata.json，以及 published-sync.verification.json。收尾提交仅更新文档和状态，生产文件、测试、版本、发布说明及内置历史保持 tag 内容。
