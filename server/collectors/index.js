@@ -3,7 +3,7 @@
 // 后续扩展：RSSHub、公开API、三方数据平台，只需新增一个适配器文件
 const fs = require('node:fs');
 const path = require('node:path');
-const { db, now, insertArticle } = require('../db');
+const { db, now, insertArticle, withTransaction } = require('../db');
 const { loadSettings } = require('../config');
 const { collectionIntervalMs } = require('../schedule-policy');
 const { isDue, nextFetchAtIso } = require('../source-health');
@@ -81,25 +81,25 @@ function seedSources() {
   // 全新库：全量导入；已有库：仅当 seed 版本更高时增量补新源
   if (count > 0 && applied >= seedVersion) return;
 
-  const migrated = count > 0 ? applySourceMigrations(seed._migrations) : 0;
+  const { migrated, removed, added } = withTransaction(() => {
+    const migrated = count > 0 ? applySourceMigrations(seed._migrations) : 0;
+    const removed = applied < Number(seed._pruneDisabledBeforeVersion || 0) ? removeDisabledSources() : 0;
+    const stmt = db.prepare(`INSERT OR IGNORE INTO sources
+      (name, type, url, tier, domain, enabled, selector_json, note, intl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    let added = 0;
+    for (const s of seed.sources) {
+      const r = stmt.run(s.name, s.type, s.url, s.tier, s.domain,
+        s.enabled === false ? 0 : 1,
+        s.selector ? JSON.stringify(s.selector) : null, s.note || null,
+        s.intl ? 1 : 0);
+      if (r.changes > 0) added++;
+    }
+    db.prepare("INSERT INTO meta (key, value) VALUES ('seedVersion', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(String(seedVersion));
+    return { migrated, removed, added };
+  });
   if (migrated) console.log(`[collect] 信源迁移（v${seedVersion}）：修正 ${migrated} 个`);
-  if (applied < Number(seed._pruneDisabledBeforeVersion || 0)) {
-    const removed = removeDisabledSources();
-    if (removed) console.log(`[collect] 信源清理（v${seedVersion}）：移除 ${removed} 个停用入口，保留历史来源`);
-  }
-
-  const stmt = db.prepare(`INSERT OR IGNORE INTO sources
-    (name, type, url, tier, domain, enabled, selector_json, note, intl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  let added = 0;
-  for (const s of seed.sources) {
-    const r = stmt.run(s.name, s.type, s.url, s.tier, s.domain,
-      s.enabled === false ? 0 : 1,
-      s.selector ? JSON.stringify(s.selector) : null, s.note || null,
-      s.intl ? 1 : 0);
-    if (r.changes > 0) added++;
-  }
-  db.prepare("INSERT INTO meta (key, value) VALUES ('seedVersion', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-    .run(String(seedVersion));
+  if (removed) console.log(`[collect] 信源清理（v${seedVersion}）：移除 ${removed} 个停用入口，保留历史来源`);
   console.log(`[collect] 种子信源同步（v${seedVersion}）：新增 ${added} 个`);
 }
 

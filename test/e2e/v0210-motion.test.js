@@ -363,7 +363,11 @@ test('v0211 Electron: decoration scheduling sleeps at rest and clears on scroll,
   assert.ok(Math.abs(delayed.actual - delayed.target) < 3, JSON.stringify(delayed));
   await page.evaluate(() => { window.requestAnimationFrame = originalMotionRaf; });
   await card.hover();
-  await page.mouse.wheel(0, 100); await page.waitForTimeout(150);
+  const scrollBefore = await page.locator('#appViewport').evaluate(el => el.scrollTop);
+  await page.mouse.wheel(0, 100);
+  // Wheel dispatch is asynchronous: observe the real native scroll before
+  // checking that its capture listener has cleared the decoration.
+  await page.waitForFunction(before => document.getElementById('appViewport').scrollTop > before, scrollBefore);
   assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
   await card.hover(); await page.emulateMedia({ forcedColors: 'active' });
   await page.waitForTimeout(100);

@@ -175,3 +175,25 @@ test('v029 升级只清理一次停用入口，历史文章、星标和来源外
   seedSources();
   assert.equal(byId(pausedLater).removed_at, null, '同版后续手工停用仍可启用，不应再次批量移除');
 });
+
+test('source seed failures roll back migrations, removal, inserts and version together', () => {
+  const retired = db.prepare('SELECT id FROM sources WHERE url=?').get('https://36kr.com/feed').id;
+  db.prepare('UPDATE sources SET enabled=1, removed_at=NULL WHERE id=?').run(retired);
+  const disabled = insertSource({ url: 'https://atomic-disabled.test/', enabled: 0 });
+  db.prepare("UPDATE meta SET value='11' WHERE key='seedVersion'").run();
+  const before = db.prepare('SELECT * FROM sources ORDER BY id').all();
+  const failingUrl = seed.sources[1].url.replaceAll("'", "''");
+  db.exec(`CREATE TRIGGER fail_seed BEFORE INSERT ON sources WHEN NEW.url='${failingUrl}'
+    BEGIN SELECT RAISE(ABORT, 'injected source seed failure'); END`);
+  try {
+    assert.throws(() => seedSources(), /injected source seed failure/);
+    assert.deepEqual(db.prepare('SELECT * FROM sources ORDER BY id').all(), before);
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key='seedVersion'").get().value, '11');
+    assert.equal(db.isTransaction, false);
+  } finally { db.exec('DROP TRIGGER fail_seed'); }
+  seedSources();
+  assert.equal(byId(retired).enabled, 0);
+  assert.ok(byId(disabled).removed_at);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='seedVersion'").get().value, String(seed._version));
+  assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
+});

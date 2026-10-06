@@ -9,7 +9,7 @@
 // 关注级别：0 未标记 · 1 关注 · 2 被投。内置条目随版本增量同步身份信息，
 // 但用户的标记、备注、停用状态永远不被覆盖；用户自建的公司（custom=1）不参与同步。
 const crypto = require('node:crypto');
-const { db, now } = require('../db');
+const { db, now, withTransaction } = require('../db');
 const { loadCompanySeed, loadSelection } = require('../industry');
 
 const WATCH_LEVELS = Object.freeze({ none: 0, watch: 1, portfolio: 2 });
@@ -42,11 +42,10 @@ let seedChecked = false;
 
 function syncCompanySeed({ force = false } = {}) {
   if (seedChecked && !force) return 0;
-  seedChecked = true;
   const seed = loadCompanySeed();
   const applied = Number(db.prepare("SELECT value FROM meta WHERE key='companySeedVersion'").get()?.value || 0);
   const count = db.prepare('SELECT COUNT(*) c FROM companies WHERE custom = 0').get().c;
-  if (!force && applied >= seed.version && count > 0) return 0;
+  if (!force && applied >= seed.version && count > 0) { seedChecked = !db.isTransaction; return 0; }
   const upsert = db.prepare(`INSERT INTO companies
       (id, name, aliases_json, products_json, domain, segment, region, status, note, custom, watch, enabled, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, ?, ?)
@@ -55,18 +54,23 @@ function syncCompanySeed({ force = false } = {}) {
       domain = excluded.domain, segment = excluded.segment, region = excluded.region, status = excluded.status,
       updated_at = excluded.updated_at
     WHERE companies.custom = 0`);
-  let changed = 0;
   const stamp = now();
-  for (const c of seed.companies) {
-    const prior = db.prepare('SELECT aliases_json, products_json FROM companies WHERE id=?').get(c.id);
-    changed += upsert.run(c.id, c.name.trim(), JSON.stringify([...new Set([...parseList(prior?.aliases_json), ...stringList(c.aliases)])]),
-      JSON.stringify([...new Set([...parseList(prior?.products_json), ...stringList(c.products)])]),
-      DOMAIN_VALUES.has(c.domain) ? c.domain : null, typeof c.segment === 'string' ? c.segment.slice(0, 40) : null,
-      c.region === 'intl' ? 'intl' : 'cn', STATUS_VALUES.has(c.status) ? c.status : 'unknown',
-      typeof c.note === 'string' ? c.note.slice(0, 200) : null, stamp, stamp).changes;
-  }
-  db.prepare("INSERT INTO meta (key, value) VALUES ('companySeedVersion', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-    .run(String(seed.version));
+  const changed = withTransaction(() => {
+    let changed = 0;
+    for (const c of seed.companies) {
+      const prior = db.prepare('SELECT aliases_json, products_json FROM companies WHERE id=?').get(c.id);
+      changed += upsert.run(c.id, c.name.trim(), JSON.stringify([...new Set([...parseList(prior?.aliases_json), ...stringList(c.aliases)])]),
+        JSON.stringify([...new Set([...parseList(prior?.products_json), ...stringList(c.products)])]),
+        DOMAIN_VALUES.has(c.domain) ? c.domain : null, typeof c.segment === 'string' ? c.segment.slice(0, 40) : null,
+        c.region === 'intl' ? 'intl' : 'cn', STATUS_VALUES.has(c.status) ? c.status : 'unknown',
+        typeof c.note === 'string' ? c.note.slice(0, 200) : null, stamp, stamp).changes;
+    }
+    db.prepare("INSERT INTO meta (key, value) VALUES ('companySeedVersion', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(String(seed.version));
+    return changed;
+  });
+  // An enclosing transaction may still roll back this seed and its version.
+  seedChecked = !db.isTransaction;
   indexVersion++;
   return changed;
 }

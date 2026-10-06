@@ -7,6 +7,7 @@
 - **连续弹簧**：选择块从实际视觉位置改向，并继承当前弹簧速度；玻璃高光与轻回弹让连续切换更自然。
 - **触压光波**：鼠标与键盘触发柔和光环，反馈有数量和寿命上限。
 - **主题与减少动画**：双主题、缩放与原有数据设置沿用。静止后停止逐帧计算；低功耗、强制颜色和减少动画关闭追光与磁吸，滚动、隐藏与失焦及时清理。
+- **冷启动优化**：合并数据库结构、默认信源和公司种子的初始化写入，减少磁盘同步；失败回滚，历史数据、星标和用户备注保持原有语义。
 
 参考 [Olivier Larose 磁吸按钮](https://blog.olivierlarose.com/tutorials/magnetic-button)、[Apple 弹簧动画](https://developer.apple.com/videos/play/wwdc2023/10158/)、[Motion 指针反馈](https://motion.dev/docs/cursor)与 [Linear 界面设计](https://linear.app/now/behind-the-latest-design-refresh)，在现有原生 JS / WAAPI 架构中实现，无新增依赖。具体实现和验证见 [v0.2.11 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0211-validation.md)。
 

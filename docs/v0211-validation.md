@@ -56,3 +56,15 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 针对上述改动的 7 项桌面复验全部通过（50.79 秒，fail／cancelled／skip／todo=0），日志在 work/v0211/motion-native-third.log；随后执行完整桌面回归并等待新的精确提交 CI。
 
 本轮完整桌面复验 **19／19 通过**（191.06 秒，fail／cancelled／skip／todo=0），日志在 work/v0211/e2e-third-final.log。本轮只修改桌面测试环境与验证记录，生产文件和候选包与上一轮已验证结果一致，单元／审计／包边界沿用前述本地结果，并由新精确提交的 GitHub CI 全量复核。
+
+## 第三次 CI 失败与冷启动修正
+
+精确提交 3e07ea90cc9c53211106eb687894bf4b7c7c8923 的 [第三次 main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37408523279) 为 882／882 单元、17／19 桌面。完整档位与分层光感专项均通过；清理专项失败时正文 scrollTop=0，150ms 固定等待尚未等到真实滚动，断言改为等待原生滚动位置变化后立即核对清理，原有零节点要求保留。既有滚动条测试的原生日志明确记录“后端启动握手超时”，随后才输出 186 个种子信源同步与 server:ready。后续发布门禁未执行，没有打 tag；原始记录在 work/v0211/main-failed-third.{json,log}。
+
+冷启动原本为建表／兼容补列、186 个信源和 78 家公司逐条提交。现在结构迁移与两个种子同步分别做原子批次，减少磁盘同步放大；不更改 PRAGMA 同步／外键／WAL 策略、15 秒启动握手上限、20 秒测试启动等待或工作流。嵌套批次使用 savepoint，不提交调用者事务；版本标记与种子同批提交，公司种子只在外层事务已提交时缓存成功，失败后可重试。默认目录与迁移内容、历史文章、星标、用户启停／别名／备注不变。批量写入依据见 [SQLite 官方说明](https://www.sqlite.org/faq.html#q19)，事务状态 API 自 Node 22.16／24.0 支持，符合项目 Node ≥22.19 要求，见 [Node SQLite 文档](https://nodejs.org/api/sqlite.html#databaseistransaction)。
+
+本机 Node 24.19 对每版三个全新隔离 profile 实测：初始化均值由 346.88ms 降至 187.35ms，数据库结构阶段由 67.51ms 降至 17.20ms，信源同步由 77.96ms 降至 3.03ms。两版均为 186 信源／78 公司、foreign_key_check=0、quick_check=ok。记录在 work/v0211/startup-{baseline,batched}.json。该数据只代表本机，不据此宣称 CI 主机的底层磁盘延迟原因已定位或启动超时已根治。
+
+新增四项真实数据库验证：结构初始化故障完整回滚并重试、嵌套批次不提交外层、信源同步失败连同迁移／移除／版本回滚，以及公司同步故障／外层回滚后可重试且用户状态保留。专项初轮为 30／31，通过修正公司测试样本脚本的字符串语法后 31／31 通过，日志在 startup-atomic-tests.log 与 startup-atomic-tests-fixed.log。完整单元为 **886／886 通过**（13.82 秒，fail／cancelled／skip／todo=0），原始日志在 work/v0211/unit-startup-final.log。完整桌面与新候选包正在复验。
+
+本轮完整桌面 **19／19 通过**（134.91 秒，fail／cancelled／skip／todo=0），原始日志 e2e-startup-final.log；生产审计 0 漏洞，47 项第三方声明再生成无 Git 差异。候选包重建、版本与 1271 项包边界通过：app.asar 13,413,951 B，安装器 99,546,559 B，PE 产品／文件版本 0.2.11，NotSigned，SHA-256 `b0c11d77ae3c7a23df06bb650d3305d3d652ce8ee35dcfbf5cc40f5b866f22c5`。五项本轮生产文件逐字节与 ASAR 核对一致，包装版本为 0.2.11；本机未运行安装器。记录在 build-startup-final.log、candidate-startup-metadata.json、audit-startup-final.log、notices-startup-final.log。新的精确提交 CI 与正式发布结果待补录。

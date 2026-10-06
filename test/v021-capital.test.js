@@ -74,3 +74,46 @@ test('migration preserves disabled-company deal and article references',()=>{
  assert.equal(db.prepare("SELECT company_id FROM deals WHERE round='C轮'").get().company_id,'dream-aerospace');
  assert.equal(db.prepare('SELECT company_id FROM article_companies WHERE article_id=?').get(a.id).company_id,'dream-aerospace');
 });
+
+test('company seeds remain atomic and retry after a failed write or enclosing rollback', async t => {
+  const sandbox = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-company-atomic-'));
+  t.after(async () => fs.promises.rm(sandbox, { recursive: true, force: true }));
+  const root = path.join(__dirname, '..');
+  const program = `
+    const assert = require('node:assert/strict');
+    const { db, withTransaction, closeDatabase } = require(${JSON.stringify(path.join(__dirname, '../server/db.js'))});
+    const companies = require(${JSON.stringify(path.join(__dirname, '../server/ai/companies.js'))});
+    const seed = require(${JSON.stringify(path.join(__dirname, '../server/industry.js'))}).loadCompanySeed();
+    const first = seed.companies[0].id;
+    db.prepare("INSERT INTO companies(id,name,aliases_json,watch,watch_note,enabled) VALUES(?,'旧公司名',?,2,'用户备注',0)")
+      .run(first, JSON.stringify(['用户别名']));
+    const before = db.prepare('SELECT * FROM companies ORDER BY id').all();
+    const failingId = seed.companies[1].id.replaceAll("'", "''");
+    db.exec("CREATE TRIGGER fail_company_seed BEFORE INSERT ON companies WHEN NEW.id='" + failingId +
+      "' BEGIN SELECT RAISE(ABORT, 'injected company seed failure'); END");
+    assert.throws(() => companies.syncCompanySeed(), /injected company seed failure/);
+    assert.deepEqual(db.prepare('SELECT * FROM companies ORDER BY id').all(), before);
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key='companySeedVersion'").get(), undefined);
+    db.exec('DROP TRIGGER fail_company_seed');
+    assert.throws(() => withTransaction(() => {
+      assert.ok(companies.syncCompanySeed() > 0);
+      assert.equal(db.isTransaction, true);
+      throw new Error('injected outer rollback');
+    }), /injected outer rollback/);
+    assert.deepEqual(db.prepare('SELECT * FROM companies ORDER BY id').all(), before);
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key='companySeedVersion'").get(), undefined);
+    assert.ok(companies.syncCompanySeed() > 0, 'uncommitted seed must not be memoized');
+    assert.equal(db.prepare('SELECT COUNT(*) c FROM companies').get().c, seed.companies.length);
+    const preserved = db.prepare('SELECT * FROM companies WHERE id=?').get(first);
+    assert.equal(preserved.watch, 2); assert.equal(preserved.enabled, 0);
+    assert.equal(preserved.watch_note, '用户备注');
+    assert.ok(JSON.parse(preserved.aliases_json).includes('用户别名'));
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key='companySeedVersion'").get().value, String(seed.version));
+    assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
+    closeDatabase();
+  `;
+  const child = require('node:child_process').spawnSync(process.execPath, ['-e', program], {
+    cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: sandbox }, encoding: 'utf8'
+  });
+  assert.equal(child.status, 0, child.stderr);
+});

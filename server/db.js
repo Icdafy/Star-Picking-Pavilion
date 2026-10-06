@@ -92,6 +92,8 @@ function initializeDatabase() {
 }
 initializeDatabase();
 
+// 建表与兼容补列一次提交，避免冷启动逐条同步磁盘；失败不留半套结构。
+withTransaction(() => {
 db.exec(`
 CREATE TABLE IF NOT EXISTS sources (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -367,6 +369,7 @@ CREATE TABLE IF NOT EXISTS model_usage (
   db.exec('CREATE INDEX IF NOT EXISTS idx_deals_kind ON deals(deal_kind)');
 }
 migrate();
+});
 repairFuturePublishedAt();
 
 // ---------- 通用助手 ----------
@@ -383,13 +386,17 @@ function repairFuturePublishedAt() {
 // articles 与 articles_fts 必须原子双写：任一失败整体回滚，
 // 否则主表行和全文影子行会永久错位（检索到不存在的条目，或条目永远搜不到）
 function withTransaction(action) {
-  db.exec('BEGIN IMMEDIATE');
+  const nested = db.isTransaction;
+  db.exec(nested ? 'SAVEPOINT spp_atomic' : 'BEGIN IMMEDIATE');
   try {
     const result = action();
-    db.exec('COMMIT');
+    db.exec(nested ? 'RELEASE spp_atomic' : 'COMMIT');
     return result;
   } catch (error) {
-    try { db.exec('ROLLBACK'); } catch {}
+    try {
+      if (nested) { db.exec('ROLLBACK TO spp_atomic'); db.exec('RELEASE spp_atomic'); }
+      else db.exec('ROLLBACK');
+    } catch {}
     throw error;
   }
 }

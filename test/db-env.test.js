@@ -73,3 +73,64 @@ test('Electron main fixes packaged userData before readiness, migrates before st
   assert.match(source, /使用.*捕风司/);
   assert.match(source, /取消启动/);
 });
+
+test('schema initialization failure rolls back every new table and permits a clean retry', async t => {
+  const sandbox = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-schema-atomic-'));
+  t.after(async () => fs.promises.rm(sandbox, { recursive: true, force: true }));
+  const program = `
+    const assert = require('node:assert/strict');
+    const { DatabaseSync } = require('node:sqlite');
+    const entry = ${JSON.stringify(path.join(root, 'server/db.js'))};
+    const original = DatabaseSync.prototype.exec;
+    let failedDatabase, injected = false;
+    DatabaseSync.prototype.exec = function (sql) {
+      if (sql.includes('ALTER TABLE articles ADD COLUMN title_zh')) {
+        failedDatabase = this; injected = true; throw new Error('injected schema failure');
+      }
+      return original.call(this, sql);
+    };
+    assert.throws(() => require(entry), /injected schema failure/);
+    DatabaseSync.prototype.exec = original;
+    assert.equal(injected, true);
+    assert.equal(failedDatabase.isTransaction, false);
+    assert.equal(failedDatabase.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").get().c, 0);
+    failedDatabase.close();
+    const { db, closeDatabase } = require(entry);
+    assert.ok(db.prepare('PRAGMA table_info(articles)').all().some(column => column.name === 'title_zh'));
+    assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
+    assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
+    closeDatabase();
+  `;
+  const child = spawnSync(process.execPath, ['-e', program], {
+    cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: sandbox }, encoding: 'utf8'
+  });
+  assert.equal(child.status, 0, child.stderr);
+});
+
+test('nested atomic batches roll back only their own writes and never commit the caller', async t => {
+  const sandbox = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-nested-atomic-'));
+  t.after(async () => fs.promises.rm(sandbox, { recursive: true, force: true }));
+  const program = `
+    const assert = require('node:assert/strict');
+    const { db, withTransaction, closeDatabase } = require(${JSON.stringify(path.join(root, 'server/db.js'))});
+    db.exec('BEGIN IMMEDIATE');
+    db.prepare("INSERT INTO meta(key,value) VALUES('outer','keep')").run();
+    assert.throws(() => withTransaction(() => {
+      db.prepare("INSERT INTO meta(key,value) VALUES('inner','rollback')").run();
+      withTransaction(() => db.prepare("INSERT INTO meta(key,value) VALUES('deeper','rollback')").run());
+      throw new Error('injected inner failure');
+    }), /injected inner failure/);
+    assert.equal(db.isTransaction, true);
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key='outer'").get().value, 'keep');
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM meta WHERE key IN ('inner','deeper')").get().c, 0);
+    withTransaction(() => db.prepare("INSERT INTO meta(key,value) VALUES('success','pending')").run());
+    assert.equal(db.isTransaction, true);
+    db.exec('ROLLBACK');
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM meta WHERE key IN ('outer','success')").get().c, 0);
+    closeDatabase();
+  `;
+  const child = spawnSync(process.execPath, ['-e', program], {
+    cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: sandbox }, encoding: 'utf8'
+  });
+  assert.equal(child.status, 0, child.stderr);
+});
