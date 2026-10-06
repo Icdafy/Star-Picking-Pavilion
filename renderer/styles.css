@@ -1024,9 +1024,9 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .update-pill:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 var(--sheen), 0 4px 14px var(--accent-ring); }
 .update-pill:active { transform: scale(.94); }
 .update-pill[aria-disabled="true"] { cursor: progress; transform: none; }
-.update-ring { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 2.2; transform: rotate(-90deg); }
+.update-ring { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 2.2; }
 .update-track { stroke: var(--accent-ink); opacity: .13; }
-.update-arc { stroke: currentColor; stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 420ms var(--ease); }
+.update-arc { stroke: currentColor; stroke-linecap: round; stroke-dasharray: 100; transform: rotate(-90deg); transform-box: fill-box; transform-origin: center; transition: stroke-dashoffset 420ms var(--ease); }
 .update-pill[data-indeterminate="true"] .update-ring { animation: spin 1.2s linear infinite; }
 .update-icon { width: 1rem; height: 1rem; margin-top: -.65rem; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform 240ms var(--spring-light); }
 .update-pill.ready:hover .update-icon { transform: rotate(-25deg); }

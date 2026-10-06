@@ -90,6 +90,19 @@ test('workspace update button retains its position, real IPC, progress and motio
   await page.evaluate(() => document.body.classList.remove('is-idle'));
   await status({ status: 'checking' });
   assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'spin');
+  const loopDelta = await page.locator('.update-ring').evaluate(node => {
+    const animation = node.getAnimations()[0], current = animation.currentTime;
+    const duration = Number(animation.effect.getTiming().duration), frames = [];
+    animation.pause();
+    for (const time of [0, duration - 1]) {
+      animation.currentTime = time;
+      const matrix = new DOMMatrix(getComputedStyle(node).transform);
+      frames.push([matrix.a, matrix.b, matrix.c, matrix.d]);
+    }
+    animation.currentTime = current; animation.play();
+    return Math.max(...frames[0].map((value, i) => Math.abs(value - frames[1][i])));
+  });
+  assert.ok(loopDelta < .01, `indeterminate rotation must join smoothly at the loop boundary: ${loopDelta}`);
   await page.evaluate(() => document.body.classList.add('is-idle'));
   assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationPlayState), 'paused');
   await page.evaluate(() => document.body.classList.remove('is-idle'));
