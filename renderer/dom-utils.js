@@ -72,6 +72,16 @@
     return 1 - Math.exp(-8 * t) * Math.cos(5 * t);
   }
 
+  // 解析阻尼弹簧：采样后仍交给 WAAPI，改向时沿用实际播放时刻的速度。
+  function indicatorSpring(displacement, velocity, seconds) {
+    const decay = 28, frequency = 14;
+    const envelope = Math.exp(-decay * seconds);
+    const a = displacement, b = (velocity + decay * a) / frequency;
+    const cosine = Math.cos(frequency * seconds), sine = Math.sin(frequency * seconds);
+    const position = envelope * (a * cosine + b * sine);
+    return { position, velocity: envelope * frequency * (-a * sine + b * cosine) - decay * position };
+  }
+
   function createMotion(deps = {}) {
     const { document: doc = null, matchMedia = null, raf = null } = deps || {};
     const win = deps.window || doc?.defaultView;
@@ -246,6 +256,9 @@
       const target = `${x},${y},${width},${height}`;
       if (!immediate && el.dataset?.motionTarget === target) return null;
       const before = el.getBoundingClientRect?.();
+      const previous = active.get(el);
+      const previousTime = Math.max(0, Number(previous?.animation?.currentTime) || 0) / 1000;
+      const momentum = previous?.trajectory?.map(axis => indicatorSpring(axis.position, axis.velocity, previousTime).velocity);
       cancel(el);
       el.style.transition = 'none';
       el.style.transformOrigin = '0 0';
@@ -261,14 +274,22 @@
       if (!after?.width || !after?.height) return null;
       const dx = before.left - after.left, dy = before.top - after.top;
       const sx = before.width / after.width, sy = before.height / after.height;
+      const duration = fxTier() === 'lite' ? 180 : 300;
+      const displacement = [dx, dy, (sx - 1) * after.width, (sy - 1) * after.height];
+      const trajectory = displacement.map((position, index) => ({ position,
+        velocity: fxTier() === 'lite' ? 0 : Math.max(-2200, Math.min(2200, momentum?.[index] || 0))
+      }));
       const frames = Array.from({ length: SPRING_SAMPLES + 1 }, (_, i) => {
-        const t = i / SPRING_SAMPLES, remaining = 1 - springProgress(t);
+        const t = i / SPRING_SAMPLES;
+        const offsets = trajectory.map(axis => t === 1 ? 0 : indicatorSpring(axis.position, axis.velocity, t * duration / 1000).position);
         return {
           offset: t,
-          transform: `translate(${x + dx * remaining}px, ${y + dy * remaining}px) scale(${1 + (sx - 1) * remaining}, ${1 + (sy - 1) * remaining})`
+          transform: `translate(${x + offsets[0]}px, ${y + offsets[1]}px) scale(${Math.max(.01, 1 + offsets[2] / after.width)}, ${Math.max(.01, 1 + offsets[3] / after.height)})`
         };
       });
-      return spring(el, { keyframes: frames, duration: fxTier() === 'lite' ? 180 : 300 });
+      const animation = spring(el, { keyframes: frames, duration });
+      if (active.has(el)) active.get(el).trajectory = trajectory;
+      return animation;
     }
 
     return Object.freeze({
@@ -295,16 +316,23 @@
   function createInteractionMotion({ document: doc, window: win, motion } = {}) {
     if (!doc || !win || !motion || !win.MutationObserver) return Object.freeze({ dispose() {} });
     const reduced = win.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const forcedColors = win.matchMedia?.('(forced-colors: active)');
     const cleanups = [], groups = [], waves = new Map();
     const controlSelector = 'button:not(:disabled):not([aria-disabled="true"])';
+    const hoverSelector = '.tab, .pill, .chip, .icon-btn, .btn-primary, .btn-ghost, .rt-toggle, .card-act, .common-links-category';
     const surfaceSelector = '.card, .common-links-card';
-    let disposed = false, glow = null, surface = null, rect = null, frame = null;
-    let x = 0, y = 0, targetX = 0, targetY = 0, lastTime = 0;
-    let velocityX = 0, velocityY = 0;
+    const surfaces = new Map(), controls = new Map();
+    // 只在存在追光时监听节点移除，每次检查最多四个目标；不扫描内容树。
+    const detached = new win.MutationObserver(() => {
+      for (const records of [surfaces, controls]) for (const element of records.keys()) {
+        if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true') removeLight(records, element);
+      }
+    });
+    let disposed = false, surface = null, control = null, frame = null, lastTime = 0;
     const canMove = () => !disposed && !doc.hidden && !reduced?.matches
       && doc.documentElement.dataset.fxTier !== 'static'
       && (typeof doc.hasFocus !== 'function' || doc.hasFocus());
-    const full = () => canMove() && doc.documentElement.dataset.fxTier === 'full';
+    const full = () => canMove() && !forcedColors?.matches && doc.documentElement.dataset.fxTier === 'full';
     function listen(target, event, handler, options) {
       target?.addEventListener?.(event, handler, options);
       cleanups.push(() => target?.removeEventListener?.(event, handler, options));
@@ -348,55 +376,140 @@
         wave.timeout = win.setTimeout(() => { if (waves.get(button) === wave) clearWave(button); }, 500);
       } catch { clearWave(button); }
     }
-    function clearGlow() {
-      motion.cancel(glow);
-      if (frame != null) win.cancelAnimationFrame(frame);
-      frame = null; lastTime = 0; velocityX = 0; velocityY = 0;
-      glow?.remove(); surface?.classList.remove('motion-surface');
-      glow = null; surface = null; rect = null;
+    function removeLight(records, element) {
+      const record = records.get(element);
+      if (!record) return;
+      win.clearTimeout(record.timeout);
+      record.node.remove();
+      element.classList.remove(record.kind === 'surface' ? 'motion-surface' : 'motion-hover-host');
+      records.delete(element);
+      if (surface === element) surface = null;
+      if (control === element) control = null;
+      if (!surfaces.size && !controls.size) detached.disconnect();
     }
-    function tick(now) {
-      frame = null;
-      if (!full() || !surface?.isConnected || !glow) { clearGlow(); return; }
-      // 有限步长防止长帧后弹簧发散；运动停止即释放帧循环。
-      const elapsed = lastTime ? Math.min((now - lastTime) / 1000, .032) : 1 / 60;
-      lastTime = now;
+    function clearGlow() {
+      if (frame != null) win.cancelAnimationFrame(frame);
+      frame = null; lastTime = 0;
+      for (const element of surfaces.keys()) removeLight(surfaces, element);
+      for (const element of controls.keys()) removeLight(controls, element);
+      surface = null; control = null;
+    }
+    function schedule() {
+      if (frame == null) frame = win.requestAnimationFrame(tick);
+    }
+    function axis(position = 0) { return { position, target: position, velocity: 0 }; }
+    function advance(value, elapsed, stiffness, damping) {
       const steps = Math.max(1, Math.ceil(elapsed / .008));
       const dt = elapsed / steps;
       for (let i = 0; i < steps; i += 1) {
-        velocityX += ((targetX - x) * 600 - velocityX * 42) * dt;
-        velocityY += ((targetY - y) * 600 - velocityY * 42) * dt;
-        x += velocityX * dt; y += velocityY * dt;
+        value.velocity += ((value.target - value.position) * stiffness - value.velocity * damping) * dt;
+        value.position += value.velocity * dt;
       }
-      const settled = Math.abs(targetX - x) + Math.abs(targetY - y) < .3
-        && Math.abs(velocityX) + Math.abs(velocityY) < 2;
-      if (settled) { x = targetX; y = targetY; velocityX = 0; velocityY = 0; lastTime = 0; }
-      glow.style.transform = `translate(${x - 90}px, ${y - 90}px)`;
-      if (!settled) frame = win.requestAnimationFrame(tick);
+      const settled = Math.abs(value.target - value.position) < .1 && Math.abs(value.velocity) < .8;
+      if (settled) { value.position = value.target; value.velocity = 0; }
+      return settled;
+    }
+    function makeSpan(className, parent) {
+      const node = doc.createElement('span'); node.className = className;
+      node.setAttribute('aria-hidden', 'true'); parent.appendChild(node); return node;
+    }
+    function point(record) {
+      const bounds = record.rect;
+      const x = Math.max(0, Math.min(bounds.width, record.clientX - bounds.left));
+      const y = Math.max(0, Math.min(bounds.height, record.clientY - bounds.top));
+      record.x.target = x; record.y.target = y;
+      record.haloX.target = x; record.haloY.target = y;
+      record.magnetX.target = (x / Math.max(1, bounds.width) - .5) * 6;
+      record.magnetY.target = (y / Math.max(1, bounds.height) - .5) * 4;
+    }
+    function enter(records, element, event, kind) {
+      let record = records.get(element);
+      if (!record) {
+        // 一个当前表面加一个淡出表面；再快的扫动也不积压节点或计时器。
+        if (records.size >= 2) removeLight(records, records.keys().next().value);
+        const node = makeSpan(kind === 'surface' ? 'surface-light' : 'control-aura', element);
+        record = { kind, node, rect: element.getBoundingClientRect(), alpha: 0, targetAlpha: 1,
+          x: axis(), y: axis(), haloX: axis(), haloY: axis(), magnetX: axis(), magnetY: axis(), timeout: null };
+        if (kind === 'surface') {
+          record.halo = makeSpan('surface-halo', node);
+          record.glow = makeSpan('surface-glow', node);
+          record.rim = makeSpan('surface-rim-light', makeSpan('surface-rim', node));
+        } else {
+          record.glow = makeSpan('control-aura-light', node);
+        }
+        records.set(element, record);
+        detached.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled'] });
+        element.classList.add(kind === 'surface' ? 'motion-surface' : 'motion-hover-host');
+        record.clientX = event.clientX; record.clientY = event.clientY;
+        point(record);
+        for (const value of [record.x, record.y, record.haloX, record.haloY]) value.position = value.target;
+      }
+      win.clearTimeout(record.timeout); record.timeout = null;
+      record.targetAlpha = 1; record.dirty = true;
+      record.clientX = event.clientX; record.clientY = event.clientY;
+      schedule();
+    }
+    function leave(records, element) {
+      const record = records.get(element);
+      if (!record || record.targetAlpha === 0) return;
+      record.targetAlpha = 0; record.magnetX.target = 0; record.magnetY.target = 0;
+      // RAF 被浏览器暂停时，淡出装饰仍有明确的资源寿命上限。
+      record.timeout = win.setTimeout(() => {
+        if (records.get(element) === record && record.targetAlpha === 0) removeLight(records, element);
+      }, 240);
+      schedule();
+    }
+    function tick(now) {
+      frame = null;
+      if (!full()) { clearGlow(); return; }
+      const elapsed = lastTime ? Math.max(.001, Math.min((now - lastTime) / 1000, .032)) : 1 / 60;
+      lastTime = now;
+      let moving = false;
+      // 每帧先完成当前两个命中区域的几何读取，再写装饰层；不扫描信息流。
+      for (const records of [surfaces, controls]) for (const [element, record] of records) {
+        if (!element.isConnected || element.disabled || element.getAttribute('aria-disabled') === 'true') {
+          removeLight(records, element); continue;
+        }
+        if (record.dirty && record.targetAlpha) {
+          record.rect = element.getBoundingClientRect(); point(record); record.dirty = false;
+        }
+      }
+      for (const records of [surfaces, controls]) for (const [element, record] of records) {
+        record.alpha += (record.targetAlpha - record.alpha) * (1 - Math.exp(-elapsed * (record.targetAlpha ? 24 : 32)));
+        const fading = Math.abs(record.alpha - record.targetAlpha) > .005;
+        if (!fading) record.alpha = record.targetAlpha;
+        if (!record.targetAlpha && record.alpha === 0) { removeLight(records, element); continue; }
+        const settled = [advance(record.x, elapsed, 1100, 56), advance(record.y, elapsed, 1100, 56),
+          advance(record.haloX, elapsed, 360, 34), advance(record.haloY, elapsed, 360, 34),
+          advance(record.magnetX, elapsed, 700, 38), advance(record.magnetY, elapsed, 700, 38)].every(Boolean);
+        record.node.style.opacity = record.alpha.toFixed(3);
+        if (record.kind === 'surface') {
+          record.glow.style.transform = `translate(${record.x.position - 160}px, ${record.y.position - 160}px)`;
+          record.halo.style.transform = `translate(${record.haloX.position - 220}px, ${record.haloY.position - 220}px)`;
+          record.rim.style.transform = `translate(${record.x.position - 190}px, ${record.y.position - 190}px)`;
+        } else {
+          record.node.style.transform = `translate(${record.magnetX.position}px, ${record.magnetY.position}px)`;
+          record.glow.style.transform = `translate(${record.x.position - 80}px, ${record.y.position - 80}px)`;
+        }
+        moving ||= fading || !settled;
+      }
+      if (moving) schedule(); else lastTime = 0;
     }
     function onOver(event) {
-      if (!full() || event.pointerType === 'touch') return;
-      const next = event.target.closest?.(surfaceSelector);
-      if (!next || next === surface) return;
-      clearGlow(); surface = next; rect = next.getBoundingClientRect();
-      surface.classList.add('motion-surface');
-      glow = doc.createElement('span'); glow.className = 'surface-glow';
-      glow.setAttribute('aria-hidden', 'true'); surface.appendChild(glow);
-      x = targetX = event.clientX - rect.left; y = targetY = event.clientY - rect.top;
-      glow.style.transform = `translate(${x - 90}px, ${y - 90}px)`;
-      motion.spring(glow, { from: { opacity: '0' }, to: { opacity: '1' }, duration: 180 });
+      if (event.pointerType === 'touch') { clearGlow(); return; }
+      if (!full()) return;
+      const nextSurface = event.target.closest?.(surfaceSelector) || null;
+      const nextControl = event.target.closest?.(controlSelector);
+      const hoverControl = nextControl?.matches(hoverSelector) ? nextControl : null;
+      if (nextSurface !== surface) { leave(surfaces, surface); surface = nextSurface; }
+      if (hoverControl !== control) { leave(controls, control); control = hoverControl; }
+      if (surface) enter(surfaces, surface, event, 'surface');
+      if (control) enter(controls, control, event, 'control');
     }
-    function onMove(event) {
-      if (!surface) onOver(event);
-      if (!surface || !rect || !full()) return;
-      targetX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-      targetY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-      if (frame == null) frame = win.requestAnimationFrame(tick);
-    }
+    function onMove(event) { onOver(event); }
     function onOut(event) {
-      if (surface && !surface.contains(event.relatedTarget)) {
-        motion.cancel(glow); clearGlow();
-      }
+      if (surface && !surface.contains(event.relatedTarget)) { leave(surfaces, surface); surface = null; }
+      if (control && !control.contains(event.relatedTarget)) { leave(controls, control); control = null; }
     }
     function syncGroup(record, immediate = false) {
       if (disposed || record.busy) return;
@@ -421,7 +534,7 @@
       groups.push(record); syncGroup(record, true);
       const observer = new win.MutationObserver(mutations => {
         if (mutations.some(m => m.type === 'attributes'
-          || [...m.addedNodes, ...m.removedNodes].some(n => n !== indicator && n.nodeType === 1 && !n.matches?.('.press-wave')))) syncGroup(record);
+          || [...m.addedNodes, ...m.removedNodes].some(n => n !== indicator && n.nodeType === 1 && !n.matches?.('.press-wave, .control-aura, .control-aura-light')))) syncGroup(record);
       });
       observer.observe(group, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
       cleanups.push(() => observer.disconnect());
@@ -431,7 +544,7 @@
     groups.forEach(({ group }) => resize?.observe(group));
     doc.fonts?.ready?.then(() => { if (!disposed) syncSizes(); }).catch(() => {});
     function settleEnvironment() {
-      if (!full()) { motion.cancel(glow); clearGlow(); }
+      if (!full()) clearGlow();
       if (!canMove()) { for (const button of waves.keys()) clearWave(button); }
       syncSizes();
     }
@@ -444,16 +557,19 @@
     listen(doc, 'pointerover', onOver, { passive: true });
     listen(doc, 'pointermove', onMove, { passive: true });
     listen(doc, 'pointerout', onOut, { passive: true });
-    listen(doc, 'scroll', () => { motion.cancel(glow); clearGlow(); }, { passive: true, capture: true });
+    listen(doc, 'scroll', clearGlow, { passive: true, capture: true });
+    listen(doc, 'pointercancel', clearGlow, { passive: true });
     listen(doc, 'visibilitychange', settleEnvironment);
     listen(win, 'blur', settleEnvironment);
     listen(win, 'resize', () => { clearGlow(); syncSizes(); }, { passive: true });
     listen(reduced, 'change', settleEnvironment);
+    listen(forcedColors, 'change', settleEnvironment);
     return Object.freeze({
       dispose() {
         if (disposed) return;
         disposed = true;
-        motion.cancel(glow); clearGlow();
+        clearGlow();
+        detached.disconnect();
         for (const button of waves.keys()) clearWave(button);
         cleanups.splice(0).forEach(cleanup => cleanup());
         resize?.disconnect(); environment.disconnect();

@@ -83,3 +83,24 @@ test('v0210: pending browser motion settles by its deadline and a stale deadline
   assert.equal(properties['--ti-y'], '160px');
   motion.dispose();
 });
+
+test('v0211: selection redirection carries the playing spring velocity into the next path', () => {
+  const { el, motion, frames } = fixture();
+  // Geometry changes after committing the new target, as in the actual DOM.
+  const geometry = { left: 0, top: 0, width: 100, height: 40 };
+  el.getBoundingClientRect = () => ({ ...geometry });
+  const originalSet = el.style.setProperty;
+  el.style.setProperty = (key, value) => { originalSet(key, value); if (key === '--ti-y') geometry.top = parseFloat(value); };
+  const first = motion.retargetIndicator(el, { x: 0, y: 200, width: 100, height: 40 });
+  first.currentTime = 70;
+  geometry.top = 128;
+  const next = motion.retargetIndicator(el, { x: 0, y: 300, width: 100, height: 40 });
+  const transforms = next.keyframes.map(frame => Number(frame.transform.match(/translate\([^,]+, ([^)]+)px\)/)[1]));
+  assert.equal(transforms[0], 128);
+  // A spring starting from rest would reach about 172px at 30ms. Momentum must
+  // preserve forward travel, while the final sample commits the exact target.
+  assert.ok(transforms[1] > 185 && transforms[1] < 240, JSON.stringify(transforms));
+  assert.equal(transforms.at(-1), 300);
+  assert.equal(frames.filter(frame => frame.playState === 'running').length, 1);
+  motion.dispose();
+});

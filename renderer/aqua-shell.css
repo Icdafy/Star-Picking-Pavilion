@@ -1002,29 +1002,78 @@ main { order: 5; width: 100%; }
 .press-wave {
   position: absolute; width: 36px; height: 36px; z-index: 2;
   border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, currentColor, transparent 70%);
+  background: radial-gradient(circle, transparent 28%, currentColor 42%, transparent 62%);
   transform: translate(-50%, -50%); opacity: 0;
 }
-.motion-surface { overflow: hidden; }
-.surface-glow {
-  position: absolute; top: 0; left: 0; width: 180px; height: 180px;
-  z-index: 0; pointer-events: none;
-  background: radial-gradient(circle, var(--accent-soft), transparent 70%);
-  opacity: 0;
+.motion-surface { overflow: hidden; isolation: isolate; }
+.motion-surface::before { opacity: 0; }
+.surface-light {
+  position: absolute; inset: 0; z-index: -1;
+  border-radius: inherit; overflow: hidden; pointer-events: none; opacity: 0;
+  --light-color: var(--accent);
 }
-.card[data-domain="aerospace"] > .surface-glow { background: radial-gradient(circle, var(--second-soft), transparent 70%); }
-.card.is-featured > .surface-glow { background: radial-gradient(circle, var(--flag-soft), transparent 70%); }
+.card[data-domain="aerospace"] > .surface-light { --light-color: var(--second); }
+.card.is-featured > .surface-light { --light-color: var(--flag); }
+.surface-glow, .surface-halo, .surface-rim-light, .control-aura-light {
+  position: absolute; top: 0; left: 0; pointer-events: none;
+}
+.surface-glow {
+  width: 320px; height: 320px;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--light-color) 12%, transparent) 0%,
+    color-mix(in srgb, var(--light-color) 6%, transparent) 30%, transparent 70%);
+}
+.surface-halo {
+  width: 440px; height: 440px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--light-color) 5%, transparent), transparent 68%);
+}
+.surface-rim {
+  position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.surface-rim-light {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--light-color) 80%, white) 0%,
+    color-mix(in srgb, var(--light-color) 50%, transparent) 30%, transparent 70%);
+}
+[data-theme="dark"] .surface-glow {
+  background: radial-gradient(circle, color-mix(in srgb, var(--light-color) 19%, transparent), transparent 70%);
+}
+.motion-hover-host { position: relative; isolation: isolate; overflow: hidden; }
+.control-aura {
+  position: absolute; inset: -3px; z-index: -1; border-radius: inherit;
+  pointer-events: none; opacity: 0; overflow: hidden;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%);
+  box-shadow: inset 0 1px 0 var(--sheen);
+}
+.control-aura-light {
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent), transparent 66%);
+}
+.tab-indicator, .selection-indicator {
+  background-image: linear-gradient(155deg, var(--sheen), transparent 44%),
+    linear-gradient(115deg, var(--accent-soft), color-mix(in srgb, var(--second) 6%, transparent));
+  box-shadow: inset 0 1px 0 var(--sheen), inset 0 -1px 0 var(--accent-ring), 0 2px 6px rgb(0 0 0 / 4%);
+}
+[data-theme="dark"] :is(.tab-indicator, .selection-indicator) {
+  box-shadow: inset 0 1px 0 var(--sheen), inset 0 -1px 0 var(--accent-ring), 0 0 16px -6px var(--accent-glow);
+}
 @supports (transition-timing-function: linear(0, 1)) {
   :root:not([data-fx-tier="static"]) {
     --spring-light: linear(0, .26 12%, .66 28%, .91 44%, 1.02 62%, 1.01 80%, 1);
   }
 }
-:root[data-fx-tier="static"] :is(.press-wave, .surface-glow),
-body.is-idle :is(.press-wave, .surface-glow) { display: none; }
+:root[data-fx-tier="static"] :is(.press-wave, .surface-light, .control-aura),
+:root[data-fx-tier="lite"] :is(.surface-light, .control-aura),
+body.is-idle :is(.press-wave, .surface-light, .control-aura) { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .press-wave, .surface-glow { display: none; }
+  .press-wave, .surface-light, .control-aura { display: none; }
 }
 @media (forced-colors: active) {
-  .selection-indicator, .surface-glow, .press-wave { display: none; }
+  .selection-indicator, .surface-light, .control-aura, .press-wave { display: none; }
   .motion-segmented > button.active { background: Highlight; color: HighlightText; border-color: Highlight; }
 }

@@ -8,14 +8,14 @@ const net = require('node:net');
 const { spawn, spawnSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = path.join(__dirname, '../..');
-const evidence = path.join(root, 'work/v0210/e2e');
+const evidence = path.join(root, 'work/v0211/e2e');
 
 async function open(t) {
   fs.mkdirSync(evidence, { recursive: true });
   const profile = fs.mkdtempSync(path.join(evidence, 'profile-'));
   fs.writeFileSync(path.join(profile, 'settings.json'), '{}');
   fs.writeFileSync(path.join(profile, 'ui-preferences.json'), JSON.stringify({ version: 2,
-    ...require('../../renderer/ui-preference-schema').getLegacyUiPreferences(require('../../renderer/common-links')) }));
+    ...require('../../renderer/ui-preference-schema').getLegacyUiPreferences(require('../../renderer/common-links')), realtime: false }));
   const seed = spawnSync(process.execPath, ['-e', `
     const {db,closeDatabase}=require('./server/db');
     const source=Number(db.prepare("INSERT INTO sources(name,type,url,tier,domain) VALUES('v0210 隔离样本','rss','https://motion-fixture.example/feed','T2','aerospace')").run().lastInsertRowid);
@@ -72,6 +72,7 @@ async function open(t) {
   // Exercise full enhancements even on the two-core CI runner; no API or render interception.
   await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
   await page.waitForTimeout(500);
+  await page.waitForFunction(() => !state.loading);
   return { page, native, profile, errors };
 }
 
@@ -153,7 +154,8 @@ test('v0210 Electron: pointer spotlight, bounded press waves and keyboard action
     await page.waitForTimeout(200);
     await page.screenshot({ path: path.join(evidence, `v0210-${theme}.png`) });
   }
-  await page.mouse.move(4, 80); assert.equal(await page.locator('.surface-glow').count(), 0);
+  await page.mouse.move(4, 80);
+  await page.waitForTimeout(300); assert.equal(await page.locator('.surface-glow').count(), 0);
   await page.evaluate(() => {
     const buttons = ['btnTheme', 'btnRealtime', 'btnPalette', 'btnLexicon', 'btnRefresh'];
     for (let i = 0; i < 40; i++) document.getElementById(buttons[i % buttons.length]).dispatchEvent(new PointerEvent('pointerdown',
@@ -214,5 +216,120 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
   await page.locator('#feedList .card').first().hover(); assert.equal(await page.locator('.surface-glow').count(), 0);
   await page.evaluate(() => interactionMotion.dispose());
   assert.equal(await page.locator('.selection-indicator, .motion-segmented, .press-wave, .surface-glow').count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('v0211 Electron: layered light and magnetic feedback follow input with bounded fading and stable content', { timeout: 90000 }, async t => {
+  const { page, errors } = await open(t);
+  const card = page.locator('#feedList .card').first();
+  await card.hover(); await page.waitForTimeout(350);
+  const bounds = await card.boundingBox();
+  await page.mouse.move(bounds.x + 60, bounds.y + 18); await page.waitForTimeout(450);
+  const before = await card.evaluate(el => ({
+    bounds: el.getBoundingClientRect().toJSON(),
+    title: el.querySelector('.card-title')?.getBoundingClientRect().toJSON(),
+    transform: el.style.transform,
+    glow: getComputedStyle(el.querySelector('.surface-glow')).transform
+  }));
+  await page.mouse.move(bounds.x + 210, bounds.y + 40);
+  await page.waitForTimeout(120);
+  const moving = await card.evaluate(el => {
+    const core = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-glow')).transform);
+    const halo = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-halo')).transform);
+    const rim = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-rim-light')).transform);
+    return { core: core.m41 + 160, halo: halo.m41 + 220, rim: rim.m41 + 190 };
+  });
+  assert.ok(moving.core > moving.halo + 5, JSON.stringify(moving));
+  assert.ok(Math.abs(moving.core - moving.rim) < .1, JSON.stringify(moving));
+  await page.waitForTimeout(500);
+  const lightState = await page.evaluate(point => ({ tier: document.documentElement.dataset.fxTier,
+    focus: document.hasFocus(), hidden: document.hidden, hit: document.elementFromPoint(point.x, point.y)?.className,
+    lights: document.querySelectorAll('.surface-light').length, card: document.querySelector('#feedList .card').getBoundingClientRect().toJSON()
+  }), { x: bounds.x + 210, y: bounds.y + 40 });
+  assert.equal(await card.locator('.surface-glow').count(), 1, JSON.stringify(lightState));
+  const after = await card.evaluate(el => ({
+    bounds: el.getBoundingClientRect().toJSON(),
+    title: el.querySelector('.card-title')?.getBoundingClientRect().toJSON(),
+    transform: el.style.transform,
+    glow: getComputedStyle(el.querySelector('.surface-glow')).transform,
+    layers: el.querySelectorAll('.surface-glow, .surface-halo, .surface-rim-light').length,
+    ignored: el.querySelector('.surface-light').getAttribute('aria-hidden'),
+    hit: getComputedStyle(el.querySelector('.surface-light')).pointerEvents
+  }));
+  assert.deepEqual(after.bounds, before.bounds); assert.deepEqual(after.title, before.title);
+  assert.equal(after.transform, before.transform); assert.notEqual(after.glow, before.glow);
+  assert.equal(after.layers, 3); assert.equal(after.ignored, 'true'); assert.equal(after.hit, 'none');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => applyTheme(theme, { persist: false }), theme);
+    await page.mouse.move(bounds.x + 60, bounds.y + 8); await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(evidence, `v0211-${theme}-light.png`) });
+  }
+  const button = page.locator('.tab[data-view="hot"]'); await button.hover();
+  const buttonBounds = await button.boundingBox();
+  const buttonBefore = await button.evaluate(el => el.getBoundingClientRect().toJSON());
+  await page.mouse.move(buttonBounds.x + buttonBounds.width - 8, buttonBounds.y + 10);
+  await page.waitForTimeout(450);
+  const magnet = await button.evaluate(el => {
+    const aura = el.querySelector('.control-aura'); const matrix = new DOMMatrixReadOnly(getComputedStyle(aura).transform);
+    return { x: matrix.m41, y: matrix.m42, bounds: el.getBoundingClientRect().toJSON(),
+      text: el.textContent, ignored: aura.getAttribute('aria-hidden') };
+  });
+  assert.ok(magnet.x > .5 && magnet.x <= 3.1, JSON.stringify(magnet));
+  assert.ok(Math.abs(magnet.y) <= 2.1); assert.deepEqual(magnet.bounds, buttonBefore);
+  assert.equal(magnet.ignored, 'true'); assert.equal(magnet.text.trim(), '热点');
+  await page.screenshot({ path: path.join(evidence, 'v0211-magnetic.png') });
+  // Rapid native pointer movement, including reversal and re-entry into a fading
+  // surface, must retain at most two decorations of each kind.
+  const tabs = await page.locator('.nav-tabs .tab').evaluateAll(nodes => nodes.map(el => {
+    const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }));
+  for (let i = 0; i < 24; i++) {
+    const point = tabs[i % tabs.length]; await page.mouse.move(point.x, point.y);
+    assert.ok(await page.locator('.control-aura').count() <= 2);
+    assert.ok(await page.locator('.surface-light').count() <= 2);
+  }
+  await page.mouse.move(4, 80); await page.waitForTimeout(300);
+  assert.equal(await page.locator('.surface-light, .control-aura, .motion-hover-host, .motion-surface').count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('v0211 Electron: decoration scheduling sleeps at rest and clears on scroll, forced colors, reduce and removal', { timeout: 90000 }, async t => {
+  const { page, errors } = await open(t);
+  const card = page.locator('#feedList .card').first();
+  await card.hover(); await page.waitForTimeout(600);
+  await page.evaluate(() => {
+    window.motionWrites = 0;
+    window.motionWriteObserver = new MutationObserver(mutations => { window.motionWrites += mutations.length; });
+    document.querySelectorAll('.surface-light, .surface-light span').forEach(el =>
+      window.motionWriteObserver.observe(el, { attributes: true, attributeFilter: ['style'] }));
+  });
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => motionWrites), 0, 'settled light still writes styles');
+  await page.evaluate(() => motionWriteObserver.disconnect());
+  await card.hover();
+  await page.mouse.wheel(0, 100); await page.waitForTimeout(150);
+  assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
+  await card.hover(); await page.emulateMedia({ forcedColors: 'active' });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
+  await page.locator('#btnRealtime').hover(); assert.equal(await page.locator('.control-aura').count(), 0);
+  await page.emulateMedia({ forcedColors: 'none' });
+  await card.hover(); await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => document.documentElement.dataset.fxTier = 'full');
+  await page.locator('.tab[data-view="all"]').hover();
+  await page.evaluate(() => document.documentElement.dataset.fxTier = 'lite');
+  await page.waitForTimeout(100); assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
+  await page.evaluate(() => document.documentElement.dataset.fxTier = 'full');
+  await card.hover(); await page.waitForTimeout(600);
+  await page.evaluate(() => { window.removedSurface = document.querySelector('#feedList .card'); removedSurface.remove(); });
+  await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(() => removedSurface.querySelector('.surface-light')), null);
+  assert.equal(await page.evaluate(() => removedSurface.classList.contains('motion-surface')), false);
+  assert.ok(await page.locator('.surface-light').count() <= 1);
+  await page.locator('#btnRealtime').hover(); await page.evaluate(() => interactionMotion.dispose());
+  assert.equal(await page.locator('.surface-light, .control-aura, .motion-hover-host, .motion-surface').count(), 0);
   assert.deepEqual(errors, []);
 });
