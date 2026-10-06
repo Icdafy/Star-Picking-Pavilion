@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.14 发布范围为热点与情报日志统一页头、紧凑报告概况及一级市场分区筛选。正式结果见 [本版验证](docs/v0214-validation.md)；本轮执行完整本地验证和既有 main、tag 门禁，六项附件发布后重新下载核验。安装／卸载仅在一次性 Windows CI 执行。
+v0.2.14 已发布为[最新正式版](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.14)：热点与情报日志统一页头、紧凑报告概况及一级市场分区筛选完成。[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37432245718) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37433420128) 完整通过，六项附件下载、摘要、PE 版本、更新元数据及发布后应用同步核验成功。完整结果及保留的失败见 [本版验证](docs/v0214-validation.md)，以下流程继续适用于后续发版。
 
 ## 发布前授权门槛
 
