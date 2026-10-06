@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-本次目标版本为 v0.2.22，需通过 main 与 tag Release 完整门禁，随后下载核验六项公开附件并同步发布记录。实际结果见 [本版验证](docs/v0222-validation.md)。
+本次 v0.2.22 已通过精确提交的 main 与 tag Release 完整门禁，六项公开附件重新下载核验及匿名更新日志同步／离线缓存恢复通过。正式版本见 [v0.2.22](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.22)，实际结果见 [本版验证](docs/v0222-validation.md)。
 
 ## 发布前授权门槛
 

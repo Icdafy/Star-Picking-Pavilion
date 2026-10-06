@@ -47,9 +47,26 @@
 
 ## 发布状态
 
-首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37543158245) 的产品提交 `d38a43eb00da21a384961b4b44785fbe68a176a6` 为 976／976 单元、25／26 桌面。失败发生在布局用例的 after 清理钩子：Windows 无法删除临时目录的 Chromium `DIPS` 数据库，错误 `EBUSY`；26 项中的新版翻页用例通过。原退出后立即删除改为沿用其他桌面用例的有界文件清理重试（10 次、100 ms 递增等待），持久占用仍失败；应用、布局断言、超时和工作流门禁保持。新翻页用例的目录清理也沿用同一策略。修正后本地完整布局矩阵及断网翻页专项 2／2、39.92 秒，原功能门禁全部保留。完整失败结果与日志保存在 main-ci-first.json／main-ci-first-failed.log，专项为 cleanup-desktop.log；修正后的提交需重新通过完整 CI。
+首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37543158245) 的产品提交 `d38a43eb00da21a384961b4b44785fbe68a176a6` 为 976／976 单元、25／26 桌面。失败发生在布局用例的 after 清理钩子：Windows 无法删除临时目录的 Chromium `DIPS` 数据库，错误 `EBUSY`；26 项中的新版翻页用例通过。原退出后立即删除改为沿用其他桌面用例的有界文件清理重试（10 次、100 ms 递增等待），持久占用仍失败；应用、布局断言、超时和工作流门禁保持。新翻页用例的目录清理也沿用同一策略。修正后本地完整布局矩阵及断网翻页专项 2／2、39.92 秒，原功能门禁全部保留。完整失败结果与日志保存在 main-ci-first.json／main-ci-first-failed.log，专项为 cleanup-desktop.log；修正后的精确提交通过下述完整 main／tag CI。
 
-发布候选准备中。只有精确提交通过 main CI 后才推送 v0.2.22 标签；tag Release 工作流再次完整验证并生成六项正式附件。发布后重新下载附件，核对 GitHub SHA-256、校验清单、PE 产品／文件版本、latest.yml 文件名／尺寸／两处 SHA-512、SBOM 和第三方声明，并确认应用匿名更新日志同步及离线缓存。
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37544113696) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37544988209) 对精确提交 `e63b533d8b17d860c840346027fbd0535b188002` 完整通过：976／976 单元与集成、26／26 真实 Electron、0 生产漏洞、47 项第三方声明、1,279 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。工作流和功能断言保持。
+
+发布时间 2026-10-06T23:18:00Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 文件名／尺寸／两处 SHA-512、CycloneDX 1.6 SBOM 和第三方声明。正式安装器 99,603,607 B、0.2.22、NotSigned，SHA-256 为 `3eec35106e2138e00ec8d4a567cd03fef166eab9e94c70ac68050214e04cba11`。应用匿名实网同步 50 条更新日志，本版正文与发布时间一致，离线缓存恢复通过。
+
+Release 工作流实测 ASAR 13,709,420 B、安装器 99,603,607 B。[公开 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.22) 的正文与本版 RELEASE_NOTES.md 一致；应用实际匿名联网同步到 v0.2.22，同步时间 2026-10-06T23:19:03.850Z，随后用空内置记录从缓存恢复相同的 50 条记录。正式安装器摘要以下表及公开 SHA256SUMS.txt 为准；本地候选摘要单独保留。
+
+| 正式附件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `b89bf3495e56b40e6f5c2abdd6eac822247027f1ab0e9551bfdd47e3537a9f6a` |
+| sbom.cdx.json | 81,352 | `d480ccd9108de10429a56314e2f018d217b156683d2cdcdec1482c87152720e7` |
+| SHA256SUMS.txt | 106 | `5cafa8edab1e85c43205d5d8d570ae29c4f859799c055f534fc9e069241bc787` |
+| Star-Picking-Pavilion-Setup-0.2.22.exe | 99,603,607 | `3eec35106e2138e00ec8d4a567cd03fef166eab9e94c70ac68050214e04cba11` |
+| Star-Picking-Pavilion-Setup-0.2.22.exe.blockmap | 105,803 | `8a8d3f4866fc37d5626797b975fb175a4bd9a1261e1adb9327c9fc2949b98072` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `c516057811cbbcedcbb5af7f79826e4de953fdf1e446f6b87257959da882ce4a` |
+
+发布证据位于被忽略的 work/v0222：main-ci-final.json／main-ci-final.log、tag-release.json／tag-release.log、release.json、latest-release.json、published-assets/、published-verification.json、published-installer.json 和 published-sync-verification.json。
+
+发布状态文档收尾专项 12／12 通过，fail／cancelled／skipped／todo 均为 0；文档差异检查通过。只更新上述发布结果文档，产品标签与六项正式附件保持对应已验证的精确提交。专项日志为 closeout-docs.log。
 
 
 ## 全部 201 个入口的最终采集记录
