@@ -305,9 +305,12 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
     transform: el.style.transform,
     glow: getComputedStyle(el.querySelector('.surface-glow')).transform
   }));
-  // Collect actual frames inside the renderer. A later CDP round trip can read
-  // an already settled animation on a busy host, missing the transient entirely.
+  // Collect actual frames inside the renderer. Drive a second native movement
+  // after the first captured frame, so a delayed first paint cannot consume
+  // the entire gesture before this observer starts sampling.
   await card.evaluate(el => {
+    let firstFrame;
+    window.layerFirstFrame = new Promise(resolve => { firstFrame = resolve; });
     window.layerFrames = new Promise(resolve => {
       document.addEventListener('pointermove', () => {
         const started = performance.now(), samples = [];
@@ -316,7 +319,8 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
           const halo = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-halo')).transform);
           const rim = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-rim-light')).transform);
           samples.push({ elapsed: now - started, core: core.m41 + 160, halo: halo.m41 + 220, rim: rim.m41 + 190 });
-          if (samples.length >= 12 || now - started >= 300) resolve(samples);
+          if (samples.length === 1) firstFrame(samples[0]);
+          if (samples.length >= 12 || now - started >= 1000) resolve(samples);
           else requestAnimationFrame(capture);
         }
         requestAnimationFrame(capture);
@@ -324,7 +328,12 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
     });
   });
   await page.mouse.move(bounds.x + 210, bounds.y + 40);
+  await page.evaluate(() => layerFirstFrame);
+  await page.mouse.move(bounds.x + 360, bounds.y + 40);
   const moving = await page.evaluate(() => layerFrames);
+  fs.writeFileSync(path.join(evidence, 'v0211-layer-frames.json'), JSON.stringify(moving, null, 2));
+  console.log('Layer follow sample:', JSON.stringify({ frames: moving.length,
+    maxLead: Math.max(...moving.map(frame => frame.core - frame.halo)), elapsed: moving.at(-1).elapsed }));
   assert.ok(moving.some(frame => frame.core > frame.halo + 5), JSON.stringify(moving));
   assert.ok(moving.every(frame => Math.abs(frame.core - frame.rim) < .1), JSON.stringify(moving));
   await page.waitForTimeout(500);
