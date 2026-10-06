@@ -921,3 +921,7 @@ DomUtils.createMotion 增加 revealText、unfold、layoutChange：文字最多�
 交互装饰继续委托监听与按需单个 RAF：最多两个表面和两个控件，页头星轨、内芯与图标提供小幅跟随，命中范围及正文不移动。离开／移除／禁用／滚动／后台／销毁都清理装饰及临时 translate；触摸与 forced-colors 不启用追光。滚入只观察九个静态设置章节，未入场内容仍然可见。details 立即改变原生 open 状态，Enter 与 Escape 沿用浏览器语义；dialog／popover 清理必须核对实际 open 状态，防止旧 close／toggle 事件影响重新打开的层。
 
 维持 292 KiB、27 脚本、20 关键帧及 10 处玻璃滤镜的现有预算。新增断言归属 test/v0217-motion.test.js、test/e2e/v0217-motion.test.js，原 160 布局、48 刊期、32 更新入口矩阵保留。专项附加 96 组配色／材质／缩放检查，文字对比度 ≥4.5、环形前景对比度 ≥3。
+
+## v0.2.19 报告日期位置
+
+.daily-date-controls 在既有日期网格行内使用 align-self: start，让日期和两侧导航略微上移。标题留白、日期字号、横幅高度与统计分列保持；窄窗口按剩余空间自然适配。沿用原 48 组刊期布局及导出、复制、重新生成验收。

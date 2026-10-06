@@ -1605,7 +1605,7 @@ body.is-idle .update-ring { animation-play-state: paused !important; }
 .daily-overview-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--c-fg-dim); font-size: var(--t-xs); margin: 0; }
 #dailyDate { font: 700 var(--t-2xl)/1.3 var(--font-display); text-align: center; overflow-wrap: anywhere; min-width: 0; margin: 0; }
 .daily-date-range { white-space: nowrap; font-size: .65em; }
-.daily-date-controls { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem; align-items: center; gap: var(--sp-3); min-width: 0; }
+.daily-date-controls { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem; align-items: center; align-self: start; gap: var(--sp-3); min-width: 0; }
 .daily-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin: 0; padding-left: var(--sp-5); border-left: 1px solid var(--glass-border); }
 .daily-metrics > div + div { border-left: 1px solid var(--glass-border); padding-left: var(--sp-3); }
 .daily-metrics dt { color: var(--c-fg-dim); font-size: var(--t-xs); }
