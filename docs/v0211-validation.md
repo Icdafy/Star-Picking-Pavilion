@@ -68,3 +68,13 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 新增四项真实数据库验证：结构初始化故障完整回滚并重试、嵌套批次不提交外层、信源同步失败连同迁移／移除／版本回滚，以及公司同步故障／外层回滚后可重试且用户状态保留。专项初轮为 30／31，通过修正公司测试样本脚本的字符串语法后 31／31 通过，日志在 startup-atomic-tests.log 与 startup-atomic-tests-fixed.log。完整单元为 **886／886 通过**（13.82 秒，fail／cancelled／skip／todo=0），原始日志在 work/v0211/unit-startup-final.log。完整桌面与新候选包正在复验。
 
 本轮完整桌面 **19／19 通过**（134.91 秒，fail／cancelled／skip／todo=0），原始日志 e2e-startup-final.log；生产审计 0 漏洞，47 项第三方声明再生成无 Git 差异。候选包重建、版本与 1271 项包边界通过：app.asar 13,413,951 B，安装器 99,546,559 B，PE 产品／文件版本 0.2.11，NotSigned，SHA-256 `b0c11d77ae3c7a23df06bb650d3305d3d652ce8ee35dcfbf5cc40f5b866f22c5`。五项本轮生产文件逐字节与 ASAR 核对一致，包装版本为 0.2.11；本机未运行安装器。记录在 build-startup-final.log、candidate-startup-metadata.json、audit-startup-final.log、notices-startup-final.log。新的精确提交 CI 与正式发布结果待补录。
+
+## 正式工作流首轮取样失败
+
+精确产品提交 24de27941a1fc8c7980c4172b6a81f4b9387099a 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37410191348) 完整通过，886／886 单元、19／19 桌面、0 漏洞、47 项声明、1271 包边界与一次性装卸检查成功。注释 tag v0.2.11 已固定到该提交。
+
+同一 tag 的 [Release 首轮](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37410913107/attempts/1) 为 886／886 单元、18／19 桌面：分层光感在 120ms 固定等待后的 CDP 读取中得到 core=210、halo=210.25406、rim=210，未满足暂态差大于 5px 的要求；目标为 210，读取时两层已到或接近目标。该记录支持“读取错过暂态”的解释，但没有原始帧时刻，因此不宣称已经量到准确延迟。其余新清理专项与既有桌面通过，构建和上传步骤未执行，没有正式 Release。失败记录在 work/v0211/release-failed-attempt1.{json,log}。
+
+对原 tag／精确产品提交完整复跑既有 Release 工作流，断言、测试、默认超时与门禁不变。主分支后续测试改为在实际 pointermove 后，于真实渲染器 RAF 内连续记录最多 12 帧／300ms，再核对暂态近光更快及各帧边缘同步；保留差值和同步精度要求。该测试改动不进入正式产品 tag 或安装包，发布后的主分支回归另行验证。
+
+帧内取样改动的本地动效专项 **5／5 通过**（32.62 秒，fail／cancelled／skip／todo=0），记录在 work/v0211/motion-frame-sampling.log。该后续提交只更新测试与失败记录，生产目录和版本文件相对 v0.2.11 tag 无差异；主分支完整 CI 结果另行补录。

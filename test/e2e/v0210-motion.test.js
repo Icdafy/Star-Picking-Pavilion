@@ -271,16 +271,28 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
     transform: el.style.transform,
     glow: getComputedStyle(el.querySelector('.surface-glow')).transform
   }));
-  await page.mouse.move(bounds.x + 210, bounds.y + 40);
-  await page.waitForTimeout(120);
-  const moving = await card.evaluate(el => {
-    const core = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-glow')).transform);
-    const halo = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-halo')).transform);
-    const rim = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-rim-light')).transform);
-    return { core: core.m41 + 160, halo: halo.m41 + 220, rim: rim.m41 + 190 };
+  // Collect actual frames inside the renderer. A later CDP round trip can read
+  // an already settled animation on a busy host, missing the transient entirely.
+  await card.evaluate(el => {
+    window.layerFrames = new Promise(resolve => {
+      document.addEventListener('pointermove', () => {
+        const started = performance.now(), samples = [];
+        function capture(now) {
+          const core = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-glow')).transform);
+          const halo = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-halo')).transform);
+          const rim = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-rim-light')).transform);
+          samples.push({ elapsed: now - started, core: core.m41 + 160, halo: halo.m41 + 220, rim: rim.m41 + 190 });
+          if (samples.length >= 12 || now - started >= 300) resolve(samples);
+          else requestAnimationFrame(capture);
+        }
+        requestAnimationFrame(capture);
+      }, { once: true });
+    });
   });
-  assert.ok(moving.core > moving.halo + 5, JSON.stringify(moving));
-  assert.ok(Math.abs(moving.core - moving.rim) < .1, JSON.stringify(moving));
+  await page.mouse.move(bounds.x + 210, bounds.y + 40);
+  const moving = await page.evaluate(() => layerFrames);
+  assert.ok(moving.some(frame => frame.core > frame.halo + 5), JSON.stringify(moving));
+  assert.ok(moving.every(frame => Math.abs(frame.core - frame.rim) < .1), JSON.stringify(moving));
   await page.waitForTimeout(500);
   const lightState = await page.evaluate(point => ({ tier: document.documentElement.dataset.fxTier,
     focus: document.hasFocus(), hidden: document.hidden, hit: document.elementFromPoint(point.x, point.y)?.className,
