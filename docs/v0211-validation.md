@@ -71,10 +71,18 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 
 ## 正式工作流首轮取样失败
 
-精确产品提交 24de27941a1fc8c7980c4172b6a81f4b9387099a 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37410191348) 完整通过，886／886 单元、19／19 桌面、0 漏洞、47 项声明、1271 包边界与一次性装卸检查成功。注释 tag v0.2.11 已固定到该提交。
+首次候选提交 24de27941a1fc8c7980c4172b6a81f4b9387099a 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37410191348) 完整通过，886／886 单元、19／19 桌面、0 漏洞、47 项声明、1271 包边界与一次性装卸检查成功。第一版候选注释 tag v0.2.11 指向该提交，原 tag 对象为 77c9a39658482fbcfe01d19e254aa288e26b2caa。
 
 同一 tag 的 [Release 首轮](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37410913107/attempts/1) 为 886／886 单元、18／19 桌面：分层光感在 120ms 固定等待后的 CDP 读取中得到 core=210、halo=210.25406、rim=210，未满足暂态差大于 5px 的要求；目标为 210，读取时两层已到或接近目标。该记录支持“读取错过暂态”的解释，但没有原始帧时刻，因此不宣称已经量到准确延迟。其余新清理专项与既有桌面通过，构建和上传步骤未执行，没有正式 Release。失败记录在 work/v0211/release-failed-attempt1.{json,log}。
 
-对原 tag／精确产品提交完整复跑既有 Release 工作流，断言、测试、默认超时与门禁不变。主分支后续测试改为在实际 pointermove 后，于真实渲染器 RAF 内连续记录最多 12 帧／300ms，再核对暂态近光更快及各帧边缘同步；保留差值和同步精度要求。该测试改动不进入正式产品 tag 或安装包，发布后的主分支回归另行验证。
+对原候选 tag／提交完整复跑既有 Release 工作流，断言、测试、默认超时与门禁不变。主分支后续测试改为在实际 pointermove 后，于真实渲染器 RAF 内连续记录最多 12 帧／300ms，再核对暂态近光更快及各帧边缘同步；保留差值和同步精度要求。当时先保留原候选 tag，复跑仍失败后按下文规则修复并重新创建候选；测试文件不进入安装包。
 
 帧内取样改动的本地动效专项 **5／5 通过**（32.62 秒，fail／cancelled／skip／todo=0），记录在 work/v0211/motion-frame-sampling.log。该后续提交只更新测试与失败记录，生产目录和版本文件相对 v0.2.11 tag 无差异；主分支完整 CI 结果另行补录。
+
+同一候选 tag 的 [Release 第 2 轮](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37410913107/attempts/2) 仍失败：886／886 单元、17／19 桌面。暂态读取为 core=210.2448、halo=207.3619，差值不足 5px；另一项在减少动画后固定 100ms 读取时仍为 tier=full，残留一个 opacity=0 的新建光层。主分支取样提交 68269bf 的 [CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37411738635) 为 886／886 单元、18／19 桌面，帧内取样专项通过，同样在减少动画的固定等待处失败。证据在 release-failed-attempt2.{json,log}、main-sampling-failed.{json,log}。两轮均没有构建或上传正式资产。
+
+测试现等待真实强制颜色／减少动画偏好及对应档位生效，再立即验证零装饰；恢复偏好也等待完整档位，避免迟到通知覆盖后续 lite 测试。断言、默认超时和工作流保持要求。依据 RELEASING.md 的回滚规则，尚未形成有效 Release 的失败候选 tag 可在核对精确目标后删除并从修复提交重建。新候选只更新测试与验证记录，生产源码与版本文件保持一致；旧 tag 对象、两个 Release 失败尝试和已成功的首次候选 main CI 均留证。
+
+仅等待媒体查询／档位的首轮本地复验为 3／5，两个等待达到原 30 秒默认上限。补充缓存查询、新查询与原生 change 事件诊断后，两项复现显示恢复时查询已为 false，但没有收到恢复 change，根档位仍为 static。布局读取可推进真实浏览器媒体生命周期；仅加该读取的两项复验为 1／2，恢复专项通过，强制颜色专项仍在原生 change 尚未送达时读取装饰。测试现先在真实 MediaQueryList 注册监听，再提交 CDP 覆盖、读取布局并等待实际 change 事件；不派发合成媒体事件、不调用产品清理或覆盖减少动画档位。针对两项的复验 **2／2 通过**（12.22 秒，fail／cancelled／skip／todo=0），恢复 change 为 matches=false、tier=full，清理保持零节点断言。记录在 motion-media-settled.log、motion-media-diagnostic.log、motion-media-layout.log 与 motion-media-events.log。
+
+媒体事件修正后的全部动效专项 **5／5 通过**（32.63 秒，fail／cancelled／skip／todo=0），品牌与发布说明检查 **12／12 通过**。记录在 work/v0211/motion-media-final.log 与 media-doc-checks.log。相对首次候选 tag，renderer／server／electron、版本、依赖、第三方声明和两个工作流均无差异；本轮提交仅更新真实桌面测试与验证记录，完整 CI 结果随后补录。

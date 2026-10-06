@@ -10,6 +10,33 @@ const { chromium } = require('playwright');
 const root = path.join(__dirname, '../..');
 const evidence = path.join(root, 'work/v0211/e2e');
 
+async function emulateMediaAndWait(page, preferences) {
+  // CDP acknowledges the override before Electron delivers the native media
+  // events. A style/layout read advances that lifecycle even when static CSS
+  // has stopped all animations; wait for the real event, without dispatching
+  // a synthetic change or changing the application's tier.
+  await page.evaluate(preferences => {
+    const queries = [];
+    if (preferences.reducedMotion) queries.push(['(prefers-reduced-motion: reduce)', preferences.reducedMotion === 'reduce']);
+    if (preferences.forcedColors) queries.push(['(forced-colors: active)', preferences.forcedColors === 'active']);
+    window.motionMediaSettled = false;
+    Promise.all(queries.map(([expression, expected]) => new Promise(resolve => {
+      const query = matchMedia(expression);
+      if (query.matches === expected) return resolve();
+      const changed = event => {
+        if (event.matches !== expected) return;
+        query.removeEventListener('change', changed); resolve();
+      };
+      query.addEventListener('change', changed);
+    }))).then(() => { window.motionMediaSettled = true; });
+  }, preferences);
+  await page.emulateMedia(preferences);
+  await page.waitForFunction(() => {
+    document.documentElement.getBoundingClientRect();
+    return motionMediaSettled;
+  });
+}
+
 async function open(t) {
   fs.mkdirSync(evidence, { recursive: true });
   const profile = fs.mkdtempSync(path.join(evidence, 'profile-'));
@@ -52,6 +79,8 @@ async function open(t) {
     if (currentPage && !currentPage.isClosed()) {
       const snapshot = await currentPage.evaluate(() => ({ focus: document.hasFocus(), hidden: document.hidden,
         tier: document.documentElement.dataset.fxTier, fonts: document.fonts.status, loading: state.loading,
+        reduced: { cached: reducedMotionQuery.matches, fresh: matchMedia('(prefers-reduced-motion: reduce)').matches },
+        forcedColors: matchMedia('(forced-colors: active)').matches, media: window.motionMediaProbe,
         banner: document.getElementById('feedBanner').hidden, scroll: document.getElementById('appViewport').scrollTop,
         pointer: window.motionPointerProbe, card: document.querySelector('#feedList .card')?.getBoundingClientRect().toJSON(),
         lights: [...document.querySelectorAll('.surface-light, .control-aura')].map(el => ({
@@ -82,7 +111,7 @@ async function open(t) {
     // window. CDP still drives the real renderer and native window lifecycle.
     win.setIgnoreMouseEvents(true);
   });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await emulateMediaAndWait(page, { reducedMotion: 'no-preference' });
   await page.waitForFunction(() => document.hasFocus() && !document.hidden);
   await page.waitForTimeout(500);
   await page.waitForFunction(() => !state.loading);
@@ -100,6 +129,12 @@ async function open(t) {
     };
     reducedMotionQuery.addEventListener('change', exerciseFullTier);
     exerciseFullTier();
+    window.motionMediaProbe = [];
+    reducedMotionQuery.addEventListener('change', event => {
+      motionMediaProbe.push({ matches: event.matches, cached: reducedMotionQuery.matches,
+        fresh: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        tier: document.documentElement.dataset.fxTier });
+    });
     window.motionPointerProbe = [];
     for (const type of ['pointerover', 'pointerout', 'pointermove']) document.addEventListener(type, event => {
       motionPointerProbe.push({ type, x: event.clientX, y: event.clientY, target: event.target.className,
@@ -230,7 +265,7 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
   const { page, native, errors } = await open(t);
   await page.locator('#feedList .card').first().hover();
   await page.locator('#btnRealtime').focus(); await page.keyboard.press('Enter');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await emulateMediaAndWait(page, { reducedMotion: 'reduce' });
   await page.waitForFunction(() => document.documentElement.dataset.fxTier === 'static');
   await page.waitForTimeout(100);
   assert.equal(await page.locator('.press-wave, .surface-glow').count(), 0);
@@ -238,9 +273,8 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
   await page.waitForTimeout(50);
   assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('.selection-indicator, .tab-indicator')].reduce((n, el) => n + el.getAnimations().length, 0)), 0);
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
-  await page.waitForTimeout(100);
+  await emulateMediaAndWait(page, { reducedMotion: 'no-preference' });
+  await page.waitForFunction(() => !reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'full');
   await page.locator('#feedList .card').first().hover();
   await native(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
   await page.waitForFunction(() => document.hidden && !document.hasFocus());
@@ -381,16 +415,15 @@ test('v0211 Electron: decoration scheduling sleeps at rest and clears on scroll,
   // checking that its capture listener has cleared the decoration.
   await page.waitForFunction(before => document.getElementById('appViewport').scrollTop > before, scrollBefore);
   assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
-  await card.hover(); await page.emulateMedia({ forcedColors: 'active' });
-  await page.waitForTimeout(100);
+  await card.hover(); await emulateMediaAndWait(page, { forcedColors: 'active' });
   assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
   await page.locator('#btnRealtime').hover(); assert.equal(await page.locator('.control-aura').count(), 0);
-  await page.emulateMedia({ forcedColors: 'none' });
-  await card.hover(); await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.waitForTimeout(100);
+  await emulateMediaAndWait(page, { forcedColors: 'none' });
+  await card.hover(); await emulateMediaAndWait(page, { reducedMotion: 'reduce' });
+  await page.waitForFunction(() => reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'static');
   assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.evaluate(() => document.documentElement.dataset.fxTier = 'full');
+  await emulateMediaAndWait(page, { reducedMotion: 'no-preference' });
+  await page.waitForFunction(() => !reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'full');
   await page.locator('.tab[data-view="all"]').hover();
   await page.evaluate(() => document.documentElement.dataset.fxTier = 'lite');
   await page.waitForTimeout(100); assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
