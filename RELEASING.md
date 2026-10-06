@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.11 的目标版本统一为 0.2.11：分层追光与磁吸反馈。当前发布验证进度见 [验证报告](docs/v0211-validation.md)；只有精确提交的 main CI 与完整 Release 工作流成功、六项附件下载核验通过后才标记为已发布。
+最新正式版本为 [v0.2.11](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.11)：分层追光与磁吸反馈。精确产品提交 1d452cf4902999319e1c6aa1177349037d3da848 的 main CI、既有 Release 工作流、安装／卸载与六项附件下载核验均通过，记录见 [验证报告](docs/v0211-validation.md)。
 
 ## 发布前授权门槛
 

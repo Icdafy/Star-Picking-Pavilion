@@ -1,10 +1,12 @@
 # v0.2.11 设计与验证记录
 
+无发布阻塞。[v0.2.11](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.11) 已作为最新正式版发布；分层卡片追光、局部边缘高光、按钮磁吸光晕与带速度衔接的选择弹簧已接入双主题、减少动画、低功耗和生命周期清理。冷启动写入已合并为原子批次，并通过回滚／重试验证，原握手上限保留。 正式证据见本文末尾“发布验证”；中间各阶段为历史记录。
+
 ## 设计依据
 
 2026-10-06 查阅以下第一方资料，并结合摘星阁的阅读场景与现有原生 JS / WAAPI 架构实现。
 
-- [Olivier Larose · Magnetic Button](https://blog.olivierlarose.com/tutorials/magnetic-button)：磁吸运动随输入偏移并在离开时恢复。这里将偏移限制为水平 3px、垂直 2px，作用于光晕装饰。
+- [Olivier Larose · Magnetic Button](https://blog.olivierlarose.com/tutorials/magnetic-button)：磁吸运动随输入偏移并在离开时恢复。这里将目标偏移设为水平 3px、垂直 2px，作用于光晕装饰。
 - [Apple · Animate with springs](https://developer.apple.com/videos/play/wwdc2023/10158/)：弹簧支持运动中的目标变化与速度衔接。这里用解析阻尼弹簧预采样选择块轨迹，改向保留当前弹簧速度。
 - [Motion · Cursor](https://motion.dev/docs/cursor)：指针反馈可以用不同运动响应形成交互层次。这里用贴近指针的近光和较缓的远光营造深度，保留系统指针。
 - [Linear · A calmer interface for a product in motion](https://linear.app/now/behind-the-latest-design-refresh)：保持视觉层级与日常阅读秩序。这里固定文字和命中区域，强调局部光感。
@@ -21,7 +23,7 @@ createInteractionMotion 为卡片创建近光、缓随远光与遮罩边缘高�
 
 full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落终态。强制颜色关闭指针装饰；滚动、窗口尺寸变化、触摸取消、隐藏／失焦、目标移除和 dispose 清理节点、计时器、帧回调与对应监听。双主题、键盘和缩放沿用原功能。用户数据、设置、内置字体与应用身份沿用，安装器继续未签名。
 
-## 验证进度
+## 首轮本地验证（历史记录）
 
 选择运动单元 6／6 通过，包含新增的运动中改向速度衔接。两项新增真实 Electron 专项已通过：近光／远光响应差异、边缘与近光同步、正文和按钮几何稳定、双主题截图、磁吸边界、24 次快速扫动的节点上限、静止后零样式写入、滚动、强制颜色、运行中减少动画、lite、稳定后的目标移除及 dispose。
 
@@ -33,7 +35,7 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 
 初轮本地候选包构建成功，1271 项 ASAR 包边界通过；app.asar 为 13,412,866 B，安装器为 99,546,165 B，版本／PE 文件版本／PE 产品版本与更新元数据均为 0.2.11，签名 NotSigned。候选安装器 SHA-256 为 `6bfbe2410eda8c39b347b61e16dd36e39944bbe1ce00e8df128f7f710e92eda2`。本机未运行安装器，安装／启动／单实例／退出／卸载由既有一次性 Windows CI 执行。
 
-原始本地结果在 work/v0211/unit.log、unit-final.log、e2e.log、build.log、candidate-metadata.json；精确提交 CI 与正式发布结果待补录。
+原始本地结果在 work/v0211/unit.log、unit-final.log、e2e.log、build.log、candidate-metadata.json；精确提交 CI 与正式发布结果见下方。
 
 ## 首次 CI 失败与修正
 
@@ -41,7 +43,7 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 
 补充指针／焦点／档位／字体／几何诊断后，本地再现了光层缺失。诊断记录显示，在指定卡片坐标后出现了另一组连续的原生鼠标坐标，目标移至 hero 区域，追光因正常离开卡片而清理。测试窗口增加 setIgnoreMouseEvents(true)，隔离系统鼠标移动，CDP 仍驱动真实渲染器，窗口焦点、显隐和原生生命周期照常验证；断言、超时与 CI 门禁保持原有要求。启动坐标测量前等待真实字体与统计／横幅就绪，静止检查先确认光层已落终态，再验证零写入。
 
-生产弹簧同时改用解析解按实际墙钟前进，避免截断长帧时间造成进度拖慢。新增 280ms 延迟 RAF 的故障注入，要求近光在实际目标 3px 内收敛；正常静止、减少动画、滚动与清理继续核验。修正后动效专项 5／5、运动单元 10／10 通过。原始诊断与复验在 work/v0211/motion-fixed.log、motion-isolated.log 和各 profile 的 motion-state.json，最终完整回归及新的精确提交 CI 待补录。
+生产弹簧同时改用解析解按实际墙钟前进，避免截断长帧时间造成进度拖慢。新增 280ms 延迟 RAF 的故障注入，要求近光在实际目标 3px 内收敛；正常静止、减少动画、滚动与清理继续核验。修正后动效专项 5／5、运动单元 10／10 通过。原始诊断与复验在 work/v0211/motion-fixed.log、motion-isolated.log 和各 profile 的 motion-state.json，随后完成的完整回归和精确提交 CI 见后文。
 
 修正后完整复验为 **882／882 单元、19／19 桌面**，fail／cancelled／skip／todo 为 0；桌面耗时 199.53 秒，原始日志在 unit-fixed-final.log 与 e2e-fixed-final.log。最终候选包重新构建并通过 1271 项包边界：app.asar 为 13,413,266 B，安装器为 99,546,251 B，PE 产品／文件版本 0.2.11，NotSigned，SHA-256 为 `9b63f5eb933196c1972da2b2e108f0fe3909ce2751e70618fd794abc9a12a8d1`。新构建日志与 PE 记录在 build-fixed-final.log 和 candidate-fixed-metadata.json。
 
@@ -65,9 +67,9 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 
 本机 Node 24.19 对每版三个全新隔离 profile 实测：初始化均值由 346.88ms 降至 187.35ms，数据库结构阶段由 67.51ms 降至 17.20ms，信源同步由 77.96ms 降至 3.03ms。两版均为 186 信源／78 公司、foreign_key_check=0、quick_check=ok。记录在 work/v0211/startup-{baseline,batched}.json。该数据只代表本机，不据此宣称 CI 主机的底层磁盘延迟原因已定位或启动超时已根治。
 
-新增四项真实数据库验证：结构初始化故障完整回滚并重试、嵌套批次不提交外层、信源同步失败连同迁移／移除／版本回滚，以及公司同步故障／外层回滚后可重试且用户状态保留。专项初轮为 30／31，通过修正公司测试样本脚本的字符串语法后 31／31 通过，日志在 startup-atomic-tests.log 与 startup-atomic-tests-fixed.log。完整单元为 **886／886 通过**（13.82 秒，fail／cancelled／skip／todo=0），原始日志在 work/v0211/unit-startup-final.log。完整桌面与新候选包正在复验。
+新增四项真实数据库验证：结构初始化故障完整回滚并重试、嵌套批次不提交外层、信源同步失败连同迁移／移除／版本回滚，以及公司同步故障／外层回滚后可重试且用户状态保留。专项初轮为 30／31，通过修正公司测试样本脚本的字符串语法后 31／31 通过，日志在 startup-atomic-tests.log 与 startup-atomic-tests-fixed.log。完整单元为 **886／886 通过**（13.82 秒，fail／cancelled／skip／todo=0），原始日志在 work/v0211/unit-startup-final.log。随后完成的完整桌面与新候选包复验见后文。
 
-本轮完整桌面 **19／19 通过**（134.91 秒，fail／cancelled／skip／todo=0），原始日志 e2e-startup-final.log；生产审计 0 漏洞，47 项第三方声明再生成无 Git 差异。候选包重建、版本与 1271 项包边界通过：app.asar 13,413,951 B，安装器 99,546,559 B，PE 产品／文件版本 0.2.11，NotSigned，SHA-256 `b0c11d77ae3c7a23df06bb650d3305d3d652ce8ee35dcfbf5cc40f5b866f22c5`。五项本轮生产文件逐字节与 ASAR 核对一致，包装版本为 0.2.11；本机未运行安装器。记录在 build-startup-final.log、candidate-startup-metadata.json、audit-startup-final.log、notices-startup-final.log。新的精确提交 CI 与正式发布结果待补录。
+本轮完整桌面 **19／19 通过**（134.91 秒，fail／cancelled／skip／todo=0），原始日志 e2e-startup-final.log；生产审计 0 漏洞，47 项第三方声明再生成无 Git 差异。候选包重建、版本与 1271 项包边界通过：app.asar 13,413,951 B，安装器 99,546,559 B，PE 产品／文件版本 0.2.11，NotSigned，SHA-256 `b0c11d77ae3c7a23df06bb650d3305d3d652ce8ee35dcfbf5cc40f5b866f22c5`。五项本轮生产文件逐字节与 ASAR 核对一致，包装版本为 0.2.11；本机未运行安装器。记录在 build-startup-final.log、candidate-startup-metadata.json、audit-startup-final.log、notices-startup-final.log。新的精确提交 CI 与正式发布结果见下方。
 
 ## 正式工作流首轮取样失败
 
@@ -85,4 +87,31 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 
 仅等待媒体查询／档位的首轮本地复验为 3／5，两个等待达到原 30 秒默认上限。补充缓存查询、新查询与原生 change 事件诊断后，两项复现显示恢复时查询已为 false，但没有收到恢复 change，根档位仍为 static。布局读取可推进真实浏览器媒体生命周期；仅加该读取的两项复验为 1／2，恢复专项通过，强制颜色专项仍在原生 change 尚未送达时读取装饰。测试现先在真实 MediaQueryList 注册监听，再提交 CDP 覆盖、读取布局并等待实际 change 事件；不派发合成媒体事件、不调用产品清理或覆盖减少动画档位。针对两项的复验 **2／2 通过**（12.22 秒，fail／cancelled／skip／todo=0），恢复 change 为 matches=false、tier=full，清理保持零节点断言。记录在 motion-media-settled.log、motion-media-diagnostic.log、motion-media-layout.log 与 motion-media-events.log。
 
-媒体事件修正后的全部动效专项 **5／5 通过**（32.63 秒，fail／cancelled／skip／todo=0），品牌与发布说明检查 **12／12 通过**。记录在 work/v0211/motion-media-final.log 与 media-doc-checks.log。相对首次候选 tag，renderer／server／electron、版本、依赖、第三方声明和两个工作流均无差异；本轮提交仅更新真实桌面测试与验证记录，完整 CI 结果随后补录。
+媒体事件修正后的全部动效专项 **5／5 通过**（32.63 秒，fail／cancelled／skip／todo=0），品牌与发布说明检查 **12／12 通过**。记录在 work/v0211/motion-media-final.log 与 media-doc-checks.log。相对首次候选 tag，renderer／server／electron、版本、依赖、第三方声明和两个工作流均无差异；本轮提交仅更新真实桌面测试与验证记录，完整 CI 结果见下文。
+
+## 失败候选重建
+
+修复提交 1d452cf4902999319e1c6aa1177349037d3da848 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37412899916) 完整通过：886／886 单元、19／19 桌面、0 生产漏洞、47 项声明、1271 包边界及一次性 Windows 安装／启动／单实例／退出／卸载成功，用户数据保留。全部测试的 fail／cancelled／skip／todo 为 0。首次候选通过的 CI 证据保存为 work/v0211/main-ci-first-candidate.{json,log,verified.json}，新候选证据使用 main-ci.{json,log,verified.json}。
+
+2026-10-06 04:22 UTC 操作前核对 GitHub v0.2.11 Release API 为 HTTP 404、最新正式版为 v0.2.10，确认首次候选远端对象仍为 77c9a39658482fbcfe01d19e254aa288e26b2caa、解引用仍为 24de27941a1fc8c7980c4172b6a81f4b9387099a。依据 RELEASING.md 回滚规则删除失败的远端／本地候选 tag，再从上述已完整通过 CI 的修复提交创建注释 tag；新对象为 6ce918e056250e7122e8cfa156698d635bf83674，解引用为 1d452cf4902999319e1c6aa1177349037d3da848。操作不使用 force，不覆盖正式 Release 或已发布资产；生产目录、版本、依赖与工作流相对原候选无差异。原对象记录保留在 remote-tag-first-candidate.txt，新对象与核对条件在 remote-tag.txt、candidate-retag.json；新的 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37413400871) 单独留证。
+
+## 发布验证
+
+正式 [v0.2.11](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.11) 已发布，draft=false、prerelease=false，并确认为最新正式版。注释 tag 解引用至精确产品提交 1d452cf4902999319e1c6aa1177349037d3da848，远端对象核对记录在 work/v0211/remote-tag.txt。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37412899916) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37413400871) 均完整通过：886／886 单元、19／19 真实桌面（112 布局组合）、0 生产漏洞、47 项声明和 1271 包边界，fail／cancelled／skip／todo 为 0。一次性 Windows 安装、启动、单实例、退出与卸载成功，用户数据保留。
+
+六项正式附件重新下载核验，尺寸与 GitHub SHA-256 摘要全部匹配。正式安装器 99,544,789 B，PE 产品／文件版本 0.2.11，签名 NotSigned；SHA-256 为 914b5a02ce5a88e0e79a51a0c439255bb3025567ba991df7f01b5a67d8951392。latest.yml 的版本、文件名、尺寸及两处 SHA-512 均与实际安装器匹配，SBOM 为 CycloneDX 1.6、产品 0.2.11，第三方声明与提交一致。
+
+| 附件 | 字节数 |
+| --- | ---: |
+| latest.yml | 373 |
+| sbom.cdx.json | 81,352 |
+| SHA256SUMS.txt | 106 |
+| Star-Picking-Pavilion-Setup-0.2.11.exe | 99,544,789 |
+| Star-Picking-Pavilion-Setup-0.2.11.exe.blockmap | 105,869 |
+| THIRD_PARTY_NOTICES.txt | 6,347 |
+
+正式 CI 包大小：app.asar: 13422959 bytes (12.80 MiB)；installer: 99544789 bytes (94.93 MiB)。候选包与正式 CI 的摘要分别记录，本机未运行安装器。
+
+原始证据在 work/v0211/main-ci.{json,log,verified.json}、release-ci.{json,log,verified.json}、remote-tag.txt、published.verification.json，以及 published-20261006042745596 内的 Release／latest 元数据、verification.json 与 pe-metadata.json。发布后文档提交只补录实际结果，正式产品 tag 与附件保持一致。

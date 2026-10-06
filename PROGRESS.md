@@ -1,6 +1,10 @@
-# v0.2.11 当前状态
+# v0.2.11 发布状态
 
-跟手动效已升级为分层卡片追光、局部边缘高光、磁吸按钮光晕和带速度衔接的选择弹簧，版本统一为 0.2.11。三轮 CI 桌面失败均已留证，最后一轮完整档位和分层光感专项已通过；原生日志确认一次后端启动握手超时。冷启动结构与种子写入现合并为原子批次，原握手上限不变，新增回滚／重试验证。当前本地完整单元 886／886、桌面 19／19、0 生产漏洞与 1271 包边界通过，47 项声明无差异，候选包已重新构建并核对五项生产文件与 ASAR 一致；精确提交 CI 与正式发布门禁待通过。设计、实际失败与证据见 [docs/v0211-validation.md](docs/v0211-validation.md)。
+无发布阻塞。[v0.2.11](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.11) 已作为最新正式版发布；分层卡片追光、局部边缘高光、按钮磁吸光晕与带速度衔接的选择弹簧已接入双主题、减少动画、低功耗和生命周期清理。冷启动写入已合并为原子批次，并通过回滚／重试验证，原握手上限保留。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37412899916) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37413400871) 均完整通过：886／886 单元、19／19 真实桌面（112 布局组合）、0 生产漏洞、47 项声明和 1271 包边界，fail／cancelled／skip／todo 为 0。一次性 Windows 安装、启动、单实例、退出与卸载成功，用户数据保留。
+
+六项正式附件重新下载核验，尺寸与 GitHub SHA-256 摘要全部匹配。正式安装器 99,544,789 B，PE 产品／文件版本 0.2.11，签名 NotSigned；SHA-256 为 914b5a02ce5a88e0e79a51a0c439255bb3025567ba991df7f01b5a67d8951392。latest.yml 的版本、文件名、尺寸及两处 SHA-512 均与实际安装器匹配，SBOM 为 CycloneDX 1.6、产品 0.2.11，第三方声明与提交一致。 完整记录及此前失败见 [docs/v0211-validation.md](docs/v0211-validation.md)。
 
 ---
 
