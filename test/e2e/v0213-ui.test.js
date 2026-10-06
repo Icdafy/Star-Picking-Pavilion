@@ -34,8 +34,10 @@ test('v0213 native page banners, journal toolbar, report overview and motion pre
     }
   } finally { database.close(); }
   await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0]; win.setContentSize(1440, 920); win.show(); win.focus();
+    const win = BrowserWindow.getAllWindows()[0]; win.setContentSize(1440, 920); win.show(); win.focus(); win.webContents.focus();
   });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.waitForFunction(() => document.documentElement.dataset.fxTier !== 'static');
   await page.waitForFunction(() => document.hasFocus());
   const shots = path.join(root, 'work/v0213/screenshots');
   fs.mkdirSync(shots, { recursive: true });
@@ -93,15 +95,25 @@ test('v0213 native page banners, journal toolbar, report overview and motion pre
   await page.locator('#dailyNext').click();
   await page.waitForFunction(() => document.querySelector('.daily-head').getAttribute('aria-busy') === 'false');
   assert.equal(await page.locator('#dailyNext').isDisabled(), true);
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.focus(); win.webContents.focus(); });
+  await page.waitForFunction(() => document.hasFocus() && !document.hidden);
+  // 从真实 click 边界采样，避免 CDP 往返耗时漏掉整个 440ms 入场。
+  await page.evaluate(() => {
+    window.bannerFrames = []; window.bannerCaptureDone = false;
+    document.querySelector('.tab[data-view="featured"]').addEventListener('click', () => {
+      const start = performance.now(), title = document.getElementById('feedHeroTitle');
+      function sample(now) {
+        window.bannerFrames.push({ transform: getComputedStyle(title).transform, opacity: getComputedStyle(title).opacity,
+          focus: document.hasFocus(), tier: document.documentElement.dataset.fxTier });
+        if (now - start < 500) requestAnimationFrame(sample); else window.bannerCaptureDone = true;
+      }
+      requestAnimationFrame(sample);
+    }, { once: true });
+  });
   await page.locator('.tab[data-view="featured"]').click();
-  const frames = await page.evaluate(() => new Promise(resolve => {
-    const samples = [], start = performance.now(), title = document.getElementById('feedHeroTitle');
-    function sample(now) {
-      samples.push({ transform: getComputedStyle(title).transform, opacity: getComputedStyle(title).opacity });
-      if (now - start < 500) requestAnimationFrame(sample); else resolve(samples);
-    }
-    requestAnimationFrame(sample);
-  }));
+  await page.waitForFunction(() => window.bannerCaptureDone);
+  const frames = await page.evaluate(() => window.bannerFrames);
+  console.log('Banner motion sample:', JSON.stringify({ count: frames.length, distinct: new Set(frames.map(frame => frame.transform)).size, first: frames[0], last: frames.at(-1) }));
   assert.ok(new Set(frames.map(frame => frame.transform)).size > 2, 'title reveal must visibly move across real frames');
   const tier = await page.locator('html').getAttribute('data-fx-tier');
   assert.equal(await page.locator('#feedHero .banner-art span').evaluate(node => getComputedStyle(node).animationName), tier === 'full' ? 'sweep' : 'none');

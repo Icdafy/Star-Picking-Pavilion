@@ -35,3 +35,11 @@ CSS 按 Windows CRLF 最坏口径共 298,936 B，低于既有 292 KiB／299,008 
 本地候选包构建成功，1273 项包边界通过，app.asar 为 13,590,704 B，安装包为 99,582,467 B。十二项生产文件与 ASAR 逐字节一致，包内版本、PE 文件／产品版本与更新元数据均为 0.2.13，签名 NotSigned；安装器 SHA-256 为 `22fed2504ac3bc112d8d593f78d6fe0aaf045671b6aac623b1f942b75542ffac`。证据为 work/v0213/build.log、package-audit.log、candidate-metadata.json、candidate-asar.json。补充比对工具首次对三层 ASAR 路径使用正斜杠，Windows 库未识别，改为本机路径分隔符后全部通过；包中该文件本来完整存在。
 
 当前候选已完成完整本地验证，将进入既有 CI／tag 发布门禁，尚未创建 v0.2.13 tag 或正式 Release。安装／启动／单实例／退出／卸载烟测仅在一次性 Windows CI 执行，本机不运行安装器。
+
+### 分支 CI 首轮与动效观测修正
+
+首个产品提交 `8f4c406bcf6bb04bdc48ebf15c3679a2679ea382` 的 [分支 CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37426460699) 为 892／892 单元、20／21 桌面通过；新增横幅用例未观察到标题位移而失败，其余二十项（包括 160 布局）通过，后续审计、构建和安装步骤未执行。原始完整 metadata／日志为 work/v0213/branch-ci-first-failed.{json,log}。
+
+将新测试的真实帧采样放在原生 click 事件边界，消除“控制点击后，再经 CDP 请求启动采样”的观测间隙；明确设置 no-preference 动画场景并核验真实焦点，随后继续测试减少动画。保留大于两个不同真实位置的原断言、500 ms 采样时长和全部几何／统计检查。补充输出首尾帧、焦点、档位及不同位置数量，不修改动画实现、时长、产品配置或性能预算。首轮没有采样帧记录，不能仅凭失败断言确定其具体原因。
+
+修正后本地专项通过（34.97 秒），73 个真实帧中有 58 个不同位置，标题从 8 px／opacity 0 到 0 px／opacity 1，真实前台且 full 档。原始输出为 work/v0213/ui-click-capture.log，更新的帧记录为 banner-motion.json。后续将按新测试重新执行完整门禁。
