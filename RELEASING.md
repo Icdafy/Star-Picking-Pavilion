@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-最新正式版本为 [v0.2.11](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.11)：分层追光与磁吸反馈。精确产品提交 1d452cf4902999319e1c6aa1177349037d3da848 的 main CI、既有 Release 工作流、安装／卸载与六项附件下载核验均通过，记录见 [验证报告](docs/v0211-validation.md)。
+当前目标版本为 v0.2.12：情报工作区重整、应用内更新日志与设置快捷导航。发布验证见 [验证报告](docs/v0212-validation.md)，公开资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。
 
 ## 发布前授权门槛
 
@@ -19,7 +19,8 @@
 
 ```powershell
 npm ci
-npm run verify:version -- --tag v0.2.11
+npm run releases:sync
+npm run verify:version -- --tag v0.2.12
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -28,11 +29,17 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.11 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.11.exe
+npm run verify:version -- --tag v0.2.12 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.12.exe
 ```
 
-v0.2.11 的签名状态预期为 `NotSigned`。
+v0.2.12 的签名状态预期为 `NotSigned`。
+
+### 更新日志同步（每次发版必做）
+
+先更新 `RELEASE_NOTES.md`，再运行 `npm run releases:sync`：从 GitHub Releases 读取完整正式版本记录，加入本版说明，写入 `config/release-history.json`。内置历史随安装包离线可读；应用打开更新日志时会自动同步后续正式版本，同步成功的公开记录保存在本机 `release-history.cache.json`。失败时保留已有记录，成功请求间隔至少五分钟，失败后一分钟可重试。
+
+`npm run releases:check`、版本校验、单元测试及构建前检查均要求内置本版正文与 `RELEASE_NOTES.md` 完全一致，防止后续版本漏更应用内日志。发布使用同一份 `RELEASE_NOTES.md`，无需手工复制两份说明。
 
 **体积不再有上限。** `npm run verify:package` 会打印 ASAR 与安装包的精确字节数供发布记录比对，但不会因为体积失败。
 
@@ -75,25 +82,25 @@ v0.2.11 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.11
-git tag -a v0.2.11 -m "摘星阁 v0.2.11"
-git push origin v0.2.11
+npm run verify:version -- --tag v0.2.12
+git tag -a v0.2.12 -m "摘星阁 v0.2.12"
+git push origin v0.2.12
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.11 Release 应包含：
+v0.2.12 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.11.exe`
-- `Star-Picking-Pavilion-Setup-0.2.11.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.12.exe`
+- `Star-Picking-Pavilion-Setup-0.2.12.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`
 - `THIRD_PARTY_NOTICES.txt`
 
-发布完成后将六项资产下载到work/v0211/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
+发布完成后将六项资产下载到work/v0212/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
 
 ## 回滚
 

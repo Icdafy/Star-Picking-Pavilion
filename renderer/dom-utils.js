@@ -520,7 +520,13 @@
       if (disposed || record.busy) return;
       const { group, indicator } = record;
       const selected = [...group.children].find(node => node.matches?.('button.active'));
-      if (!selected || !selected.offsetWidth || !selected.offsetHeight) return;
+      if (!selected) {
+        motion.cancel(indicator);
+        indicator.style.setProperty('--ti-o', '0');
+        delete indicator.dataset.motionTarget;
+        return;
+      }
+      if (!selected.offsetWidth || !selected.offsetHeight) return;
       record.busy = true;
       if (indicator.parentNode !== group) group.appendChild(indicator);
       motion.retargetIndicator(indicator, {

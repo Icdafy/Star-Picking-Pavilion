@@ -188,7 +188,7 @@ test('v0210 Electron: current version, continuous navigation redirection, filter
   assert.equal(await page.locator('#appVersion').isVisible(), true);
   assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
   const tab = page.locator('.tab[data-view="featured"]'); await tab.focus();
-  await page.keyboard.press('ArrowRight'); assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'hot');
+  await page.keyboard.press('ArrowRight'); assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'all');
   await page.waitForTimeout(450);
   assert.ok((await page.evaluate(selectedGeometry, '.nav-tabs')).every(delta => delta < 1));
   assert.deepEqual(errors, []);

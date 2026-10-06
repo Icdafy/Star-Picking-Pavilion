@@ -35,13 +35,13 @@ test('command palette, go-to sequences and the V4.1 Flash default model', { time
   assert.equal(await input.getAttribute('aria-expanded'), 'true');
   assert.equal(await input.getAttribute('aria-activedescendant'), 'palette-opt-0');
   const labels = await page.locator('#paletteList .palette-label').allTextContents();
-  for (const name of ['精选', '热点', '一级市场', '全部动态', '星标', '情报日报', '常用网址', '信源', '设置']) {
+  for (const name of ['热点', '精选', '全部动态', '星标', '情报日志', '一级市场', '更新日志', '常用网址', '信源', '设置']) {
     assert.ok(labels.includes(name), `面板缺少跳转命令 ${name}`);
   }
 
   // 拼音首字母命中 → Enter 执行 → 面板关闭
   await input.fill('qbrb');
-  assert.equal((await page.locator('#paletteList [role="option"] .palette-label').first().textContent()).trim(), '情报日报');
+  assert.equal((await page.locator('#paletteList [role="option"] .palette-label').first().textContent()).trim(), '情报日志');
   await page.keyboard.press('Enter');
   await palette.waitFor({ state: 'hidden' });
   assert.equal(await activeView(), 'daily');
@@ -86,7 +86,7 @@ test('command palette, go-to sequences and the V4.1 Flash default model', { time
   await page.keyboard.press('Control+k');
   await palette.waitFor({ state: 'visible' });
   assert.equal((await page.locator('#paletteList .palette-group').first().textContent()).trim(), '最近使用');
-  assert.equal((await page.locator('#paletteList .palette-label').first().textContent()).trim(), '情报日报');
+  assert.equal((await page.locator('#paletteList .palette-label').first().textContent()).trim(), '情报日志');
   await page.keyboard.press('Control+k');
   await palette.waitFor({ state: 'hidden' });
 

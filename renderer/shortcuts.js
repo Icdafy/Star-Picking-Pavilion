@@ -21,7 +21,7 @@
   // G 之后的第二键 → 视图。字母取英文视图名首字母，与侧栏顺序一致；设置沿用各家通行的逗号。
   const GO_KEYS = Object.freeze({
     f: 'featured', h: 'hot', c: 'capital', a: 'all', s: 'starred',
-    d: 'daily', l: 'links', r: 'sources', ',': 'settings'
+    d: 'daily', u: 'releases', l: 'links', r: 'sources', ',': 'settings'
   });
   const GO_WINDOW_MS = 1500;
 
@@ -344,7 +344,7 @@
         return;
       }
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
-        const tabIndex = '12345678'.indexOf(event.key);
+        const tabIndex = '1234567890'.indexOf(event.key);
         if (tabIndex >= 0) {
           const tab = getTabs()[tabIndex];
           if (tab) { switchView(tab.dataset.view); event.preventDefault(); }

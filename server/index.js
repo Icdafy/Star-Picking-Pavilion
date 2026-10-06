@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createCredentialIpcTracer } = require('../electron/credential-ipc-trace');
 const { createServerShutdownLifecycle } = require('./shutdown-lifecycle');
-const { db, now, closeDatabase, DATABASE_PATH } = require('./db');
+const { db, now, closeDatabase, DATABASE_PATH, DATA_DIR } = require('./db');
 const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require('./config');
 const runtimeCredentials = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
@@ -35,6 +35,12 @@ const {
   sanitizeSourceInput, sanitizeStarInput
 } = require('./input-validation');
 const packageJson = require('../package.json');
+const { createReleaseHistoryService } = require('./release-history');
+const releaseHistory = createReleaseHistoryService({
+  bundled: require('../config/release-history.json').items,
+  version: packageJson.version,
+  dataDir: DATA_DIR
+});
 const { resolveStaticFile } = require('./static-files');
 const { closeHttpServerGracefully } = require('./http-close');
 const { localDateString, startOfLocalDayIso, clampPublishedAt } = require('./date-time');
@@ -495,6 +501,11 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (p === '/api/version' && req.method === 'GET') return json(res, 200, { version: packageJson.version });
+      if (p === '/api/releases' && req.method === 'GET') {
+        const history = u.searchParams.get('sync') === '1'
+          ? await releaseHistory.sync() : releaseHistory.snapshot();
+        return json(res, 200, history);
+      }
       if (p === '/api/feed' && req.method === 'GET') return json(res, 200, queryFeed(u.searchParams));
       if (p === '/api/stats' && req.method === 'GET') return json(res, 200, getStats());
       if (p === '/api/categories') return json(res, 200, CATEGORIES);
@@ -782,6 +793,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 function closeHttpServer() {
+  releaseHistory.dispose();
   return closeHttpServerGracefully(server);
 }
 

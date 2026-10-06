@@ -790,7 +790,104 @@
     return Object.freeze({ createCapitalViewController, splitNames });
   })();
 
-  const api = Object.freeze({ IntelRender, HotViewController, CapitalViewController });
+  // The release view shares this view-module boundary and uses no Markdown runtime.
+  const ReleaseLog = (function createReleaseLogModule() {
+    function renderMarkdown(source, { esc, safeUrl }) {
+      function inline(value) {
+        const pattern = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|`([^`\n]+)`|\*\*([^*\n]+)\*\*/g;
+        let output = '', cursor = 0, match;
+        while ((match = pattern.exec(value))) {
+          output += esc(value.slice(cursor, match.index));
+          if (match[1]) output += `<a href="${esc(safeUrl(match[2]))}" target="_blank" rel="noopener noreferrer">${esc(match[1])}</a>`;
+          else if (match[3]) output += `<code>${esc(match[3])}</code>`;
+          else output += `<strong>${esc(match[4])}</strong>`;
+          cursor = pattern.lastIndex;
+        }
+        return output + esc(value.slice(cursor));
+      }
+      const lines = String(source || '').replace(/\r\n/g, '\n').split('\n');
+      let output = '', paragraph = [], list = [], code = null;
+      function flush() {
+        if (paragraph.length) output += `<p>${inline(paragraph.join('\n'))}</p>`;
+        if (list.length) output += `<ul>${list.map(item => `<li>${inline(item)}</li>`).join('')}</ul>`;
+        paragraph = []; list = [];
+      }
+      for (const line of lines) {
+        if (/^\s*```/.test(line)) {
+          flush();
+          if (code !== null) { output += `<pre><code>${esc(code.join('\n'))}</code></pre>`; code = null; }
+          else code = [];
+        } else if (code !== null) code.push(line);
+        else if (!line.trim()) flush();
+        else if (/^#{1,6}\s/.test(line)) { flush(); output += `<h4>${inline(line.replace(/^#{1,6}\s+/, ''))}</h4>`; }
+        else if (/^\s*[-*]\s/.test(line)) {
+          if (paragraph.length) flush();
+          list.push(line.replace(/^\s*[-*]\s+/, ''));
+        } else { if (list.length) flush(); paragraph.push(line); }
+      }
+      flush();
+      if (code !== null) output += `<pre><code>${esc(code.join('\n'))}</code></pre>`;
+      return output;
+    }
+
+    function createReleaseLogController({ api, esc, safeUrl, elements } = {}) {
+      let history = null, query = '', rendered = '', loading = null;
+      const expanded = new Set();
+      function render() {
+        if (!history) return;
+        const versionQuery = /^v?\d+\.\d+\.\d+(?:\.\d+)?$/.test(query) ? `v${query.replace(/^v/, '')}` : null;
+        const items = history.items.filter(item => versionQuery ? item.tag === versionQuery
+          : `${item.tag}\n${item.name}\n${item.body}`.toLowerCase().includes(query));
+        const stamp = JSON.stringify([history.items, query, history.currentVersion]);
+        if (stamp !== rendered) {
+          const focus = elements.list.ownerDocument?.activeElement?.closest('[data-release-tag]')?.dataset.releaseTag;
+          elements.list.innerHTML = items.length ? items.map(item => {
+            const current = item.tag === `v${history.currentVersion}`;
+            const date = item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' }) : '本次更新';
+            const intro = item.body.split(/\r?\n/).find(line => line.trim() && !/^[#`]/.test(line)) || item.name;
+            return `<details class="release-entry glass" data-release-tag="${esc(item.tag)}"${expanded.has(item.tag) || (query && items.length < 6) ? ' open' : ''}>
+              <summary><span class="release-version">${esc(item.tag)}</span><span class="release-summary"><strong>${esc(item.name)}${current ? '<span class="release-current">当前版本</span>' : ''}</strong><span>${esc(intro.replace(/\*\*/g, '').slice(0, 160))}</span></span><time datetime="${esc(item.publishedAt || '')}">${esc(date)}</time><span class="release-chevron" aria-hidden="true">⌄</span></summary>
+              <div class="release-body">${renderMarkdown(item.body, { esc, safeUrl })}<a class="release-original" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer">查看 GitHub 原文 ↗</a></div>
+            </details>`;
+          }).join('') : '<div class="empty-state glass"><p>没有找到匹配的版本或更新内容。</p></div>';
+          if (focus) [...elements.list.querySelectorAll('[data-release-tag]')].find(node => node.dataset.releaseTag === focus)?.querySelector('summary')?.focus({ preventScroll: true });
+          rendered = stamp;
+        }
+        const last = history.lastSyncedAt ? ` · 最近同步 ${new Date(history.lastSyncedAt).toLocaleString('zh-CN')}` : '';
+        elements.meta.textContent = `${query ? `${items.length} / ` : ''}${history.items.length} 个版本 · 当前 v${history.currentVersion}${last}${history.syncError ? ` · ${history.syncError}` : ''}`;
+      }
+      async function sync() {
+        if (loading) return loading;
+        elements.sync.disabled = true;
+        elements.sync.textContent = '同步中…';
+        loading = (async () => {
+          try { history = await api('/api/releases?sync=1'); render(); }
+          catch { elements.meta.textContent = '暂时无法同步，已保留当前更新日志。'; }
+          finally { elements.sync.disabled = false; elements.sync.textContent = '同步日志'; loading = null; }
+        })();
+        return loading;
+      }
+      async function load() {
+        try {
+          const initial = !history;
+          history = await api('/api/releases');
+          if (initial) expanded.add(`v${history.currentVersion}`);
+          render();
+          return sync();
+        } catch { elements.meta.textContent = '读取更新日志失败，请点击同步日志重试。'; }
+      }
+      elements.search.addEventListener('input', () => { query = elements.search.value.trim().toLowerCase(); render(); });
+      elements.sync.addEventListener('click', sync);
+      elements.list.addEventListener('toggle', event => {
+        const tag = event.target.dataset?.releaseTag;
+        if (tag) event.target.open ? expanded.add(tag) : expanded.delete(tag);
+      }, true);
+      return Object.freeze({ load, sync });
+    }
+    return Object.freeze({ renderMarkdown, createReleaseLogController });
+  })();
+
+  const api = Object.freeze({ IntelRender, HotViewController, CapitalViewController, ReleaseLog });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) Object.assign(root, api);
 })(typeof globalThis !== 'undefined' ? globalThis : this);

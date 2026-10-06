@@ -503,7 +503,7 @@ test/feed-controller.test.js）：date-group 新增 data-group-time 属性记录
   `导出失败：`（navigator/document 经依赖注入）
 - 备忘（→ settings-view-controller.js）：`async function loadFeedback()`、`await api('/api/feedback')`、
   ``await api(`/api/feedback/${id}`, { method: 'DELETE' })``、`备忘删除失败：`
-- 快捷键（→ shortcuts.js）：`const tabIndex = '12345678'.indexOf(event.key);`、`if (letter === 'c')`
+- 快捷键（→ shortcuts.js）：`const tabIndex = '1234567890'.indexOf(event.key);`、`if (letter === 'c')`
 - 缩放：`document.documentElement.dataset.uiScale = scale;`、
   `preferenceActions.remember('textScale', scale)`；`applyTextScale('md')`（→ shortcuts.js 的 Ctrl+0 复位）；
   `$$('.domain-pills .pill').forEach(pill => {` 与 `$$('.domain-pills .pill').forEach(p => p.addEventListener`；
@@ -880,3 +880,11 @@ v0.2.5 说明（预算不变：CSS ≈ 292,300 B ≤ 292 KiB，脚本 27/27，�
 ### v0.2.10 版本与交互运动
 
 左上角 #appVersion 由 Desktop.version 或 GET /api/version 赋值；都读取 package.json，UI 不另存版本。选择块仍同步提交 --ti-x/y/w/h/o，但尺寸立即落定，过渡只插值 transform；重新选中同一几何不重播，中断从当前视觉矩形继续。新增局部选择块不进入按钮查询或键盘顺序。光波最多 4 个、单按钮最多 1 个；追光最多 1 个，仅 full 档开放，鼠标静止后停止 RAF。static、运行中减少动画与隐藏／失焦必须取消运动并保留可见选中态，退出销毁监听。CSS／脚本／关键帧／滤镜预算不变，测试以新增真实 Electron 用例及既有布局矩阵核验。
+
+## v0.2.12 工作区补充契约
+
+- 侧栏顺序为 `hot, featured, all, starred, daily, capital, releases, links, sources, settings`；`daily` 的公开名称为情报日志，日报／周报／月报仍使用原 ID 和接口。Alt+1–9／0 跟随上述顺序，G U 打开更新日志。
+- `GET /api/releases` 立即返回 `{ items, currentVersion, lastSyncedAt, syncError }`；`GET /api/releases?sync=1` 同步 GitHub 正式版本，网络失败仍以 200 返回可用本机记录与明确状态。接口沿用原鉴权。
+- `config/release-history.json` 包含 GitHub 39 个历史正式版本及本版说明；本版正文必须与 `RELEASE_NOTES.md` 一致。构建、版本校验和单元测试均检查此约定。
+- 设置九章顺序由静态导航 `data-settings-target` 与卡片 `data-settings-section` 保持一致；实际滚动容器为 `#appViewport`，`aria-current=location` 仅标识当前章节。导航点击不改 URL／偏好；键盘点击把焦点交给标题，鼠标点击保留目录焦点。
+- 日志控制器并入既有 `intel-views.js` 边界，设置导航并入 `settings-view-controller.js`，页面脚本仍为 27 条。样式／关键帧／滤镜预算沿用；CSS 的 CRLF 最坏口径为 298,334 B，低于 292 KiB 的 299,008 B。

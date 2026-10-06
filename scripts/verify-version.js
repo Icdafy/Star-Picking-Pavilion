@@ -81,6 +81,7 @@ if (require.main === module) {
   try {
     const projectRoot = path.join(__dirname, '..');
     const args = process.argv.slice(2);
+    require('./sync-release-history').verifyBundledHistory();
     const result = verifyVersion({
       packageJson: require(path.join(projectRoot, 'package.json')),
       tag: argumentValue(args, '--tag') || process.env.GITHUB_REF_NAME,

@@ -171,3 +171,11 @@ v0.2.10 高频运动集中在既有 dom-utils.js：createMotion.retargetIndicato
 正则抽取并解析真实 <template> 的 templateFromHtml），支撑模板填充与
 diff 调和的行为级断言（test/feed-diff.test.js）；perf-guard 整表赋值
 上限由 4 下调为 3（骨架/空态/失败态），并新增 keyed diff 接入断言。
+
+## v0.2.12 更新日志与设置导航
+
+`intel-views.js` 新增 `ReleaseLog`：完整版本记录由 `/api/releases` 提供，本机记录先呈现，在线同步随后更新；使用安全的文本／列表／标题／链接／代码渲染和原生 details，不执行 Releases 中的 HTML，不引入 Markdown 依赖。完整版本号按 tag 精确搜索，其他检索词按正文搜索。当前版本初始展开，其他版本按需阅读。
+
+`settings-view-controller.js` 的 `createSettingsNavigation` 管理九章快捷目录与内容视口。宽屏为固定纵向目录，窄屏为自动换行的横向目录；设置内容保持单列及章节顺序。滚动位置和标题偏移取自实际 `#appViewport` 与 sticky 导航尺寸，返回第一章同时回到页首，避免设置标题留在吸顶栏下面。每次进入接入滚动与尺寸监听，退出断开并取消待处理帧，页面销毁移除目录事件。
+
+`server/release-history.js` 只请求固定 GitHub 仓库的公开 Releases API，合并分页并过滤草稿／预发布；请求有超时、大小限制、合并与限频。可用记录与同步时间原子写入本机公开日志缓存，重启离线时读取；服务器退出中止未完成请求。内置日志由 `scripts/sync-release-history.js` 从 Releases 和本版 RELEASE_NOTES.md 生成，后续版本继续走同一源与门禁。

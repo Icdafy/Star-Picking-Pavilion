@@ -23,11 +23,7 @@ body {
   padding-top: 0 !important;
 }
 
-/* v0.2.5 无缝标题栏：对齐 macOS 统一工具栏、Windows 11「内容延伸进标题栏」以及 Linear、Arc、
-   VS Code 的做法——标题栏不再是一条独立色带：没有描边、投影、高光和自己的底色，
-   与下方共用同一层氛围背景，任何主题、任何壁纸下颜色都一致。
-   只有内容滚到它下面时，才由一段渐隐模糊（Apple 的 scroll edge effect）把文字柔化；
-   模糊层用蒙版从上往下淡出，下沿止于吸顶面板上方，因此不会重新画出分界线。 */
+/* 标题栏与正文共用氛围层；滚入内容用顶部柔化，不增加独立底色或边界。 */
 .desktop-titlebar-liquid-glass {
   position: fixed;
   top: env(titlebar-area-y, 0px);
@@ -1076,4 +1072,65 @@ body.is-idle :is(.press-wave, .surface-light, .control-aura) { display: none; }
 @media (forced-colors: active) {
   .selection-indicator, .surface-light, .control-aura, .press-wave { display: none; }
   .motion-segmented > button.active { background: Highlight; color: HighlightText; border-color: Highlight; }
+}
+
+/* Settings: a persistent chapter index and one continuous editing column. */
+.settings-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); align-items: start; }
+.settings-layout .settings-grid { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.settings-nav { position: sticky; top: var(--stack-top); z-index: 45; min-width: 0; padding: .45rem; background: var(--glass-bg-deep); }
+.settings-nav-label { display: none; }
+.settings-nav-items { display: flex; flex-wrap: wrap; gap: .2rem; }
+.settings-nav a { display: flex; align-items: center; gap: .55rem; flex: 0 0 auto; padding: .65rem .7rem; border-radius: var(--radius-sm); color: var(--c-fg-dim); font-size: var(--t-sm); text-decoration: none; white-space: nowrap; }
+.settings-nav a:hover { color: var(--c-fg); background: var(--hover-bg); }
+.settings-nav a[aria-current] { color: var(--accent-ink); background: var(--accent-soft); font-weight: 650; box-shadow: inset 2px 0 var(--accent); }
+.settings-nav a:focus-visible, .release-entry summary:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+.settings-nav-number { color: var(--c-fg-faint); font-size: var(--t-xs); font-variant-numeric: tabular-nums; }
+.settings-nav a[aria-current] .settings-nav-number { color: var(--accent-ink); }
+[data-settings-section] { scroll-margin-top: var(--stack-top); }
+[data-settings-section] h3:focus { outline: none; }
+[data-settings-section] h3:focus-visible { outline: var(--focus-ring); outline-offset: 5px; }
+@media (min-width: 70rem) {
+  .settings-layout { grid-template-columns: 10.5rem minmax(0, 1fr); gap: var(--sp-5); }
+  .settings-nav { padding: .55rem; max-height: calc(100vh - var(--desktop-titlebar-height) - var(--stack-top) - 2rem); overflow-y: auto; }
+  .settings-nav-label { display: block; margin: .5rem .7rem .65rem; color: var(--c-fg-faint); font-size: var(--t-xs); letter-spacing: .12em; }
+  .settings-nav-items { display: grid; overflow: visible; }
+  .settings-nav a { padding: .7rem .6rem; }
+}
+
+/* Native disclosure controls keep every version accessible by keyboard. */
+.release-hero .btn-row { flex-wrap: wrap; }
+.release-hero a { text-decoration: none; }
+.release-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); margin: var(--sp-5) 0; }
+.release-search { flex: 1 1 18rem; max-width: 28rem; margin: 0; }
+.release-toolbar .hint { flex: 1 1 15rem; margin: 0; }
+.release-timeline { display: grid; gap: var(--sp-3); }
+.release-entry { min-width: 0; border-radius: var(--radius-lg); }
+.release-entry summary { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-5); cursor: pointer; list-style: none; border-radius: inherit; }
+.release-entry summary::-webkit-details-marker { display: none; }
+.release-version { flex: 0 0 5.5rem; color: var(--accent-ink); font-size: var(--t-lg); font-weight: 700; }
+.release-summary { flex: 1; min-width: 0; display: grid; gap: .35rem; }
+.release-summary strong { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; font-size: var(--t-base); }
+.release-summary > span { color: var(--c-fg-dim); font-size: var(--t-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.release-current { padding: .1rem .45rem; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); font-size: var(--t-xs); font-weight: 500; }
+.release-entry time { flex: 0 0 auto; color: var(--c-fg-faint); font-size: var(--t-xs); }
+.release-chevron { color: var(--c-fg-dim); font-size: var(--t-lg); }
+.release-entry[open] .release-chevron { transform: rotate(180deg); }
+.release-body { border-top: 1px solid var(--glass-border); padding: var(--sp-5); overflow-wrap: anywhere; line-height: 1.85; }
+.release-body :is(p, ul, pre, h4) { margin: 0 0 1rem; }
+.release-body h4 { margin-top: 1.3rem; font-size: var(--t-base); }
+.release-body h4:first-child { margin-top: 0; }
+.release-body ul { padding-left: 1.4rem; }
+.release-body li + li { margin-top: .6rem; }
+.release-body a { color: var(--accent-ink); text-underline-offset: .2em; }
+.release-body pre { max-width: 100%; overflow: auto; padding: .8rem 1rem; background: var(--input-bg); border-radius: var(--radius-sm); font-size: var(--t-sm); }
+.release-original { display: inline-block; margin-top: .3rem; font-size: var(--t-sm); }
+@media (max-width: 42rem) {
+  .release-entry summary { gap: .65rem; padding: var(--sp-4); flex-wrap: wrap; }
+  .release-version { flex-basis: 4.5rem; font-size: var(--t-base); }
+  .release-entry time { margin-left: 5.15rem; }
+  .release-body { padding: var(--sp-4); }
+}
+@media (forced-colors: active) {
+  .settings-nav a[aria-current] { color: Highlight; outline: 1px solid Highlight; }
+  .release-current { border: 1px solid ButtonText; }
 }

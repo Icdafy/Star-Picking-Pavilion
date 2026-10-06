@@ -42,6 +42,7 @@ const CommonLinksController = window.CommonLinksController;
 const IntelRender = window.IntelRender;
 const HotViewController = window.HotViewController;
 const CapitalViewController = window.CapitalViewController;
+const ReleaseLog = window.ReleaseLog;
 const AquaShell = window.AquaShell;
 // 阶段 3：纯函数与表示层已拆入 renderer/format-utils.js、renderer/feed-card.js，
 // 这里按名解构，保持组合根内调用点不变
@@ -530,6 +531,11 @@ const sourcesController = SourcesController.createSourcesController({
 });
 const { loadSources } = sourcesController;
 
+const releaseLog = ReleaseLog.createReleaseLogController({
+  api, esc, safeUrl,
+  elements: { list: $('#releaseList'), search: $('#releaseSearch'), meta: $('#releaseMeta'), sync: $('#btnSyncReleases') }
+});
+
 // ---------- 设置 ----------
 // 设置页全部接线拆入 renderer/settings-view-controller.js（批 2），
 // 组合根只负责注入 $、api 与各子控制器工厂
@@ -538,9 +544,10 @@ const settingsViewController = SettingsViewController.createSettingsViewControll
   Desktop, SettingsFormController, DesktopSettingsController,
   StorageMaintenanceController, DailyArchiveController,
   focusTools: { findFocusKey: DomUtils.findFocusKey, restoreFocusByKey: DomUtils.restoreFocusByKey },
-  motion
+  motion, document, window, viewport: $('#appViewport')
 });
 const { loadSettings } = settingsViewController;
+window.addEventListener('pagehide', () => settingsViewController.dispose(), { once: true });
 
 // ---------- 云幄 · 常用网址（批 4 拆入 renderer/common-links-controller.js） ----------
 // renderCommonLinks 模板与分类/常用点击接线随工厂迁出，
@@ -573,16 +580,17 @@ const viewRegistry = ViewRegistry.createViewRegistry({
 });
 const { syncTabIndicator, syncNavHeight } = viewRegistry;
 
-// 9 个视图全部注册：三个信息流视图共享 #viewFeed，onEnter 各自触发加载
+// 三个信息流视图共享 #viewFeed，onEnter 各自触发加载。
 for (const feedView of FEED_VIEWS) {
   viewRegistry.registerView({ id: feedView, tab: '#viewFeed', isFeed: true, onEnter: () => registryDeps.loadFeed() });
 }
 viewRegistry.registerView({ id: 'hot', tab: '#viewHot', onEnter: () => hotViewController.loadHot() });
 viewRegistry.registerView({ id: 'capital', tab: '#viewCapital', onEnter: () => capitalViewController.load() });
 viewRegistry.registerView({ id: 'daily', tab: '#viewDaily', onEnter: () => registryDeps.loadDaily(state.dailyDate) });
+viewRegistry.registerView({ id: 'releases', tab: '#viewReleases', onEnter: () => releaseLog.load() });
 viewRegistry.registerView({ id: 'links', tab: '#viewLinks', onEnter: () => registryDeps.renderCommonLinks() });
 viewRegistry.registerView({ id: 'sources', tab: '#viewSources', onEnter: () => registryDeps.loadSources() });
-viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => { registryDeps.loadSettings(); loadIndustryInfo(); } });
+viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => { settingsViewController.enter(); registryDeps.loadSettings(); loadIndustryInfo(); }, onLeave: () => settingsViewController.leave() });
 
 // 设置页“精选标准”：行业包的门槛、内容类型权重、提示词版本与本小时 / 今日调用量（只读）
 async function loadIndustryInfo() {
@@ -632,7 +640,7 @@ async function initCategories() {
     // 只绑分类条自己的 chips：词库面板、热点与一级市场的筛选也用 .chip 外观，
     // 全局抓取会把它们的选中态清掉，还会把它们当成分类改写 state.category
     $$('#catChips .chip').forEach(ch => ch.addEventListener('click', () => {
-      const on = ch.classList.contains('active');
+      const on = state.category === ch.dataset.cat;
       $$('#catChips .chip').forEach(x => {
         x.classList.remove('active');
         x.setAttribute('aria-pressed', 'false');
@@ -707,7 +715,8 @@ const VIEW_ALIASES = {
   capital: ['yijishichang', 'yjsc', 'capital', 'market', 'rongzi', '融资', '投融资', 'ipo'],
   all: ['quanbudongtai', 'qbdt', 'all', 'feed', 'dongtai'],
   starred: ['xingbiao', 'xb', 'starred', 'shoucang', '收藏'],
-  daily: ['qingbaoribao', 'qbrb', 'ribao', 'rb', 'daily', 'zhoubao', 'yuebao', '周报', '月报'],
+  daily: ['qingbaoribao', 'qbrb', 'ribao', 'rb', 'daily', 'zhoubao', 'yuebao', '周报', '月报', 'qingbaorizhi', 'qbrz', '情报日报'],
+  releases: ['gengxinrizhi', 'gxrz', 'release', 'releases', 'changelog', '版本', '更新'],
   links: ['changyongwangzhi', 'cywz', 'links', 'wangzhi', '网址导航'],
   sources: ['xinyuan', 'xy', 'sources', 'rss', '信源监控'],
   settings: ['shezhi', 'sz', 'settings', 'moxing', 'model', '模型', 'api', '密钥', 'deepseek']
@@ -723,7 +732,7 @@ function paletteCommands() {
       // 只取文字节点：星标标签里的计数角标不进命令名
       label: [...tab.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join('').trim(),
       detail: view === state.view ? '当前视图' : '',
-      keys: go ? ['G', go.toUpperCase()] : index < 8 ? ['Alt', String(index + 1)] : [],
+      keys: go ? ['G', go.toUpperCase()] : index < 10 ? ['Alt', String((index + 1) % 10)] : [],
       aliases: VIEW_ALIASES[view] || [view],
       run: () => switchView(view)
     };

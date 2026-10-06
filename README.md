@@ -2,27 +2,27 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.11 · 分层追光与磁吸反馈
+## v0.2.12 · 情报工作区与设置导航
 
-- 卡片由单层柔光升级为近光、缓随远光与指针边缘高光；颜色跟随领域，快速扫过时柔和交接。
-- 导航、筛选与操作按钮增加轻微磁吸光晕，装饰层随指针偏移，正文与点击区域保持稳定。
-- 导航与筛选选择块采用带速度衔接的阻尼弹簧，连续点击时从当前视觉位置继续运动，并增加玻璃高光与细腻回弹。
-- 主题、缩放、键盘与原有功能继续可用；静止后停止计算，减少动画、低功耗、强制颜色、滚动和窗口隐藏时及时清理。
-- 参考 Apple、Motion、Linear 与 Olivier Larose 的设计和交互资料，在现有原生 JS / WAAPI 架构内实现，无新增依赖。
+- 情报工作区顺序调整为：热点、精选、全部动态、星标、情报日志、一级市场、更新日志、常用网址、信源、设置。
+- 应用内更新日志完整收录 GitHub Releases 的 39 个历史版本和本版说明；支持搜索、展开、自动及手动同步，离线保留记录。
+- 全部动态七个分类再次点击即可取消，同时清除分类高亮和动效选择块；领域和检索条件继续生效。
+- 设置依次提供九个章节，固定目录与滚动高亮支持快速定位；窄窗口改用自动换行的横向快捷栏，双主题、缩放及减少动画继续适用。
+- 原有情报、星标、模型密钥与个人设置保留；构建前校验应用内本版日志和 GitHub 发布说明一致，无新增运行依赖。
 
-版本、界面与更新元数据统一为 0.2.11，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0211-validation.md)，历史版本见 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.12，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0212-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.11.exe`，双击并按向导安装。v0.2.11 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.12.exe`，双击并按向导安装。v0.2.12 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.11.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.12.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -235,7 +235,7 @@ npm run eval:selection -- --gold data/gold.jsonl  # 用自标注样本校准精�
 npm run audit:sources -- --strict # 在隔离数据目录实时复查全部启用信源
 npm run dist                # 生成 Windows 安装包，不发布
 npm run verify:package      # 审计 ASAR、文件边界和体积
-npm run verify:version -- --tag v0.2.9 --artifacts
+npm run verify:version -- --tag v0.2.12 --artifacts
 npm run notices
 ```
 

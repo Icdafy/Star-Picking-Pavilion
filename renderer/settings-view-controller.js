@@ -10,11 +10,92 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.SettingsViewController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createSettingsViewControllerModule() {
+  function createSettingsNavigation({ document: doc, window: win, viewport, panel, nav } = {}) {
+    if (!win || !viewport || !panel || !nav?.querySelectorAll) return null;
+    const links = [...nav.querySelectorAll('[data-settings-target]')];
+    const sections = links.map(link => doc.getElementById(link.dataset.settingsTarget));
+    let entered = false, frame = null;
+
+    function offset() {
+      const stickyTop = parseFloat(win.getComputedStyle(nav).top) || 0;
+      return stickyTop + (win.matchMedia('(min-width: 70rem)').matches ? 0 : nav.getBoundingClientRect().height) + 12;
+    }
+    function select(id) {
+      for (const link of links) {
+        if (link.dataset.settingsTarget === id) link.setAttribute('aria-current', 'location');
+        else link.removeAttribute('aria-current');
+      }
+    }
+    function update() {
+      frame = null;
+      if (!entered || panel.hidden) return;
+      const boundary = viewport.getBoundingClientRect().top + offset() + 28;
+      let current = sections[0];
+      for (const section of sections) {
+        if (section?.getBoundingClientRect().top <= boundary) current = section;
+      }
+      if (viewport.scrollTop > 0 && viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 2) current = sections.at(-1);
+      if (current) select(current.id);
+    }
+    function schedule() {
+      if (entered && frame === null) frame = win.requestAnimationFrame(update);
+    }
+    function onClick(event) {
+      const link = event.target.closest('[data-settings-target]');
+      if (!link || !nav.contains(link)) return;
+      const section = doc.getElementById(link.dataset.settingsTarget);
+      if (!section) return;
+      event.preventDefault();
+      const top = section === sections[0] ? 0
+        : viewport.scrollTop + section.getBoundingClientRect().top - viewport.getBoundingClientRect().top - offset();
+      const reduced = win.matchMedia('(prefers-reduced-motion: reduce)').matches || doc.documentElement.dataset.fxTier === 'static';
+      viewport.scrollTo({ top: Math.max(0, top), behavior: reduced ? 'instant' : 'smooth' });
+      select(section.id);
+      if (event.detail === 0) section.querySelector('h3')?.focus({ preventScroll: true });
+    }
+    function onKey(event) {
+      const current = links.indexOf(doc.activeElement);
+      if (current < 0) return;
+      let next;
+      if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = links.length - 1;
+      else if (['ArrowDown', 'ArrowRight'].includes(event.key)) next = (current + 1) % links.length;
+      else if (['ArrowUp', 'ArrowLeft'].includes(event.key)) next = (current + links.length - 1) % links.length;
+      else return;
+      event.preventDefault(); event.stopPropagation(); links[next]?.focus({ preventScroll: true });
+    }
+    const resize = win.ResizeObserver ? new win.ResizeObserver(schedule) : null;
+    nav.addEventListener('click', onClick);
+    nav.addEventListener('keydown', onKey);
+    function leave() {
+      entered = false;
+      viewport.removeEventListener('scroll', schedule);
+      win.removeEventListener('resize', schedule);
+      resize?.disconnect();
+      if (frame !== null) win.cancelAnimationFrame(frame);
+      frame = null;
+    }
+    return Object.freeze({
+      enter() {
+        if (entered) return;
+        entered = true;
+        viewport.addEventListener('scroll', schedule, { passive: true });
+        win.addEventListener('resize', schedule, { passive: true });
+        resize?.observe(panel);
+        if (sections[0]) select(sections[0].id);
+        schedule();
+      },
+      leave,
+      dispose() { leave(); nav.removeEventListener('click', onClick); nav.removeEventListener('keydown', onKey); }
+    });
+  }
+
   function createSettingsViewController({
     $, api, esc, timeAgo, formatBytes, toast, confirmGlass, refreshStats,
     Desktop, SettingsFormController, DesktopSettingsController,
     StorageMaintenanceController, DailyArchiveController,
-    focusTools = {}, motion = null
+    focusTools = {}, motion = null,
+    document: doc, window: win, viewport
   } = {}) {
     if (typeof $ !== 'function' || typeof api !== 'function'
       || typeof esc !== 'function' || typeof timeAgo !== 'function'
@@ -23,6 +104,7 @@
       || !SettingsFormController || !StorageMaintenanceController) {
       throw new TypeError('settings view controller requires $, api, esc, timeAgo, formatBytes, toast, confirmGlass, refreshStats and sub-controller dependencies');
     }
+    const navigation = createSettingsNavigation({ document: doc, window: win, viewport, panel: $('#viewSettings'), nav: $('#settingsNav') });
 
     const settingsForm = SettingsFormController.createSettingsFormController({
       elements: {
@@ -103,7 +185,7 @@
       $('#btnChooseDailyArchive').disabled = true;
       $('#btnSaveDailyArchive').disabled = true;
       $('#btnRetryDailyArchive').disabled = true;
-      $('#dailyArchiveStatus').textContent = '每日新闻简报自动归档仅在安装版中可用；当前仍可在“情报日报”中手动导出 Markdown。';
+      $('#dailyArchiveStatus').textContent = '每日新闻简报自动归档仅在安装版中可用；当前仍可在“情报日志”中手动导出 Markdown。';
       $('#dailyArchiveStatus').className = 'test-result daily-archive-live warning';
     }
 
@@ -268,8 +350,9 @@
       }
     });
 
-    return Object.freeze({ loadSettings, loadModels: () => modelsSettings.load() });
+    return Object.freeze({ loadSettings, loadModels: () => modelsSettings.load(),
+      enter: () => navigation?.enter(), leave: () => navigation?.leave(), dispose: () => navigation?.dispose() });
   }
 
-  return Object.freeze({ createSettingsViewController });
+  return Object.freeze({ createSettingsViewController, createSettingsNavigation });
 });

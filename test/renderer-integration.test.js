@@ -88,7 +88,7 @@ test('常用网址作为摘星阁顶部主导航的原生视图接入', () => {
   assert.match(html, /id="commonLinksGrid"[^>]*tabindex="-1"/);
 });
 
-test('宽屏指挥栏保留九视图语义，并为每个导航项提供内联 SVG 图标', () => {
+test('宽屏指挥栏按工作区顺序保留十视图语义，并为每个导航项提供内联 SVG 图标', () => {
   assert.match(html, /<aside class="command-rail glass"[^>]*aria-label="摘星阁指挥栏">/);
   const navStart = html.indexOf('<nav class="nav"');
   const navEnd = html.indexOf('</nav>', navStart);
@@ -97,7 +97,7 @@ test('宽屏指挥栏保留九视图语义，并为每个导航项提供内联 S
   const buttons = [...navigation.matchAll(/<button class="tab(?: active)?" data-view="([^"]+)"[\s\S]*?<\/button>/g)];
   assert.deepEqual(
     buttons.map(match => match[1]),
-    ['featured', 'hot', 'capital', 'all', 'starred', 'daily', 'links', 'sources', 'settings']
+    ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'sources', 'settings']
   );
   for (const [markup, view] of buttons.map(match => [match[0], match[1]])) {
     assert.match(markup, /<span class="tab-glyph" aria-hidden="true"><svg viewBox="0 0 20 20">[\s\S]*?(?:<path|<circle)/, `${view} 缺少可继承主题色的 SVG 图标`);
@@ -888,10 +888,9 @@ test('星标作为一等信息流视图接入导航、筛选与实时轮询', ()
   // 与“一级市场”一起作为独立面板注册，不属于共享 #viewFeed 的信息流家族
   assert.match(app, /registerView\(\{ id: 'hot', tab: '#viewHot'/);
   assert.match(app, /registerView\(\{ id: 'capital', tab: '#viewCapital'/);
-  // 批 3：9 个视图全部经注册表接入：循环注册覆盖 FEED_VIEWS 三个信息流视图
-  //（共享 #viewFeed），另六个面板逐条注册；组合根的 switchView 退化为注册表
+  // 三个信息流视图共享 #viewFeed，另七个面板逐条注册；组合根的 switchView 退化为注册表
   // 透传（启动序列断言仍可命中）
-  assert.equal((app.match(/registerView\(\{ id:/g) || []).length, 7);
+  assert.equal((app.match(/registerView\(\{ id:/g) || []).length, 8);
   assert.match(app, /for \(const feedView of FEED_VIEWS\)[\s\S]{0,160}?tab: '#viewFeed', isFeed: true/);
   assert.match(app, /return viewRegistry\.switchView\(view, \{ persist \}\);/);
   // 批 3：状态层经 renderer/store.js 持有同一个 state 对象，UI 状态切换走 setState
@@ -1011,11 +1010,11 @@ test('情报备忘可回看与删除，不再是只写不读', () => {
   assert.ok(css.includes('.note-list'), '缺少 .note-list 样式');
 });
 
-test('快捷键随第八个视图扩展，并新增复制当前视图', () => {
+test('快捷键覆盖十个视图，并提供复制当前视图', () => {
   // 批 2：键盘快捷键迁到 renderer/shortcuts.js
-  assert.match(shortcutsSource, /const tabIndex = '12345678'\.indexOf\(event\.key\);/);
+  assert.match(shortcutsSource, /const tabIndex = '1234567890'\.indexOf\(event\.key\);/);
   assert.match(shortcutsSource, /if \(letter === 'c'\)/);
-  assert.match(html, /切换第 1–8 个视图/);
+  assert.match(html, /按侧栏顺序切换视图（0 为设置）/);
   assert.match(html, /<kbd>Alt<\/kbd><kbd>C<\/kbd>/);
 });
 

@@ -16,9 +16,9 @@ const WINDOWS = [
   { width: 1920, height: 1080 }
 ];
 const SCALES = ['sm', 'md', 'lg', 'xl'];
-const VIEWS = ['featured', 'hot', 'capital', 'daily', 'links', 'sources', 'settings'];
+const VIEWS = ['featured', 'hot', 'capital', 'daily', 'releases', 'links', 'sources', 'settings'];
 
-// 4 种窗口 × 4 档缩放 × 7 个视图共 112 个组合，每个组合都遍历全部可交互元素的计算样式；
+// 4 种窗口 × 4 档缩放 × 8 个视图共 128 个组合，每个组合都遍历全部可交互元素的计算样式；
 // GitHub Windows 运行器上 v0.2.3 已用到 116.5 s，贴着 120 s 上限，v0.2.4 超时。断言不变，只放宽时限。
 test('全部窗口、缩放和核心视图无横向溢出且主导航完整可见', { timeout: 300_000 }, async t => {
   const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-layout-'));
@@ -132,7 +132,7 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
         });
         const label = `${size.width}×${size.height}/${scale}/${view}`;
         assert.ok(result.scrollWidth <= result.clientWidth + 1, `${label} 文档横向溢出`);
-        assert.equal(result.visibleTabs, 9, `${label} 主导航不完整`);
+        assert.equal(result.visibleTabs, 10, `${label} 主导航不完整`);
         assert.deepEqual(result.overflowers, [], `${label} 存在交互元素越界`);
         if (
           screenshotDir

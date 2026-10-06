@@ -1,52 +1,4 @@
-/* ============================================================
-   摘星阁 · 双主题设计系统 v5（质感深化）
-   深空夜航（默认）—— OLED 墨蓝液态玻璃，夜航塔台气质
-   宣纸白 —— 墨色纸面，报馆情报看板气质
-
-   v4 修的是「第一眼观感」，不换骨架：
-   - 图层：玻璃不再套玻璃。导航浮层加重、卡片落回素色，背景与前景分开；
-     极光/星点/颗粒降噪，只留「夜航」的氛围，不再抢内容的戏。
-   - 层级：卡片收敛成「来源 → 标题 → 摘要 → 研判 → 操作」一条视觉动线，
-     评分胶囊退到它该有的配角位；领域由整张卡片的左缘色条表达，
-     不再靠文字标签重复播报。
-   - 控件：导航、领域筛选、缩放档位统一为带底槽的分段控件；
-     卡片底部的「星标 / 复制」从幽灵小字改为常态可见的描边按钮——
-     开源给同事用，功能要让人找得到。
-
-   v5 在 v4 的骨架上做「第二眼质感」，全部是可降级的装饰层：
-   - 卡片：悬停浮起一道领域色的渐变压边（mask 挖空的 1px 光环，
-     不占布局、不抢标题），暗色主题下再叠一层同色系远光；
-     精选卡的底色微微向旗标色倾斜，不用翻元信息就能感到「这张不一样」。
-   - 徽记：技术突破胶囊加一道周期性扫光——它是全站价值最高的标记，
-     值得唯一的常驻动效；精选胶囊在暗色下带一点余辉。
-   - 微交互：星标落定时五角星轻轻回弹一下；主按钮悬停有缎面扫光；
-     导航指示块在暗色下带光晕；卡片标题悬停长出下划线而不是只变色。
-   - 氛围：深空主题偶尔划过一颗流星（约 16 秒一次、转瞬即灭），
-     宣纸白主题不出现；所有新动效都被 prefers-reduced-motion 兜住。
-
-   字体：中文一律思源黑体（随包内置，见 fonts/source-han-sans-sc/），
-         英文与数字一律 Times New Roman。二者靠一条字体栈同时生效——
-         Times New Roman 放首位、没有汉字字形，中文字符自动回落到思源黑体。
-         层次不再靠换字体家族，改由字号 / 字重 / 字距拉开。
-   尺度：根字号是全站唯一标尺，字号、间距、圆角、栏宽一律用 rem 从它派生，
-         所以「整体放大 / 缩小」时各部分是同一个比例，版面不会走形。
-   颜色：语义令牌 accent / second / flag 各自带 ink（可读文字）、
-         soft（背景晕染）、line（描边）三档，主题只需覆写令牌本身。
-   思源黑体的 @font-face 分片声明在 fonts/source-han-sans-sc/index.css，
-   由 index.html 单独引一条 <link>（与本表并行下载，比 @import 少一跳）。
-
-   v6.5 令牌与动效治理（只增不删，双主题可读性不变）：
-   - 语义令牌：阴影阶梯 --shadow-sm/md/lg、玻璃分层 --glass-bg-deep/soft
-     与 --glass-border-subtle、焦点环 --focus-ring、状态色
-     --state-success/warn/danger、动效别名 --dur-base；组件改用令牌取层级。
-   - 动效治理：扫光（pill-sheen / 主按钮缎面）与骨架微光（shimmer）从
-     left / background-position 改为纯 transform 合成层动画；新条目高亮
-     card-flash 改为覆盖层 opacity 淡出；body.is-idle 时暂停氛围层动画，
-     供脚本在页面隐藏时挂 class。液态玻璃阶段后关键帧共 19组，
-     上限 20 组；新增动效优先复用既有组。
-   - 交互反馈：通用 :focus-visible 焦点环兜底、disabled 光标、
-     aria-pressed=true 零特异性视觉兜底；loading/empty/error 三态视觉统一。
-   ============================================================ */
+/* 摘星阁 · 双主题设计系统。颜色、字号、间距和材质通过语义令牌统一管理。 */
 
 :root {
   --scrollbar-hue: var(--aqua-user-hue, 40deg);
@@ -2501,15 +2453,7 @@ body.theme-transition :is(.glass, .card, .tab, .pill, .chip, .btn-icon, .btn-gho
   transition: color 260ms var(--ease), background-color 260ms var(--ease), border-color 260ms var(--ease) !important;
 }
 
-/* ---------- 液态玻璃阶段 3：fx-tier 运行时档位覆盖 ----------
-   app.js 启动时即席推导档位写入 <html data-fx-tier>（full / lite /
-   static，不持久化、不进偏好 schema）。覆盖块只改既有令牌的值：
-   玻璃模糊强度令牌 --glass-blur 与时长令牌 --dur-glide，不新增
-   任何滤镜声明点（消费处仍读同一个令牌），也不新增循环动画。
-   lite：低内存/少核心设备降模糊与饱和、缩短光斑缓过渡，并关停两枚
-   液态光斑的持续动画（与 static 同口径，仅 full 档保留）；
-   static：reduced 偏好或极低配设备，玻璃滤镜令牌置 none，
-   氛围层光斑动画关停（与既有 reduced 媒体查询双保险） */
+/* 动效档位由运行时写入 data-fx-tier；lite 降低材质成本，static 关闭装饰。系统减少动画优先。 */
 [data-fx-tier="lite"] {
   --glass-blur: blur(8px) saturate(110%);
   --dur-glide: 320ms;
@@ -2708,11 +2652,7 @@ body.theme-transition :is(.glass, .card, .tab, .pill, .chip, .btn-icon, .btn-gho
   .models-segmented-thumb, .models-customized > summary::before, .icon-btn svg, .models-customized[open] .models-customized-body { transition: none; }
 }
 
-/* ---------- v0.2.3 可读性与动效升级 ----------
-   可读性：宣纸白主题下思源黑体 400 字重在 Windows 上笔画偏细，正文整体提到 450（可变字重）；
-   动效：① 主题切换的圆形揭开（app.js 驱动 View Transitions，这里只关掉默认交叉淡化）；
-   ② 滚动驱动的卡片入场，复用既有 card-in 关键帧，交给合成线程随滚动推进，不新增关键帧；
-   ③ reduced 偏好与 static 档位一律关闭。 */
+/* 中文正文使用 450 字重；顶光位于文字下方。渐入沿用现有关键帧，减少动画时关闭。 */
 [data-theme="light"] body { font-weight: 450; }
 [data-theme="light"] .card-summary, [data-theme="light"] .hint, [data-theme="light"] .models-hint { font-weight: 450; }
 :root.theme-reveal::view-transition-old(root),
