@@ -31,3 +31,9 @@
 ## 发布状态
 
 本地验证已完成，等待 main 的精确提交完整通过后推送 v0.2.20 tag。安装／启动／单实例／退出／卸载只在一次性 Windows CI 执行；公开附件核验在发布后回填，仍使用原 main／tag 门禁。
+
+最初的后端提交 `553d9d04e0c37c8be0a4478617a1542e8c06d64f` 已通过 [main 完整门禁](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37481309119)。其 Release 两轮均为 941／941 单元、23／24 桌面，原有 layout 矩阵在 Electron 主进程主题观察绑定处（旧 test/e2e/layout.test.js:195）报告“Execution context was destroyed”。原样单项本地补验 1／1 通过、35.15 秒，没有布局溢出断言失败；两次 CI 的原始协议错误未被保留，不能由通用提示推断应用发生导航或崩溃。
+
+核对 [Playwright 1.61.1 的错误改写源码](https://github.com/microsoft/playwright/blob/v1.61.1/packages/playwright-core/src/server/chromium/crExecutionContext.ts)及[上游同类问题](https://github.com/microsoft/playwright/issues/33737)后，将该测试的主进程观察改为项目既有原生 IPC，继续启动真实 Electron 主入口、真实后端和 renderer，DOM 仍由 Chromium CDP 观察。保持原 160 组矩阵、主题、布局与 240 秒用例时限，额外核对真实主进程 PID，并要求真实抛出的异常透传到调用者；没有重试观察调用或放行门禁。该修改处理测试对实验性 Node 调试上下文的依赖，首次底层协议故障的具体原因仍未知。
+
+修正后的矩阵 1／1 通过、33.95 秒；在相同断言前增加 100 秒观察生命周期的隔离副本 1／1 通过、134.23 秒，单元及集成 941／941 再次通过、20.39 秒。观察修正后的完整桌面回归继续验证。正式 Release 尚未生成，版本仍为 0.2.20；未发布标签将在新提交 main 完整通过后对齐，再重新触发原 Release 流程。旧标签对象和两个失败运行证据完整保留。相关证据为 main-ci-backend-original.log／result.json／verified.json、tag-backend-original-verification.txt、release-first.log、release-first-result.json、release-second.log、release-second-result.json、release-failed-layout-local.log、layout-native.log、layout-native-long.log、unit-layout-native.log。

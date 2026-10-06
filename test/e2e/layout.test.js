@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { _electron: electron } = require('playwright');
+const { launchNativeElectron } = require('./native-electron.cjs');
 
 const projectRoot = path.join(__dirname, '..', '..');
 const fixture = path.join(__dirname, 'fixtures', 'empty-settings.json');
@@ -30,16 +30,9 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     ...require('../../renderer/ui-preference-schema').getLegacyUiPreferences(require('../../renderer/common-links'))
   }));
   if (screenshotDir) await fs.promises.mkdir(screenshotDir, { recursive: true });
-  const app = await electron.launch({
-    args: ['.', '--hidden'],
-    cwd: projectRoot,
-    env: {
-      ...process.env,
-      STAR_PICKING_PAVILION_TEST_DATA_DIR: dataDir,
-      STAR_PICKING_PAVILION_NO_SCHEDULER: '1',
-      STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE: '1'
-    }
-  });
+  // 与其他桌面回归共用真实入口 + 原生 IPC 主进程观察，避免长矩阵依赖实验性 Node 调试上下文。
+  // Renderer 仍通过 Chromium CDP 验证；应用异常、进程退出和 IPC 超时仍使本用例失败。
+  const app = await launchNativeElectron(projectRoot, dataDir);
   t.after(async () => {
     await app.close().catch(() => {});
     await fs.promises.rm(dataDir, { recursive: true, force: true });
@@ -47,6 +40,8 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
 
   const page = await app.firstWindow();
   await page.waitForSelector('.nav');
+  assert.equal(await app.evaluate(() => process.pid), app.process().pid, '必须观察真实 Electron 主进程');
+  await assert.rejects(app.evaluate(() => { throw new Error('layout IPC exception sentinel'); }), /layout IPC exception sentinel/);
   assert.deepEqual(
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getMinimumSize()),
     [800, 600]
