@@ -29,4 +29,25 @@
 
 main 首轮 `37439295522` 在提交 `7c759b6594979b29e734f8119a529738ff44a8ee` 上为 903／903 单元、21／22 桌面：旧工作区验收的截图及几何记录已移至本版目录，但末尾动效记录漏改，仍写入不存在的 work/v0214，干净 CI 报 ENOENT。本地旧目录存在，未暴露该问题。动效断言及本版情报日志专项通过；仅修正记录路径，修正后本地工作区专项 1／1 通过，44.49 秒，完整门禁重新执行，首轮日志保留。
 
-本地验证与候选包审核完成。main CI、tag Release 和六项公开资产下载核验待完成，本文件不把推送 tag 视为发布成功。
+Release [首轮](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37441759863/attempts/1) 为 903／903 单元、21／22 桌面，旧 v0210-motion 测试等待初始 #feedList .card[data-id] 超时 30 秒；本版情报日志专项和同提交 main CI 通过。本地原样专项 1／1 通过，5.97 秒，原因未定位。同一提交的第 2 次完整发布门禁通过，没有修改产品、断言、超时或门禁；后续通过不代表首轮根因已修复。首轮及最终日志均保留。
+
+[v0.2.15](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.15) 已发布为最新正式版。情报日志日期居中放大并移除生成时间，保持原报告概况尺寸；日报、周报、月报共享复制、重新生成与 .md／原生 .doc 文件导出。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37440510862) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37441759863/attempts/2) 对产品提交 `06f0f52ecb163d28ff1fddf33851dcaf347eea3d` 全部通过：903 单元、22 真实桌面（原 160 布局与新增 48 刊期组合）、0 生产漏洞、47 项声明、1274 包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+注释 tag 对象为 `c05459701f163c4ed28c94151e5f467d85279820`，远端解引用与上述提交一致。发布时间为 2026-10-06T09:35:41Z。最终两套 CI 的 fail／cancelled／skip／todo 均为 0；工作流、阈值、超时与安装烟测范围沿用既有门禁。
+
+六项附件已重新下载并核验 GitHub 摘要、PE 版本与更新元数据。安装器 99,588,593 B、0.2.15、NotSigned，SHA-256 为 `6550007db2d5c2717a282f10a658d5c3957bdbf46755fadc5af7a00bfbfdb58c`。发布后应用匿名实网同步 43 条版本记录、当前正文及离线缓存恢复一致。
+
+| 公开附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `6eeec831bd0fc29c068745cc465086dd346a14e158b81635e29092ad082cca2f` |
+| sbom.cdx.json | 81,352 | `0db7b866042d9004223765474d83954ce1a973c790a67ede9bf2cb3140f1911c` |
+| SHA256SUMS.txt | 106 | `b1bd271ff492d4597906cc5a68ea782b5b1d860800d1ac916a2063e3ce3e2289` |
+| Star-Picking-Pavilion-Setup-0.2.15.exe | 99,588,593 | `6550007db2d5c2717a282f10a658d5c3957bdbf46755fadc5af7a00bfbfdb58c` |
+| Star-Picking-Pavilion-Setup-0.2.15.exe.blockmap | 106,011 | `93d6fa498b7d1f144970b34215b864fee20c0483a53ec97b50429bcf63e88f33` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `d507d6b2e4b442fa4d0bb8fdc3d5a36888a1654836399322b68edb4d8e953e72` |
+
+latest.yml 的版本、文件名、尺寸和两处 SHA-512 与下载的安装器一致；SBOM 为 CycloneDX 1.6、产品 0.2.15；第三方声明与提交逐字匹配（仅归一换行），公开 Release 与内置本版正文一致。用户安装器未在本机运行。
+
+原始证据保存在 work/v0215：main-ci-attempt1.log、main-ci-attempt1.json、workspace-path-fix.log、main-ci.log、main-ci-result.json、main-ci-verified.json、release-attempt1.log、release-attempt1.json、release-motion-isolated.log、release.log、release-result.json、release-verified.json、release.json、latest-release.json、published-verification.json、published-installer.json、published-sync-verification.json，以及 published-assets 六份原件。收尾仅更新文档，产品代码与发布 tag 保持一致。

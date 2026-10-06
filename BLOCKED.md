@@ -1,6 +1,12 @@
 # v0.2.15 发布状态
 
-情报日志日期居中放大、三种刊期共享操作与 .md／原生 .doc 导出已实现。正在执行本地完整回归和既有 GitHub 发布门禁；正式 Release 与六资产核验尚未完成。详见 [本版验证](docs/v0215-validation.md)。
+无发布阻塞。[v0.2.15](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.15) 已发布为最新正式版。情报日志日期居中放大并移除生成时间，保持原报告概况尺寸；日报、周报、月报共享复制、重新生成与 .md／原生 .doc 文件导出。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37440510862) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37441759863/attempts/2) 对产品提交 `06f0f52ecb163d28ff1fddf33851dcaf347eea3d` 全部通过：903 单元、22 真实桌面（原 160 布局与新增 48 刊期组合）、0 生产漏洞、47 项声明、1274 包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+六项附件已重新下载并核验 GitHub 摘要、PE 版本与更新元数据。安装器 99,588,593 B、0.2.15、NotSigned，SHA-256 为 `6550007db2d5c2717a282f10a658d5c3957bdbf46755fadc5af7a00bfbfdb58c`。发布后应用匿名实网同步 43 条版本记录、当前正文及离线缓存恢复一致。
+
+main 首轮因旧工作区测试末尾动效记录漏改目录而报 ENOENT，修正记录路径后专项及完整门禁通过。Release 首轮为 21／22 桌面，旧动效测试等待初始卡片超时；本地原样专项通过，原因未定位。同一提交重新执行完整发布门禁通过，没有修改产品、断言、超时或门禁，后续通过不代表首轮根因已修复。实网信源严格复查仍为 184／186，东财检索·穿越者为空、泰伯网·空天资讯请求失败；本版未修改采集逻辑。原始失败与最终证据保留，详见 [本版验证](docs/v0215-validation.md)。
 
 ---
 
