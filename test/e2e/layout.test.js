@@ -35,7 +35,7 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
   const app = await launchNativeElectron(projectRoot, dataDir);
   t.after(async () => {
     await app.close().catch(() => {});
-    await fs.promises.rm(dataDir, { recursive: true, force: true });
+    await fs.promises.rm(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   const page = await app.firstWindow();

@@ -16,7 +16,7 @@ test('v0222 native pagination survives offline failure and retries every unread 
   fs.writeFileSync(path.join(directory, 'ui-preferences.json'), JSON.stringify({ version: 2,
     ...Schema.getLegacyUiPreferences(CommonLinks), view: 'all', realtime: false, aquaEnabled: false }));
   const app = await launchNativeElectron(root, directory);
-  t.after(async () => { await app.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  t.after(async () => { await app.close(); await fs.promises.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
   const page = await app.firstWindow();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

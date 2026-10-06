@@ -29,7 +29,7 @@
 
 ## 页面与数据完整性
 
-十个页面：热点、精选、全部动态、星标、情报日志、一级市场、更新日志、常用网址、信源、设置。用真实采集数据库副本完成 800／1440 宽度、浅色／深色共 40 组原生 Electron 检查，逐页查看截图；没有横向溢出、页面脚本异常或失败的应用 API。真实样本副本为 2,324 条、708 条相关、116 条精选、169 条等待翻译；仅在副本星标一条实际新闻验证有内容的星标页。
+十个页面：热点、精选、全部动态、星标、情报日志、一级市场、更新日志、常用网址、信源、设置。用最终真实采集数据库副本完成 800／1440 宽度、浅色／深色共 40 组原生 Electron 检查，每组检查顶端与滚动到底部，生成并逐页查看 80 张截图；没有横向溢出、页面脚本异常或失败的应用 API。最终样本副本为 2,323 条、707 条相关、116 条精选、169 条等待翻译；仅在副本星标一条实际新闻验证有内容的星标页。之前 2,324 条副本的复核记录与截图摘要同样保留。
 
 翻页故障已复现并修复：追加页失败保留已有卡片，未读页码只在成功后提交；按钮可重试同页；失败后暂停自动预取。旧翻页响应不覆盖新筛选，新请求完成后不会被旧请求提前解除 loading。原生桌面专项使用 Chromium 断网状态，保留首屏 30 条、恢复后读全 65 条且无重复；不拦截 API 伪造成功。
 
@@ -46,6 +46,8 @@
 主要本地证据：sources-baseline.json、list-items-baseline.json、list-responses-baseline/、sources-final.json、all-items-final.json、sources-release.json、all-items-release.json、sources-verified.json、all-items-verified.json、controllers-reproduction.log、controllers-fixed.log、date-migration-verified.log、extra-date-validation.log、explicit-date-reproduction.log、explicit-date-fixed.log、unit-first-final.log、unit-final.log、electron-first-final.log、electron-final.log、real-pages-review.json、real-page-screenshots/、runtime-audit.log、notices.log、releases-sync-final.log、build-final.log、package-final.log、version-final.log、candidate-pe.json 和 candidate-metadata.json，均位于 work/v0222。
 
 ## 发布状态
+
+首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37543158245) 的产品提交 `d38a43eb00da21a384961b4b44785fbe68a176a6` 为 976／976 单元、25／26 桌面。失败发生在布局用例的 after 清理钩子：Windows 无法删除临时目录的 Chromium `DIPS` 数据库，错误 `EBUSY`；26 项中的新版翻页用例通过。原退出后立即删除改为沿用其他桌面用例的有界文件清理重试（10 次、100 ms 递增等待），持久占用仍失败；应用、布局断言、超时和工作流门禁保持。新翻页用例的目录清理也沿用同一策略。修正后本地完整布局矩阵及断网翻页专项 2／2、39.92 秒，原功能门禁全部保留。完整失败结果与日志保存在 main-ci-first.json／main-ci-first-failed.log，专项为 cleanup-desktop.log；修正后的提交需重新通过完整 CI。
 
 发布候选准备中。只有精确提交通过 main CI 后才推送 v0.2.22 标签；tag Release 工作流再次完整验证并生成六项正式附件。发布后重新下载附件，核对 GitHub SHA-256、校验清单、PE 产品／文件版本、latest.yml 文件名／尺寸／两处 SHA-512、SBOM 和第三方声明，并确认应用匿名更新日志同步及离线缓存。
 
