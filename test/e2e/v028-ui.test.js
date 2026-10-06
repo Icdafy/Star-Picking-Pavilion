@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { _electron: electron } = require('playwright');
+const { launchNativeElectron } = require('./native-electron.cjs');
 const Schema = require('../../renderer/ui-preference-schema');
 const CommonLinks = require('../../renderer/common-links');
 const root = path.join(__dirname, '../..');
@@ -26,10 +26,7 @@ async function profile(t) {
 }
 
 async function launch(t, directory) {
-  const app = await electron.launch({ args: ['.', '--hidden'], cwd: root, env: {
-    ...process.env, STAR_PICKING_PAVILION_TEST_DATA_DIR: directory,
-    STAR_PICKING_PAVILION_NO_SCHEDULER: '1', STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE: '1'
-  } });
+  const app = await launchNativeElectron(root, directory);
   processes.get(directory).push({ app, child: app.process() });
   const page = await app.firstWindow();
   await page.waitForLoadState('load');

@@ -84,14 +84,22 @@ async function open(t) {
   });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.waitForFunction(() => document.hasFocus() && !document.hidden);
-  // Exercise full enhancements even on the two-core CI runner; no API or render interception.
-  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
   await page.waitForTimeout(500);
   await page.waitForFunction(() => !state.loading);
   // Await the actual initial font and stats/banner hydration before measuring
   // local coordinates. Both can finish after the first cards on slower hosts.
   await page.evaluate(async () => { await Promise.all([document.fonts.ready, refreshStats()]); });
   await page.evaluate(() => {
+    // This functional fixture exercises full enhancements on low-core hosts.
+    // Register after the application's listener on the same MediaQueryList:
+    // a delayed native preference notification must not reset it to lite.
+    // Reduced motion still uses the application's static tier, and the tests
+    // below continue to exercise explicit lite and disposal without overrides.
+    const exerciseFullTier = () => {
+      if (!reducedMotionQuery.matches) document.documentElement.dataset.fxTier = 'full';
+    };
+    reducedMotionQuery.addEventListener('change', exerciseFullTier);
+    exerciseFullTier();
     window.motionPointerProbe = [];
     for (const type of ['pointerover', 'pointerout', 'pointermove']) document.addEventListener(type, event => {
       motionPointerProbe.push({ type, x: event.clientX, y: event.clientY, target: event.target.className,

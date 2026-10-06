@@ -44,3 +44,15 @@ full 启用增强，lite 关闭追光和磁吸，static／减少动画直接落�
 生产弹簧同时改用解析解按实际墙钟前进，避免截断长帧时间造成进度拖慢。新增 280ms 延迟 RAF 的故障注入，要求近光在实际目标 3px 内收敛；正常静止、减少动画、滚动与清理继续核验。修正后动效专项 5／5、运动单元 10／10 通过。原始诊断与复验在 work/v0211/motion-fixed.log、motion-isolated.log 和各 profile 的 motion-state.json，最终完整回归及新的精确提交 CI 待补录。
 
 修正后完整复验为 **882／882 单元、19／19 桌面**，fail／cancelled／skip／todo 为 0；桌面耗时 199.53 秒，原始日志在 unit-fixed-final.log 与 e2e-fixed-final.log。最终候选包重新构建并通过 1271 项包边界：app.asar 为 13,413,266 B，安装器为 99,546,251 B，PE 产品／文件版本 0.2.11，NotSigned，SHA-256 为 `9b63f5eb933196c1972da2b2e108f0fe3909ce2751e70618fd794abc9a12a8d1`。新构建日志与 PE 记录在 build-fixed-final.log 和 candidate-fixed-metadata.json。
+
+## 第二次 CI 失败与测试环境修正
+
+精确提交 11f32aa28f82463bea74af144b82b84ba6c1cd7a 的 [第二次 main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37406649675) 为 882／882 单元通过、桌面 16／19。两项指针专项失败时，诊断记录均为 focused=true、hidden=false、tier=lite，指针位于正确卡片；另一项既有滚动条测试在 Playwright electronApplication.firstWindow 阶段报告窗口／上下文已关闭，没有留下足以确认应用启动失败原因的原生日志。后续审计／构建／安装步骤未执行，尚未打发布标签。证据在 work/v0211/main-failed-fixed.{json,log}。
+
+应用只在启动和减少动画偏好变化时推导档位。专项原本先手动指定 full，再等待字体／统计；CI 低核心数设备上的异步偏好通知随后将档位写回 lite。测试改为在应用的同一 MediaQueryList 上注册后置监听，并在真实字体／统计就绪后启用 full 功能档位；减少动画仍由应用进入 static，手动 lite、显隐、滚动和 dispose 验证保留。这是明确的完整档位功能覆盖，不用于宣称低配设备默认开启增强或达到某一帧率，生产档位策略未变。
+
+两项 v028 界面测试改用与既有 v027 专项相同的原生 Electron 启动协议：独立 profile 中的 IPC 包装器加载真实 electron/main.js，通过 CDP 连接真实窗口；后端、preload、HTTP、数据库、安装行为与界面断言均未替换。包装器记录原生进程输出，启动失败立即报错，不重试、不跳过测试。此前 firstWindow 错误的具体根因仍未确认，不把协议更换写成生产启动问题已经修复。
+
+针对上述改动的 7 项桌面复验全部通过（50.79 秒，fail／cancelled／skip／todo=0），日志在 work/v0211/motion-native-third.log；随后执行完整桌面回归并等待新的精确提交 CI。
+
+本轮完整桌面复验 **19／19 通过**（191.06 秒，fail／cancelled／skip／todo=0），日志在 work/v0211/e2e-third-final.log。本轮只修改桌面测试环境与验证记录，生产文件和候选包与上一轮已验证结果一致，单元／审计／包边界沿用前述本地结果，并由新精确提交的 GitHub CI 全量复核。
