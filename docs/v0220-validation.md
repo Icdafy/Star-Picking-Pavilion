@@ -30,10 +30,26 @@
 
 ## 发布状态
 
-本地验证已完成，等待 main 的精确提交完整通过后推送 v0.2.20 tag。安装／启动／单实例／退出／卸载只在一次性 Windows CI 执行；公开附件核验在发布后回填，仍使用原 main／tag 门禁。
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37486620935) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37487850271) 对提交 `5f01ee5b45d08047c21627c8ba36d60d987b4126` 完整通过：941 项单元及集成、24 项真实桌面、生产依赖审计 0 漏洞、47 项第三方声明、1,276 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。发布工作流和门禁保持。
+
+发布时间 2026-10-06T15:36:44Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 两处 SHA-512、文件名及尺寸、CycloneDX 1.6 SBOM 和第三方声明。正式安装器 99,593,725 B、0.2.20、NotSigned，SHA-256 为 `4c382563bd995688edd21a4b3c7ea4937a0c57aa51ef13320d50012db056a205`。应用匿名实网同步 48 条更新日志，本版正文、发布时间及离线缓存恢复与公开 Release 一致。
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `1e11ef051194c2f9bb7e28b9b60c50c7d5227717b24a095a1f95c2b305a19dc7` |
+| sbom.cdx.json | 81,352 | `bf20b84f3750d3c6dc0086cb7d7d8708b315e975f9187a7a0cd061ae4f8a0063` |
+| SHA256SUMS.txt | 106 | `ff3b8a4968a379e36c76bfd323a734e7f4040e1f29e221616fc649fc93f6c437` |
+| Star-Picking-Pavilion-Setup-0.2.20.exe | 99,593,725 | `4c382563bd995688edd21a4b3c7ea4937a0c57aa51ef13320d50012db056a205` |
+| Star-Picking-Pavilion-Setup-0.2.20.exe.blockmap | 105,942 | `848ceb31ec8f2d0a2187a7e2b6c0cdb0fee8cb4993e124edba152481416f5e9e` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `9b46826125ba2bd85f97d27d61c99ac0f473971df3f39e164a7e307a83076051` |
+
+发布证据位于 work/v0220：main-ci.log／result.json／verified.json、release.log／result.json／verified.json、tag-verification.txt、release.json、latest-release.json、published-assets/、published-verification.json、published-installer.json、published-sync-verification.json、unpublished-tag-update.json。
 
 最初的后端提交 `553d9d04e0c37c8be0a4478617a1542e8c06d64f` 已通过 [main 完整门禁](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37481309119)。其 Release 两轮均为 941／941 单元、23／24 桌面，原有 layout 矩阵在 Electron 主进程主题观察绑定处（旧 test/e2e/layout.test.js:195）报告“Execution context was destroyed”。原样单项本地补验 1／1 通过、35.15 秒，没有布局溢出断言失败；两次 CI 的原始协议错误未被保留，不能由通用提示推断应用发生导航或崩溃。
 
 核对 [Playwright 1.61.1 的错误改写源码](https://github.com/microsoft/playwright/blob/v1.61.1/packages/playwright-core/src/server/chromium/crExecutionContext.ts)及[上游同类问题](https://github.com/microsoft/playwright/issues/33737)后，将该测试的主进程观察改为项目既有原生 IPC，继续启动真实 Electron 主入口、真实后端和 renderer，DOM 仍由 Chromium CDP 观察。保持原 160 组矩阵、主题、布局与 240 秒用例时限，额外核对真实主进程 PID，并要求真实抛出的异常透传到调用者；没有重试观察调用或放行门禁。该修改处理测试对实验性 Node 调试上下文的依赖，首次底层协议故障的具体原因仍未知。
 
-修正后的矩阵 1／1 通过、33.95 秒；在相同断言前增加 100 秒观察生命周期的隔离副本 1／1 通过、134.23 秒，单元及集成 941／941 再次通过、20.39 秒。观察修正后的完整桌面回归继续验证。正式 Release 尚未生成，版本仍为 0.2.20；未发布标签将在新提交 main 完整通过后对齐，再重新触发原 Release 流程。旧标签对象和两个失败运行证据完整保留。相关证据为 main-ci-backend-original.log／result.json／verified.json、tag-backend-original-verification.txt、release-first.log、release-first-result.json、release-second.log、release-second-result.json、release-failed-layout-local.log、layout-native.log、layout-native-long.log、unit-layout-native.log。
+修正后的矩阵 1／1 通过、33.95 秒；在相同断言前增加 100 秒观察生命周期的隔离副本 1／1 通过、134.23 秒，单元及集成 941／941 再次通过、20.39 秒。观察修正后本地完整桌面 24／24 通过、260.24 秒，fail／cancelled／skipped／todo 均为 0，证据为 electron-native-complete.log。新提交 main 完整通过后，核对 GitHub 尚不存在 v0.2.20 Release，远端仍为本轮创建的旧标签对象 `e684f8fe9ba71783ff8cd87559384cb935879709`，再以精确 force-with-lease 定向更新这一未发布标签至当前通过提交，重新触发原 Release 流程并完成发布；没有更改已发布版本。旧标签在本地 refs/codex/v0220-unpublished-initial-tag 留有可恢复引用。旧标签对象和两个失败运行证据完整保留。相关证据为 main-ci-backend-original.log／result.json／verified.json、tag-backend-original-verification.txt、release-first.log、release-first-result.json、release-second.log、release-second-result.json、release-failed-layout-local.log、layout-native.log、layout-native-long.log、unit-layout-native.log。
+
+
+两个旧 Release 运行见 [attempt 1](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37482902289/attempts/1) 与 [attempt 2](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37482902289/attempts/2)。移除测试对实验性 Node 调试上下文的依赖后，完整 main 与新 tag Release 均通过；原始底层协议错误的具体原因仍未知。

@@ -1,8 +1,12 @@
-# v0.2.20 发布验证中
+# v0.2.20 发布状态
 
-后端审查与修复、本地 941 项单元及集成、24 项真实桌面、0 生产依赖漏洞和候选包边界／版本检查完成。整轮任务去重、并行收束、原子入库、信源在途校验、完整检索、模型预算／端点与刊物快照保护已落地，无新增依赖或数据库迁移。
+[v0.2.20](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.20) 已发布为最新正式版。整轮任务去重、并行收束、原子入库、在途信源校验、完整检索、模型预算／端点与刊物快照保护已落地，无新增依赖或数据库迁移。
 
-main 精确提交和 tag Release 的完整门禁、一次性 Windows 安装烟测及六项公开附件核验待执行。实网严格审计为 185／186，巨潮深市公告首次请求失败，单独复查 30 条成功；首次原因未定位。详见 [本版验证](docs/v0220-validation.md)和[后端审查](docs/v0220-backend-audit.md)。
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37486620935) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37487850271) 对提交 `5f01ee5b45d08047c21627c8ba36d60d987b4126` 完整通过：941 项单元及集成、24 项真实桌面、生产依赖审计 0 漏洞、47 项第三方声明、1,276 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。发布工作流和门禁保持。
+
+发布时间 2026-10-06T15:36:44Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 两处 SHA-512、文件名及尺寸、CycloneDX 1.6 SBOM 和第三方声明。正式安装器 99,593,725 B、0.2.20、NotSigned，SHA-256 为 `4c382563bd995688edd21a4b3c7ea4937a0c57aa51ef13320d50012db056a205`。应用匿名实网同步 48 条更新日志，本版正文、发布时间及离线缓存恢复与公开 Release 一致。
+
+实网严格审计 185／186，巨潮深市公告首次请求失败，单独复查成功，首次原因未定位。两万行词库首次完整计数约 3.2 秒的成本保留披露。旧 Release 的两个布局观察失败完整保留；主进程观察改为既有原生 IPC 后完整门禁通过，原协议错误具体原因仍未知。详见 [本版验证](docs/v0220-validation.md)和[后端审查](docs/v0220-backend-audit.md)。
 
 ---
 
