@@ -72,7 +72,7 @@ function sanitizeSelector(value, current) {
   }
   if (value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) badRequest('选择器必须是对象');
-  if (Object.keys(value).some(key => !['list', 'datePattern', 'title', 'summary', 'date', 'linkPattern', 'utcOffset'].includes(key))) {
+  if (Object.keys(value).some(key => !['list', 'row', 'datePattern', 'title', 'summary', 'date', 'dateParts', 'linkPattern', 'utcOffset'].includes(key))) {
     badRequest('选择器包含不支持的字段');
   }
   if (Buffer.byteLength(JSON.stringify(value), 'utf8') > 4096) badRequest('选择器配置过长');
@@ -84,8 +84,17 @@ function sanitizeSelector(value, current) {
     selector.datePattern = boundedString(value.datePattern, '日期正则', { min: 1, max: 200 });
     try { new RegExp(selector.datePattern); } catch { badRequest('日期正则不是有效表达式'); }
   }
-  for (const field of ['title', 'summary', 'date']) {
+  for (const field of ['row', 'title', 'summary', 'date']) {
     if (value[field] !== undefined) selector[field] = boundedString(value[field], 'CSS 选择器', { min: 1, max: 500 });
+  }
+  if (value.dateParts !== undefined) {
+    const parts = value.dateParts;
+    if (!parts || typeof parts !== 'object' || Array.isArray(parts)
+      || Object.keys(parts).length !== 3 || Object.keys(parts).some(key => !['year', 'month', 'day'].includes(key))) {
+      badRequest('拆分日期必须包含年、月、日选择器');
+    }
+    selector.dateParts = Object.fromEntries(['year', 'month', 'day'].map(key =>
+      [key, boundedString(parts[key], '日期 CSS 选择器', { min: 1, max: 500 })]));
   }
   if (value.linkPattern !== undefined) {
     selector.linkPattern = boundedString(value.linkPattern, '新闻链接正则', { min: 1, max: 200 });

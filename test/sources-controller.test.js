@@ -35,7 +35,7 @@ test('缺少必需依赖时工厂抛 TypeError', () => {
 
 const format = require('../renderer/format-utils');
 
-function createController({ sources = [], confirm = true, patchImpl } = {}) {
+function createController({ sources = [], confirm = true, patchImpl, apiImpl } = {}) {
   const clickListeners = [];
   const list = {
     innerHTML: '',
@@ -46,6 +46,7 @@ function createController({ sources = [], confirm = true, patchImpl } = {}) {
   const ctrl = createSourcesController({
     api: async (url, opts) => {
       requests.push([url, opts]);
+      if (apiImpl) return apiImpl(url, opts);
       if (url === '/api/sources' && !opts) {
         if (sources === 'fail') throw new Error('sources down');
         return sources;
@@ -102,6 +103,32 @@ test('加载失败给出带重试按钮的错误态', async () => {
   await ctrl.loadSources();
   assert.match(list.innerHTML, /信 号 中 断/);
   assert.match(list.innerHTML, /data-act="retry-sources"/);
+});
+
+test('较早信源加载在最新加载成功后返回，不覆盖最新列表', async () => {
+  const pending = [];
+  const { ctrl, list } = createController({ apiImpl: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) });
+  const older = ctrl.loadSources();
+  const newer = ctrl.loadSources();
+  pending[1].resolve([{ ...SAMPLE[0], name: '最新列表' }]);
+  await newer;
+  pending[0].resolve([{ ...SAMPLE[0], name: '旧列表' }]);
+  await older;
+  assert.match(list.innerHTML, /最新列表/);
+  assert.doesNotMatch(list.innerHTML, /旧列表/);
+});
+
+test('较早信源加载在最新加载成功后失败，不覆盖最新列表', async () => {
+  const pending = [];
+  const { ctrl, list } = createController({ apiImpl: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) });
+  const older = ctrl.loadSources();
+  const newer = ctrl.loadSources();
+  pending[1].resolve(SAMPLE);
+  await newer;
+  pending[0].reject(new Error('old failed'));
+  await older;
+  assert.match(list.innerHTML, /某站/);
+  assert.doesNotMatch(list.innerHTML, /信 号 中 断|old failed/);
 });
 
 test('停用一个启用中的信源走 PATCH 并 toast', async () => {

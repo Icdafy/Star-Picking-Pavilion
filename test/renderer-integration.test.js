@@ -747,7 +747,7 @@ test('信息流重载以最后一次请求为准，加载途中切换筛选不�
   // 骨架屏有最短驻留：本地接口毫秒级返回时，骨架不该只是一闪而过的噪点
   // 批 1：SKELETON_MIN_MS 迁到 renderer/format-utils.js
   assert.match(formatUtilsSource, /const SKELETON_MIN_MS = \d+;/);
-  assert.match(feedControllerSource, /if \(request\.isCurrent\(\)\) state\.loading = false;/);
+  assert.match(feedControllerSource, /finally\s*\{\s*if \(request\.isCurrent\(\)\)\s*\{\s*state\.loading = false;/);
 });
 
 test('信源卡片展示失败退避状态并提供立即重试', () => {
@@ -1089,7 +1089,7 @@ test('信息流哨兵自动预取下一页，加载更多保留为键盘可达�
   assert.match(feedControllerSource, /async function loadNextFeedPage[\s\S]{0,300}?if \(btn\.hidden \|\| state\.loading\) return;/);
   assert.match(feedControllerSource, /elements\.btnMore\.addEventListener\('click', loadNextFeedPage\)/);
   // 分页大小 30 与 /api/feed 服务端契约不变
-  assert.match(feedControllerSource, /const startIdx = state\.page \* 30;/);
+  assert.match(feedControllerSource, /const startIdx = requestedPage \* 30;/);
 });
 
 test('实时轮询先比对 stats 信号再探测，无变化轮次直接跳过', () => {

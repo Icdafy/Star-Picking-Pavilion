@@ -41,6 +41,14 @@
     }
     const { delay, SKELETON_MIN_MS } = format;
     const { skeletons, publishedTime, starredTime } = card;
+    let paginationFailed = false;
+
+    function syncMoreButton() {
+      const btn = elements.btnMore;
+      btn.disabled = state.loading;
+      btn.classList[state.loading ? 'add' : 'remove']('is-busy');
+      btn.textContent = state.loading ? '加载中…' : paginationFailed ? '重试加载更多' : '加载更多';
+    }
 
     function syncFeedToolbar(hasItems) {
       if (elements.btnCopyFeed) elements.btnCopyFeed.disabled = !hasItems;
@@ -63,7 +71,11 @@
       const context = () => [state.view, state.domain, state.category, state.q].join('\u0000');
       const requestedContext = context();
       const requestedQuery = state.q;
+      // 页码只在追加成功后推进；失败或过期响应不会跳过未读页面。
+      const requestedPage = reset ? 0 : state.page + 1;
       state.loading = true;
+      if (reset) paginationFailed = false;
+      syncMoreButton();
       const list = elements.list;
       list.setAttribute?.('aria-busy', 'true');
       if (elements.feedToolbarNote) elements.feedToolbarNote.textContent = '正在更新列表…';
@@ -72,7 +84,7 @@
       const originalFocus = list.ownerDocument?.activeElement;
       if (reset) { state.page = 0; state.listed = 0; list.innerHTML = skeletons(); if (elements.newFlash) elements.newFlash.hidden = true; }
       try {
-        const params = new URLSearchParams({ view: state.view, page: state.page });
+        const params = new URLSearchParams({ view: state.view, page: requestedPage });
         if (state.domain) params.set('domain', state.domain);
         if (state.category) params.set('category', state.category);
         if (state.q) params.set('q', state.q);
@@ -83,13 +95,15 @@
         if (!request.isCurrent()) return;
         if (context() !== requestedContext
           || (typeof getSearchIntent === 'function' && getSearchIntent() !== requestedQuery)) return;
-        const startIdx = state.page * 30;
+        const startIdx = requestedPage * 30;
         // 阶段 4：渲染走 keyed diff 调和——同 data-id 的节点复用、缺失项才新建，
         // 避免整页卡片全量解析
         const mode = 'timeline';
         const timeOf = state.view === 'starred' ? starredTime : publishedTime;
         if (reset) diff.reconcile(data.items, { mode, startIdx, timeOf });
         else diff.appendPage(data.items, { mode, startIdx, timeOf });
+        state.page = requestedPage;
+        paginationFailed = false;
         state.listed = reset ? data.items.length : state.listed + data.items.length;
         renderSearchContext();
         // 记录已知 id；高亮本次新到达的条目（实时插入）
@@ -126,14 +140,23 @@
         if (context() !== requestedContext) return;
         // 失败后列表骤短为错误态，哨兵会立刻进入视口——翻页入口必须同步
         // 隐藏，否则 Observer 触发 loadNextFeedPage，页码前跳、第 0 页被跳过
-        elements.btnMore.hidden = true;
-        if (elements.feedEnd) elements.feedEnd.hidden = true;
         // 失败不是终点：给出重试动作，而不是留一行死文字让人去找全局刷新
-        if (reset) list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>后端连接失败：${esc(e.message)}</p>
+        if (reset) {
+          elements.btnMore.hidden = true;
+          if (elements.feedEnd) elements.feedEnd.hidden = true;
+          list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>后端连接失败：${esc(e.message)}</p>
       <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-feed">重试</button></div>`;
+        } else {
+          paginationFailed = true;
+          if (elements.feedToolbarNote) elements.feedToolbarNote.textContent = '加载更多失败，已有内容保留；点击下方按钮重试。';
+          if (typeof toast === 'function') toast('加载更多失败：' + e.message, true);
+        }
       } finally {
-        if (request.isCurrent()) state.loading = false;
-        if (request.isCurrent()) list.setAttribute?.('aria-busy', 'false');
+        if (request.isCurrent()) {
+          state.loading = false;
+          list.setAttribute?.('aria-busy', 'false');
+          syncMoreButton();
+        }
       }
     }
 
@@ -145,17 +168,7 @@
       if (btn.hidden || state.loading) return;
       // 双保险：列表里没有卡片（失败态/空态/骨架）时静默，防止页码前跳
       if (!elements.list.querySelector('.card[data-id]')) return;
-      btn.disabled = true;
-      btn.classList.add('is-busy');
-      btn.textContent = '加载中…';
-      state.page++;
-      try {
-        await loadFeed(false);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('is-busy');
-        btn.textContent = '加载更多';
-      }
+      await loadFeed(false);
     }
     elements.btnMore.addEventListener('click', loadNextFeedPage);
 
@@ -164,7 +177,7 @@
     if (InjectedIntersectionObserver) {
       const feedSentinelObserver = new InjectedIntersectionObserver(entries => {
         for (const entry of entries) {
-          if (entry.isIntersecting) loadNextFeedPage();
+          if (entry.isIntersecting && !paginationFailed) loadNextFeedPage();
         }
       }, { rootMargin: '600px 0px' });   // 提前约六屏身位预取，翻页感受接近无缝
       const feedSentinel = elements.feedSentinel;

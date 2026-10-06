@@ -44,3 +44,21 @@ test('normalizeUrl 只放行无内嵌凭据的 HTTP(S)，bing 包装解开后同
     null
   );
 });
+
+test('旧 RSS 缺少 pubDate 时使用链接完整日期，明确 pubDate 优先', async () => {
+  const http = require('node:http');
+  const server = http.createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/rss+xml');
+    res.end(`<rss version="2.0"><channel><title>news</title>
+      <item><title>历史火箭发射消息日期缺失</title><link>https://www.news.cn/tech/2022-10/19/a.htm</link></item>
+      <item><title>官方发布日期优先于文章路径</title><link>https://example.test/20261001/a.htm</link><pubDate>Fri, 02 Oct 2026 08:00:00 GMT</pubDate></item>
+      <item><title>只有月份目录的新闻不能伪造日期</title><link>https://example.test/2026/10/123456.shtm</link></item>
+    </channel></rss>`);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const items = await require('../server/collectors/rss').fetch({ url: `http://127.0.0.1:${server.address().port}/` },
+      { collect: { userAgent: 'source-date-test' } });
+    assert.deepEqual(items.map(i => i.publishedAt), ['2022-10-19T00:00:00.000Z', '2026-10-02T08:00:00.000Z', null]);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});

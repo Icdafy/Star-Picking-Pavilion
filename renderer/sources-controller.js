@@ -23,6 +23,7 @@
     let importSourceId = null;
     // v0.2.2：两百多个信源平铺无法查找——列表在本地按关键词、类型、领域与运行状态筛选，不重复请求
     let allSources = [];
+    let loadRevision = 0;
     const filter = { q: '', status: '', type: '', domain: '' };
     const TYPE_LABEL = { rss: 'RSS', html: '网页', api: '接口', wechat: '公众号', external: '外部导入', bing: '必应' };
 
@@ -125,6 +126,7 @@
     }
 
     async function loadSources() {
+      const revision = ++loadRevision;
       const list = elements.list;
       // 每次操作后整表重载会丢键盘焦点——先记下，渲染后归还
       const focusKey = DomUtils.findFocusKey(list);
@@ -135,11 +137,15 @@
           elements.networkStatus ? api('/api/sources/network') : Promise.resolve(null),
           delay(SKELETON_MIN_MS)
         ]);
+        if (revision !== loadRevision) return;
         allSources = Array.isArray(sources) ? sources : [];
         renderNetwork(network);
         renderList();
         if (focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
       } catch (e) {
+        if (revision !== loadRevision) return;
+        allSources = [];
+        if (elements.summary) elements.summary.textContent = '信源暂不可用，请重试。';
         list.innerHTML = `<div class="empty-state glass"><div class="es-icon">信 号 中 断</div><p>加载失败：${esc(e.message)}</p>
       <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-sources">重试</button></div>`;
       }

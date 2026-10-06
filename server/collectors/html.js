@@ -5,23 +5,24 @@
 // 卡片式列表常把封面、标题、导语、出处整个包进一个 <a>：指定 title/summary 后只取对应元素的文字。
 const cheerio = require('cheerio');
 const { fetchText } = require('./fetch-util');
-const { looseDateIso } = require('./loose-date');
+const { looseDateIso, dateFromUrl, listDateIso } = require('./loose-date');
 
-function parseHtml(html, source) {
+function parseHtml(html, source, { nowMs = Date.now() } = {}) {
   const $ = cheerio.load(html);
   const cfg = source.selector_json ? JSON.parse(source.selector_json) : {};
   const listSel = cfg.list || 'ul li a';
   const dateRe = cfg.datePattern ? new RegExp(cfg.datePattern) : /\d{4}[-/年]\d{1,2}[-/月]\d{1,2}/;
 
-  const seen = new Set();
+  const seen = new Map();
   const linkRe = cfg.linkPattern ? new RegExp(cfg.linkPattern) : null;
   const items = [];
   $(listSel).each((_, el) => {
     const $a = $(el).is('a') ? $(el) : $(el).find('a').first();
     if (!$a.length) return;
     const href = $a.attr('href');
-    const $row = $(el).is('a') ? ($a.closest('li,tr,article').length ? $a.closest('li,tr,article') : $a.parent()) : $(el);
-    const titleText = cfg.title ? $row.find(cfg.title).first().text() : '';
+    const $row = cfg.row && $(el).closest(cfg.row).length ? $(el).closest(cfg.row)
+      : $(el).is('a') ? ($a.closest('li,tr,article').length ? $a.closest('li,tr,article') : $a.parent()) : $(el);
+    const titleText = cfg.title ? ($a.is(cfg.title) ? $a.text() : $row.find(cfg.title).first().text()) : '';
     const title = (titleText || $a.attr('title') || $a.text() || '').replace(/\s+/g, ' ').trim();
     const summary = cfg.summary ? $row.find(cfg.summary).first().text().replace(/\s+/g, ' ').trim().slice(0, 400) : '';
     if (!href || !title || title.length < 10) return; // 过滤导航类短链接
@@ -39,27 +40,31 @@ function parseHtml(html, source) {
       url = parsed.href;
     } catch { return; }
     if (linkRe && !linkRe.test(url)) return;
-    if (seen.has(url) || url === source.url) return;
-    seen.add(url);
+    if (url === source.url) return;
 
     // 日期：在链接附近的文本里找
     const $date = cfg.date ? $row.find(cfg.date).first() : null;
-    const ctx = $date?.length ? ($date.attr('datetime') || $date.text()) : ($row.text() || '');
-    const urlDate = url.match(/(?:\D)(20\d{2})(\d{2})(\d{2})(?:\D)/);
-    const pathDate = url.match(/\/(20\d{2})[-/](\d{1,2})[-/](\d{1,2})(?:\/|\D)/);
-    const m = ctx.match(dateRe) || (pathDate ? [`${pathDate[1]}-${pathDate[2]}-${pathDate[3]}`]
-      : urlDate ? [`${urlDate[1]}-${urlDate[2]}-${urlDate[3]}`] : null);
-    // 列表页日期不带时区：按信源时区（默认北京时间）读，不随本机时区漂移
-    let dateText = m?.[0] || '';
-    if (cfg.date && /^\d{1,2}[-/]\d{1,2}$/.test(dateText)) {
-      const current = new Date();
-      let year = current.getUTCFullYear();
-      const tentative = looseDateIso(`${year}-${dateText.replace('/', '-')}`, cfg.utcOffset || '+08:00');
-      if (tentative && Date.parse(tentative) > Date.now() + 86400000) year--;
-      dateText = `${year}-${dateText.replace('/', '-')}`;
+    const ctx = cfg.date ? ($date?.length ? ($date.attr('datetime') || $date.text()) : '') : ($row.text() || '');
+    const dateText = ctx.match(dateRe)?.[0] || '';
+    const zone = cfg.utcOffset || '+08:00';
+    let publishedAt = cfg.date && $date?.length ? listDateIso(ctx, zone, nowMs) : null;
+    if (!publishedAt && cfg.dateParts) {
+      const parts = ['year', 'month', 'day'].map(key => $row.find(cfg.dateParts[key]).first().text().match(/\d+/)?.[0]);
+      if (parts.every(Boolean)) publishedAt = looseDateIso(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`, zone);
     }
-    const publishedAt = dateText ? looseDateIso(dateText, cfg.utcOffset || '+08:00') : null;
-    items.push({ title, url, summary, publishedAt });
+    if (!publishedAt && dateText) publishedAt = cfg.date ? listDateIso(dateText, zone, nowMs) : looseDateIso(dateText, zone);
+    if (!publishedAt) publishedAt = dateFromUrl(url);
+    // 首页封面往往没有时间，列表中的同一 URL 有完整日期；合并缺项而非丢弃后者。
+    const prior = seen.get(url);
+    if (prior) {
+      if (!prior.publishedAt && publishedAt) prior.publishedAt = publishedAt;
+      if (!prior.summary && summary) prior.summary = summary;
+      if (/[.…]{3}|…$/.test(prior.title) && !/[.…]{3}|…$/.test(title)) prior.title = title;
+      return;
+    }
+    const item = { title, url, summary, publishedAt };
+    seen.set(url, item);
+    items.push(item);
   });
   return items.slice(0, 40);
 }

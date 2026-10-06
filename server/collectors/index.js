@@ -12,6 +12,7 @@ const { structureItem } = require('../ai/normalize');
 const { settleAll } = require('../async-work');
 const { networkAccess } = require('../network-access');
 const { needsChinese } = require('../ai/translation');
+const { dateFromUrl } = require('./loose-date');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
@@ -44,6 +45,14 @@ function applySourceMigrations(migrations) {
         .run(step.note || current.note, step.remove ? 1 : 0, now(), current.id);
       applied++;
       continue;
+    }
+
+    if (step.repairUrlDates) {
+      const updateDate = db.prepare('UPDATE articles SET published_at=? WHERE id=? AND published_at IS NULL');
+      for (const article of db.prepare('SELECT id,url FROM articles WHERE source_id=? AND published_at IS NULL').all(current.id)) {
+        const date = dateFromUrl(article.url);
+        if (date) updateDate.run(date, article.id);
+      }
     }
 
     // 目标地址已经有独立的一行了（用户手工加过，或上一次迁移只跑了一半）：

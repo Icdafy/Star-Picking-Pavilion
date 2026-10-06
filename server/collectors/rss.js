@@ -3,6 +3,7 @@
 const Parser = require('rss-parser');
 const { fetchText } = require('./fetch-util');
 const { extractContent } = require('./article-content');
+const { dateFromUrl } = require('./loose-date');
 
 const parser = new Parser({
   customFields: {
@@ -32,7 +33,7 @@ async function fetch(source, settings) {
     title: cleanText(it.title),
     url: normalizeUrl(it.link),
     summary: cleanText(it.contentSnippet || it.description || it.content || ''),
-    publishedAt: toIso(it.isoDate || it.pubDate),
+    publishedAt: toIso(it.isoDate || it.pubDate) || dateFromUrl(normalizeUrl(it.link)),
     image: extractImage(it),
     images: extractContent(it['content:encoded'] || it.content || it.description || '', it.link).images
   }));

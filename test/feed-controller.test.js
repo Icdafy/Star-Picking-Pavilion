@@ -86,7 +86,7 @@ function makeElements() {
 }
 
 function createController({ items = [], hasMore = false, view = 'featured', q = '',
-  guard = makeGuard(), withObserver = false } = {}) {
+  guard = makeGuard(), withObserver = false, apiImpl } = {}) {
   const elements = makeElements();
   const requests = [];
   const calls = { renderSearchContext: 0, reconcile: 0, appendPage: 0 };
@@ -97,6 +97,7 @@ function createController({ items = [], hasMore = false, view = 'featured', q = 
   const deps = {
     api: async url => {
       requests.push(url);
+      if (apiImpl) return apiImpl(url);
       if (items === 'fail') throw new Error('feed down');
       return { items, hasMore };
     },
@@ -250,8 +251,68 @@ test('加载更多统一入口在隐藏或加载中静默，翻页递增 page', 
   const { ctrl, state, elements } = createController({ items: [{ id: 'n' }], hasMore: true });
   elements.btnMore.hidden = false;
   await ctrl.loadNextFeedPage();
-  assert.equal(state.page, 1);   // 先自增再走 loadFeed(false)
+  assert.equal(state.page, 1);   // loadFeed(false) 成功后提交页码
   assert.equal(elements.btnMore.disabled, false);   // finally 复原
+  assert.equal(elements.btnMore.textContent, '加载更多');
+});
+
+test('翻页失败保留已有内容和页码，手动重试同一页后继续加载', async () => {
+  let fail = true;
+  const { ctrl, state, elements, requests } = createController({ apiImpl: async url => {
+    const page = Number(new URL(url, 'http://localhost').searchParams.get('page'));
+    if (page === 1 && fail) throw new Error('temporary network failure');
+    return { items: [{ id: page * 30 + 1 }], hasMore: page < 2 };
+  } });
+  await ctrl.loadFeed();
+  const original = elements.list.innerHTML;
+  await ctrl.loadNextFeedPage();
+  assert.equal(state.page, 0, '失败页不能被当作已经读过');
+  assert.equal(state.listed, 1);
+  assert.equal(elements.list.innerHTML, original);
+  assert.equal(elements.btnMore.hidden, false, '必须保留手动重试入口');
+  assert.match(elements.btnMore.textContent, /重试/);
+  fail = false;
+  await ctrl.loadNextFeedPage();
+  assert.equal(state.page, 1);
+  assert.equal(state.listed, 2);
+  assert.deepEqual(requests.map(url => new URL(url, 'http://localhost').searchParams.get('page')), ['0', '1', '1']);
+  await ctrl.loadNextFeedPage();
+  assert.equal(state.page, 2);
+  assert.equal(state.listed, 3);
+  assert.equal(elements.btnMore.hidden, true);
+});
+
+test('翻页失败后自动哨兵不反复请求，点击才重试', async () => {
+  const { ctrl, requests, observers } = createController({ withObserver: true, apiImpl: async url => {
+    if (new URL(url, 'http://localhost').searchParams.get('page') === '1') throw new Error('offline');
+    return { items: [{ id: 1 }], hasMore: true };
+  } });
+  await ctrl.loadFeed();
+  observers[0].callback([{ isIntersecting: true }]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(requests.length, 2);
+  observers[0].callback([{ isIntersecting: true }]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(requests.length, 2, '失败之后不可自动请求风暴');
+  await ctrl.loadNextFeedPage();
+  assert.equal(requests.length, 3);
+});
+
+test('旧翻页在切换检索之后失败，不覆盖新列表的页码和重试状态', async () => {
+  let rejectPage;
+  const { ctrl, state, elements } = createController({ apiImpl: async url => {
+    const params = new URL(url, 'http://localhost').searchParams;
+    if (params.get('page') === '1') return new Promise((_, reject) => { rejectPage = reject; });
+    return { items: [{ id: params.get('q') ? 2 : 1 }], hasMore: true };
+  } });
+  await ctrl.loadFeed();
+  const oldPage = ctrl.loadNextFeedPage();
+  state.q = '火箭';
+  await ctrl.loadFeed();
+  rejectPage(new Error('old request failed'));
+  await oldPage;
+  assert.equal(state.page, 0);
+  assert.match(elements.list.innerHTML, /data-id="2"/);
   assert.equal(elements.btnMore.textContent, '加载更多');
 });
 

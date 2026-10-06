@@ -27,7 +27,11 @@ function parseLooseDate(value, utcOffset = '+08:00') {
   if (value == null) return null;
   const v = String(value).trim();
   if (!v) return null;
-  if (EXPLICIT_ZONE.test(v) || /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, mo, d] = v.split('-');
+    return atOffset(y, mo, d, '00', '00', '00', '+00:00');
+  }
+  if (EXPLICIT_ZONE.test(v)) {
     const direct = Date.parse(v);
     if (Number.isFinite(direct) && /\d{4}/.test(v)) return new Date(direct);
   }
@@ -49,4 +53,35 @@ function looseDateIso(value, utcOffset = '+08:00') {
   return date ? date.toISOString() : null;
 }
 
-module.exports = { parseLooseDate, looseDateIso, EXPLICIT_ZONE };
+// 仅使用 URL 路径中明确的完整年月日，不从查询参数或只有年月的目录猜日期。
+function dateFromUrl(value) {
+  try {
+    const pathname = new URL(value).pathname;
+    const match = pathname.match(/(?:^|[/_t-])(20\d{2})[-/]?(\d{2})[-/]?(\d{2})(?=[/_.-]|$)/);
+    return match ? looseDateIso(`${match[1]}-${match[2]}-${match[3]}`) : null;
+  } catch { return null; }
+}
+
+// 专门的日期元素可以省略年份，或写“昨天16:33”；正文中的日期不会走这条路径。
+function listDateIso(value, utcOffset = '+08:00', nowMs = Date.now()) {
+  const text = String(value || '').trim().replace(/^[·•]\s*/, '');
+  const direct = looseDateIso(text, utcOffset);
+  if (direct) return direct;
+  const today = new Date(nowMs + offsetMs(utcOffset));
+  const relative = /^(今天|昨天|前天)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+  if (relative) {
+    today.setUTCDate(today.getUTCDate() - { 今天: 0, 昨天: 1, 前天: 2 }[relative[1]]);
+    const date = atOffset(today.getUTCFullYear(), today.getUTCMonth() + 1, today.getUTCDate(), relative[2], relative[3], relative[4] || '00', utcOffset);
+    return date?.toISOString() || null;
+  }
+  const partial = /^(\d{1,2})[-/月](\d{1,2})日?(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(text);
+  if (!partial) return null;
+  let year = today.getUTCFullYear();
+  const date = atOffset(year, partial[1], partial[2], partial[3] || '00', partial[4] || '00', partial[5] || '00', utcOffset);
+  if (date && date.getTime() > nowMs + 86400000) year--;
+  // 无时间的 ISO 日期保持既有 UTC 零点口径。
+  return looseDateIso(`${year}-${String(partial[1]).padStart(2, '0')}-${String(partial[2]).padStart(2, '0')}`
+    + (partial[3] ? ` ${partial[3]}:${partial[4]}:${partial[5] || '00'}` : ''), utcOffset);
+}
+
+module.exports = { parseLooseDate, looseDateIso, dateFromUrl, listDateIso, EXPLICIT_ZONE };

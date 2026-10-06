@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.21 · 信源整合、外网检测与中文新闻
+## v0.2.22 · 全量信源复查与页面修复
 
-- **信源梳理**：清理 5 个重复检索入口与 1 个身份不符的网站，修正融资栏目和新闻选择器，新增 21 个实测可解析入口；内置信源共 201 个。
-- **国内与海外扩展**：增加蓝箭航天、星河动力、亿航、中国航空新闻网及创投科技媒体，海外覆盖 SpaceNews、NASA、ESA、Rocket Lab、Joby 等，共 16 个海外信源。
-- **网络自动判断**：结合脱敏出口 IP 与实际连通性检测，沿用 HTTP(S) 环境／Windows 系统代理。外网不可达时静默跳过海外信源，国内采集继续运行；信源页可手动检测。
-- **海外新闻中文展示**：标题、摘要自动译为中文，名称和型号等专有名词保留英文，随后进入原有双行业分析链。复用已配置的分析模型与预算；未配置模型或翻译暂未完成时保留待译原文。
+- **全量复查**：重新实际采集全部 201 个内置信源，核对标题、正文链接、日期与内容；包括 16 个随外网可用性启用的海外入口。
+- **停更入口修复**：新华网、人民网和新浪科技从已停更的 RSS 改为当前官方新闻页；国家航天局和航天科工改用有日期的要闻列表，界面新闻补齐主要卡片列表。
+- **日期完整性**：蓝箭航天支持拆分年月日，中国航天报补齐月日，慧博和钛媒体读取专门日期；同一新闻的封面与列表合并缺失日期。RSS 缺日期时只采用正文 URL 中明确的完整年月日，未知日期继续保留未知。
+- **页面恢复**：翻页请求失败保留已有内容和未读页码，可手动重试；信源列表只采用最新请求结果，避免旧响应覆盖操作后的状态。
 
-版本、界面与更新元数据统一为 0.2.21，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。信源名单、审计依据和运行逻辑见 [信源梳理](docs/v0221-sources.md)，实现与发布验证见 [验证记录](docs/v0221-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。已有情报、星标、归档、密钥与设置保留，双主题、界面缩放和现有动效继续适用，无新增依赖。
+版本、界面与更新元数据统一为 0.2.22，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。信源复查、页面检查和发布验证见 [验证记录](docs/v0222-validation.md)，完整信源目录见 [此前信源梳理](docs/v0221-sources.md)及 `config/sources.default.json`，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。升级保留来源 ID、启停状态、统计、已有情报、星标、归档、密钥与设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.21.exe`，双击并按向导安装。v0.2.21 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.22.exe`，双击并按向导安装。v0.2.22 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.21.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.22.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
