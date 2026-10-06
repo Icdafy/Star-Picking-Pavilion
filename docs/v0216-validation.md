@@ -25,6 +25,10 @@
 
 ## 发布状态
 
-本地验证完成，main CI、tag Release 与公开附件核验待执行。使用既有工作流与一次性 Windows 安装／启动／单实例／退出／卸载烟测，门禁及范围不变。
+main [首轮 CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37448908877) 在提交 `54623062582d5a3e163bc2e5e2d676127b97b48c` 上为 908／908 单元、22／23 桌面。新增更新专项在旋转断言中收到 none 而非 spin；日期 48 组、入口布局 32 组和其余 22 项桌面通过。新测试直接写 data-fx-tier=full，与应用 MediaQueryList 异步重算存在竞态；低资源设备会按原策略回到 lite。修正功能测试的设备能力夹具为 8 核／8 GiB，通过应用自身 syncFxTier 推导 full，再用 4 核及 4 GiB 两种条件验证 lite，真实减少动画媒体条件验证 static。保留 spin／none、进度、布局等原断言，不修改产品、工作流、超时或门禁。
+
+能力夹具补验首次在等待减少动画媒体事件时超时；静态样式停掉全部动画后，CDP 接受设置不代表 Electron 已送出媒体事件。沿用旧动效测试的布局读取方式推进原生渲染生命周期，再等待实际 MediaQueryList 与 static 状态，不伪发事件。最终更新专项 1／1 通过，8.17 秒；原失败与最终日志为 update-capabilities.log、update-capabilities-settled.log。首轮 CI 日志及结果另存 main-ci-attempt1.log／json。完整 CI 待重跑确认。
+
+本地验证完成，tag Release 与公开附件核验待执行。使用既有工作流与一次性 Windows 安装／启动／单实例／退出／卸载烟测，门禁及范围不变。
 
 原始证据保存在 work/v0216：unit.log、unit-final.log、journal-first.log、electron-final.log、update-first.log、update-diagnostic.log、update-final.log、runtime-audit.log、sources-audit.log、sources-summary.json、build.log、package-audit.log、candidate-installer.json、native-exports 与 update-button 截图／几何记录。

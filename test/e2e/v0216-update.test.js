@@ -73,19 +73,37 @@ test('workspace update button retains its position, real IPC, progress and motio
     await page.screenshot({ path: path.join(output, `${payload.status}-${payload.percent ?? ''}.png`) });
     assert.equal(await page.locator('#updatePill').evaluate(node => node === globalThis.__updateButtonNode && node.querySelector('.update-arc') === globalThis.__updateArcNode), true);
   }
+  // Exercise motion policies with deterministic device capabilities. The app's
+  // own MediaQueryList may recalculate the tier after emulateMedia returns.
+  // Changing capabilities and calling its policy keeps late notifications valid.
+  const capabilities = async (cores, memory) => page.evaluate(values => {
+    Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: values[0] });
+    Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: values[1] });
+    syncFxTier();
+  }, [cores, memory]);
+  await capabilities(8, 8);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; document.body.classList.remove('is-idle'); });
+  await page.waitForFunction(() => {
+    document.documentElement.getBoundingClientRect();
+    return !reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'full';
+  });
+  await page.evaluate(() => document.body.classList.remove('is-idle'));
   await status({ status: 'checking' });
   assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'spin');
   await page.evaluate(() => document.body.classList.add('is-idle'));
   assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationPlayState), 'paused');
   await page.evaluate(() => document.body.classList.remove('is-idle'));
-  for (const tier of ['lite', 'static']) {
-    await page.evaluate(value => { document.documentElement.dataset.fxTier = value; }, tier);
+  for (const device of [[4, 8], [8, 4]]) {
+    await capabilities(...device);
+    assert.equal(await page.locator('html').getAttribute('data-fx-tier'), 'lite');
     assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'none');
   }
-  await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
+  await capabilities(8, 8);
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForFunction(() => {
+    document.documentElement.getBoundingClientRect();
+    return reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'static';
+  });
   assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'none');
   assert.equal(await page.locator('.update-arc').evaluate(node => getComputedStyle(node).transitionDuration), '0s');
   await page.emulateMedia({ forcedColors: 'active' });
