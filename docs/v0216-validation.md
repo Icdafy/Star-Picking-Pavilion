@@ -2,6 +2,8 @@
 
 验证日期：2026-10-06。目标仓库 Icdafy/Star-Picking-Pavilion，目标版本 0.2.16。
 
+[v0.2.16](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.16) 已发布为最新正式版。报告概况保持既有尺寸，日期在统计左侧区域居中、前后导航分列两侧；更新入口移至“本地情报工作区”右侧，按钮内环形及百分比显示下载进度，支持检查、失败重试与点击重启安装。
+
 ## 实现与设计依据
 
 报告概况保持既有最小高度和内外留白，日期移到统计左侧空间的中心，上一期和下一期按钮在日期两侧。三种刊期、四档字号和双主题继续适用。
@@ -31,8 +33,27 @@ main [首轮 CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37
 
 main [第二轮 CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37450311957) 在提交 `af90712e0d4292939a7c7c648a9bb530e4ba2b78` 上为 908／908 单元、22／23 桌面；新更新专项和日期专项均通过。原有 electron.test.js 在关闭首个应用后，第二个应用的 firstWindow 收到 Target page, context or browser has been closed，原因未定位。该原测试单独在本地补验 1／1 通过，11.11 秒；未更改其断言、超时或启动代码，也未加入内部重试。证据保存在 main-ci-attempt2.log／json、restart-isolated.log。
 
-最终动效复核发现：环形 SVG 的初始 -90° 变换与复用 spin 的 360° 终点组合成 450° 旋转，循环边界会跳变。新增真实动画矩阵断言，在原实现上复现边界差值 0.999979；将 -90° 只作用于进度弧，外层按 0→360° 连续旋转，保持进度从顶部起步。修正后差值小于 0.01，更新专项 1／1 通过，8.46 秒，性能预算通过；不新增关键帧，不放宽断言或发布门禁。原失败与修正日志为 update-loop-before.log、update-loop-final.log、perf-final.log。最终候选重新构建并检查包边界、PE 版本和更新元数据。完整 CI 待重跑确认。
+最终动效复核发现：环形 SVG 的初始 -90° 变换与复用 spin 的 360° 终点组合成 450° 旋转，循环边界会跳变。新增真实动画矩阵断言，在原实现上复现边界差值 0.999979；将 -90° 只作用于进度弧，外层按 0→360° 连续旋转，保持进度从顶部起步。修正后差值小于 0.01，更新专项 1／1 通过，8.46 秒，性能预算通过；不新增关键帧，不放宽断言或发布门禁。原失败与修正日志为 update-loop-before.log、update-loop-final.log、perf-final.log。最终候选重新构建并检查包边界、PE 版本和更新元数据。修正后的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37451655336) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37452683848) 全部通过，最终发布提交为 `35b4e5b1237a663c30489d6f040bbe263817c27e`。
 
-本地验证完成，tag Release 与公开附件核验待执行。使用既有工作流与一次性 Windows 安装／启动／单实例／退出／卸载烟测，门禁及范围不变。
+正式发布及公开附件核验已完成。使用既有工作流与一次性 Windows 安装／启动／单实例／退出／卸载烟测，门禁及范围不变。
 
 原始证据保存在 work/v0216：unit.log、unit-final.log、journal-first.log、electron-final.log、update-first.log、update-diagnostic.log、update-final.log、runtime-audit.log、sources-audit.log、sources-summary.json、build.log、package-audit.log、candidate-installer.json、build-loop-final.log、package-loop-final.log、candidate-loop-final.json、native-exports 与 update-button 截图／几何记录。
+
+## 正式发布核验
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37451655336) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37452683848) 对提交 `35b4e5b1237a663c30489d6f040bbe263817c27e` 全部通过：908 单元、23 真实桌面，原 160 布局、48 刊期及新增 32 更新入口组合，0 生产漏洞、47 项声明、1274 包边界，以及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+发布时间 2026-10-06T11:02:57Z。最终 main 与 tag 流程的 fail／cancelled／skip／todo 均为 0；全部步骤 success，工作流与阈值沿用。tag v0.2.16 远端解引用与上述提交一致。
+
+六项公开附件已重新下载并核验 GitHub 摘要、SHA-256、PE 版本、latest.yml 的两处 SHA-512、文件名与尺寸、SBOM 及第三方声明。安装器 99,588,566 B、0.2.16、NotSigned，SHA-256 为 `ff5069b9f2d6899946e2271bf6d5405aae11ecd1a246e5f251d8fa4f7944c695`。应用匿名实网同步 44 条更新日志，本版正文与离线缓存恢复一致。
+
+| 公开附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `7184d0309eadf21e19902db9bcc9dd22604c7d9736ad845428dffcf5186f7a9e` |
+| sbom.cdx.json | 81,352 | `296f73f51e3d09af28d1582e7222ba9a1f3ff64dca756b0063f4dbeeaf82e4d5` |
+| SHA256SUMS.txt | 106 | `b80a24c92de52b2833eaf02c345639a5c6e8377a76cf47ad5e602e22b5ba5612` |
+| Star-Picking-Pavilion-Setup-0.2.16.exe | 99,588,566 | `ff5069b9f2d6899946e2271bf6d5405aae11ecd1a246e5f251d8fa4f7944c695` |
+| Star-Picking-Pavilion-Setup-0.2.16.exe.blockmap | 105,870 | `0384c8da677a693013f6d34f5a7d8ff55b4bd1ecc1023a93edee39d97bac61e8` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `fa246fbeaa8a95ba2747c6be77d17c2c854f94737c2ec2f25d174b9782eb1e0b` |
+
+安装器未在本机运行。发布后证据保存在 work/v0216：main-ci-attempt1.log／json、main-ci-attempt2.log／json、restart-isolated.log、update-capabilities.log、update-capabilities-settled.log、update-loop-before.log、update-loop-final.log、perf-final.log、main-ci.log／result.json／verified.json、release.log／result.json／verified.json、release.json、latest-release.json、published-verification.json、published-installer.json、published-sync-verification.json、published-assets 六份原件及 tag-verification.txt。收尾只更新文档，应用代码与发布 tag 保持一致。
