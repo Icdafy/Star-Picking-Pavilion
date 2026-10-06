@@ -40,6 +40,25 @@
 
 本地证据：sources-before.json、sources-after-first.json、sources-after.json、existing-content.json、candidate-sites.json、lp-probe.json、selector-fixes-initial.json／selector-fixes.json、focused-final.log、translation-upgrade-final.log、desktop-sources.log、unit-final.log、unit-verified.log、unit-release-candidate.log、electron-complete.log、electron-sources-final.log、runtime-audit.log、notices.log、releases-sync.log、build-release-candidate.log、package-verification-release.log、version-artifacts-release.log、candidate-pe-release.json、candidate-update-metadata.json 及 screenshots/。
 
+最终提交首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37496980200/attempts/1) 为 963／963 单元、24／25 桌面：原有 v0210 指针光效用例在移动后 250 毫秒取得相同 transform，两次均为 matrix(1, 0, 0, 1, 355.969, -63.7266)，原断言失败（test/e2e/v0210-motion.test.js:220）。记录显示指针事件到达、窗口聚焦、full 档位与光效节点存在，具体导致位置未及时变化的原因未定位。本地原样单项 1／1 通过、7.11 秒；同一提交重新执行完整门禁后通过，未修改产品动效、断言、超时、工作流或门禁。后续通过不代表首次原因已修复，原始日志和结果保存在 main-ci-final-first.log／result.json，单项为 ci-motion-local.log。
+
 ## 发布状态
 
-本地验证完成，待 main 完整 CI、tag Release 完整门禁与公开附件下载核验。下方将记录实际运行、精确提交、正式附件摘要及应用发布记录同步结果。
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37496980200) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37499508242) 对精确提交 `df8ea2d2cdd1e74e19c0af31f7b212e702f93e81` 完整通过：963／963 单元与集成、25／25 真实 Electron、生产依赖 0 漏洞、47 项第三方声明、1279 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。工作流和门禁保持。
+
+发布时间 2026-10-06T17:04:14Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 文件名／尺寸／两处 SHA-512、CycloneDX 1.6 SBOM 和第三方声明。正式安装器 99,601,286 B、0.2.21、NotSigned，SHA-256 为 `8f65d8bf3aa3fdf582972ea1b832edac597e637bf7068dd8236b2b2131df219e`。应用匿名实网同步 49 条更新日志，本版正文与发布时间一致，离线缓存恢复通过。
+
+正式包：ASAR 13,698,123 B，1279 项；安装器及各附件信息如下。
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | `11d11a5229ff1389eb0b7c80cdc56f4901b8cb30189943afc84042dd6ce7b471` |
+| sbom.cdx.json | 81,352 | `2f37606548783a0089f40f31f3340a83d3bed2d93570153e121299d9a8ae695a` |
+| SHA256SUMS.txt | 106 | `add51b043a19cd75cd4ab15567b904464b7e74036a2af767d23f36cf27c2936c` |
+| Star-Picking-Pavilion-Setup-0.2.21.exe | 99,601,286 | `8f65d8bf3aa3fdf582972ea1b832edac597e637bf7068dd8236b2b2131df219e` |
+| Star-Picking-Pavilion-Setup-0.2.21.exe.blockmap | 105,914 | `69e781806501b3405a786fdf5f54e36bedef10fbd8c8cb24395f93a35d5c449d` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `3f844d31d4b83be8ce2db73b3f09216a9e2a12eb52a944b8c42b5b47e2cf4b6d` |
+
+首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37496350620) 对 `3dc5b0ed2dfcaea0f4f1d682cbe9c50ecc8c19db` 的 962 单元／25 桌面及安装烟测通过；随后补齐历史海外正文／配图等待，最终产品提交重新通过上述完整 main 与 Release，标签只指向最终提交。
+
+发布证据位于 work/v0221：main-ci-final.log／result.json／verified.json、release.log／result.json／verified.json、tag-verification.txt、release.json、latest-release.json、published-assets/、published-verification.json、published-installer.json、published-sync-verification.json。源代码与标签一致；发布后收尾仅同步验证和状态文档。

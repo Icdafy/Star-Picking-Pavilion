@@ -1,6 +1,12 @@
 # v0.2.21 发布状态
 
-本地实现与候选验证完成，暂无已知发布阻塞，目标版本 0.2.21。待 main 完整 CI、tag Release 与六项公开附件下载核验后确认正式发布。原始失败及修复记录保留，详见 [验证记录](docs/v0221-validation.md)和[信源梳理](docs/v0221-sources.md)。
+[v0.2.21](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.21) 已发布为最新正式版，无发布阻塞。信源整合（201 个，含 16 个海外入口）、外网检测与静默跳过、海外新闻中文翻译和旧库迁移已完成；历史海外正文与配图同样遵守网络等待。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37496980200) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37499508242) 对精确提交 `df8ea2d2cdd1e74e19c0af31f7b212e702f93e81` 完整通过：963／963 单元与集成、25／25 真实 Electron、生产依赖 0 漏洞、47 项第三方声明、1279 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。工作流和门禁保持。
+
+发布时间 2026-10-06T17:04:14Z，Release 非 draft、非 prerelease 且为最新正式版。六项公开附件重新下载并核验 GitHub SHA-256 摘要、校验清单、PE 产品／文件版本、latest.yml 文件名／尺寸／两处 SHA-512、CycloneDX 1.6 SBOM 和第三方声明。正式安装器 99,601,286 B、0.2.21、NotSigned，SHA-256 为 `8f65d8bf3aa3fdf582972ea1b832edac597e637bf7068dd8236b2b2131df219e`。应用匿名实网同步 49 条更新日志，本版正文与发布时间一致，离线缓存恢复通过。
+
+实网严格审计 201／201、0 空／失败／跳过。旧库迁移、中文翻译与检索、网络等待及恢复验证通过。详细名单、运行限制与过程证据见 [信源梳理](docs/v0221-sources.md)和[验证记录](docs/v0221-validation.md)。
 
 # v0.2.20 发布状态
 
