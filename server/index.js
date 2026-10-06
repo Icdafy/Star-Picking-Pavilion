@@ -11,6 +11,8 @@ const { applySettingsPatch, loadSettings, saveSettings, loadScoring } = require(
 const runtimeCredentials = require('./runtime-credentials');
 const { seedSources } = require('./collectors');
 const { describeHealth } = require('./source-health');
+const { networkAccess } = require('./network-access');
+const { validateChineseText } = require('./ai/translation');
 const { countExpiring, getMaintenanceSnapshot, resolveRetentionPlan } = require('./retention');
 const exportMarkdown = require('./export/markdown');
 const { encodeWordDocument } = require('./export/word');
@@ -206,6 +208,12 @@ function clampDeal(value) {
 }
 
 function articleRow(r, scoring, nowMs) {
+  const translated = parseOptionalJson(r.translation_json, {}, isJsonObject);
+  const waitingTranslation = r.translation_status === 'pending';
+  const translatedTitle = translated.titleZh && !validateChineseText(r.title_zh, translated.names || [])
+    ? translated.titleZh : r.title_zh;
+  const translatedSummary = translated.summaryZh && !validateChineseText(r.ai_summary, translated.names || [])
+    ? translated.summaryZh : r.ai_summary;
   const timing = require('./ai/event-time').timingFields(r);
   const vision = parseOptionalJson(r.vision_json, {}, isJsonObject);
   const rawQuality = Number(r.quality_score);
@@ -218,7 +226,7 @@ function articleRow(r, scoring, nowMs) {
   const breakthroughBonus = Math.max(0, Number(r.breakthrough_bonus) || 0);
   return {
     id: r.id, title: r.title, url: r.url,
-    summary: r.ai_summary || (r.summary_raw || '').slice(0, 120),
+    summary: waitingTranslation ? '原文已保存，配置分析模型后自动翻译。' : translatedSummary || (r.summary_raw || '').slice(0, 120),
     reason: r.ai_reason || null,
     image: r.image_url || null,
     publishedAt, fetchedAt, ...timing,
@@ -254,7 +262,8 @@ function articleRow(r, scoring, nowMs) {
     events: clampEvents(parseOptionalJson(r.events_json, [], Array.isArray)),
     eventKey: r.event_key || null,
     // v0.2.0 AIHOT 内核的产物；老资料这些字段为 null / 空数组
-    titleZh: typeof r.title_zh === 'string' && r.title_zh.trim() ? r.title_zh.trim().slice(0, 120) : null,
+    titleZh: waitingTranslation ? '海外新闻待翻译' : typeof translatedTitle === 'string' && translatedTitle.trim() ? translatedTitle.trim().slice(0, 200) : null,
+    translationStatus: r.translation_status || null,
     itemType: r.item_type || null,
     itemTypeLabel: r.item_type ? industry.itemTypeById(r.item_type)?.label || null : null,
     authorRole: ['principal', 'observer', 'relayer'].includes(r.author_role) ? r.author_role : null,
@@ -294,6 +303,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE, likeSearch = false } = {}) {
   if (view === 'all') where.push("(a.relevant IS NULL OR a.relevant = 1)");
   // 星标是用户的显式收藏，不受相关性判定影响：被 AI 判为无关但用户仍想留着的条目必须能看到
   if (view === 'starred') where.push('a.starred = 1');
+  if (view !== 'starred') where.push("COALESCE(a.translation_status, '') <> 'pending'");
   if (domain) { where.push('(a.domain = ? OR a.domain = \'both\')'); params.push(domain); }
   if (category) { where.push('a.category = ?'); params.push(category); }
 
@@ -398,6 +408,7 @@ function countVisible(surface, like = false) {
     LEFT JOIN clusters c ON c.id = a.cluster_id
     WHERE (${filter.sql})
       AND (a.relevant IS NULL OR a.relevant = 1)
+      AND COALESCE(a.translation_status, '') <> 'pending'
       AND (a.cluster_id IS NULL OR a.id = c.main_article_id)`).get(...filter.params).c;
   } catch (error) {
     if (!like && [...surface].length >= 3 && /fts5|MATCH|syntax error/i.test(error.message)) return countVisible(surface, true);
@@ -640,27 +651,34 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      if (p === '/api/sources/network' && req.method === 'GET') {
+        return json(res, 200, { ...networkAccess.snapshot(), translationReady: Boolean(loadSettings().ai.apiKey) });
+      }
+      if (p === '/api/sources/network' && req.method === 'POST') {
+        return json(res, 200, { ...await networkAccess.detect({ force: true }), translationReady: Boolean(loadSettings().ai.apiKey) });
+      }
       if (p === '/api/sources' && req.method === 'GET') {
         const nowMs = Date.now();
-        return json(res, 200, db.prepare('SELECT * FROM sources WHERE removed_at IS NULL ORDER BY tier, id').all()
-          .map(source => ({ ...source, health: describeHealth(source, nowMs) })));
+        return json(res, 200, db.prepare(`SELECT s.*, (SELECT COUNT(*) FROM articles a WHERE a.source_id=s.id
+          AND a.translation_status='pending') AS pending_translations FROM sources s WHERE s.removed_at IS NULL ORDER BY s.tier, s.id`).all()
+          .map(source => ({ ...source, health: describeHealth(source, nowMs, networkAccess.snapshot()) })));
       }
       if (p === '/api/sources' && req.method === 'POST') {
         const b = await readJsonBody(req);
         const source = sanitizeSourceInput(b);
         const removed = db.prepare('SELECT id FROM sources WHERE url=? AND removed_at IS NOT NULL').get(source.url);
         if (removed) {
-          db.prepare(`UPDATE sources SET name=?, type=?, tier=?, domain=?, enabled=?, selector_json=?, note=?,
+          db.prepare(`UPDATE sources SET name=?, type=?, tier=?, domain=?, enabled=?, selector_json=?, note=?, intl=?,
             removed_at=NULL, consecutive_errors=0, next_fetch_at=NULL, last_status=NULL WHERE id=?`)
             .run(source.name, source.type, source.tier, source.domain, source.enabled ? 1 : 0,
-              source.selector ? JSON.stringify(source.selector) : null, source.note, removed.id);
+              source.selector ? JSON.stringify(source.selector) : null, source.note, source.intl ? 1 : 0, removed.id);
           invalidateStatsCache();
           return json(res, 200, { id: removed.id });
         }
-        const r = db.prepare(`INSERT INTO sources (name, type, url, tier, domain, enabled, selector_json, note)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        const r = db.prepare(`INSERT INTO sources (name, type, url, tier, domain, enabled, selector_json, note, intl)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           source.name, source.type, source.url, source.tier, source.domain,
-          source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note);
+          source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note, source.intl ? 1 : 0);
         invalidateStatsCache();
         return json(res, 200, { id: r.lastInsertRowid });
       }
@@ -670,9 +688,9 @@ const server = http.createServer(async (req, res) => {
         const cur = db.prepare('SELECT * FROM sources WHERE id=? AND removed_at IS NULL').get(Number(mSrc[1]));
         if (!cur) return json(res, 404, { error: '不存在' });
         const source = sanitizeSourceInput(b, cur);
-        db.prepare(`UPDATE sources SET name=?, type=?, url=?, tier=?, domain=?, enabled=?, selector_json=?, note=? WHERE id=?`)
+        db.prepare(`UPDATE sources SET name=?, type=?, url=?, tier=?, domain=?, enabled=?, selector_json=?, note=?, intl=? WHERE id=?`)
           .run(source.name, source.type, source.url, source.tier, source.domain,
-            source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note, cur.id);
+            source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note, source.intl ? 1 : 0, cur.id);
         // 用户重新启用或改了地址，视为「我已处理」，清掉退避让它下一轮立刻重试
         if (source.enabled !== Boolean(cur.enabled) || source.url !== cur.url) {
           db.prepare('UPDATE sources SET consecutive_errors=0, next_fetch_at=NULL WHERE id=?').run(cur.id);

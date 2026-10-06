@@ -27,9 +27,12 @@ function isDue(source, nowMs = Date.now()) {
   return !Number.isFinite(due) || due <= nowMs;
 }
 
-function describeHealth(source, nowMs = Date.now()) {
+function describeHealth(source, nowMs = Date.now(), network) {
   const errors = Number(source?.consecutive_errors) || 0;
   if (!source?.enabled) return { state: 'disabled', consecutiveErrors: errors, pausedUntil: null };
+  if (source.intl && network && !network.available) {
+    return { state: 'network-wait', consecutiveErrors: errors, pausedUntil: null, waitingForNetwork: true };
+  }
   const paused = !isDue(source, nowMs);
   return {
     state: errors >= UNHEALTHY_AFTER_ERRORS ? 'failing' : errors > 0 ? 'degraded' : 'ok',

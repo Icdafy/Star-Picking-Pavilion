@@ -14,7 +14,7 @@ test('信源审计区分正常、空结果和失败且保留明细', () => {
     { source: '失败源', error: 'HTTP 404', consecutiveErrors: 1 }
   ]);
 
-  assert.deepEqual(summary.counts, { total: 3, ok: 1, empty: 1, failed: 1 });
+  assert.deepEqual(summary.counts, { total: 3, ok: 1, empty: 1, failed: 1, skipped: 0 });
   assert.deepEqual(summary.failed, [{ source: '失败源', error: 'HTTP 404' }]);
   assert.deepEqual(summary.empty, [{ source: '空结果源', fetched: 0 }]);
 });

@@ -10,6 +10,8 @@ const { isDue, nextFetchAtIso } = require('../source-health');
 const { removeDisabledSources } = require('../source-lifecycle');
 const { structureItem } = require('../ai/normalize');
 const { settleAll } = require('../async-work');
+const { networkAccess } = require('../network-access');
+const { needsChinese } = require('../ai/translation');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
@@ -36,9 +38,10 @@ function applySourceMigrations(migrations) {
     if (!current || current.removed_at) continue;   // 用户已删或本来就没有，不复活
 
     if (step.retire) {
-      if (!current.enabled) continue;
-      db.prepare('UPDATE sources SET enabled=0, note=?, consecutive_errors=0, next_fetch_at=NULL WHERE id=?')
-        .run(step.note || current.note, current.id);
+      if (!current.enabled && !step.remove) continue;
+      db.prepare(`UPDATE sources SET enabled=0, note=?, consecutive_errors=0, next_fetch_at=NULL,
+        removed_at=CASE WHEN ? THEN ? ELSE removed_at END WHERE id=?`)
+        .run(step.note || current.note, step.remove ? 1 : 0, now(), current.id);
       applied++;
       continue;
     }
@@ -53,7 +56,7 @@ function applySourceMigrations(migrations) {
       continue;
     }
 
-    db.prepare(`UPDATE sources SET url=?, name=?, tier=?, selector_json=?, note=?, type=?,
+    db.prepare(`UPDATE sources SET url=?, name=?, tier=?, selector_json=?, note=?, type=?, intl=?,
         consecutive_errors=0, next_fetch_at=NULL, last_status=NULL WHERE id=?`)
       .run(
         step.to || current.url,
@@ -62,6 +65,7 @@ function applySourceMigrations(migrations) {
         step.selector ? JSON.stringify(step.selector) : current.selector_json,
         step.note || current.note,
         step.type || current.type,
+        typeof step.intl === 'boolean' ? (step.intl ? 1 : 0) : current.intl,
         current.id
       );
     applied++;
@@ -83,17 +87,28 @@ function seedSources() {
   if (count > 0 && applied >= seedVersion) return;
 
   const { migrated, removed, added } = withTransaction(() => {
+    const suppressed = new Set((seed._migrations || []).filter(step => step.to
+      && db.prepare('SELECT removed_at FROM sources WHERE url=?').get(step.from)?.removed_at).map(step => step.to));
     const migrated = count > 0 ? applySourceMigrations(seed._migrations) : 0;
     const removed = applied < Number(seed._pruneDisabledBeforeVersion || 0) ? removeDisabledSources() : 0;
     const stmt = db.prepare(`INSERT OR IGNORE INTO sources
       (name, type, url, tier, domain, enabled, selector_json, note, intl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     let added = 0;
     for (const s of seed.sources) {
+      if (suppressed.has(s.url)) continue;
       const r = stmt.run(s.name, s.type, s.url, s.tier, s.domain,
         s.enabled === false ? 0 : 1,
         s.selector ? JSON.stringify(s.selector) : null, s.note || null,
         s.intl ? 1 : 0);
       if (r.changes > 0) added++;
+    }
+    // 老库中尚无中文译文的海外文章进入待译队列；星标、原文和统计保持原样。
+    const untranslated = db.prepare(`SELECT a.id,a.title,a.title_zh,a.summary_raw,a.ai_summary FROM articles a
+      JOIN sources s ON s.id=a.source_id WHERE s.intl=1 AND a.translation_status IS NULL`).all();
+    for (const a of untranslated) {
+      if (needsChinese(a.title_zh || a.title, a.ai_summary || a.summary_raw)) {
+        db.prepare("UPDATE articles SET translation_status='pending' WHERE id=?").run(a.id);
+      }
     }
     db.prepare("INSERT INTO meta (key, value) VALUES ('seedVersion', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
       .run(String(seedVersion));
@@ -111,9 +126,9 @@ async function collectSource(source, settings) {
   const cutoff = Date.now() - settings.collect.keepDays * 86400e3;
   return withTransaction(() => {
     // 请求期间用户可能停用、移除或改写信源；旧响应不能继续进入新配置。
-    const current = db.prepare('SELECT enabled, removed_at, url, type, selector_json FROM sources WHERE id=?').get(source.id);
+    const current = db.prepare('SELECT enabled, removed_at, url, type, selector_json, intl FROM sources WHERE id=?').get(source.id);
     if (!current?.enabled || current.removed_at || current.url !== source.url
-      || current.type !== source.type || current.selector_json !== source.selector_json) {
+      || current.type !== source.type || current.selector_json !== source.selector_json || current.intl !== source.intl) {
       return { fetched: items.length, added: 0, skipped: true };
     }
     let added = 0;
@@ -127,7 +142,8 @@ async function collectSource(source, settings) {
         domain: source.domain === 'both' ? null : source.domain
       });
       if (!structured) continue;
-      if (insertArticle({ sourceId: source.id, ...structured })) added++;
+      const translationStatus = source.intl && needsChinese(structured.title, structured.summaryRaw) ? 'pending' : null;
+      if (insertArticle({ sourceId: source.id, ...structured, translationStatus })) added++;
     }
     db.prepare(`UPDATE sources SET last_fetch_at=?, last_status='ok',
       fetch_count=fetch_count+1, item_count=item_count+?,
@@ -139,16 +155,22 @@ async function collectSource(source, settings) {
 
 // 采集全部启用信源（带并发限制）
 // force=true 时忽略失败退避 —— 用户点「立即采集分析」意味着他要的就是现在全量重试一次
-async function collectAll(onProgress, { force = false } = {}) {
+async function collectAll(onProgress, { force = false, network = networkAccess } = {}) {
   seedSources();
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   // 外部源由导入接口接收；不能把每轮的“未请求”伪记为采集成功。
   const enabled = db.prepare("SELECT * FROM sources WHERE enabled = 1 AND removed_at IS NULL AND type <> 'external'").all();
   const startedAt = Date.now();
-  const sources = force ? enabled : enabled.filter(source => isDue(source, startedAt));
-  const skipped = enabled.length - sources.length;
-  const results = [];
+  const networkStatus = enabled.some(source => source.intl) ? await network.detect({ force }) : network.snapshot();
+  const waiting = enabled.filter(source => source.intl && !networkStatus.available);
+  const reachable = enabled.filter(source => !source.intl || networkStatus.available);
+  const sources = force ? reachable : reachable.filter(source => isDue(source, startedAt));
+  const skippedBackoff = reachable.length - sources.length;
+  const skippedNetwork = waiting.length;
+  const skipped = skippedBackoff + skippedNetwork;
+  const results = waiting.map(source => ({ source: source.name, url: source.url, type: source.type,
+    intl: true, skipped: true, reason: 'network-unavailable' }));
   const CONCURRENCY = 4;
   let idx = 0;
   async function worker() {
@@ -157,7 +179,7 @@ async function collectAll(onProgress, { force = false } = {}) {
       const started = Date.now();
       try {
         const r = await collectSource(source, settings);
-        results.push({ source: source.name, ...r, ms: Date.now() - started });
+        results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), ...r, ms: Date.now() - started });
         onProgress && onProgress({ source: source.name, ...r });
       } catch (e) {
         const msg = String(e.message || e).slice(0, 200);
@@ -165,20 +187,20 @@ async function collectAll(onProgress, { force = false } = {}) {
         const recorded = db.prepare(`UPDATE sources SET last_fetch_at=?, last_status=?,
           fetch_count=fetch_count+1, error_count=error_count+1,
           consecutive_errors=?, next_fetch_at=? WHERE id=? AND enabled=1 AND removed_at IS NULL
-            AND url=? AND type=? AND selector_json IS ?`)
+            AND url=? AND type=? AND selector_json IS ? AND intl=?`)
           .run(now(), 'error: ' + msg, consecutive,
-            nextFetchAtIso(consecutive, intervalMs, Date.now()), source.id, source.url, source.type, source.selector_json);
+            nextFetchAtIso(consecutive, intervalMs, Date.now()), source.id, source.url, source.type, source.selector_json, source.intl);
         if (!recorded.changes) {
-          results.push({ source: source.name, added: 0, skipped: true });
+          results.push({ source: source.name, url: source.url, added: 0, skipped: true, reason: 'source-changed' });
           continue;
         }
-        results.push({ source: source.name, error: msg, consecutiveErrors: consecutive });
+        results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), error: msg, consecutiveErrors: consecutive });
         onProgress && onProgress({ source: source.name, error: msg, consecutiveErrors: consecutive });
       }
     }
   }
   await settleAll(Array.from({ length: CONCURRENCY }, worker));
-  return { results, skipped };
+  return { results, skipped, skippedBackoff, skippedNetwork, network: networkStatus };
 }
 
 module.exports = { collectAll, seedSources, applySourceMigrations };

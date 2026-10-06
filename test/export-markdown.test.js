@@ -10,7 +10,7 @@ const {
 
 const BRAND = {
   productName: '摘星阁',
-  version: '0.2.20',
+  version: '0.2.21',
   homepage: 'https://github.com/Icdafy/Star-Picking-Pavilion'
 };
 
@@ -50,7 +50,7 @@ const REPORT = {
 };
 
 test('导出格式白名单支持 markdown、text 与 doc，其余一律回落到 markdown', () => {
-  assert.equal(EXPORT_VERSION, '0.2.20');
+  assert.equal(EXPORT_VERSION, '0.2.21');
   assert.deepEqual([...FORMATS].sort(), ['doc', 'markdown', 'text']);
   assert.equal(normalizeFormat('markdown'), 'markdown');
   assert.equal(normalizeFormat('text'), 'text');
@@ -75,7 +75,7 @@ test('Markdown 日报保留标题、分组、链接、来源与研判', () => {
   assert.match(output, /- 研判：首个全国统一口径的空域管理规则。/);
   // 事件簇要在导出里保留「这条有几篇关联报道」的信息
   assert.match(output, /质量分 71 · 4 篇关联报道/);
-  assert.match(output, /由 摘星阁 v0\.2\.20 生成 · https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion/);
+  assert.match(output, /由 摘星阁 v0\.2\.21 生成 · https:\/\/github\.com\/Icdafy\/Star-Picking-Pavilion/);
 });
 
 test('纯文本日报把链接单独成行，不留任何 Markdown 语法', () => {

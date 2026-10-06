@@ -87,6 +87,16 @@ test('渲染信源卡片：退避暂停、连续失败与操作按钮齐备', as
   assert.match(list.innerHTML, /移出监控/);
 });
 
+test('等待外网使用中性状态，不把旧失败显示成当前错误，待译计数可见', async () => {
+  const { ctrl, list, toasts } = createController({ sources: [{ ...SAMPLE[0], intl: 1, pending_translations: 3,
+    last_status: 'error: blocked', health: { state: 'network-wait', waitingForNetwork: true } }] });
+  await ctrl.loadSources();
+  assert.match(list.innerHTML, /等待外网/);
+  assert.match(list.innerHTML, /待翻译 3 条/);
+  assert.doesNotMatch(list.innerHTML, /is-failing|src-status err|连续失败/);
+  assert.equal(toasts.length, 0);
+});
+
 test('加载失败给出带重试按钮的错误态', async () => {
   const { ctrl, list } = createController({ sources: 'fail' });
   await ctrl.loadSources();

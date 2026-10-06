@@ -374,6 +374,10 @@
       <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
     <div class="src-toolbar glass">
+      <div class="src-network-row">
+        <p id="sourceNetworkStatus" class="hint" role="status" aria-live="polite">外网信源会在网络可用时自动采集；国内信源持续运行。</p>
+        <button class="btn-ghost btn-compact" id="btnDetectNetwork" type="button">检测网络</button>
+      </div>
       <div class="src-summary" id="sourcesSummary" aria-live="polite"></div>
       <div class="src-filters">
         <input id="sourcesSearch" class="intel-search" type="search" placeholder="搜索信源名称、地址或说明…" aria-label="搜索信源" maxlength="60" autocomplete="off">
@@ -381,6 +385,7 @@
           <button class="chip active" type="button" data-source-status="" aria-pressed="true">全部</button>
           <button class="chip" type="button" data-source-status="on" aria-pressed="false">运行中</button>
           <button class="chip" type="button" data-source-status="err" aria-pressed="false">异常</button>
+          <button class="chip" type="button" data-source-status="wait" aria-pressed="false">等待外网</button>
           <button class="chip" type="button" data-source-status="off" aria-pressed="false">已停用</button>
         </div>
         <label class="intel-select"><span>类型</span><select id="sourcesType"><option value="">全部</option><option value="rss">RSS</option><option value="html">网页</option><option value="api">接口</option><option value="wechat">公众号</option><option value="external">外部导入</option></select></label>
@@ -769,6 +774,7 @@
         </select>
       </label>
     </div>
+    <label class="ingest-backfill"><input name="intl" type="checkbox"> 外网信源（网络可用时自动采集）</label>
     <label class="field"><span>备注</span><input name="note" placeholder="选填"></label>
     <div class="btn-row">
       <button class="btn-primary" value="ok">保存</button>

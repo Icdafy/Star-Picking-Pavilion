@@ -8,9 +8,12 @@ function summarizeSourceResults(results) {
   const ok = [];
   const empty = [];
   const failed = [];
+  const skipped = [];
 
   for (const result of results) {
-    if (result.error) {
+    if (result.skipped) {
+      skipped.push({ source: result.source, url: result.url, reason: result.reason || 'skipped' });
+    } else if (result.error) {
       failed.push({ source: result.source, error: result.error });
     } else if (Number(result.fetched) === 0) {
       empty.push({ source: result.source, fetched: 0 });
@@ -30,11 +33,13 @@ function summarizeSourceResults(results) {
       total: results.length,
       ok: ok.length,
       empty: empty.length,
-      failed: failed.length
+      failed: failed.length,
+      skipped: skipped.length
     },
     ok,
     empty,
-    failed
+    failed,
+    skipped
   };
 }
 
@@ -59,6 +64,8 @@ async function runAudit(options = {}) {
   try {
     const collection = await collectAll(undefined, { force: true });
     const summary = summarizeSourceResults(collection.results);
+    summary.network = collection.network;
+    summary.skippedBackoff = collection.skippedBackoff;
     const output = options.output ? path.resolve(options.output) : null;
     if (output) {
       await fs.promises.mkdir(path.dirname(output), { recursive: true });

@@ -1645,6 +1645,9 @@ body.is-idle .update-ring { animation-play-state: paused !important; }
 
 /* ---------- 信源 ---------- */
 .src-head { width: 100%; }
+.src-network-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.src-network-row .hint { flex: 1 1 16rem; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.src-network-row button { flex-shrink: 0; }
 .src-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 23.75rem), 1fr));

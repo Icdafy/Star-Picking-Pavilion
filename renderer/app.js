@@ -530,6 +530,8 @@ const sourcesController = SourcesController.createSourcesController({
   elements: {
     list: $('#sourcesList'),
     summary: $('#sourcesSummary'),
+    networkStatus: $('#sourceNetworkStatus'),
+    detectNetwork: $('#btnDetectNetwork'),
     search: $('#sourcesSearch'),
     status: $('#sourcesStatus'),
     type: $('#sourcesType'),

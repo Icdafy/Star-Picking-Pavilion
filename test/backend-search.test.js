@@ -24,6 +24,9 @@ test('search filters the full match set before sorting and paginating, with trut
     }
     const shortId = insert.run(sourceId, '未出现在标题中的主体', 'https://example.com/scale/entity', stamp, stamp, 1, 1).lastInsertRowid;
     fts.run(shortId, '未出现在标题中的主体', '主体公司 亿航智能；比例100%');
+    const pendingId = insert.run(sourceId, 'SpaceX completes rocket flight test', 'https://example.com/scale/pending-translation', stamp, stamp, 1, 1).lastInsertRowid;
+    database.prepare("UPDATE articles SET translation_status='pending' WHERE id=?").run(pendingId);
+    fts.run(pendingId, 'SpaceX completes rocket flight test', '相关主体 蓝箭航天');
     database.exec('COMMIT');
   } finally { database.close(); }
   const api = async route => {

@@ -26,7 +26,7 @@ function resolveUrl(url, settings) {
 }
 
 async function fetch(source, settings) {
-  const xml = await fetchText(resolveUrl(source.url, settings), settings);
+  const xml = await fetchText(resolveUrl(source.url, settings), settings, { international: Boolean(source.intl) });
   const feed = await parser.parseString(flattenAtomXhtml(sanitizeXml(xml)));
   return (feed.items || []).map(it => ({
     title: cleanText(it.title),

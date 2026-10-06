@@ -27,6 +27,7 @@
     const TYPE_LABEL = { rss: 'RSS', html: '网页', api: '接口', wechat: '公众号', external: '外部导入', bing: '必应' };
 
     function statusOf(s) {
+      if (s.enabled && s.health?.waitingForNetwork) return 'wait';
       if (!s.enabled) return 'off';
       if (s.health?.state === 'failing' || s.health?.consecutiveErrors || String(s.last_status || '').startsWith('error')) return 'err';
       return 'on';
@@ -45,11 +46,12 @@
 
     function renderSummary(shown) {
       if (!elements.summary) return;
-      const counts = { on: 0, err: 0, off: 0 };
+      const counts = { on: 0, err: 0, off: 0, wait: 0 };
       for (const s of allSources) counts[statusOf(s)]++;
       const items = allSources.reduce((sum, s) => sum + (Number(s.item_count) || 0), 0);
       elements.summary.innerHTML = `<span><b>${allSources.length}</b> 个信源</span><span class="ok"><b>${counts.on}</b> 运行中</span>`
         + `<span class="err"><b>${counts.err}</b> 异常或退避</span><span class="off"><b>${counts.off}</b> 已停用</span>`
+        + `<span class="off"><b>${counts.wait}</b> 等待外网</span>`
         + `<span>累计采集 <b>${items.toLocaleString('zh-CN')}</b> 条</span>`
         + (shown !== allSources.length ? `<span class="src-shown">筛选出 <b>${shown}</b> 个</span>` : '');
     }
@@ -86,8 +88,9 @@
     }
 
     function sourceCard(s) {
-          const st = !s.enabled ? 'idle' : s.last_status?.startsWith('error') ? 'err' : s.last_status === 'ok' ? 'ok' : 'idle';
           const health = s.health || {};
+          const waiting = Boolean(health.waitingForNetwork);
+          const st = !s.enabled || waiting ? 'idle' : s.last_status?.startsWith('error') ? 'err' : s.last_status === 'ok' ? 'ok' : 'idle';
           const paused = health.pausedUntil
             ? `<span class="src-backoff" title="连续失败后自动拉长重试间隔，避免每轮空转">
              暂停至 ${esc(hhmm(health.pausedUntil))}</span>`
@@ -95,7 +98,7 @@
           return `
       <div class="src-card glass${health.state === 'failing' ? ' is-failing' : ''}" data-id="${s.id}">
         <div class="src-row1">
-          <span class="src-status ${st}" title="${esc(s.last_status || '未采集')}"></span>
+          <span class="src-status ${st}" title="${esc(waiting ? '等待外网，国内采集继续运行' : s.last_status || '未采集')}"></span>
           <span class="src-name" title="${esc(s.url)}">${esc(s.name)}</span>
           <span class="tier-chip tier-${esc(s.tier)}">${esc(s.tier)}</span>
           ${paused}
@@ -103,8 +106,10 @@
         <div class="src-meta">
           <span>${s.type === 'external' ? '外部导入' : esc(s.type.toUpperCase())}</span>
           <span>${DOMAIN_NAME[s.domain] || '双领域'}</span>
+          ${s.intl ? `<span>${waiting ? '等待外网' : '外网自动采集'}</span>` : ''}
           <span>累计 ${s.item_count} 条</span>
-          ${health.consecutiveErrors
+          ${s.pending_translations ? `<span>待翻译 ${Number(s.pending_translations)} 条</span>` : ''}
+          ${!waiting && health.consecutiveErrors
             ? `<span style="color:var(--danger-ink)">连续失败 ${health.consecutiveErrors} 次</span>`
             : s.error_count ? `<span>累计失败 ${s.error_count} 次</span>` : ''}
           <span>${s.last_fetch_at ? timeAgo(s.last_fetch_at) : s.type === 'external' ? '等待导入' : '未采集'}</span>
@@ -125,11 +130,13 @@
       const focusKey = DomUtils.findFocusKey(list);
       list.innerHTML = skeletons(4);
       try {
-        const [sources] = await Promise.all([
+        const [sources, network] = await Promise.all([
           api('/api/sources'),
+          elements.networkStatus ? api('/api/sources/network') : Promise.resolve(null),
           delay(SKELETON_MIN_MS)
         ]);
         allSources = Array.isArray(sources) ? sources : [];
+        renderNetwork(network);
         renderList();
         if (focusKey) DomUtils.restoreFocusByKey(list, focusKey, list);
       } catch (e) {
@@ -137,6 +144,28 @@
       <button type="button" class="btn-ghost btn-compact es-retry" data-act="retry-sources">重试</button></div>`;
       }
     }
+
+    function renderNetwork(network) {
+      if (!elements.networkStatus || !network) return;
+      const location = [network.country, network.ip].filter(Boolean).join(' · ');
+      const route = { 'system-proxy': '系统代理', 'environment-proxy': '环境代理', direct: '直接连接' }[network.route] || '';
+      const state = network.state === 'available' ? '外网可用，海外信源自动采集'
+        : network.state === 'unavailable' ? '当前网络无法访问外网，已自动跳过海外信源；国内采集正常运行'
+        : '外网尚未检测，采集时自动检测';
+      const translation = network.translationReady ? '海外新闻自动译为中文，专有名称保留原文' : '配置分析模型后，海外新闻自动译为中文';
+      elements.networkStatus.textContent = [state, location, route, translation].filter(Boolean).join(' · ');
+    }
+
+    elements.detectNetwork?.addEventListener('click', async () => {
+      const button = elements.detectNetwork;
+      button.disabled = true;
+      button.textContent = '检测中…';
+      try {
+        renderNetwork(await api('/api/sources/network', { body: {} }));
+        await loadSources();
+      } catch (error) { toast('网络状态加载失败：' + error.message, true); }
+      finally { button.disabled = false; button.textContent = '检测网络'; }
+    });
 
     elements.list.addEventListener('click', async e => {
       const btn = e.target.closest('button[data-act]');
@@ -196,6 +225,7 @@
         e.preventDefault();
         const fd = new FormData(e.target);
         const body = Object.fromEntries(fd.entries());
+        body.intl = body.intl === 'on';
         const list = String(body.selectorList || '').trim();
         const datePattern = String(body.selectorDate || '').trim();
         delete body.selectorList;

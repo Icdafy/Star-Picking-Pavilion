@@ -115,16 +115,16 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
   const started = Date.now();
   try {
     console.log(`[collect] 开始（${trigger}）`);
-    const { results, skipped } = await collectAll(p =>
+    const { results, skippedBackoff, skippedNetwork, network } = await collectAll(p =>
       p.error ? console.log(`  ✗ ${p.source}: ${p.error}`)
               : (p.added ? console.log(`  ✓ ${p.source}: 新增 ${p.added}`) : null), { force });
     const added = results.reduce((s, r) => s + (r.added || 0), 0);
     lastRun = {
       at: new Date().toISOString(), trigger, ms: Date.now() - started,
       collected: added, errors: results.filter(r => r.error).length,
-      backoffSkipped: skipped
+      backoffSkipped: skippedBackoff, networkSkipped: skippedNetwork, network
     };
-    console.log(`[collect] 完成：新增 ${added} 条，退避跳过 ${skipped} 个源，耗时 ${Math.round(lastRun.ms / 1000)}s`);
+    console.log(`[collect] 完成：新增 ${added} 条，退避跳过 ${skippedBackoff} 个源，等待外网 ${skippedNetwork} 个源，耗时 ${Math.round(lastRun.ms / 1000)}s`);
     return lastRun;
   } finally {
     collectRunning = false;

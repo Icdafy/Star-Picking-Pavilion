@@ -72,7 +72,7 @@ function sanitizeSelector(value, current) {
   }
   if (value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) badRequest('选择器必须是对象');
-  if (Object.keys(value).some(key => !['list', 'datePattern'].includes(key))) {
+  if (Object.keys(value).some(key => !['list', 'datePattern', 'title', 'summary', 'date', 'linkPattern', 'utcOffset'].includes(key))) {
     badRequest('选择器包含不支持的字段');
   }
   if (Buffer.byteLength(JSON.stringify(value), 'utf8') > 4096) badRequest('选择器配置过长');
@@ -83,6 +83,17 @@ function sanitizeSelector(value, current) {
   if (value.datePattern !== undefined) {
     selector.datePattern = boundedString(value.datePattern, '日期正则', { min: 1, max: 200 });
     try { new RegExp(selector.datePattern); } catch { badRequest('日期正则不是有效表达式'); }
+  }
+  for (const field of ['title', 'summary', 'date']) {
+    if (value[field] !== undefined) selector[field] = boundedString(value[field], 'CSS 选择器', { min: 1, max: 500 });
+  }
+  if (value.linkPattern !== undefined) {
+    selector.linkPattern = boundedString(value.linkPattern, '新闻链接正则', { min: 1, max: 200 });
+    try { new RegExp(selector.linkPattern); } catch { badRequest('新闻链接正则不是有效表达式'); }
+  }
+  if (value.utcOffset !== undefined) {
+    if (typeof value.utcOffset !== 'string' || !/^[+-](?:0\d|1[0-4]):[0-5]\d$/.test(value.utcOffset)) badRequest('信源时区格式无效');
+    selector.utcOffset = value.utcOffset;
   }
   return selector;
 }
@@ -102,7 +113,9 @@ function sanitizeSourceInput(input, current = null) {
   const selector = sanitizeSelector(input.selector, current);
   const enabledValue = input.enabled !== undefined ? input.enabled : (current ? Boolean(current.enabled) : true);
   if (typeof enabledValue !== 'boolean') badRequest('启用状态必须是布尔值');
-  return { name, type, url, tier, domain, note, selector, enabled: enabledValue };
+  const intl = input.intl !== undefined ? input.intl : Boolean(current?.intl);
+  if (typeof intl !== 'boolean') badRequest('外网信源标记必须是布尔值');
+  return { name, type, url, tier, domain, note, selector, enabled: enabledValue, intl };
 }
 
 function parseFeedQuery(query, categories) {

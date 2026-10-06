@@ -36,6 +36,7 @@ const { repairTiming } = require('./timing-repair');
 const { reserveCall } = require('./receipts');
 const { clampPublishedAt } = require('../date-time');
 const { settleAll } = require('../async-work');
+const { translatePending, validateChineseText, NAMES } = require('./translation');
 
 const CATEGORIES = ['政策法规', '企业动态', '技术研发', '资本市场', '发射与任务', '应用场景', '观点报告'];
 const ANALYSIS_VERSION = 3;
@@ -83,9 +84,12 @@ function itemTypeForCategory(category, taxonomy = industry.loadTaxonomy()) {
 }
 
 function heuristicAnalyze(a) {
-  const text = `${a.title} ${a.summary_raw || ''}`;
+  let translation = {};
+  try { translation = JSON.parse(a.translation_json || '{}'); } catch {}
+  const title = translation.titleZh || a.title;
+  const text = `${title} ${translation.summaryZh || a.summary_raw || ''}`;
   // T2 媒体源要求标题直接命中词库；T1/T1.5 官方源放宽到全文（官方标题常含蓄）
-  const profile = a.tier === 'T2' ? kw.relevanceOf(a.title) : kw.relevanceOf(text);
+  const profile = a.tier === 'T2' ? kw.relevanceOf(title) : kw.relevanceOf(text);
   if (!profile.relevant) return { relevant: false };
   const category = (CATEGORY_PATTERNS.find(([, pattern]) => pattern.test(text)) || ['企业动态'])[0];
   const tierBonus = a.tier === 'T1' ? 8 : a.tier === 'T1.5' ? 4 : 0;
@@ -105,8 +109,8 @@ function heuristicAnalyze(a) {
       category,
       authorRole: a.tier === 'T1' ? 'principal' : 'relayer',
       tags: [],
-      titleZh: '',
-      summaryZh: normalize.cleanSummary(a.summary_raw || '').slice(0, 120) || a.title,
+      titleZh: translation.titleZh || '',
+      summaryZh: translation.summaryZh || normalize.cleanSummary(a.summary_raw || '').slice(0, 120) || a.title,
       editorialJudgment: (a.tier === 'T1' ? '官方一手 · ' : '') + (REASON_TEMPLATES[category] || ''),
       subjects: [],
       fact: null,
@@ -222,6 +226,7 @@ async function analyzePending(onProgress, limit = 200) {
   const selection = industry.loadSelection();
   const breakthroughs = loadBreakthroughs();
   const hasKey = !!settings.ai.apiKey;
+  const translation = await translatePending(settings);
   const repair = () => repairTiming(db, { hasKey, enrich: enrichArticle, extract: async article => {
     reserveCall();
     const response = await chat([
@@ -239,10 +244,11 @@ async function analyzePending(onProgress, limit = 200) {
     SELECT a.id, a.source_id, a.title, a.url, a.summary_raw, a.published_at, a.fetched_at, a.domain,
            a.canonical_url, a.clean_version, a.image_url, a.content_text, a.content_status, a.images_json, a.vision_json, a.publisher_id, a.imported_backfill,
            a.prefilter_attempts, s.name AS source_name, s.tier, s.intl
+           , a.translation_status, a.translation_json
     FROM articles a JOIN sources s ON s.id = a.source_id
-    WHERE a.analyzed = 0
+    WHERE a.analyzed = 0 AND COALESCE(a.translation_status, '') <> 'pending'
     ORDER BY a.id DESC LIMIT ?`).all(limit);
-  if (!pending.length) return { analyzed: 0, featured: 0, backfilled, timingRepair: await repair() };
+  if (!pending.length) return { analyzed: 0, featured: 0, backfilled, translation, timingRepair: await repair() };
 
   const cleaned = refreshCleaning(pending);
   let analyzed = 0;
@@ -257,8 +263,10 @@ async function analyzePending(onProgress, limit = 200) {
   // 第 0 步：词库粗过滤（省 token）。国外源与 T1 官方源标题常不带中文行业词，交给模型预筛。
   const candidates = [];
   for (const a of pending) {
-    const text = `${a.title} ${a.summary_raw || ''}`;
-    a._profile = a.tier === 'T2' ? kw.relevanceOf(`${a.title} ${(a.summary_raw || '').slice(0, 80)}`) : kw.relevanceOf(text);
+    let translated = {};
+    try { translated = JSON.parse(a.translation_json || '{}'); } catch {}
+    const text = `${a.title} ${a.summary_raw || ''} ${translated.titleZh || ''} ${translated.summaryZh || ''}`;
+    a._profile = a.tier === 'T2' ? kw.relevanceOf(`${a.title} ${(a.summary_raw || '').slice(0, 80)} ${translated.titleZh || ''}`) : kw.relevanceOf(text);
     if (!a._profile.relevant && !(hasKey && (a.tier === 'T1' || a.intl))) {
       markIrrelevant(a.id, 'LEXICON');
       analyzed++;
@@ -401,6 +409,7 @@ async function analyzePending(onProgress, limit = 200) {
     cleaned,
     backfilled,
     mode: 'full',
+    translation,
     budgetPaused,
     timingRepair: budgetPaused ? null : await repair()
   };
@@ -449,6 +458,14 @@ function structureResult(result, fullText, article = {}) {
 // 落库。返回是否入选。
 function persistAnalysis(a, domain, outcome, { selection, breakthroughs, analyzedFlag }) {
   const { passA, passB, understanding: u } = outcome;
+  let translated = {};
+  try { translated = JSON.parse(a.translation_json || '{}'); } catch {}
+  if (translated.titleZh) {
+    const names = translated.names || [];
+    const lostName = [...NAMES, ...names].some(name => translated.titleZh.includes(name) && !String(u.titleZh || '').includes(name));
+    if (!validateChineseText(u.titleZh, names) || lostName) u.titleZh = translated.titleZh;
+    if (!validateChineseText(u.summaryZh, names)) u.summaryZh = translated.summaryZh;
+  }
   const heuristic = analyzedFlag === 3;
   const decision = editorial.decideSelection({ scoreA: passA.score, scoreB: passB.score, tier: a.tier, heuristic }, selection);
   const itemType = u.itemType || passA.itemType;

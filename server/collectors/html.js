@@ -7,22 +7,23 @@ const cheerio = require('cheerio');
 const { fetchText } = require('./fetch-util');
 const { looseDateIso } = require('./loose-date');
 
-async function fetch(source, settings) {
-  const html = await fetchText(source.url, settings);
+function parseHtml(html, source) {
   const $ = cheerio.load(html);
   const cfg = source.selector_json ? JSON.parse(source.selector_json) : {};
   const listSel = cfg.list || 'ul li a';
   const dateRe = cfg.datePattern ? new RegExp(cfg.datePattern) : /\d{4}[-/年]\d{1,2}[-/月]\d{1,2}/;
 
   const seen = new Set();
+  const linkRe = cfg.linkPattern ? new RegExp(cfg.linkPattern) : null;
   const items = [];
   $(listSel).each((_, el) => {
     const $a = $(el).is('a') ? $(el) : $(el).find('a').first();
     if (!$a.length) return;
     const href = $a.attr('href');
-    const titleText = cfg.title ? $a.find(cfg.title).first().text() : '';
+    const $row = $(el).is('a') ? ($a.closest('li,tr,article').length ? $a.closest('li,tr,article') : $a.parent()) : $(el);
+    const titleText = cfg.title ? $row.find(cfg.title).first().text() : '';
     const title = (titleText || $a.attr('title') || $a.text() || '').replace(/\s+/g, ' ').trim();
-    const summary = cfg.summary ? $a.find(cfg.summary).first().text().replace(/\s+/g, ' ').trim().slice(0, 400) : '';
+    const summary = cfg.summary ? $row.find(cfg.summary).first().text().replace(/\s+/g, ' ').trim().slice(0, 400) : '';
     if (!href || !title || title.length < 10) return; // 过滤导航类短链接
     // 过滤站点导航/栏目入口等非新闻链接
     if (/^(链接到|进入|返回|首页|更多|查看|无障碍|english|登录|注册)/i.test(title)) return;
@@ -37,18 +38,34 @@ async function fetch(source, settings) {
       if (parsed.username || parsed.password) return;
       url = parsed.href;
     } catch { return; }
+    if (linkRe && !linkRe.test(url)) return;
     if (seen.has(url) || url === source.url) return;
     seen.add(url);
 
     // 日期：在链接附近的文本里找
-    const ctx = $a.closest('li,tr,div').text() || '';
+    const $date = cfg.date ? $row.find(cfg.date).first() : null;
+    const ctx = $date?.length ? ($date.attr('datetime') || $date.text()) : ($row.text() || '');
     const urlDate = url.match(/(?:\D)(20\d{2})(\d{2})(\d{2})(?:\D)/);
-    const m = ctx.match(dateRe) || (urlDate ? [`${urlDate[1]}-${urlDate[2]}-${urlDate[3]}`] : null);
+    const pathDate = url.match(/\/(20\d{2})[-/](\d{1,2})[-/](\d{1,2})(?:\/|\D)/);
+    const m = ctx.match(dateRe) || (pathDate ? [`${pathDate[1]}-${pathDate[2]}-${pathDate[3]}`]
+      : urlDate ? [`${urlDate[1]}-${urlDate[2]}-${urlDate[3]}`] : null);
     // 列表页日期不带时区：按信源时区（默认北京时间）读，不随本机时区漂移
-    const publishedAt = m ? looseDateIso(m[0], cfg.utcOffset || '+08:00') : null;
+    let dateText = m?.[0] || '';
+    if (cfg.date && /^\d{1,2}[-/]\d{1,2}$/.test(dateText)) {
+      const current = new Date();
+      let year = current.getUTCFullYear();
+      const tentative = looseDateIso(`${year}-${dateText.replace('/', '-')}`, cfg.utcOffset || '+08:00');
+      if (tentative && Date.parse(tentative) > Date.now() + 86400000) year--;
+      dateText = `${year}-${dateText.replace('/', '-')}`;
+    }
+    const publishedAt = dateText ? looseDateIso(dateText, cfg.utcOffset || '+08:00') : null;
     items.push({ title, url, summary, publishedAt });
   });
   return items.slice(0, 40);
 }
 
-module.exports = { fetch };
+async function fetch(source, settings) {
+  return parseHtml(await fetchText(source.url, settings, { international: Boolean(source.intl) }), source);
+}
+
+module.exports = { fetch, parseHtml };

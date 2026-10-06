@@ -63,6 +63,16 @@ test('external imports deduplicate, preserve backfill through analysis, and neve
   assert.throws(() => ingestItems({ sourceId, items: [article] }, at + 60001), error => error.statusCode === 409);
 });
 
+test('海外导入同样进入中文翻译队列，中文专名混排不重复翻译', () => {
+  const sourceId = Number(db.prepare("INSERT INTO sources(name,type,url,domain,intl) VALUES('海外导入','external','external://intl','aerospace',1)").run().lastInsertRowid);
+  ingestItems({ sourceId, items: [
+    { title: 'SpaceX completes rocket flight test', url: 'https://example.org/intl-en' },
+    { title: 'SpaceX完成火箭飞行试验', url: 'https://example.org/intl-zh' }
+  ] }, Date.now() + 120000);
+  assert.equal(db.prepare('SELECT translation_status FROM articles WHERE url=?').get('https://example.org/intl-en').translation_status, 'pending');
+  assert.equal(db.prepare('SELECT translation_status FROM articles WHERE url=?').get('https://example.org/intl-zh').translation_status, null);
+});
+
 test('ingest HTTP boundary enforces token, source ownership/type, payload bounds and idempotence', async t => {
   const server = await startServer(t);
   const headers = { [API_TOKEN_HEADER]: server.token, 'content-type': 'application/json' };

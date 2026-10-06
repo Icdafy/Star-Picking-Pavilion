@@ -230,6 +230,10 @@ function migrate() {
 // v0.2.0 AIHOT 内核：两次独立评分、内容理解、事件（stories）与热度、一级市场（公司库与融资事件）。
 // 全部是向后兼容的增量：老数据列为 NULL，界面按“没有就不渲染”处理；老版本打开新库也不会读到陌生必填列。
 function migrateV020(addCol) {
+  addCol('translation_status', 'TEXT');
+  addCol('translation_json', 'TEXT');
+  addCol('translation_retry_at', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_translation ON articles(translation_status, translation_retry_at, id)');
   addCol('prefilter_label', 'TEXT');                       // PASS | BLOCK | UNKNOWN（模型预筛结论）
   addCol('prefilter_attempts', 'INTEGER NOT NULL DEFAULT 0');
   addCol('score_a', 'REAL');                               // 第一次独立评分（0–100）
@@ -412,12 +416,12 @@ function insertArticle(a) {
   const fetchedAt = now();
   return withTransaction(() => {
     const stmt = db.prepare(`INSERT OR IGNORE INTO articles
-      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id, imported_backfill, historical)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id, imported_backfill, historical, translation_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
       clampPublishedAt(a.publishedAt, fetchedAt), fetchedAt, a.domain || null, a.image || null,
       Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0, JSON.stringify(a.images || []), a.contentText || null, a.publisherId || null,
-      a.importedBackfill ? 1 : 0, a.historical || a.importedBackfill ? 1 : 0);
+      a.importedBackfill ? 1 : 0, a.historical || a.importedBackfill ? 1 : 0, a.translationStatus || null);
     if (r.changes > 0) {
       db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
         .run(r.lastInsertRowid, a.title, a.summaryRaw || '');

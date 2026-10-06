@@ -5,6 +5,7 @@ const { db, insertArticle, now } = require('./db');
 const { HttpError } = require('./http-security');
 const { structureItem, stripMarkup, decodeEntities } = require('./ai/normalize');
 const { loadSelection } = require('./industry');
+const { needsChinese } = require('./ai/translation');
 
 function fail(message) { throw new HttpError(400, message); }
 function text(value, label, max, required = false) {
@@ -41,6 +42,7 @@ function sanitizeItem(item, source, at) {
   if (!structured) fail('清洗后标题或原文地址为空');
   const importedBackfill = Boolean(item.backfill || upstreamBackfill);
   return { sourceId: source.id, ...structured, importedBackfill,
+    translationStatus: source.intl && needsChinese(structured.title, structured.summaryRaw) ? 'pending' : null,
     historical: importedBackfill || (publishedAt && at - Date.parse(publishedAt) > loadSelection().historicalHours * 3600000) };
 }
 

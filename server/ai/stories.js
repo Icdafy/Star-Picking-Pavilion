@@ -234,7 +234,7 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
   db.prepare('UPDATE articles SET grouped_at = ? WHERE relevant = 1 AND analyzed >= 1 AND grouped_at IS NULL AND fetched_at < ?')
     .run(now(), recallCutoff);
   const rows = db.prepare(`SELECT ${ROW_COLUMNS} FROM articles a JOIN sources s ON s.id = a.source_id
-    WHERE a.relevant = 1 AND a.analyzed IN (1, 3) AND a.grouped_at IS NULL
+    WHERE a.relevant = 1 AND a.analyzed IN (1, 3) AND a.grouped_at IS NULL AND COALESCE(a.translation_status, '') <> 'pending'
     ORDER BY COALESCE(a.published_at, a.fetched_at), a.id LIMIT ?`).all(limit);
   const stats = { processed: 0, attached: 0, created: 0, judged: 0, merged: 0, skipped: 0 };
   if (!rows.length) return stats;
