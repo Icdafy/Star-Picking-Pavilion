@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-当前目标版本为 v0.2.12：情报工作区重整、应用内更新日志与设置快捷导航。发布验证见 [验证报告](docs/v0212-validation.md)，公开资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。
+v0.2.12 已发布为[最新正式版](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.12)：情报工作区重整、应用内更新日志与设置快捷导航。[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37419711923) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37420427051/attempts/2) 均完整通过，六项正式附件下载、摘要、PE 版本和更新元数据核验通过；发布后应用实网同步与离线缓存恢复成功。具体记录见 [验证报告](docs/v0212-validation.md)，以下流程继续适用于后续发版。
 
 ## 发布前授权门槛
 

@@ -1,6 +1,10 @@
-# v0.2.12 发布准备
+# v0.2.12 发布状态
 
-本地 892 项单元、20 项桌面、128 布局组合、构建与 1273 包边界已通过；正在推进精确提交 CI 与正式发布。实网信源复查 184／186 返回内容，东财检索·穿越者返回空、泰伯网·空天资讯请求失败；此轮未改动信源或采集逻辑，不将该复查计为严格全通过。具体门禁状态见 [docs/v0212-validation.md](docs/v0212-validation.md)。
+无发布阻塞。[v0.2.12](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.12) 已作为最新正式版发布，[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37419711923) 与 [Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37420427051/attempts/2) 对产品提交 `e8c5ca1d99efccae32c3de34c73c58c00ad728c8` 最终完整通过：892 单元、20 真实桌面（128 布局）、0 生产漏洞、1273 包边界及一次性 Windows 安装／卸载验证成功，用户数据保留。六附件下载后的摘要、版本和自动更新元数据均匹配；应用内正文与公开 Release 一致，发布后实网同步和缓存恢复通过。
+
+保留实网可用性结果：184／186 信源返回内容，东财检索·穿越者返回空、泰伯网·空天资讯请求失败；`audit:sources --strict` 退出 1，没有宣称严格全通过，本次未改变信源或采集逻辑。运行时首次 GitHub 请求超时后保留离线记录，原超时设置下重试成功，不据此宣称网络原因已修复。详见 [docs/v0212-validation.md](docs/v0212-validation.md)。
+
+Release 首轮为 19／20 桌面通过，旧卡片光效的瞬态差值断言失败；原样本地动效复查 5／5，原因未定位。正式门禁第 2 次完整执行通过，失败日志继续保留，没有修改光效实现、阈值、超时或验收门禁；后续通过不代表首轮根因已修复。
 
 ---
 
