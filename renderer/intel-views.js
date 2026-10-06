@@ -518,6 +518,14 @@
      依赖全部注入，工厂体不直读 window/document。 */
   const CapitalViewController = (function createCapitalViewControllerModule() {
     const TABS = Object.freeze(['overview', 'deals', 'activity', 'heat', 'companies', 'investors']);
+    const TAB_HELP = Object.freeze({
+      overview: '从融资规模、企业分布与活跃机构看市场全貌。',
+      deals: '逐笔查看融资、上市与并购，可继续按轮次和事件性质筛选。',
+      activity: '查看未上市及状态待核企业的订单、取证、试验与经营进展。',
+      heat: '按独立信源的近期报道热度排列企业，统计周期见下方说明。',
+      companies: '查阅全部已收录企业与公司档案，不受时间范围限制。',
+      investors: '按所选时间范围内的投资事件查看活跃机构。'
+    });
     const WATCH_TEXT = Object.freeze({ 0: '已取消标记', 1: '已标记为关注', 2: '已标记为被投' });
 
     function splitNames(value) {
@@ -546,9 +554,18 @@
           const on = !view.companyId && tab.dataset.capitalTab === view.tab;
           tab.classList.toggle('active', on);
           tab.setAttribute('aria-selected', String(on));
+          tab.tabIndex = on || (view.companyId && tab.dataset.capitalTab === view.tab) ? 0 : -1;
         }
-        if (elements.search) elements.search.hidden = Boolean(view.companyId);
-        if (elements.days) elements.days.disabled = !['overview', 'deals', 'activity', 'investors'].includes(view.tab);
+        elements.body.setAttribute('aria-labelledby', view.companyId ? 'capitalHeroTitle' : `capitalTab-${view.tab}`);
+        if (elements.tabHint) elements.tabHint.textContent = view.companyId ? '公司档案：关联报道、融资记录与关注标记。' : TAB_HELP[view.tab];
+        if (elements.timeLabel) elements.timeLabel.textContent = view.tab === 'heat' ? '热度统计范围' : '时间范围';
+        if (elements.search) (elements.search.closest('.intel-search-field') || elements.search).hidden = Boolean(view.companyId);
+        const usesDays = ['overview', 'deals', 'activity', 'investors'].includes(view.tab);
+        if (elements.days) { elements.days.disabled = !usesDays; elements.days.hidden = !usesDays; }
+        if (elements.timeNote) {
+          elements.timeNote.hidden = usesDays;
+          elements.timeNote.textContent = view.tab === 'heat' ? '按近期报道计算' : '全部已收录企业';
+        }
       }
 
       async function show(loader) {
@@ -730,6 +747,18 @@
         const tab = event.target.closest('[data-capital-tab]');
         if (!tab || !TABS.includes(tab.dataset.capitalTab)) return;
         switchTab(tab.dataset.capitalTab);
+      });
+      // 方向键只移动焦点；Enter / Space 使用按钮的原生点击激活，避免切换时等待网络。
+      elements.tabs?.addEventListener('keydown', event => {
+        const current = event.target.closest('[data-capital-tab]');
+        if (!current || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const tabs = [...elements.tabs.querySelectorAll('[data-capital-tab]')];
+        const index = tabs.indexOf(current);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+          : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        event.preventDefault();
+        tabs.forEach((tab, i) => { tab.tabIndex = i === next ? 0 : -1; });
+        tabs[next].focus();
       });
       elements.domains?.addEventListener('click', event => {
         const chip = event.target.closest('[data-capital-domain]');

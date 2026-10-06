@@ -112,7 +112,8 @@ test('加载日报渲染分区与条目，落 state 与日期栏', async () => {
   assert.equal(elements.date.textContent, '2026 / 08 / 08');
   assert.match(elements.body.innerHTML, /daily-section glass/);
   assert.match(elements.body.innerHTML, /safe:u/);
-  assert.match(elements.sub.textContent, /2 条精选/);
+  assert.match(elements.sub.textContent, /^生成于 /);
+  assert.doesNotMatch(elements.sub.textContent, /条精选|低空经济|商业航天/, '概况文字不重复独立统计');
   assert.deepEqual(elements.metricValues.map(node => node.textContent), ['2', '1', '1']);
   assert.equal(elements.overview.attributes['aria-busy'], 'false');
   assert.equal(elements.copy.disabled, false);

@@ -170,17 +170,20 @@
 <!-- 主内容 -->
 <main id="main">
   <section id="viewHot" class="view" role="tabpanel" hidden>
-    <header class="intel-hero glass">
-      <div>
-        <p class="intel-kicker">HOT EVENTS · 当前热点</p>
-        <h2 class="view-title">有很多人在说的事</h2>
-        <p id="hotMeta">热度按事件计算：48 小时内每个独立信源只算一次，24 小时减半。</p>
+    <header class="page-banner glass" aria-labelledby="hotHeroTitle">
+      <div class="banner-copy">
+        <p class="banner-kicker" data-banner-reveal>HOT EVENTS · 当前热点</p>
+        <h2 class="view-title" id="hotHeroTitle" data-banner-reveal>有很多人在说的事</h2>
+        <p class="banner-description" id="hotMeta" data-banner-reveal>热度按事件计算：48 小时内每个独立信源只算一次，24 小时减半。</p>
       </div>
+      <div class="banner-aside"><span class="banner-tag">事件热度 · 独立信源</span>
       <div class="intel-domains" id="hotDomains" role="group" aria-label="热点领域筛选">
         <button class="chip active" type="button" data-hot-domain="" aria-pressed="true">全部</button>
         <button class="chip" type="button" data-hot-domain="lowaltitude" aria-pressed="false">低空经济</button>
         <button class="chip" type="button" data-hot-domain="aerospace" aria-pressed="false">商业航天</button>
       </div>
+      </div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
     <div id="hotBody" aria-live="polite"></div>
   </section>
@@ -220,14 +223,21 @@
   </section>
 
   <section id="viewDaily" class="view" role="tabpanel" hidden>
+    <header class="page-banner glass" aria-labelledby="dailyHeroTitle">
+      <div class="banner-copy">
+        <p class="banner-kicker" data-banner-reveal>INTELLIGENCE JOURNAL · 情报归档</p>
+        <h2 class="view-title" id="dailyHeroTitle" data-banner-reveal>情报日志</h2>
+        <p class="banner-description" data-banner-reveal>按日、周、月梳理精选与热点，留存每一期值得回看的判断。</p>
+      </div>
+      <div class="banner-aside"><span class="banner-tag">留存判断 · 复盘线索</span><span class="banner-caption" id="dailySchedule">每日 08:00 出刊</span></div>
+      <div class="banner-art" aria-hidden="true"><span></span></div>
+    </header>
     <header class="daily-toolbar glass" aria-label="情报日志工具栏">
-      <div class="daily-tool-context"><span class="banner-kicker" data-banner-reveal>INTELLIGENCE JOURNAL</span><h2>情报日志</h2></div>
       <div class="period-switch" id="periodSwitch" role="group" aria-label="刊期">
         <button class="chip active" type="button" data-period="daily" aria-pressed="true">日报</button>
         <button class="chip" type="button" data-period="weekly" aria-pressed="false">周报</button>
         <button class="chip" type="button" data-period="monthly" aria-pressed="false">月报</button>
       </div>
-      <span class="daily-schedule" id="dailySchedule">每日 08:00 出刊</span>
       <div class="daily-actions" role="group" aria-label="报告操作">
         <button class="btn-primary btn-compact" id="btnCopyDaily" type="button"
           title="把整份日报复制成纯文本，直接贴进微信群或邮件">复制日报</button>
@@ -238,13 +248,12 @@
     </header>
     <section class="daily-head glass" aria-label="报告概况" aria-busy="true">
       <div class="daily-overview-heading">
-        <div class="daily-title"><p class="banner-kicker">报告概况 <span class="banner-tag" id="dailyState">正在读取</span></p><h2 id="dailyDate" data-banner-reveal>–</h2></div>
+        <div class="daily-title"><p class="daily-overview-label">报告概况 <span class="banner-tag" id="dailyState">正在读取</span></p><h3 id="dailyDate">–</h3><p id="dailySub" role="status" aria-live="polite">正在读取本期报告…</p></div>
         <div class="daily-date-controls" role="group" aria-label="切换报告日期">
           <button class="btn-icon" id="dailyPrev" type="button" aria-label="前一天"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 4 L6.5 10 L12.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="btn-icon" id="dailyNext" type="button" aria-label="后一天"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4 L13.5 10 L7.5 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
-      <p id="dailySub" role="status" aria-live="polite">正在读取本期报告…</p>
       <dl class="daily-metrics" id="dailyMetrics" aria-label="报告统计"><div><dt>精选情报</dt><dd>–</dd></div><div><dt>低空经济</dt><dd>–</dd></div><div><dt>商业航天</dt><dd>–</dd></div></dl>
     </section>
     <div id="dailyBody"></div>
@@ -279,27 +288,31 @@
     </form>
     <div class="intel-toolbar glass">
       <div class="intel-tabs" id="capitalTabs" role="tablist" aria-label="一级市场分区">
-        <button class="chip active" type="button" role="tab" aria-selected="true" data-capital-tab="overview">市场概览</button>
-        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="deals">融资动态</button>
-        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="activity">企业动态</button>
-        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="heat">公司热度</button>
-        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="companies">公司库</button>
-        <button class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="investors">活跃机构</button>
+        <button id="capitalTab-overview" tabindex="0" aria-controls="capitalBody" class="chip active" type="button" role="tab" aria-selected="true" data-capital-tab="overview">市场概览</button>
+        <button id="capitalTab-deals" tabindex="-1" aria-controls="capitalBody" class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="deals">融资动态</button>
+        <button id="capitalTab-activity" tabindex="-1" aria-controls="capitalBody" class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="activity">企业动态</button>
+        <button id="capitalTab-heat" tabindex="-1" aria-controls="capitalBody" class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="heat">公司热度</button>
+        <button id="capitalTab-companies" tabindex="-1" aria-controls="capitalBody" class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="companies">公司库</button>
+        <button id="capitalTab-investors" tabindex="-1" aria-controls="capitalBody" class="chip" type="button" role="tab" aria-selected="false" data-capital-tab="investors">活跃机构</button>
       </div>
+      <p class="intel-tab-hint" id="capitalTabHint" role="status">从融资规模、企业分布与活跃机构看市场全貌。</p>
       <div class="intel-filters">
+        <div class="intel-filter-field"><span>领域</span>
         <div class="intel-domains" id="capitalDomains" role="group" aria-label="一级市场领域筛选">
           <button class="chip active" type="button" data-capital-domain="" aria-pressed="true">全部</button>
           <button class="chip" type="button" data-capital-domain="lowaltitude" aria-pressed="false">低空经济</button>
           <button class="chip" type="button" data-capital-domain="aerospace" aria-pressed="false">商业航天</button>
         </div>
-        <label class="intel-select"><span>时间窗</span>
+        </div>
+        <label class="intel-filter-field"><span id="capitalTimeLabel">时间范围</span>
           <select id="capitalDays"><option value="30">近 30 天</option><option value="90" selected>近 90 天</option><option value="180">近 180 天</option><option value="365">近一年</option></select>
+          <span id="capitalTimeNote" hidden></span>
         </label>
-        <label class="intel-check"><input id="capitalWatched" type="checkbox"> 只看关注与被投</label>
-        <input id="capitalSearch" class="intel-search" type="search" placeholder="搜索企业、别名、型号或投资机构…" aria-label="搜索一级市场企业或投资机构" maxlength="40">
+        <div class="intel-filter-field"><span>标的范围</span><label class="intel-check"><input id="capitalWatched" type="checkbox"> 只看关注与被投</label></div>
+        <label class="intel-filter-field intel-search-field"><span>搜索企业或机构</span><input id="capitalSearch" class="intel-search" type="search" placeholder="企业、别名、型号或机构名称" aria-label="搜索一级市场企业或投资机构" maxlength="40"></label>
       </div>
     </div>
-    <div id="capitalBody" aria-live="polite"></div>
+    <div id="capitalBody" role="tabpanel" aria-labelledby="capitalTab-overview" tabindex="0" aria-live="polite"></div>
   </section>
 
   <section id="viewReleases" class="view" role="tabpanel" hidden>

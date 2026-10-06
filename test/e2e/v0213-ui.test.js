@@ -11,7 +11,7 @@ const Schema = require('../../renderer/ui-preference-schema');
 const CommonLinks = require('../../renderer/common-links');
 const root = path.join(__dirname, '../..');
 
-test('v0213 native page banners, journal toolbar, report overview and motion preferences', { timeout: 150_000 }, async t => {
+test('native workspace banners, compact journal, market filters and motion preferences', { timeout: 150_000 }, async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-v0213-ui-'));
   fs.writeFileSync(path.join(directory, 'settings.json'), '{}');
   fs.writeFileSync(path.join(directory, 'ui-preferences.json'), JSON.stringify({ version: 2,
@@ -39,11 +39,13 @@ test('v0213 native page banners, journal toolbar, report overview and motion pre
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.waitForFunction(() => document.documentElement.dataset.fxTier !== 'static');
   await page.waitForFunction(() => document.hasFocus());
-  const shots = path.join(root, 'work/v0213/screenshots');
+  const shots = path.join(root, 'work/v0214/screenshots');
   fs.mkdirSync(shots, { recursive: true });
   const titles = { featured: '精选情报', all: '让每一条信号，都进入视野', starred: '摘下的星，留给下一次判断',
     capital: '一级市场雷达', releases: '每一次进步，都有迹可循', links: '常用网址，即刻可达',
-    sources: '信源监控台', settings: '让摘星阁，更合你的习惯' };
+    sources: '信源监控台', settings: '让摘星阁，更合你的习惯',
+    hot: '有很多人在说的事', daily: '情报日志' };
+  const overviewGeometry = [];
   for (const width of [1440, 800]) for (const theme of ['light', 'dark']) {
     await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(size, 920), width);
     await page.waitForFunction(value => innerWidth === value, width);
@@ -73,8 +75,64 @@ test('v0213 native page banners, journal toolbar, report overview and motion pre
         separate: !overview.contains(document.getElementById('btnCopyDaily')) };
     });
     assert.deepEqual(layout, { periods: true, actions: true, below: true, separate: true });
+    const overview = await page.locator('.daily-head').boundingBox();
+    assert.ok(overview.height <= (width === 1440 ? 115 : 180), `compact overview at ${width}: ${overview.height}px`);
+    assert.match(await page.locator('#dailySub').textContent(), /^生成于 /);
+    assert.doesNotMatch(await page.locator('#dailySub').textContent(), /条精选|低空经济|商业航天/);
+    overviewGeometry.push({ width, theme, height: overview.height });
     await page.screenshot({ path: path.join(shots, `daily-${width}-${theme}.png`) });
+    await page.locator('.tab[data-view="capital"]').click();
+    const tabs = await page.locator('#capitalTabs [role="tab"]').evaluateAll(nodes => nodes.map(node => {
+      const r = node.getBoundingClientRect();
+      return { top: r.top, width: r.width, fits: node.scrollWidth <= node.clientWidth + 1 };
+    }));
+    assert.ok(tabs.every(tab => tab.fits && Math.abs(tab.top - tabs[0].top) < 1 && Math.abs(tab.width - tabs[0].width) < 1), 'six market tabs must share one aligned row with readable labels');
+    const filters = await page.locator('.intel-filters').boundingBox(), tabRow = await page.locator('#capitalTabs').boundingBox();
+    assert.ok(filters.y > tabRow.y + tabRow.height, 'filters must sit below market navigation');
   }
+  fs.writeFileSync(path.join(root, 'work/v0214/overview-geometry.json'), JSON.stringify(overviewGeometry, null, 2));
+  // Manual tab activation keeps remote content stable while keyboard focus moves.
+  await page.locator('#capitalTab-overview').focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('#capitalTab-deals').evaluate(node => node === document.activeElement), true);
+  assert.equal(await page.locator('#capitalTab-overview').getAttribute('aria-selected'), 'true');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#capitalBody .deal-tools');
+  assert.equal(await page.locator('#capitalBody').getAttribute('aria-labelledby'), 'capitalTab-deals');
+  assert.match(await page.locator('#capitalTabHint').textContent(), /融资、上市与并购/);
+  await page.keyboard.press('End');
+  assert.equal(await page.locator('#capitalTab-investors').evaluate(node => node === document.activeElement), true);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('#capitalTab-overview').evaluate(node => node === document.activeElement), true);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.locator('#capitalTab-investors').evaluate(node => node === document.activeElement), true);
+  await page.keyboard.press('Home');
+  assert.equal(await page.locator('#capitalTab-overview').evaluate(node => node === document.activeElement), true);
+  await page.keyboard.press('Space');
+  await page.locator('[data-capital-domain="aerospace"]').click();
+  await page.locator('#capitalDays').selectOption('30');
+  await page.locator('#capitalWatched').check();
+  const filteredRequest = page.waitForRequest(request => {
+    const url = new URL(request.url()), q = url.searchParams;
+    return url.pathname === '/api/capital/overview' && q.get('domain') === 'aerospace'
+      && q.get('days') === '30' && q.get('watched') === '1' && q.get('q') === '测试机构';
+  });
+  await page.locator('#capitalSearch').fill('测试机构');
+  const filteredResponse = await (await filteredRequest).response();
+  assert.equal(filteredResponse.status(), 200, 'all labelled filters must reach the real overview endpoint');
+  assert.equal((await filteredResponse.json()).days, 30);
+  for (const tab of ['heat', 'companies']) {
+    await page.locator(`#capitalTab-${tab}`).click();
+    assert.equal(await page.locator('#capitalDays').isDisabled(), true);
+    assert.equal(await page.locator('#capitalDays').isVisible(), false);
+    assert.equal(await page.locator('#capitalTimeNote').isVisible(), true);
+  }
+  await page.locator('#capitalTab-deals').click();
+  assert.equal(await page.locator('#capitalDays').inputValue(), '30');
+  assert.equal(await page.locator('#capitalDays').isVisible(), true);
+  assert.equal(await page.locator('#capitalSearch').inputValue(), '测试机构');
+  assert.equal(await page.locator('#capitalWatched').isChecked(), true);
+  await page.locator('.tab[data-view="daily"]').click();
   for (const kind of ['weekly', 'monthly', 'daily']) {
     await page.locator(`#periodSwitch [data-period="${kind}"]`).click();
     await page.waitForFunction(() => document.querySelector('.daily-head').getAttribute('aria-busy') === 'false');
@@ -85,6 +143,7 @@ test('v0213 native page banners, journal toolbar, report overview and motion pre
     assert.equal(await page.locator('#dailyRegen').isVisible(), kind === 'daily');
     assert.equal(await page.locator('#dailyPrev').getAttribute('aria-label'), kind === 'daily' ? '前一天' : '前一期');
     assert.match(await page.locator('#dailySchedule').textContent(), kind === 'daily' ? /08:00/ : kind === 'weekly' ? /每周一/ : /每月 1 日/);
+    await page.screenshot({ path: path.join(shots, `journal-${kind}-800-dark.png`) });
   }
   await page.locator('#dailyRegen').click();
   await page.waitForFunction(() => !document.getElementById('dailyRegen').disabled && document.querySelector('.daily-head').getAttribute('aria-busy') === 'false');
@@ -125,5 +184,5 @@ test('v0213 native page banners, journal toolbar, report overview and motion pre
   assert.equal(await page.locator('#feedHeroTitle').evaluate(node => getComputedStyle(node).opacity), '1');
   await page.emulateMedia({ forcedColors: 'active' });
   assert.equal(await page.locator('#feedHero .banner-art').isVisible(), false);
-  fs.writeFileSync(path.join(root, 'work/v0213/banner-motion.json'), JSON.stringify({ tier, frames }, null, 2));
+  fs.writeFileSync(path.join(root, 'work/v0214/banner-motion.json'), JSON.stringify({ tier, frames }, null, 2));
 });

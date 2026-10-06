@@ -481,6 +481,9 @@ const capitalViewController = CapitalViewController.createCapitalViewController(
   elements: {
     body: $('#capitalBody'),
     tabs: $('#capitalTabs'),
+    tabHint: $('#capitalTabHint'),
+    timeLabel: $('#capitalTimeLabel'),
+    timeNote: $('#capitalTimeNote'),
     domains: $('#capitalDomains'),
     days: $('#capitalDays'),
     watched: $('#capitalWatched'),

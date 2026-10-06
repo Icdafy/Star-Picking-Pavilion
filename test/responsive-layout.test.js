@@ -95,10 +95,10 @@ test('阶段 2：词库面板、弹窗层、日报头部与存储治理在窄容
     css,
     /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.glass-dialog h3\s*\{[^}]*font-size:\s*var\(--t-lg\);/s
   );
-  // 日报头部：标题独占一行，动作组整行居中
+  // 报告概况在窄容器上下分行，操作组独立整行显示
   assert.match(
     css,
-    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-title\s*\{[^}]*flex-basis:\s*100%;/s
+    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.daily-head\s*\{[^}]*grid-template-columns:\s*1fr;/s
   );
   assert.match(
     css,

@@ -89,7 +89,7 @@
         period.keys[kind] = r.key;
         period.lists[kind] = data.keys || [];
         elements.date.textContent = r.label;
-        elements.sub.textContent = `${r.totals.featured} 条精选 · ${r.totals.stories} 个事件 · ${r.totals.deals} 起资本事件 · ${r.finished ? '已定稿' : '本期进行中'} · 生成于 ${new Date(r.generatedAt).toLocaleString('zh-CN')}`;
+        elements.sub.textContent = `生成于 ${new Date(r.generatedAt).toLocaleString('zh-CN')}`;
         reportReady(r);
         const html = render ? render.issueBlocks(r) : '';
         body.innerHTML = html || `<div class="empty-state glass"><div class="es-icon">尚 无 刊 期</div><p>这一期还没有可收录的精选与热点。</p></div>`;
@@ -123,7 +123,7 @@
         state.dailyDates = data.dates;
         elements.date.textContent = r.date.replace(/-/g, ' / ');
         elements.sub.textContent =
-          `${r.total} 条精选 · 低空经济 ${r.byDomain.lowaltitude} 条 · 商业航天 ${r.byDomain.aerospace} 条 · 生成于 ${new Date(r.generatedAt).toLocaleTimeString('zh-CN')}`;
+          `生成于 ${new Date(r.generatedAt).toLocaleTimeString('zh-CN')}`;
         reportReady(r);
         const before = render ? render.issueBlocks(r, { parts: ['lead', 'hot'] }) : '';
         const after = render ? render.issueBlocks(r, { parts: ['deals', 'portfolio', 'companies', 'breakthroughs'] }) : '';

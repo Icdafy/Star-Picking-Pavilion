@@ -72,7 +72,7 @@ test('一级市场默认打开“市场概览”，阶段条跳转融资动态�
   assert.match(html, /class="chip active" type="button" role="tab" aria-selected="true" data-capital-tab="overview">市场概览/);
   const calls = [];
   const listeners = {};
-  const body = { innerHTML: '', addEventListener: (type, fn) => { listeners[type] = fn; } };
+  const body = { innerHTML: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, addEventListener: (type, fn) => { listeners[type] = fn; } };
   const controller = CapitalViewController.createCapitalViewController({
     api: async url => { calls.push(url); return url.startsWith('/api/capital/overview') ? overview : { deals: [], discovered: [], investors: [] }; },
     esc: DomUtils.escapeHTML, render, skeletons: () => '', toast: () => {},
@@ -81,11 +81,13 @@ test('一级市场默认打开“市场概览”，阶段条跳转融资动态�
   });
   await controller.load();
   assert.equal(controller.state().tab, 'overview');
+  assert.equal(body.attributes['aria-labelledby'], 'capitalTab-overview');
   assert.match(calls[0], /^\/api\/capital\/overview\?days=90$/);
   const target = { dataset: { dealStage: 'growth' } };
   await listeners.click({ target: { closest: selector => (selector === '[data-deal-stage]' ? target : null) } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(controller.state().tab, 'deals');
+  assert.equal(body.attributes['aria-labelledby'], 'capitalTab-deals');
   assert.equal(controller.state().stage, 'growth');
   assert.match(calls.at(-1), /^\/api\/deals\?days=90&stage=growth$/);
   const investor = { dataset: { investor: '晨熹资本' } };

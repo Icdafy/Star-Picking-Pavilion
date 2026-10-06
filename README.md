@@ -2,27 +2,28 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.13 · 工作区横幅与情报日志
+## v0.2.14 · 统一页头与紧凑工作区
 
-- 精选、全部动态、星标、一级市场、更新日志、常用网址、信源和设置升级为统一页头横幅，栏目、标题、说明、状态和操作层次更清晰。
-- 切换页面时文字轻柔入场，背景星轨缓慢运行；低功耗停止持续动效，减少动画保留静态效果，后台暂停。
-- 日报、周报、月报切换与复制日报、导出 .md、重新生成合并为一个工具栏，下方独立展示日期、状态与报告统计。
+- 热点、情报日志补齐统一页头，与精选、全部动态、星标、一级市场等页面使用同样的栏目、标题、说明和星轨装饰。
+- 报告概况收紧上下留白、缩小日期字号，日期和生成信息与三项统计整齐对齐，窄窗口自然分行，移除重复统计文字。
+- 一级市场六个分区等宽排列，用途说明与领域、时间、标的范围、搜索分层展示；支持方向键移动焦点、Enter / Space 激活，不适用的时间条件显示范围说明。
+- 日报、周报、月报切换与复制、导出、重新生成保留；文字和星轨动效继续支持低功耗、减少动画及后台暂停。
 - 深浅主题、窄窗口、界面缩放与键盘操作继续适用；原有情报、星标、归档、模型密钥和个人设置保留。
 - 应用内更新日志与 GitHub 发布说明同步，无新增运行依赖、脚本标签或动画关键帧。
 
-版本、界面与更新元数据统一为 0.2.13，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0213-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
+版本、界面与更新元数据统一为 0.2.14，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。设计依据与发布验证见 [验证记录](docs/v0214-validation.md)，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.13.exe`，双击并按向导安装。v0.2.13 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.14.exe`，双击并按向导安装。v0.2.14 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.13.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.14.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
