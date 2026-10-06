@@ -1,6 +1,12 @@
 # v0.2.18 发布状态
 
-更新按钮按需显示、报告日期导航与搜索焦点边框已完成。913 项单元、24 项完整桌面回归及候选构建、1,274 项包边界、PE 版本与更新元数据检查通过。安装包为 99,593,589 B、0.2.18、NotSigned；主分支 CI 和 tag Release 门禁待执行，尚未公开发布。详见 [本版验证](docs/v0218-validation.md)。
+[v0.2.18](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.18) 已发布为最新正式版：更新按钮仅在有待安装的新版本时显示，报告日期导航下移并与标题分行，顶栏搜索焦点边框贴合外层圆角。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37465193386) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37466542088) 对提交 `10952bca2554481729f1acb23003e4006dc1c287` 全部通过：913 单元、24 真实桌面、0 生产漏洞、47 项声明、1,274 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+六项公开附件重新下载并核验摘要、PE 版本、更新元数据、SBOM 和声明；安装器 99,591,790 B、0.2.18、NotSigned，SHA-256 为 `e6426e2d55d72c23e15a997dadaef430132a372faf845ff641122759d3f3330a`。应用匿名实网同步 46 条历史记录及离线恢复通过。
+
+本地早期布局失败及修复证据保留，最终横幅高度、48 组刊期及搜索鼠标／键盘／高对比度检查通过。实网信源严格复查 184／186，国家航天局·官网、泰伯网·空天资讯请求失败，采集逻辑未修改。详见 [本版验证](docs/v0218-validation.md)。
 
 ---
 
