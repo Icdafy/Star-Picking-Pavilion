@@ -37,7 +37,7 @@ async function open(t) {
     cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_TEST_DATA_DIR: profile,
       STAR_PICKING_PAVILION_NO_SCHEDULER: '1', STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE: '1' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   });
-  let output = '', sequence = 0, browser;
+  let output = '', sequence = 0, browser, currentPage;
   const pending = new Map();
   child.stdout.on('data', data => output += data); child.stderr.on('data', data => output += data);
   child.on('message', message => { const call = pending.get(message.id); if (!call) return;
@@ -49,6 +49,17 @@ async function open(t) {
     pending.set(id, { resolve, reject, timer }); child.send({ id, expression: fn.toString(), arg });
   });
   t.after(async () => {
+    if (currentPage && !currentPage.isClosed()) {
+      const snapshot = await currentPage.evaluate(() => ({ focus: document.hasFocus(), hidden: document.hidden,
+        tier: document.documentElement.dataset.fxTier, fonts: document.fonts.status, loading: state.loading,
+        banner: document.getElementById('feedBanner').hidden, scroll: document.getElementById('appViewport').scrollTop,
+        pointer: window.motionPointerProbe, card: document.querySelector('#feedList .card')?.getBoundingClientRect().toJSON(),
+        lights: [...document.querySelectorAll('.surface-light, .control-aura')].map(el => ({
+          type: el.className, alpha: el.style.opacity, parent: el.parentElement.className }))
+      })).catch(error => ({ diagnosticError: error.message }));
+      fs.writeFileSync(path.join(profile, 'motion-state.json'), JSON.stringify(snapshot, null, 2));
+      console.log('Motion state:', JSON.stringify({ ...snapshot, pointer: snapshot.pointer?.slice(-6) }));
+    }
     if (browser) await browser.close().catch(() => {});
     if (child.exitCode === null && child.connected) await native(({ app }) => { setTimeout(() => app.quit(), 30); return true; }).catch(() => {});
     if (child.exitCode === null) await new Promise(resolve => { child.once('exit', resolve); setTimeout(() => { if (child.exitCode === null) child.kill(); resolve(); }, 5000).unref(); });
@@ -62,10 +73,14 @@ async function open(t) {
   }
   browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { noDefaults: true });
   const context = browser.contexts()[0], page = context.pages()[0] || await context.waitForEvent('page');
+  currentPage = page;
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.waitForSelector('#feedList .card[data-id]');
   await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
     win.setContentSize(1440, 920); win.setAlwaysOnTop(true); win.show(); win.focus(); win.webContents.focus();
+    // Keep OS cursor movement from racing the CDP pointer on the foreground
+    // window. CDP still drives the real renderer and native window lifecycle.
+    win.setIgnoreMouseEvents(true);
   });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.waitForFunction(() => document.hasFocus() && !document.hidden);
@@ -73,6 +88,18 @@ async function open(t) {
   await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
   await page.waitForTimeout(500);
   await page.waitForFunction(() => !state.loading);
+  // Await the actual initial font and stats/banner hydration before measuring
+  // local coordinates. Both can finish after the first cards on slower hosts.
+  await page.evaluate(async () => { await Promise.all([document.fonts.ready, refreshStats()]); });
+  await page.evaluate(() => {
+    window.motionPointerProbe = [];
+    for (const type of ['pointerover', 'pointerout', 'pointermove']) document.addEventListener(type, event => {
+      motionPointerProbe.push({ type, x: event.clientX, y: event.clientY, target: event.target.className,
+        focus: document.hasFocus(), tier: document.documentElement.dataset.fxTier,
+        scroll: document.getElementById('appViewport').scrollTop });
+      if (motionPointerProbe.length > 24) motionPointerProbe.shift();
+    }, { passive: true });
+  });
   return { page, native, profile, errors };
 }
 
@@ -225,6 +252,11 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
   await card.hover(); await page.waitForTimeout(350);
   const bounds = await card.boundingBox();
   await page.mouse.move(bounds.x + 60, bounds.y + 18); await page.waitForTimeout(450);
+  const initialLightState = await page.evaluate(point => ({ tier: document.documentElement.dataset.fxTier,
+    focus: document.hasFocus(), hidden: document.hidden, hit: document.elementFromPoint(point.x, point.y)?.className,
+    pointer: motionPointerProbe, card: document.querySelector('#feedList .card').getBoundingClientRect().toJSON()
+  }), { x: bounds.x + 60, y: bounds.y + 18 });
+  assert.equal(await card.locator('.surface-glow').count(), 1, JSON.stringify(initialLightState));
   const before = await card.evaluate(el => ({
     bounds: el.getBoundingClientRect().toJSON(),
     title: el.querySelector('.card-title')?.getBoundingClientRect().toJSON(),
@@ -296,7 +328,8 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
 test('v0211 Electron: decoration scheduling sleeps at rest and clears on scroll, forced colors, reduce and removal', { timeout: 90000 }, async t => {
   const { page, errors } = await open(t);
   const card = page.locator('#feedList .card').first();
-  await card.hover(); await page.waitForTimeout(600);
+  await card.hover();
+  await page.waitForFunction(() => document.querySelector('#feedList .card .surface-light')?.style.opacity === '1');
   await page.evaluate(() => {
     window.motionWrites = 0;
     window.motionWriteObserver = new MutationObserver(mutations => { window.motionWrites += mutations.length; });
@@ -306,6 +339,21 @@ test('v0211 Electron: decoration scheduling sleeps at rest and clears on scroll,
   await page.waitForTimeout(250);
   assert.equal(await page.evaluate(() => motionWrites), 0, 'settled light still writes styles');
   await page.evaluate(() => motionWriteObserver.disconnect());
+  // A real delayed RAF callback must use elapsed wall time, without requiring
+  // many short virtual steps after the browser resumes rendering.
+  await page.evaluate(() => {
+    window.originalMotionRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = callback => originalMotionRaf(timestamp => setTimeout(() => callback(performance.now()), 280));
+  });
+  const bounds = await card.boundingBox();
+  await page.mouse.move(bounds.x + bounds.width / 2 + 130, bounds.y + bounds.height / 2);
+  await page.waitForTimeout(500);
+  const delayed = await card.evaluate(el => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.surface-glow')).transform);
+    return { actual: matrix.m41 + 160, target: el.getBoundingClientRect().width / 2 + 130 };
+  });
+  assert.ok(Math.abs(delayed.actual - delayed.target) < 3, JSON.stringify(delayed));
+  await page.evaluate(() => { window.requestAnimationFrame = originalMotionRaf; });
   await card.hover();
   await page.mouse.wheel(0, 100); await page.waitForTimeout(150);
   assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);

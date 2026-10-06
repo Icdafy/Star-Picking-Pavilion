@@ -395,16 +395,21 @@
       surface = null; control = null;
     }
     function schedule() {
-      if (frame == null) frame = win.requestAnimationFrame(tick);
+      if (frame == null) {
+        if (!lastTime) lastTime = win.performance?.now?.() || 0;
+        frame = win.requestAnimationFrame(tick);
+      }
     }
     function axis(position = 0) { return { position, target: position, velocity: 0 }; }
     function advance(value, elapsed, stiffness, damping) {
-      const steps = Math.max(1, Math.ceil(elapsed / .008));
-      const dt = elapsed / steps;
-      for (let i = 0; i < steps; i += 1) {
-        value.velocity += ((value.target - value.position) * stiffness - value.velocity * damping) * dt;
-        value.position += value.velocity * dt;
-      }
+      // 解析解按真实墙钟前进：低帧率或长帧后仍稳定，不截断时间拖慢追光。
+      const decay = damping / 2, frequency = Math.sqrt(stiffness - decay * decay);
+      const envelope = Math.exp(-decay * elapsed);
+      const a = value.position - value.target, b = (value.velocity + decay * a) / frequency;
+      const cosine = Math.cos(frequency * elapsed), sine = Math.sin(frequency * elapsed);
+      const displacement = envelope * (a * cosine + b * sine);
+      value.position = value.target + displacement;
+      value.velocity = envelope * frequency * (-a * sine + b * cosine) - decay * displacement;
       const settled = Math.abs(value.target - value.position) < .1 && Math.abs(value.velocity) < .8;
       if (settled) { value.position = value.target; value.velocity = 0; }
       return settled;
@@ -462,7 +467,7 @@
     function tick(now) {
       frame = null;
       if (!full()) { clearGlow(); return; }
-      const elapsed = lastTime ? Math.max(.001, Math.min((now - lastTime) / 1000, .032)) : 1 / 60;
+      const elapsed = lastTime ? Math.max(0, (now - lastTime) / 1000) : 1 / 60;
       lastTime = now;
       let moving = false;
       // 每帧先完成当前两个命中区域的几何读取，再写装饰层；不扫描信息流。
