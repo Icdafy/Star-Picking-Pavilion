@@ -54,28 +54,40 @@ test('timeAgo 按分钟/小时/天分档，远期回退本地化日期', () => {
 
 test('dateLabel 给出今天/昨天/月日三档相对标签', () => {
   const at = (daysAgo, hour = 9) => {
-    const d = new Date();
-    d.setDate(d.getDate() - daysAgo);
-    d.setHours(hour, 30, 0, 0);
-    return d;
+    const d = new Date(Date.now() + 8 * 3600e3);
+    d.setUTCDate(d.getUTCDate() - daysAgo);
+    d.setUTCHours(hour, 30, 0, 0);
+    return new Date(d.getTime() - 8 * 3600e3);
   };
   assert.equal(dateLabel(null), '日期未知');
   assert.equal(dateLabel(at(0).toISOString()), '今天');
   assert.equal(dateLabel(at(1).toISOString()), '昨天');
   const older = at(9);
-  assert.equal(dateLabel(older.toISOString()), `${older.getMonth() + 1}月${older.getDate()}日`);
+  const calendar = new Date(older.getTime() + 8 * 3600e3);
+  assert.equal(dateLabel(older.toISOString()), `${calendar.getUTCMonth() + 1}月${calendar.getUTCDate()}日`);
 });
 
 test('去年新闻的日期分组显示年份，不能与今年同月日混淆', () => {
-  const date = new Date(new Date().getFullYear() - 1, 8, 30);
-  assert.equal(dateLabel(date.toISOString()), `${date.getFullYear()}年9月30日`);
+  const year = new Date(Date.now() + 8 * 3600e3).getUTCFullYear() - 1;
+  assert.equal(dateLabel(`${year}-09-29T16:00:00Z`), `${year}年9月30日`);
 });
 
-test('hhmm 补零输出本地时分', () => {
-  const d = new Date();
-  d.setHours(5, 7, 0, 0);
-  assert.equal(hhmm(d.toISOString()), '05:07');
+test('hhmm 补零输出北京时间', () => {
+  assert.equal(hhmm('2026-01-05T21:07:00Z'), '05:07');
   assert.equal(hhmm(null), '--:--');
+});
+
+test('新闻日期与时分在 UTC、美国和上海系统时区下保持北京时间', () => {
+  const modulePath = require.resolve('../renderer/format-utils');
+  for (const timezone of ['UTC', 'America/Los_Angeles', 'Asia/Shanghai']) {
+    const result = spawnSync(process.execPath, ['-e', `
+      const { dateLabel, hhmm, timeAgo } = require(${JSON.stringify(modulePath)});
+      const date = '2025-09-29T16:00:00Z';
+      process.stdout.write(JSON.stringify({ label: dateLabel(date), clock: hhmm(date), published: timeAgo(date) }));
+    `], { encoding: 'utf8', env: { ...process.env, TZ: timezone } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { label: '2025年9月30日', clock: '00:00', published: '2025/9/30' }, timezone);
+  }
 });
 
 test('localDateString/parseLocalDate 按本地日历往返，不做 UTC 切片', () => {

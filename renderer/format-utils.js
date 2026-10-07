@@ -28,24 +28,27 @@
     if (h < 24) return `${h} 小时前`;
     const d = Math.floor(h / 24);
     if (d < 30) return `${d} 天前`;
-    return new Date(iso).toLocaleDateString('zh-CN');
+    return new Date(iso).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
   }
 
   function dateLabel(iso) {
     if (!iso) return '日期未知';
-    const d = new Date(iso);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const that = new Date(d); that.setHours(0, 0, 0, 0);
-    const diff = Math.round((today - that) / 86400e3);
+    // 新闻日历与服务器的北京时间一致，不能随 Windows / CI 的系统时区改变。
+    const d = new Date(Date.parse(iso) + 8 * 3600e3);
+    if (!Number.isFinite(d.getTime())) return '日期未知';
+    const today = new Date(Date.now() + 8 * 3600e3);
+    const day = value => Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+    const diff = (day(today) - day(d)) / 86400e3;
     if (diff === 0) return '今天';
     if (diff === 1) return '昨天';
-    return `${d.getFullYear() !== today.getFullYear() ? d.getFullYear() + '年' : ''}${d.getMonth() + 1}月${d.getDate()}日`;
+    return `${d.getUTCFullYear() !== today.getUTCFullYear() ? d.getUTCFullYear() + '年' : ''}${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
   }
 
   function hhmm(iso) {
     if (!iso) return '--:--';
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const d = new Date(Date.parse(iso) + 8 * 3600e3);
+    if (!Number.isFinite(d.getTime())) return '--:--';
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
   }
 
   function localDateString(date = new Date()) {
