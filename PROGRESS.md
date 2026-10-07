@@ -1,6 +1,10 @@
 # v0.2.29 发布状态
 
-设置卡片光晕与全局字体覆盖已修复，正在完成本机验证与发布门禁；正式版本和公开下载复核结果见 [验证记录](docs/v0229-validation.md)。此前最新正式版为 v0.2.28。
+设置中两张卡片的左上角光晕已删除，全局西文、数字与符号优先使用 Times New Roman，表单、代码与恢复页面覆盖完整。
+
+[v0.2.29](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.29) 已于 2026-10-07 19:17:47（北京时间）发布为最新正式版，无发布阻塞。精确提交 `8df9e2c73a75b641e7946d1a352ae966a23525dc` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37610699762) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37611994911) 均完整通过：1029／1029 单元与集成、33／33 真实 Electron、0 生产漏洞、47 项声明、1292 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载。
+
+六项附件已公开重新下载核验，安装器 100,451,881 B、0.2.29、NotSigned，SHA-256 为 `6dc54b93ba7b17f2b7ef6b1d1d74a99740806a0ca41316c16d69c2db3304bb1d`；24 个包内关键文件与发布源码一致。额外实网信源严格审计有一个检索空结果，原始失败与复核结果保留于 [验证记录](docs/v0229-validation.md)。
 
 ---
 

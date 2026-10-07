@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.29 修复设置卡片光晕与全局字体覆盖。发布需等待本版精确提交的 main CI 完整通过，再推送同一提交的注释 tag，由现有 Release 工作流构建和上传六项资产。沿用此前已采用的未签名策略；验证记录见 [本版验证](docs/v0229-validation.md)。
+v0.2.29 已于 2026-10-07 19:17:47（北京时间）正式发布，修复设置卡片光晕与全局字体覆盖。精确提交 `8df9e2c73a75b641e7946d1a352ae966a23525dc` 的 main CI 与 tag Release 均完整通过，六项附件已从公开链接重新下载复核；沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0229-validation.md)，下载见 [正式 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.29)。
 
 ## 发布前授权门槛
 

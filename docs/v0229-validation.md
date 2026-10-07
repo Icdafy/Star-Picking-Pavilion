@@ -30,4 +30,29 @@
 
 额外实网信源审计首轮 199／201：国家航天局官网一次 `fetch failed`，东财“穿越者”检索返回空结果。完整复核为 200／201、零网络失败、零跳过；该检索仍为空，严格审计按既有规则返回 1。这两次结果保存在 `source-audit.log` 与 `source-audit-retry.json`，不能表述为严格审计通过。本版现有 main／Release 工作流继续执行全部既定门禁。
 
-main CI、tag Release 与公开下载核验将在各项实际完成后补齐。本机不运行安装器，安装、启动、单实例、退出与卸载烟测由一次性 Windows CI 执行。
+本机不运行安装器，安装、启动、单实例、退出与卸载烟测由一次性 Windows CI 执行。
+
+## main CI 与正式发布
+
+精确提交 `8df9e2c73a75b641e7946d1a352ae966a23525dc` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37610699762) 和 [tag Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37611994911) 全部通过。main 为 1029／1029 单元与集成（31.07 秒）、33／33 真实 Electron（485.88 秒）；Release 独立再验 1029／1029（41.84 秒）和 33／33（418.94 秒），均零失败、零跳过。版本检查、生产依赖审计、声明、构建、包边界及一次性 Windows 安装／启动／单实例／退出／卸载均通过；Release 另通过摘要与 CycloneDX 验证。
+
+注释标签 `v0.2.29` 指向上述提交；发布完成后的收尾仅补齐验证文档，保留已发布标签与资产。
+
+## 公开下载复核
+
+[摘星阁 v0.2.29](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.29) 于 2026-10-07 19:17:47（北京时间）公开发布，为最新正式版、非草稿、非预发布。六项附件从不带认证的公开链接重新下载，逐项比对 GitHub SHA-256、实际文件大小与安装器校验清单；正文与 `RELEASE_NOTES.md` 一致。
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 374 | `cbea320a143b8c12791bc0b38978f3a657ec75fef5e2389863335601914d1c0b` |
+| sbom.cdx.json | 81,352 | `9c4ec4108adbb4e834f8cfe9cbe38951e51d08a4cb9d0698428c3b46a6170498` |
+| SHA256SUMS.txt | 106 | `9066a9637a0c56e3675cb4e5284ef7b5d8ad240d417b980ba89092f83c7fc3d0` |
+| Star-Picking-Pavilion-Setup-0.2.29.exe | 100,451,881 | `6dc54b93ba7b17f2b7ef6b1d1d74a99740806a0ca41316c16d69c2db3304bb1d` |
+| Star-Picking-Pavilion-Setup-0.2.29.exe.blockmap | 106,166 | `c57f2cc455cfefa07d5bcca648756a4a7efe674749f81fc2feb58a2b6892254c` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `c097dab26ae6ee28889c342939c74f0e721577b0fec977808dacffe5ddf5dc98` |
+
+公开安装器的 PE 产品名称为“摘星阁”，产品／文件版本均为 `0.2.29`，签名状态为 `NotSigned`。`latest.yml` 的版本、文件名、大小和两处 SHA-512 均与实际安装器一致：`Wzxxf7/Bus7oObx4hqFyrtE089QnhKhMoOJKzQwD8fXkPp/F/38yNltZ6OhqnlBbA50gpQfMyZfyLoct5AZRcA==`。
+
+CycloneDX 1.6 SBOM 包含 41 项生产组件，均映射到 lockfile；第三方声明与仓库相符。只读解包得到 `app.asar` 14,943,440 B，1292 项再次通过包边界与秘密检查，24 个关键文件与发布源码相符，包括共享字体表、两张恢复页面及卡片样式。核验未执行本机安装器。
+
+公开元数据、六项下载文件、摘要结果、PE 信息与包内源码核验保存在被忽略的 `work/v0229/public-assets/` 及同级记录。
