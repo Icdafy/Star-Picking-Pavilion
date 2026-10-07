@@ -2,26 +2,25 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.25 · 两行业采集与全部动态过滤修复
+## v0.2.26 · 摘星阁 Logo 统一更新
 
-- **只展示已确认的行业动态**：全部动态、精选、导出与词库计数使用相同口径，待判、失败或领域非法的资料不提前进入列表。
-- **采集先过滤**：普通媒体明显无关的综合新闻在入库和补抓正文前拦截；官方与海外陌生主体可留给已配置模型判断。
-- **防止摘要片段误导**：通用财经合集不能凭航天段落被放行；英文缩写和短中文别名检查词边界，模型 PASS 必须明确指定两行业之一。
-- **自动复核历史条目**：撤回受影响合集、重新排队错误的启发式与旧版标记，修复热度、事件主条和综述，保留原文、原分析及星标。
+- **所有应用 Logo 统一**：界面、网页页签、窗口、任务栏、系统托盘、后台通知、快捷方式及安装／卸载程序采用上传的新 Logo。
+- **Logo 随主题变色**：浅色保留原图的白底、金色星星与紫色弧线；深色切换为深色底、金色星星和较亮的紫色弧线，切回浅色恢复原图。宽窄窗口均保持原图轮廓和透明度。
+- **图标可复现**：`renderer/logo.png` 为原始图片，`build/make-icon.py` 从它生成 PNG 与多尺寸 ICO，重新构建继续使用新版 Logo。
 
-版本、界面与更新元数据统一为 0.2.25，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。定位与测试见 [验证记录](docs/v0225-validation.md)，此前 AIHOT 适配见 [深度对照](docs/v0224-aihot-audit.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)及 `config/sources.default.json`，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。升级保留来源 ID、启停状态、统计、已有情报、星标、归档、密钥与设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.26，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。资源覆盖与测试见 [验证记录](docs/v0226-validation.md)，两行业过滤修复见 [v0.2.25 验证](docs/v0225-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)及 `config/sources.default.json`，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.25.exe`，双击并按向导安装。v0.2.25 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.26.exe`，双击并按向导安装。v0.2.26 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.25.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.26.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

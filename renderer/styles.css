@@ -488,7 +488,7 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
 @media (prefers-reduced-motion: reduce) {
   html, .app-viewport { scroll-behavior: auto; }
   .aurora, .stars, .comet, .blob,
-  .radar-sweep, .blip, .pulse-dot, .sk-line, .rt-toggle.active .rt-dot,
+  .pulse-dot, .sk-line, .rt-toggle.active .rt-dot,
   .card-new::before, .breakthrough-pill::after {
     animation: none !important;
   }
@@ -537,13 +537,9 @@ body.is-idle .aurora, body.is-idle .stars, body.is-idle .comet, body.is-idle .bl
 }
 
 .brand { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
-.brand-mark { width: 2.875rem; height: 2.875rem; color: var(--accent); flex-shrink: 0; }
-[data-theme="dark"] .brand-mark { filter: drop-shadow(0 0 12px var(--accent-ring)); }
-.radar-sweep { transform-origin: 24px 24px; animation: sweep 5s linear infinite; }
-@keyframes sweep { to { transform: rotate(360deg); } }
-.blip { animation: blip 5s ease-in-out infinite; }
-.blip-2 { animation-delay: 2.4s; }
-@keyframes blip { 0%, 12% { opacity: 1; } 45%, 100% { opacity: .12; } }
+.brand-filters { position: absolute; pointer-events: none; }
+.brand-mark { display: block; width: 2.875rem; height: 2.875rem; object-fit: contain; flex-shrink: 0; }
+[data-theme="dark"] .brand-mark { filter: url("#brandLogoDark"); }
 
 .brand-text h1 {
   font-family: var(--font-display);

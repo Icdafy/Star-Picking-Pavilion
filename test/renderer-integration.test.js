@@ -125,9 +125,9 @@ test('领域模块在应用脚本之前加载', () => {
 });
 
 test('页面声明可由现有静态路由提供的摘星阁图标', () => {
-  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg">/);
-  const favicon = fs.readFileSync(path.join(root, 'renderer', 'favicon.svg'), 'utf8');
-  assert.match(favicon, /^<svg[^>]*aria-label="摘星阁"/);
+  assert.match(html, /<link rel="icon" type="image\/png" href="\/logo\.png">/);
+  const favicon = fs.readFileSync(path.join(root, 'renderer', 'logo.png'));
+  assert.deepEqual([...favicon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
 });
 
 test('视图切换、分类、星标和持久化均接入 app.js', () => {

@@ -146,7 +146,8 @@ function createBackgroundModeController({
       if (!Notification || Notification.isSupported?.() === false) return;
       const notification = new Notification({
         title: '摘星阁仍在后台运行',
-        body: '可从系统托盘重新打开，或选择“退出摘星阁”彻底退出。'
+        body: '可从系统托盘重新打开，或选择“退出摘星阁”彻底退出。',
+        icon: iconPath
       });
       notification.show();
     } catch {}

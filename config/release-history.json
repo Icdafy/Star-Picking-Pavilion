@@ -2,10 +2,17 @@
   "source": "https://github.com/Icdafy/Star-Picking-Pavilion/releases",
   "items": [
     {
+      "tag": "v0.2.26",
+      "name": "摘星阁 v0.2.26",
+      "publishedAt": null,
+      "body": "# 摘星阁 v0.2.26\n\n统一更新摘星阁 Logo，使用本次上传的白色圆角底、金色星星与紫色弧线图片。\n\n- **界面与页签统一**：桌面指挥栏、宽窄窗口以及网页页签使用同一张原图，保留轮廓和透明度。\n- **主题颜色自动适配**：软件内 Logo 随浅色、深色主题即时变色。浅色使用原图的白底、金色星星与紫色弧线，深色使用深色底、金色星星和较亮的紫色弧线，切回浅色恢复原图颜色。\n- **桌面图标统一**：Windows 应用、窗口、任务栏、系统托盘、后台通知、桌面和开始菜单快捷方式，以及安装、卸载程序均采用新版 Logo。\n- **可复现的图标资源**：上传的 PNG 保存为项目 Logo 原图，图标生成脚本从同一文件生成 512 像素 PNG 和 16—256 像素多尺寸 ICO，避免重新构建时恢复旧雷达图标。\n- **版本信息同步**：应用界面、安装器、自动更新元数据与内置更新日志统一为 0.2.26。已有情报、星标、归档、模型密钥与设置保留，无新增运行依赖。\n\n资源覆盖、桌面检查与发布证据见 [v0.2.26 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0226-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.26.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；请先核对 `SHA256SUMS.txt`。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.26.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.26"
+    },
+    {
       "tag": "v0.2.25",
       "name": "摘星阁 v0.2.25",
-      "publishedAt": null,
-      "body": "# 摘星阁 v0.2.25\n\n修复“全部动态”混入其他行业新闻的问题，恢复低空经济与商业航天两行业的展示与采集边界。\n\n- **行业判断完成后再展示**：“全部动态”、精选、领域筛选、信息流导出与词库计数统一要求资料已完成判断、确认相关且领域合法。采集过程中、模型等待或失败时的原始资料不再提前混入列表；等待判断不再默认归为低空经济。\n- **采集前过滤通用媒体噪声**：普通媒体的明显无关内容在入库和补抓正文前过滤，减少无关资料及网络请求。官方与海外陌生主体仍可留给已配置的模型判断，等待期间不进入普通信息流。\n- **拦截跨行业财经合集**：通用“投资早参”“假期／周末重点速递”等合集不能凭检索摘要中的航天片段取得行业相关性；“航天早参”等行业专刊继续正常判断。\n- **避免关键词误命中**：英文缩写和短中文别名检查词边界，避免把 POPULAR、DISEASES 或“千亿航天”分别当作 ULA、SES 或亿航。采集守卫、词库和公司匹配沿用一致的边界规则。\n- **明确模型行业结论**：预筛 PASS 必须明确指定低空经济或商业航天，缺失或非法领域的答复按异常处理，不沿用信源领域或默认领域冒充确认结论。\n- **升级自动复核旧库**：撤回明确的跨行业财经合集，重新排队错误的启发式与未完成的旧版相关标记，撤销其热度信号并修复事件主条和综述。保留原文、原分析、星标、归档、模型密钥与设置，无新增运行依赖。\n\n定位确认：“全部动态”放行未判资料的条件在 v0.2.23 已存在，v0.2.24 仍沿用；本次修复针对真实的行业过滤漏洞。根因、回归与发布证据见 [v0.2.25 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0225-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.25.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；请先核对 `SHA256SUMS.txt`。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.25.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "publishedAt": "2026-10-07T05:26:11.000Z",
+      "body": "# 摘星阁 v0.2.25\r\n\r\n修复“全部动态”混入其他行业新闻的问题，恢复低空经济与商业航天两行业的展示与采集边界。\r\n\r\n- **行业判断完成后再展示**：“全部动态”、精选、领域筛选、信息流导出与词库计数统一要求资料已完成判断、确认相关且领域合法。采集过程中、模型等待或失败时的原始资料不再提前混入列表；等待判断不再默认归为低空经济。\r\n- **采集前过滤通用媒体噪声**：普通媒体的明显无关内容在入库和补抓正文前过滤，减少无关资料及网络请求。官方与海外陌生主体仍可留给已配置的模型判断，等待期间不进入普通信息流。\r\n- **拦截跨行业财经合集**：通用“投资早参”“假期／周末重点速递”等合集不能凭检索摘要中的航天片段取得行业相关性；“航天早参”等行业专刊继续正常判断。\r\n- **避免关键词误命中**：英文缩写和短中文别名检查词边界，避免把 POPULAR、DISEASES 或“千亿航天”分别当作 ULA、SES 或亿航。采集守卫、词库和公司匹配沿用一致的边界规则。\r\n- **明确模型行业结论**：预筛 PASS 必须明确指定低空经济或商业航天，缺失或非法领域的答复按异常处理，不沿用信源领域或默认领域冒充确认结论。\r\n- **升级自动复核旧库**：撤回明确的跨行业财经合集，重新排队错误的启发式与未完成的旧版相关标记，撤销其热度信号并修复事件主条和综述。保留原文、原分析、星标、归档、模型密钥与设置，无新增运行依赖。\r\n\r\n定位确认：“全部动态”放行未判资料的条件在 v0.2.23 已存在，v0.2.24 仍沿用；本次修复针对真实的行业过滤漏洞。根因、回归与发布证据见 [v0.2.25 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0225-validation.md)。\r\n\r\n## 安装与校验\r\n\r\n下载 `Star-Picking-Pavilion-Setup-0.2.25.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；请先核对 `SHA256SUMS.txt`。\r\n\r\n```powershell\r\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.25.exe\r\nGet-Content .\\SHA256SUMS.txt\r\n```\r\n\r\n正式安装包、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。\r\n",
       "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.25"
     },
     {

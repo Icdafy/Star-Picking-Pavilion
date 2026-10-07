@@ -9,7 +9,7 @@
      域连接也仍然被禁。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self'; connect-src 'self'">
 <title>摘星阁 · 低空经济与商业航天情报站</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" href="/logo.png">
 <script src="ui-preference-schema.js"></script>
 <script src="bootstrap.js"></script>
 <link rel="stylesheet" href="fonts/source-han-sans-sc/index.css">
@@ -18,6 +18,18 @@
 <link rel="stylesheet" href="intel.css">
 </head>
 <body>
+<!-- 深色主题只改变 Logo 的显示配色，原图轮廓和透明度保持。 -->
+<svg class="brand-filters" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="brandLogoDark" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values="
+        2.788610 -2.439014 -0.268625 0 0
+        2.065344 -1.725469 -0.242709 0 0
+        2.045000 -2.462434 0.555085 0 0
+        0 0 0 1 0"/>
+    </filter>
+  </defs>
+</svg>
 <div class="desktop-titlebar-liquid-glass" aria-hidden="true"></div>
 <div id="desktop-titlebar-drag-region" aria-hidden="true"></div>
 <!-- 氛围层：宣纸暖光 / 深空极光 -->
@@ -42,20 +54,7 @@
 <!-- 桌面指挥栏：宽屏纵向组织，窄屏由 CSS 还原为品牌 + 顶部导航 -->
 <aside class="command-rail glass" aria-label="摘星阁指挥栏">
   <div class="brand rail-brand">
-    <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <circle cx="24" cy="24" r="21" stroke="currentColor" stroke-opacity=".25" stroke-width="1.5"/>
-      <circle cx="24" cy="24" r="13" stroke="currentColor" stroke-opacity=".4" stroke-width="1.5"/>
-      <path class="radar-sweep" d="M24 24 L24 4 A20 20 0 0 1 40.5 14.5 Z" fill="url(#sweepGrad)"/>
-      <circle cx="24" cy="24" r="2.5" fill="currentColor"/>
-      <circle class="blip blip-1" cx="33" cy="13" r="1.8" fill="#d96f1e"/>
-      <circle class="blip blip-2" cx="12" cy="31" r="1.5" fill="currentColor"/>
-      <defs>
-        <linearGradient id="sweepGrad" x1="24" y1="4" x2="40" y2="24">
-          <stop stop-color="currentColor" stop-opacity=".55"/>
-          <stop offset="1" stop-color="currentColor" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-    </svg>
+    <img class="brand-mark" src="/logo.png" width="48" height="48" alt="" aria-hidden="true">
     <div class="brand-text">
       <div class="brand-title-row">
         <h1>摘星阁</h1>

@@ -48,6 +48,9 @@ const {
   publicVersionFromUpdateInfo
 } = require('./update-coordinator');
 const packageMetadata = require('../package.json');
+const applicationIconPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'tray-icon.ico')
+  : path.join(__dirname, '..', 'build', 'icon.ico');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -324,6 +327,7 @@ async function createWindow(serverPort, initialTheme = 'dark') {
     minHeight: 600,
     backgroundColor: windowTheme.backgroundColor,
     title: '摘星阁 · 低空经济与商业航天情报站',
+    icon: applicationIconPath,
     titleBarStyle: 'hidden',
     ...(process.platform !== 'darwin'
       ? { titleBarOverlay: windowTheme.titleBarOverlay }
@@ -528,9 +532,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     Notification,
     getWindow: () => win,
     preferenceStore: uiPreferencesStore,
-    iconPath: app.isPackaged
-      ? path.join(process.resourcesPath, 'tray-icon.ico')
-      : path.join(__dirname, '..', 'build', 'icon.ico'),
+    iconPath: applicationIconPath,
     isQuitting: () => quitAfterShutdown,
     requestQuit: () => app.quit()
   });
