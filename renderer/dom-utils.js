@@ -709,6 +709,7 @@
     doc.fonts?.ready?.then(() => { if (!disposed) syncSizes(); }).catch(() => {});
     function settleEnvironment() {
       if (!full()) clearGlow();
+      else if (surfaces.size || controls.size) schedule();
       if (!canMove()) { for (const button of waves.keys()) clearWave(button); }
       syncSizes();
     }
