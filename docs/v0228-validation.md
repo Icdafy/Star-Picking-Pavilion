@@ -47,6 +47,33 @@ Logo 从宽屏 2.55rem 放大至 3.5rem、窄屏 2.875rem 放大至 4rem，并�
 
 最终本机候选 `app.asar` 为 14,928,757 B，安装器为 100,453,754 B，签名状态 `NotSigned`。候选安装器 SHA-256：`09cc0c3b05bf42ad45e62ce928c2ec9f9bdef6f87e6e5a02b6dec8df9849d03e`。正式公开安装包由 Windows CI 另行构建，其摘要须从公开下载重新核对，不使用本机候选摘要代替。
 
-本机检查日志、素材核验、状态轨迹与深浅主题截图保存在被忽略的 `work/v0228/`。本机没有运行安装器；安装、启动、单实例、退出与卸载仅在一次性 Windows CI 执行。main CI、tag Release 和公开附件复核以完成后的实际结果追加。
+本机检查日志、素材核验、状态轨迹与深浅主题截图保存在被忽略的 `work/v0228/`。本机没有运行安装器；安装、启动、单实例、退出与卸载仅在一次性 Windows CI 执行。
 
 首个 main CI（`dd1441a`）单元测试通过，桌面矩阵为 30／31；失败来自新增状态栏检查将宽屏 sticky 写死，而一次性 Windows 初始窗口落入窄屏、原有布局为 relative。已显式设置原生窗口尺寸并覆盖 1024px／1440px 两种真实布局，要求悬停前后定位与完整几何一致；保留原生定位断言、减少动画策略与所有预算，不改产品样式来迎合测试。
+
+## 最终 main CI
+
+精确提交 `0be2fbddd0e4e9f5185ea3d8b123673fc14079ea` 的 [Windows CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37604966037) 已于 2026-10-07 18:14（北京时间）全部通过：1029／1029 单元与集成测试（36.99 秒）、31／31 真实 Electron 桌面测试（422.29 秒），均零失败、零跳过。生产依赖审计、第三方声明、安装器构建、包边界，以及一次性 Windows 上的安装、启动、单实例、退出与卸载均通过。
+
+`v0.2.28` 注释标签指向上述完整通过的精确提交。
+
+## 正式发布与公开下载复核
+
+[tag Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37606282546) 全部通过，发布提交仍为 `0be2fbddd0e4e9f5185ea3d8b123673fc14079ea`。独立再验 1029／1029 单元与集成测试（37.83 秒）和 31／31 真实 Electron 桌面测试（459.44 秒），均零失败、零跳过；版本门禁、生产审计、声明、构建、包边界、安装与卸载、摘要及 CycloneDX 验证全部通过。
+
+[摘星阁 v0.2.28](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.28) 于 2026-10-07 18:26:50（北京时间）公开发布；仓库为 public，版本为 latest，非草稿、非预发布。发布正文与 `RELEASE_NOTES.md` 一致。六项附件从不带认证的公开下载地址重新获取，逐项核对文件大小与 GitHub API 提供的 SHA-256：
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| Star-Picking-Pavilion-Setup-0.2.28.exe | 100,451,487 | `58e5fba3007c8b9c2445db7c7972cf8ea4d0da65f1b1e52c461b4cc4905a7277` |
+| Star-Picking-Pavilion-Setup-0.2.28.exe.blockmap | 106,090 | `db746ccb764cfa9275edac76714c921b68b397f1a6103b996dba3608dab2158e` |
+| latest.yml | 374 | `386eb9de95ec5ec0698bca77d4accdf7c9ea7bf9f7e1c97be60c4f70f9da351f` |
+| SHA256SUMS.txt | 106 | `7e4dbbba7e8cc2bf64deb2d4bb7f473641fd55b0d9d6cf1acd5705f746b50c86` |
+| sbom.cdx.json | 81,352 | `eaf6119f6449e7dd3f3ec959a1eef2931eba8cf50a1aa725b2dacf3cf6efc444` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `d056eb7eca602058f9c10578d3ff41ca8738329d9f9e90b1710bcfbb6760dc8a` |
+
+公开安装器的 PE 产品名称为“摘星阁”，产品版本与文件版本均为 `0.2.28`，签名状态 `NotSigned`。`SHA256SUMS.txt` 的安装器摘要与下载文件一致；`latest.yml` 的版本、文件名、大小以及根级和文件级 SHA-512 全部一致：`oPDupijCmLf4J84bw9H+f7QSXw39uSajvBirm0b5aSbR+2Ki3/kNhrxklPn6fwYUoAxeTjeB7pJLDXFnKR4aBA==`。
+
+CycloneDX 1.6 SBOM 包含 41 项生产组件，均可映射到 lockfile 的生产依赖；第三方声明与仓库原文一致。只读解包公开安装器得到 `app.asar` 14,941,615 B，1291 项再次通过应用路径、生产依赖与秘密边界检查。18 个关键前后端文件与发布源码相符，原稿 SVG 字节及 SHA-256 相符。该核验未执行本机安装器。
+
+公开元数据、六项下载文件、逐项摘要结果、PE 信息及包内素材核验保存在被忽略的 `work/v0228/public-assets/` 与同级日志。本次收尾只更新发布验证文档，不改变已发布标签或安装包。

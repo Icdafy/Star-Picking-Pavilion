@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.28 候选版已完成更新图标、工作状态同步、Logo 尺寸和全局跟手动效调整。发布前依次完成本地验证、精确 main 提交的 CI、tag Release 和六项公开附件复核；沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0228-validation.md)。
+v0.2.28 已于 2026-10-07 正式发布，完成更新图标、工作状态同步、Logo 尺寸和全局跟手动效调整。发布提交 `0be2fbddd0e4e9f5185ea3d8b123673fc14079ea` 的 main CI 与 tag Release 均全部通过，六项附件已从公开链接重新下载复核；沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0228-validation.md)，下载见 [正式 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.28)。
 
 ## 发布前授权门槛
 
