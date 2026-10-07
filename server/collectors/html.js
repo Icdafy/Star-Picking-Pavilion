@@ -67,7 +67,7 @@ function parseHtml(html, source, { nowMs = Date.now() } = {}) {
       if (/[.…]{3}|…$/.test(prior.title) && !/[.…]{3}|…$/.test(title)) prior.title = title;
       return;
     }
-    const item = { title, url, summary, publishedAt, ...(publication || {}) };
+    const item = { title, url, summary, textFormat: 'plain', publishedAt, ...(publication || {}) };
     seen.set(url, item);
     items.push(item);
   });

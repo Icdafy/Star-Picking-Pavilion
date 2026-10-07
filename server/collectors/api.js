@@ -236,6 +236,7 @@ function mapCninfoResponse(raw, spec) {
   const items = list.map(a => ({
     // isHLtitle=true 时命中词会被 <em> 包裹，入库前剥掉
     title: decodeEntities(stripMarkup(a.announcementTitle, '')).trim(),
+    textFormat: 'plain',
     url: resolveStaticAssetUrl('http://static.cninfo.com.cn/', a.adjunctUrl),
     summary: a.secName || a.secCode ? `${a.secName || ''}（${a.secCode || ''}）` : '',
     publishedAt: epochIso(a.announcementTime),
@@ -330,7 +331,8 @@ function mapClsResponse(raw, spec) {
   const items = list.map(t => {
     const content = decodeEntities(stripMarkup(t.content)).replace(/\s+/g, ' ').trim();
     return {
-      title: String(t.title || '').trim() || content.slice(0, 60),
+      title: decodeEntities(stripMarkup(t.title, '')).trim() || content.slice(0, 60),
+      textFormat: 'plain',
       url: t.id ? `https://www.cls.cn/detail/${t.id}` : null,
       summary: content,
       publishedAt: epochIso(t.ctime, 1000),

@@ -34,6 +34,28 @@ test('已清洗纯文本在入库及启发式摘要中保留尖括号与实体�
   assert.equal(normalize.cleanSummary(item.summaryRaw, { plainText: true }), item.summaryRaw);
 });
 
+test('HTML 列表及已清洗 API 的型号字面值不会在入库时二次删除', () => {
+  const { parseHtml } = require('../server/collectors/html');
+  const { mapCninfoResponse, mapClsResponse } = require('../server/collectors/api');
+  const items = [
+    ...parseHtml('<ul><li><a href="/news/1">商业航天 &lt;Model-X&gt; 完成首次试验</a></li></ul>', { url: 'https://example.com/list' }),
+    ...mapCninfoResponse(JSON.stringify({ announcements: [{ announcementTitle: '<em>商业航天</em> &lt;Model-X&gt; 完成首次试验', adjunctUrl: '/notice.pdf' }] }), { keyword: '' }),
+    ...mapClsResponse(JSON.stringify({ data: { roll_data: [{ id: 1, title: '商业航天 &lt;Model-X&gt; 完成首次试验', content: '<p>原文保留 &lt;Model-X&gt;</p>' }] } }), { keyword: '' })
+  ];
+  assert.equal(items.length, 3);
+  for (const item of items) assert.match(normalize.structureItem(item).title, /<Model-X>/);
+  assert.match(normalize.structureItem(items[2]).summaryRaw, /<Model-X>/);
+});
+
+test('中文译文保留原文的型号与实体字面值，拒绝新增标签', () => {
+  const { normalizeTranslations } = require('../server/ai/translation');
+  const originals = [{ id: 1, title: 'SpaceX <Model-X> completes flight', summary_raw: 'SpaceX <Model-X> keeps &amp; literal text.' }];
+  const translated = { id: 1, titleZh: 'SpaceX <Model-X> 完成飞行', summaryZh: 'SpaceX <Model-X> 保留 &amp; 字面值', names: [] };
+  assert.deepEqual(normalizeTranslations({ items: [translated] }, originals), [translated]);
+  assert.throws(() => normalizeTranslations({ items: [{ ...translated, titleZh: 'SpaceX <Other-Model> 完成飞行' }] }, originals), /中文/);
+  assert.throws(() => normalizeTranslations({ items: [{ ...translated, summaryZh: '<b>SpaceX 完成飛行</b>' }] }, originals), /中文/);
+});
+
 test('Atom 默认及 text 构造保留原文，HTML/XHTML 清洗，纯文本不生成伪图片', async t => {
   const feed = `<feed xmlns="http://www.w3.org/2005/Atom"><title>核验</title>
     <entry><title type="text">&lt;型号&gt;</title><link href="https://example.com/text"/>
