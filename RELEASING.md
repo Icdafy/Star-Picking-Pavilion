@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.32 候选版完成全层审查及可复现问题修复，正在执行完整验证、精确 main CI、tag Release 与六项匿名下载复核。沿用 NotSigned 策略，实网信源审计单列披露；完整证据见 [本版验证](docs/v0232-validation.md)。
+[v0.2.32](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.32) 已于北京时间 2026-10-08 01:16:28 发布。精确源码的 main CI 与 tag Release 全部门禁通过，六项公开附件匿名下载、摘要、PE 版本、全部 259 个包内应用文件、实际 Electron 42.11.11、SBOM 完整引用及应用匿名日志同步／离线恢复均已复核。沿用 NotSigned 策略，实网审计中的一个检索空结果单列披露；完整证据见 [本版验证](docs/v0232-validation.md)。
 
 ## 发布前授权门槛
 

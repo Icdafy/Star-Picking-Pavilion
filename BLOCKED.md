@@ -1,8 +1,10 @@
 # v0.2.32 发布状态
 
-完成全层审查并修复刊期定稿、统计乱序、实时信号、维护结果、桌面 IPC、地址边界与信源冲突。Electron 更新为 42.11.11，构建依赖完整审计及运行时 SBOM 纳入发布门禁。
+完成全层审查并修复 12 类可复现问题，覆盖刊期定稿、统计乱序、实时信号、维护结果、桌面 IPC、地址边界、模型审核重试及信源冲突。Electron 更新为 42.11.11，完整依赖审计及实际运行时 SBOM 纳入发布门禁。
 
-候选验证与精确 main CI、tag Release、匿名下载复核进行中；完整证据见 [审查与验证记录](docs/v0232-validation.md)。实网审计 201 个源中一个检索空结果已单独披露。尚未声明正式发布。
+[v0.2.32](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.32) 已于 2026-10-08 01:16:28（北京时间）发布为最新正式版，无发布阻塞。精确提交 `41e09e3c09e0e16789b26ce6e929ea8c3dd20b2f` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37654745614) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37655700003) 均完整通过：1057／1057 单元与集成、37／37 真实 Electron、零生产及完整依赖漏洞、47 项声明、1293 项包边界和一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+六项附件已匿名重新下载复核，安装器 101,304,242 B、0.2.32、NotSigned，SHA-256 为 `29b23f532232888d4bb5e38953f12860a488100c6750ae4876d1e759d737a4aa`；全部 259 个包内应用文件与标签源码一致，实际原生运行时、SBOM 完整引用、60 条匿名更新日志及离线缓存恢复通过。实网审计 201 个源中 200 个有内容、1 个检索空结果、0 失败，模型验证使用可控夹具，完整证据及限制见 [审查与验证记录](docs/v0232-validation.md)。
 
 ---
 
