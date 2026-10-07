@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.27 候选实现软件内 Logo 默认静止、悬停循环播放，使用上传的 SVG 原稿。按下述完整门禁发布，验证记录见 [本版验证](docs/v0227-validation.md)，沿用 NotSigned 策略。
+[v0.2.27](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.27) 已发布为最新正式版，软件内 Logo 使用上传的 SVG 原稿，默认静止、悬停循环播放。精确提交 `9d48edc077ec9d171382bb04b7eab903bb2060ee` 的 main CI 与 tag Release 完整通过，六项公开附件重新下载核验通过，沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0227-validation.md)。
 
 ## 发布前授权门槛
 

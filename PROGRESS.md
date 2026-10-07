@@ -1,8 +1,12 @@
-# v0.2.27 候选状态
+# v0.2.27 发布状态
 
 软件内 Logo 已采用上传的 SVG 原稿，默认静止，鼠标悬停循环播放 5.2 秒动效，移开复位。减少动态效果、失焦和后台显示恢复静态，宽窄窗口与两种主题适配完成。
 
-完整单元与集成 1024／1024，0 生产漏洞，47 项声明，55 条内置日志。本地构建、1,289 项包边界和版本校验通过；候选安装器 100,448,017 B、0.2.27、NotSigned。桌面回归、main CI、tag Release 及公开附件验证结果完成后补齐，详见 [本版验证](docs/v0227-validation.md)。
+[v0.2.27](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.27) 已发布为最新正式版，无发布阻塞。精确提交 `9d48edc077ec9d171382bb04b7eab903bb2060ee` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37583162679) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37584205329) 均完整通过：1024／1024 单元与集成、30／30 真实 Electron、0 生产漏洞、47 项声明、1,289 项包边界，以及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+发布时间 2026-10-07T07:13:43Z，六项公开附件重新下载核验通过；公开安装器 100,446,098 B、0.2.27、NotSigned，SHA-256 为 `1820fbd09fbff8a9acbe90496478fc30714ebf8b4384c1d9a538ae3a800aaf33`。安装包内 SVG、静态第一帧和动效源码一致，更新元数据、SBOM、55 条匿名更新日志与离线缓存恢复均已核验，无新增运行依赖。
+
+首轮 main CI 的播放测试缺少普通动效与前台焦点的前置条件，补齐后完整通过；首轮 Release 在已有用例清理临时 profile 时遇到 Windows 文件占用，同一提交与 tag 的完整重跑通过。原始失败与最终结果分别保留，详见 [本版验证](docs/v0227-validation.md)。
 
 ---
 
