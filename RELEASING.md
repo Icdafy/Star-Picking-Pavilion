@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.30 调整更新图标为持续动效，悬停显示百分比，外圈始终同步真实下载进度。正在验证候选提交，正式发布通过既有 main CI 与 tag Release 完整门禁生成六项附件，沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0230-validation.md)。
+v0.2.30 已于 2026-10-07 20:37:14（北京时间）正式发布，调整更新图标为持续动效、悬停百分比与始终同步的进度外圈。精确提交 `b23e454984ca9cd2bef57036f5425d48e3221439` 的 main CI 与 tag Release 均完整通过，六项附件已从公开链接重新下载复核；沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0230-validation.md)，下载见 [正式 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.30)。
 
 ## 发布前授权门槛
 

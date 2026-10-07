@@ -27,10 +27,39 @@
 
 专项首轮发现中间旋转计时正常而图形保持静止：只有结束角度的 CSS 关键帧从 SVG 原有矩阵插值到 360° 时，两端矩阵等价。明确指定 0° 起点后实际图形旋转通过；未放宽断言。首轮失败、探针与最终结果保存在 work/v0230/。
 
-视觉复核另发现 CDP 截图会改变原生窗口的视口指标、丢失宽窗口下的悬停状态，造成截图中恢复箭头。为截图增加前后状态核对后确认这一现象；改用 Electron 原生 capturePage 后悬停保持且截图中的百分比与实时进度一致。产品代码没有因此变更，新增状态核对保留。
+视觉复核另发现 CDP 截图结束后宽窗口下的悬停状态会丢失，造成截图中恢复箭头。为截图增加前后状态核对后确认这一现象；改用 Electron 原生 capturePage 后悬停保持且截图中的百分比与实时进度一致。产品代码没有因此变更，新增状态核对保留。
 
 首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37618077152) 对提交 `db9434f6e729f1d01c2292c0868b259125173a7b` 为 1029／1029 单元、33／34 桌面：本版更新专项通过，最后一项旧滚动条测试在 after 钩子删除临时 profile 时遇到 Windows Chromium `DIPS-wal` 文件占用（EBUSY）。该钩子原先没有清理重试，本版补为与其他桌面夹具一致的十次、100ms 起始间隔的有界重试，持久占用仍使测试失败。没有修改产品功能、功能断言、工作流或测试超时；首轮日志和结果保存在 main-ci-initial.log／json。
 
 清理修正后，旧安装偏好／滚动条测试与本版动效专项合计 3／3 通过，24.15 秒，零失败、零跳过；记录为 cleanup-and-update.log。
 
-main CI、tag Release 与公开附件核验待执行。原始证据保存在被忽略的 work/v0230/。本机不执行安装器，安装、启动、单实例、退出与卸载烟测由一次性 Windows CI 执行。
+原始证据保存在被忽略的 work/v0230/。本机不执行安装器，安装、启动、单实例、退出与卸载烟测由一次性 Windows CI 执行。
+
+## main CI 与正式发布
+
+精确提交 `b23e454984ca9cd2bef57036f5425d48e3221439` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37619482480) 和 [tag Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37620939553) 全部通过。main 为 1029／1029 单元与集成（36.81 秒）、34／34 真实 Electron（461.85 秒）；Release 独立再验 1029／1029（32.43 秒）和 34／34（472.22 秒），均零失败、零跳过。版本检查、生产依赖审计、声明、构建、包边界及一次性 Windows 安装／启动／单实例／退出／卸载均通过；Release 另通过摘要与 CycloneDX 验证。
+
+注释标签 `v0.2.30` 指向上述提交；发布完成后的收尾仅补齐验证文档，保留已发布标签与资产。
+
+## 公开下载复核
+
+[摘星阁 v0.2.30](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.30) 于 2026-10-07 20:37:14（北京时间）公开发布，为最新正式版、非草稿、非预发布。六项附件从不带认证的公开链接重新下载，逐项比对 GitHub SHA-256、实际文件大小与安装器校验清单；正文与 `RELEASE_NOTES.md` 一致。
+
+| 附件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 374 | `506c6dd0e80e2058912bfc45a4ce7f2c05c2a3da52e826b9f166288d4f38db3d` |
+| sbom.cdx.json | 81,352 | `4b7c0b6aadba571737590a0623548b80e97690c40f969c10231273ce8eff9309` |
+| SHA256SUMS.txt | 106 | `630fed502c801a9a3f331bcf272ffbbc0d8da9629711ae42c377783010c36fd0` |
+| Star-Picking-Pavilion-Setup-0.2.30.exe | 100,452,021 | `9a6cfa429452d081d722a563600948183d97f13f2f161ad007c59c1c4363ec26` |
+| Star-Picking-Pavilion-Setup-0.2.30.exe.blockmap | 106,067 | `6cd010075f6bc6e70375f979ace1a8e68b9caf794f611eb2780e3e29d2fbd34c` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `a89a6988fdd614150e80afa569dad60cf1335786a6c0763f5bc2ccfae55452b3` |
+
+公开安装器的 PE 产品名称为“摘星阁”，产品／文件版本均为 `0.2.30`，签名状态为 `NotSigned`。`latest.yml` 的版本、文件名、大小和两处 SHA-512 均与实际安装器一致：`rzEfIO9+ao/pCyQRwZ+T4cYCWf8x80PLv8+HK0LGcLWAK/UbJYnzqgT0pBn6ydIFxHlUE/2dgeIBppkJOO4ArA==`。
+
+CycloneDX 1.6 SBOM 包含 41 项生产组件，均映射到 lockfile；第三方声明与仓库相符。只读解包得到 `app.asar` 14,946,000 B，1292 项再次通过包边界与秘密检查，24 个关键文件与发布源码相符，包括本版持续旋转、始终可见的进度外圈与悬停百分比样式。核验未执行本机安装器。
+
+应用原有匿名同步服务按默认 8 秒超时成功取得 58 条正式更新日志，本版正文及发布时间与公开 Release 一致，离线缓存重建恢复通过。
+
+公开元数据、六项下载文件、摘要结果、PE 信息、包内源码与应用日志同步核验保存在被忽略的 `work/v0230/` 及 `public-assets/`。
+
+公开下载首轮五个小附件完成，安装器的 Node fetch 流在 180 秒超时前未收到文件数据；同一链接的 8 MiB 分段请求也超时。随后匿名 curl 公开下载与 GitHub CLI 下载分别完成，各为 100,452,021 B，两份 SHA-256 均与 GitHub 摘要和校验清单一致。正式核验采用匿名 curl 副本；未据此推断下载失败原因，也未改动发布资产。原始输出保留于 public-downloads.log、public-ranges.log、curl-download.log、gh-installer-download.log 与 independent-installer-downloads.json。

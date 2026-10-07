@@ -1,8 +1,10 @@
 # v0.2.30 发布状态
 
-更新图标已改为持续旋转，悬停或键盘聚焦时显示百分比，外圈始终同步真实下载进度。正在进行本地验证，随后由精确提交的 main CI 与 tag Release 完整门禁构建并发布六项附件。
+更新图标持续旋转，悬停或键盘聚焦时显示百分比，外圈始终同步真实下载进度，移入与移出不重置外圈。
 
-验证证据见 [本版验证](docs/v0230-validation.md)。
+[v0.2.30](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.30) 已于 2026-10-07 20:37:14（北京时间）发布为最新正式版，无发布阻塞。精确提交 `b23e454984ca9cd2bef57036f5425d48e3221439` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37619482480) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37620939553) 均完整通过：1029／1029 单元与集成、34／34 真实 Electron、0 生产漏洞、47 项声明、1292 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载。
+
+六项附件已公开重新下载核验，安装器 100,452,021 B、0.2.30、NotSigned，SHA-256 为 `9a6cfa429452d081d722a563600948183d97f13f2f161ad007c59c1c4363ec26`；24 个包内关键文件与发布源码一致，58 条应用匿名更新日志与离线缓存恢复通过。完整证据见 [验证记录](docs/v0230-validation.md)。
 
 ---
 
