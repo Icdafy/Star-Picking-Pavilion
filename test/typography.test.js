@@ -8,6 +8,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const css = read('renderer/styles.css');
+const typography = read('renderer/typography.css');
 const html = read('renderer/index.html');
 const app = read('renderer/app.js');
 // 阶段 3 批 2：Ctrl 缩放快捷键随键盘快捷键迁到 renderer/shortcuts.js，
@@ -46,30 +47,34 @@ test('思源黑体随安装包内置，分片文件与 OFL 许可齐全', () => 
 });
 
 test('字体表与主样式表并行加载，且排在样式表之前', () => {
-  const fontLink = html.indexOf('<link rel="stylesheet" href="fonts/source-han-sans-sc/index.css">');
-  const styleLink = html.indexOf('<link rel="stylesheet" href="styles.css">');
-  assert.ok(fontLink >= 0, '缺少字体样式表引用');
-  assert.ok(fontLink < styleLink);
+  for (const [page, stylesheet] of [['renderer/index.html', 'styles.css'],
+    ['renderer/failure.html', 'failure.css'], ['renderer/startup-failure.html', 'failure.css']]) {
+    const source = read(page);
+    const fontLink = source.indexOf('<link rel="stylesheet" href="fonts/source-han-sans-sc/index.css">');
+    const typographyLink = source.indexOf('<link rel="stylesheet" href="typography.css">');
+    const styleLink = source.indexOf(`<link rel="stylesheet" href="${stylesheet}">`);
+    assert.ok(fontLink >= 0 && fontLink < typographyLink && typographyLink < styleLink, `${page}: 缺少统一字体或加载顺序错误`);
+  }
   // @import 要等主样式表解析完才发起请求，白白多一跳；字体表必须走 <link>
   assert.equal(/^\s*@import/m.test(css), false);
 });
 
-test('中文一律思源黑体、英文与数字一律 Times New Roman', () => {
+test('中文一律思源黑体、西文、数字与符号统一优先使用 Times New Roman', () => {
   // 一条字体栈同时管两种文字：Times New Roman 在前但没有汉字字形，
   // 汉字会自动落到后面的思源黑体上。
-  assert.match(css, /--font-latin: 'Times New Roman',/);
-  assert.match(css, /--font-hans: 'Source Han Sans SC', 'Noto Sans SC',/);
-  assert.match(css, /--font-sans: var\(--font-latin\), var\(--font-hans\);/);
+  assert.match(typography, /--font-latin: 'Times New Roman',/);
+  assert.match(typography, /--font-hans: 'Source Han Sans SC', 'Noto Sans SC',/);
+  assert.match(typography, /--font-sans: var\(--font-latin\), var\(--font-hans\);/);
   for (const role of ['display', 'ui', 'body', 'mono']) {
     assert.match(
-      css,
+      typography,
       new RegExp(`--font-${role}: var\\(--font-sans\\);`),
       `--font-${role} 没有指向统一字体栈`
     );
   }
   // 旧的三层字体（得意黑 / 仿宋 / 等宽）不得残留
   for (const legacy of ['Smiley Sans', 'SmileySans', 'FangSong', '仿宋', 'Cascadia Mono', 'Consolas', 'monospace']) {
-    assert.equal(css.includes(legacy), false, `样式表仍残留旧字体 ${legacy}`);
+    assert.equal((css + typography).includes(legacy), false, `样式表仍残留旧字体 ${legacy}`);
   }
   assert.equal(fs.existsSync(path.join(root, 'renderer', 'fonts', 'SmileySans-Oblique.woff2')), false);
 });

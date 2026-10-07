@@ -2,25 +2,24 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.28 · 在线待命与全局跟手动效
+## v0.2.29 · 设置卡片与全局字体修复
 
-- **静态在线与真实任务同频**：启动时不采集、不分析。点击采集按钮后，采集、分析和收尾统一显示“采集中”，完成后恢复“在线”。自动调度在“设置 → 采集调度”中明确开启，默认关闭。
-- **SVG 更新图标**：采用上传的圆环与双箭头轮廓，居于工作区标识右侧空白中央；悬停显示真实百分比，颜色适配主题。软件内 Logo 放大并与名称对齐。
-- **全板块跟手追光**：设置中可连续调整 80—800px 大小、使用任意颜色与八组预设，立即预览并记住选择。
+- **设置卡片背景一致**：删除“存储治理”和“每日新闻资料库”左上角的专属圆环光晕，浅色、深色主题均与普通设置卡片共用玻璃材质。
+- **统一字体覆盖**：西文、数字与符号优先采用 Times New Roman，表单、数字与日期输入、代码、快捷键和两张恢复页面采用相同字体规则；中文使用内置思源黑体。
 
-版本、界面与更新元数据统一为 0.2.28，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。检查与发布证据见 [验证记录](docs/v0228-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档与密钥；自动调度作为新开关默认关闭，无新增依赖。
+版本、界面与更新元数据统一为 0.2.29，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。检查与发布证据见 [验证记录](docs/v0229-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.28.exe`，双击并按向导安装。v0.2.28 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.29.exe`，双击并按向导安装。v0.2.29 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.28.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.29.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -46,7 +45,7 @@ Get-Content .\SHA256SUMS.txt
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
 - 深色和浅色主题
 - Aqua 指挥舱与外观实验室：云母/兼容材质、浅色/深色各 6 组流体配色、精细色相与明暗、本机壁纸、DSH 1.1.0 星鲸与星尘，并支持低功耗和减少动态效果降级
-- 中文思源黑体、英文 Times New Roman，字体随安装包内置，不依赖本机是否装过中文字体
+- 中文使用内置思源黑体；西文、数字与符号优先采用 Windows 自带的 Times New Roman，覆盖表单、代码与恢复页面
 - 四档界面缩放（小 / 标准 / 大 / 特大，<kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd>），字号、行距、留白、圆角、栏宽等比例同步缩放
 - 自动记住主题、界面缩放档位、最后视图、领域与分类、日报日期、常用网址分类与星标、实时更新开关
 - 可选的关闭到系统托盘与 Windows 登录自动启动，两项默认关闭、可独立设置

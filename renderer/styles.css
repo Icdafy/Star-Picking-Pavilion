@@ -3,17 +3,6 @@
 :root {
   --scrollbar-hue: var(--aqua-user-hue, 40deg);
   --scrollbar-saturation: 36%;
-  /* 西文使用 Times New Roman，汉字回退思源黑体。 */
-  --font-latin: 'Times New Roman', 'Nimbus Roman', 'Liberation Serif';
-  --font-hans: 'Source Han Sans SC', 'Noto Sans SC', 'Source Han Sans CN',
-               'Microsoft YaHei', sans-serif;
-  --font-sans: var(--font-latin), var(--font-hans);
-  /* 角色字体共用字栈。 */
-  --font-display: var(--font-sans);   /* 标题、导航、数据大字 */
-  --font-ui: var(--font-sans);        /* 控件、标签、元信息 */
-  --font-body: var(--font-sans);      /* 摘要、研判、说明 */
-  --font-mono: var(--font-sans);      /* 数字与代码：TNR 的数字本身就是等宽的 */
-
   /* 界面倍率由 data-ui-scale 覆写。 */
   --ui-scale: 1;
 
@@ -1802,21 +1791,6 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   overflow: hidden;
   isolation: isolate;
 }
-.daily-archive-card::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  width: 18rem;
-  height: 18rem;
-  right: -7rem;
-  top: -10rem;
-  border: 1px solid var(--second-line);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 3rem color-mix(in srgb, var(--second) 4%, transparent),
-    0 0 0 6rem color-mix(in srgb, var(--accent) 3%, transparent);
-  pointer-events: none;
-}
 .daily-archive-heading {
   display: flex;
   align-items: flex-start;
@@ -1953,21 +1927,6 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   position: relative;
   overflow: hidden;
   isolation: isolate;
-}
-.storage-governance-card::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  width: 15rem;
-  height: 15rem;
-  right: -6rem;
-  top: -8rem;
-  border: 1px solid var(--accent-line);
-  border-radius: 50%;
-  box-shadow: 0 0 0 2.5rem color-mix(in srgb, var(--accent) 4%, transparent),
-              0 0 0 5rem color-mix(in srgb, var(--second) 3%, transparent);
-  opacity: .7;
-  pointer-events: none;
 }
 .storage-heading {
   display: flex;

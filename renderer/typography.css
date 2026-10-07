@@ -1,0 +1,17 @@
+/* 主界面与恢复页面共用字体；西文、数字和符号先用 Times New Roman，汉字回退思源黑体。 */
+:root {
+  --font-latin: 'Times New Roman', 'Nimbus Roman', 'Liberation Serif';
+  --font-hans: 'Source Han Sans SC', 'Noto Sans SC', 'Source Han Sans CN',
+               'Microsoft YaHei', sans-serif;
+  --font-sans: var(--font-latin), var(--font-hans);
+  --font-display: var(--font-sans);
+  --font-ui: var(--font-sans);
+  --font-body: var(--font-sans);
+  --font-mono: var(--font-sans);
+  font-family: var(--font-ui);
+}
+
+/* 原生表单及代码标签有浏览器默认字体，不能只依赖 body 的继承。 */
+:where(button, input, select, textarea, option, optgroup, pre, code, kbd, samp) {
+  font-family: var(--font-ui);
+}
