@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.31 候选加入流星拖尾、星尘粒子与弹性光环及独立尺寸、颜色和强度自定义。本机功能、构建与包边界验证通过，之后由精确 main 提交的 CI 与 tag Release 完成完整门禁；沿用 NotSigned 策略。额外实网审计结果单列披露，验证记录见 [本版验证](docs/v0231-validation.md)。
+v0.2.31 已正式发布：流星拖尾、星尘粒子与弹性光环及独立尺寸、颜色和强度自定义。精确 main CI、tag Release 和六项匿名公开下载复核均完成，沿用 NotSigned 策略。实网信源审计的空检索结果单列披露，完整证据见 [本版验证](docs/v0231-validation.md)。
 
 ## 发布前授权门槛
 

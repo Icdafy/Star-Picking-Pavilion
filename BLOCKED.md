@@ -1,6 +1,10 @@
-# v0.2.31 候选验证状态
+# v0.2.31 发布状态
 
-新增流星拖尾、星尘粒子与弹性光环及独立尺寸、颜色、强度自定义；现有柔光偏好保留。四种样式共用按实际慢帧触发的合成降级，默认和最大尺寸的软件渲染对照通过。本机最终 1032／1032 单元与集成、36／36 真实 Electron、构建及 1292 项包边界通过，28 个关键文件与源码一致。前两轮 main CI 原始失败单列保留，第二轮确认真实合成回退并已修复，等待最终提交的完整 CI。tag Release 与公开下载复核尚未完成，额外实网审计结果单列披露。详见 [验证记录](docs/v0231-validation.md)。
+范围柔光保留，新增流星拖尾、星尘粒子与弹性光环；各风格独立记住尺寸，共用颜色与 10—100% 强度，自动保存且重启恢复。
+
+[v0.2.31](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.31) 已于 2026-10-07 23:57:52（北京时间）发布为最新正式版，无发布阻塞。精确提交 `a4ecfbfa2d23ed8c862924a5f2151f405b443ab8` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37642823720) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37644659518/attempts/2) 均完整通过：1032／1032 单元与集成、36／36 真实 Electron、零生产漏洞、47 项声明、1292 项包边界和一次性 Windows 安装／启动／单实例／退出／卸载。
+
+六项附件已匿名重新下载复核，安装器 100,458,108 B、0.2.31、NotSigned，SHA-256 为 `6436982c03b73a47b07376e9628fde016ef4a5dddd5b85b5cbfbc890142df297`；28 个包内关键文件与发布源码一致，59 条匿名更新日志与离线缓存恢复通过。额外实网审计的空检索结果单列披露，完整证据见 [验证记录](docs/v0231-validation.md)。
 
 ---
 
