@@ -1,8 +1,12 @@
 # v0.2.24 发布状态
 
-本地候选无已知功能阻塞。1015 项单元与集成、28 项真实 Electron及最终原生复测、生产依赖审计、第三方声明、构建和包边界已通过；正在按既有流程完成 main CI、tag Release、一次性安装烟测与公开附件复验。
+无发布阻塞。[v0.2.24](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.24) 已发布为最新正式版。研究 AIHOT 的 56 个新增提交，完成原文与译文保真、隐藏正文、日期、图片能力、路由回执、完整归组、证据指纹综述和评测失败口径的适配。实网三轮均为 201／201、0 空／失败／跳过，无新增运行依赖，已有情报、星标、密钥、设置与归档保留。
 
-详见 [本版验证](docs/v0224-validation.md)。
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37569454226) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37570073030) 对精确提交 bdc2e9f111d8d66c63ff9196068b2f0ceb08d4a2 全部通过：1015／1015 单元与集成、28／28 真实 Electron、0 生产漏洞、47 项声明、1,284 项包边界和一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+发布时间 2026-10-07T04:18:33Z，六项公开附件已重新下载并核验摘要、校验清单、PE 版本、更新元数据、SBOM 与声明。正式安装器 99,612,607 B、0.2.24、NotSigned，SHA-256 为 cedff2582c10482666cb5e203b263caa5130b55ee29fe6fb79c0a5bbe5507ec0。应用实网同步 52 条日志及离线恢复通过。
+
+研究判断见 [深度对照](docs/v0224-aihot-audit.md)，全部过程与证据见 [本版验证](docs/v0224-validation.md)。
 
 # v0.2.22 发布状态（历史）
 

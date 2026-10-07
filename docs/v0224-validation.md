@@ -17,12 +17,33 @@
 - 首轮完整单元／集成测试 1011／1011，通过；追加边界及版本断言更新后 1013／1013，通过；最终译文与列表入库边界补齐后全量 1015／1015，通过，0 失败、0 跳过。
 - 完整真实 Electron 测试 28／28，通过，0 失败、0 跳过。最后补齐译文和列表类型后，本版原生用例再复测 1／1 通过。测试涉及真实主进程、后端、预加载桥、界面、模型编辑与旧库／设置保留；本版两张截图已检查。
 - 生产依赖审计 0 漏洞；47 项第三方声明与本版版本同步。
-- 实网严格审计两轮均为 201／201 成功，0 空、0 失败、0 跳过；最终轮在全部采集修复后重新执行，海外网络通过环境代理可达。原始结果保存于 work/v0224/source-audit.json 与 source-audit-final.json。
+- 实网严格审计三轮均为 201／201 成功，0 空、0 失败、0 跳过；最终轮在译文与列表类型补齐后重新执行，时间为 2026-10-07T04:02:12.231Z，海外网络通过环境代理可达。原始结果保存于 work/v0224/source-audit.json、source-audit-final.json 和 source-audit-release.json。
 - 版本、lockfile、安装器及更新元数据统一 0.2.24；本版更新日志包含 52 个正式版本及候选说明。
 - 最终本地 Windows 构建、安装器版本及包边界通过：1,284 项 ASAR 条目，app.asar 为 13,737,959 B，候选安装器为 99,614,707 B。追加译文说明后，一次构建在更新日志同步完成前启动，被既有一致性检查正确拦截；待 52 条记录同步完成后按顺序重建通过。数据库、日志、研究资料、开发依赖与密钥未进入生产包；本地不运行安装器。
 - 新增可空 clusters.digest_hash，原数据、星标、设置、加密密钥与归档保留；无新增运行依赖。
 - 10 页 PDF 对照报告经过文字提取和逐页渲染检查，中文、目录、表格、页码与链接完整；交付于被忽略的 output/pdf，不进入安装器。
 
-## 发布验证
+## 正式发布结果
 
-main 精确提交 CI、tag Release 门禁、一次性 Windows 安装／启动／单实例／退出／卸载和六项公开资产复验完成后回填。本机不运行安装器。正式 Release 只由既有受门禁保护的工作流生成。
+正式注释 tag v0.2.24 指向 bdc2e9f111d8d66c63ff9196068b2f0ceb08d4a2。
+
+- [main CI 37569454226](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37569454226)：成功，精确提交 bdc2e9f111d8d66c63ff9196068b2f0ceb08d4a2。1015／1015 单元与集成、28／28 真实 Electron、0 生产漏洞、47 项第三方声明、构建与包边界，以及安装／启动／单实例／退出／卸载和用户数据保留全部通过。
+- [Release 工作流 37570073030](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37570073030)：成功，同一提交再次完整验证 1015／1015 与 28／28，完成 tag／产物版本、安装烟测、SHA-256、CycloneDX 1.6 SBOM 及正式上传。
+- 正式包边界 1,284 项，app.asar 13,750,328 B，公开安装器 99,612,607 B。生产包无用户数据库、日志、临时资料、开发依赖或密钥；本机未运行安装器。
+
+[v0.2.24 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.24) 于 2026-10-07T04:18:33Z 发布，非 draft、非 prerelease，并已核对为最新正式版。六项附件均在新的 public-assets 目录重新下载；尺寸、GitHub SHA-256 摘要及安装器校验清单一致。PE 文件／产品版本均为 0.2.24，签名状态为 NotSigned。latest.yml 的版本、文件名、尺寸与两处 SHA-512 均与公开安装器一致；SBOM 含 41 个生产组件，无构建／测试依赖，第三方声明与源码一致。
+
+应用于 2026-10-07T04:20:30.405Z 匿名实际联网同步到 52 条正式日志，本版正文、发布时间与公开 Release 一致，随后以空内置记录恢复完全相同的离线缓存。
+
+第一次匿名同步返回既有离线提示，首次根因未定位。原样独立重试通过，同期使用生产 fetchReleases 的诊断请求返回 HTTP 200、约 805 ms、52 条记录，匿名额度剩余 50；未延长应用 8 秒超时或放宽同步断言。首次失败与重试分别保留于 v0224-public-verification.log、v0224-release-sync-retry.log 和 v0224-release-sync-diagnostic.log。后续通过不宣称首次故障已修复。
+
+| 公开附件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 373 | 6380c08fe606d74321688b50edf4c15b157189b00fe592a08bef5994969d184f |
+| sbom.cdx.json | 81,352 | 384c3e40b74468f767dd3d26868701f9c165acf502a103f11735dfcb18887a04 |
+| SHA256SUMS.txt | 106 | 8daac9e0d5af57679e0a63f6eb8a563f605c45f0f22d0e0d568625e93c074169 |
+| Star-Picking-Pavilion-Setup-0.2.24.exe | 99,612,607 | cedff2582c10482666cb5e203b263caa5130b55ee29fe6fb79c0a5bbe5507ec0 |
+| Star-Picking-Pavilion-Setup-0.2.24.exe.blockmap | 105,929 | 788d9f9e5cfe698ad237ac4c8b5aa7a1491de0e328daf14322450e21e796319a |
+| THIRD_PARTY_NOTICES.txt | 6,347 | 2dc70d10dca5bd30e3bd227d05e793da7fbc745399aee020eaf79002cf2da145 |
+
+正式证据保留于被忽略的 work/v0224：main-ci-final.json／log、release-ci-final.json／log、public-assets、public-verification.json、public-pe-verification.json、release-sync-verification.json 和三轮信源审计。首次候选 29a428f 的 CI 37569071235 也已通过；发布使用的是追加文字保真修复后的最终提交。
