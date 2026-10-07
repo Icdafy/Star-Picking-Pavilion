@@ -46,6 +46,11 @@ const LOWALTITUDE = surfacesOf('lowaltitude');
 const AEROSPACE = surfacesOf('aerospace');
 const NOISE = NOISE_PATTERNS;
 
+// 通用财经合集的检索摘要可能只截取航天段落，不能据此把整篇当作行业动态。
+// “航天早参”“低空周报”等行业专刊没有这些通用合集标记，仍按词库与模型判断。
+const GENERIC_ROUNDUP = /四大证券报|证券报精华|财经(?:早报|晚报|早参)|投资早参|(?:假期|周末|今日|每日|一周)重点速递|隔夜外盘|盘前必读|一图读懂今日|今日热点汇总/;
+function isGenericRoundup(text) { return GENERIC_ROUNDUP.test(String(text || '')); }
+
 // 领域归属：'lowaltitude' | 'aerospace' | 'both' | null
 // 判定交给词库的加权逻辑，单个泛词（航空、卫星）不足以定性
 function matchDomain(text) {
@@ -67,7 +72,7 @@ function relevanceOf(text) {
   return {
     ...summary,
     noiseHits: noise,
-    relevant: lexicon.isRelevantSummary(summary) && noise < 2
+    relevant: lexicon.isRelevantSummary(summary) && noise < 2 && !isGenericRoundup(text)
   };
 }
 
@@ -84,5 +89,5 @@ function isNoise(text) {
 
 module.exports = {
   LOWALTITUDE, AEROSPACE, NOISE, NOISE_PATTERNS,
-  matchDomain, keywordHits, relevanceOf, noiseHits, isNoise
+  matchDomain, keywordHits, relevanceOf, noiseHits, isNoise, isGenericRoundup
 };

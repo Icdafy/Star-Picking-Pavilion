@@ -37,8 +37,8 @@ test('single-source delay and a single right thumbnail render at narrow and wide
     await page.locator('.card[data-id]').first().screenshot({path:path.join(__dirname,`../../build/v016-evidence-${width}.png`)});
   }
   const db=new DatabaseSync(path.join(dataDir,'star-picking-pavilion.db'));
-  const insert=db.prepare(`INSERT INTO articles(source_id,title,url,fetched_at,published_at,relevant,featured,analyzed,events_json,content_status)
-    VALUES(?,?,?,?,'2026-09-05T00:00:00Z',1,1,1,?,?)`);
+  const insert=db.prepare(`INSERT INTO articles(source_id,title,url,fetched_at,published_at,relevant,featured,analyzed,domain,events_json,content_status)
+    VALUES(?,?,?,?,'2026-09-05T00:00:00Z',1,1,1,'aerospace',?,?)`);
   const cases=[
     {status:'completed',title:'完成首飞，日期待确认',badge:'事件日期待确认',content:'正文未获取',reason:/已确认事件发生.*正文未获取/},
     {status:'planned',title:'计划开展首飞',badge:'计划事件',content:'ok',reason:/计划/},

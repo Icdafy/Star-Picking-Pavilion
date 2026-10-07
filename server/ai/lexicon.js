@@ -6,10 +6,10 @@
 //   ② 打分（scoring.computeQuality）：命中词的权重决定相关度加成
 //   ③ 采集与预筛（collectors/api.js、pipeline.js）：关键词型信源的入库守卫与启发式降级
 //
-// 匹配是纯字符串包含，不做分词：中文标题里「低空经济」就是连续四个字，
-// 引入分词器只会带来依赖和歧义，而这里要的恰恰是确定性。
+// 匹配连续词面，不做分词；英文缩写与短中文别名检查词边界，避免跨词误命中。
 const fs = require('node:fs');
 const path = require('node:path');
+const { boundaryOk, cjkBoundaryOk } = require('./text-boundary');
 
 const LEXICON_PATH = path.join(__dirname, '..', '..', 'config', 'lexicon.json');
 const DOMAINS = new Set(['lowaltitude', 'aerospace']);
@@ -84,13 +84,28 @@ function reloadLexicon() {
 
 // 文本中命中的词条。同一词条命中多次只算一次——一篇稿子把「低空经济」写十遍，
 // 并不比写一遍更相关，按次数累加只会让长文和复读机拿到虚高的分。
+function containsSurface(text, surface) {
+  const haystack = String(text || '');
+  const needle = String(surface || '');
+  if (!needle) return false;
+  const latin = /^[A-Za-z0-9]/.test(needle) && /[A-Za-z0-9]$/.test(needle);
+  let from = 0;
+  while (from < haystack.length) {
+    const at = haystack.indexOf(needle, from);
+    if (at < 0) return false;
+    if (latin ? boundaryOk(haystack, at, needle.length) : cjkBoundaryOk(haystack, at, needle.length)) return true;
+    from = at + needle.length;
+  }
+  return false;
+}
+
 function matchTerms(text) {
   const haystack = String(text || '');
   if (!haystack) return [];
   const { ordered } = loadLexicon();
   const hits = [];
   for (const term of ordered) {
-    const surface = term.surfaces.find(s => haystack.includes(s));
+    const surface = term.surfaces.find(s => containsSurface(haystack, s));
     if (surface) hits.push({ ...term, surface });
   }
   return hits;
@@ -164,6 +179,7 @@ module.exports = {
   loadLexicon,
   reloadLexicon,
   matchTerms,
+  containsSurface,
   summarize,
   analyze,
   isRelevantSummary,

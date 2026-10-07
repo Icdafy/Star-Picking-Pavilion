@@ -138,7 +138,7 @@ function buildGuard(keyword) {
   const unique = [...new Set(probes)];
   return item => {
     const text = `${item.title} ${item.summary || ''}`;
-    if (unique.some(probe => text.includes(probe))) return true;
+    if (unique.some(probe => lexicon.containsSurface(text, probe))) return true;
     // 关键词没直接出现，就要求整条确实落在本领域内（词库判定）
     return lexicon.isRelevantSummary(lexicon.analyze(text));
   };

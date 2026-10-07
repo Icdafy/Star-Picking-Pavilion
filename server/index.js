@@ -28,6 +28,7 @@ const {
 } = require('./database-maintenance');
 const { getDaily, generateDaily, listDailyDates } = require('./ai/daily');
 const lexicon = require('./ai/lexicon');
+const { VISIBLE_INDUSTRY_SQL } = require('./ai/relevance');
 const { heatScore } = require('./ai/scoring');
 const { discoverModels, testConnection } = require('./ai/deepseek');
 const { createModelRoutes } = require('./model-routes');
@@ -301,8 +302,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE, likeSearch = false } = {}) {
     params.push(company);
   }
   if (view === 'featured') where.push('a.featured = 1');
-  if (view === 'featured') where.push('a.relevant = 1');
-  if (view === 'all') where.push("(a.relevant IS NULL OR a.relevant = 1)");
+  if (view === 'featured' || view === 'all') where.push(`(${VISIBLE_INDUSTRY_SQL})`);
   // 星标是用户的显式收藏，不受相关性判定影响：被 AI 判为无关但用户仍想留着的条目必须能看到
   if (view === 'starred') where.push('a.starred = 1');
   if (view !== 'starred') where.push("COALESCE(a.translation_status, '') <> 'pending'");
@@ -363,8 +363,8 @@ function countStats() {
     sourcesTotal: g('SELECT COUNT(*) c FROM sources WHERE removed_at IS NULL').c,
     articles: g('SELECT COUNT(*) c FROM articles').c,
     today: g('SELECT COUNT(*) c FROM articles WHERE fetched_at >= ?', todayStart).c,
-    relevantToday: g('SELECT COUNT(*) c FROM articles WHERE relevant=1 AND fetched_at >= ?', todayStart).c,
-    featuredToday: g('SELECT COUNT(*) c FROM articles WHERE featured=1 AND fetched_at >= ?', todayStart).c,
+    relevantToday: g(`SELECT COUNT(*) c FROM articles a WHERE (${VISIBLE_INDUSTRY_SQL}) AND a.fetched_at >= ?`, todayStart).c,
+    featuredToday: g(`SELECT COUNT(*) c FROM articles a WHERE (${VISIBLE_INDUSTRY_SQL}) AND a.featured=1 AND a.fetched_at >= ?`, todayStart).c,
     starred: g('SELECT COUNT(*) c FROM articles WHERE starred=1').c,
     pending: g('SELECT COUNT(*) c FROM articles WHERE analyzed=0').c
   };
@@ -404,12 +404,12 @@ let lexiconCache = null;
 
 function countVisible(surface, like = false) {
   const filter = articleSearch(surface, { like });
-  // 与「全部动态」同口径：判为无关的不算，事件簇只算主条
+  // 与「全部动态」同口径：只统计行业判断完成的资料，事件簇只算主条
   try { return db.prepare(`
     SELECT COUNT(*) c FROM articles a
     LEFT JOIN clusters c ON c.id = a.cluster_id
     WHERE (${filter.sql})
-      AND (a.relevant IS NULL OR a.relevant = 1)
+      AND (${VISIBLE_INDUSTRY_SQL})
       AND COALESCE(a.translation_status, '') <> 'pending'
       AND (a.cluster_id IS NULL OR a.id = c.main_article_id)`).get(...filter.params).c;
   } catch (error) {
@@ -831,6 +831,7 @@ process.on('message', handleControlMessage);
 process.once('SIGTERM', shutdownServer);
 
 seedSources();
+require('./ai/relevance-migration').repairIndustryScope();
 require('./ai/capital-migration').migrateCapital();
 // 启动时：补转载文章的真实出版方（一次性），再按纯规则合并同一事件的重复条目（不调模型），有变化则重算热榜
 setImmediate(() => {

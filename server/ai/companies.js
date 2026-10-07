@@ -11,6 +11,7 @@
 const crypto = require('node:crypto');
 const { db, now, withTransaction } = require('../db');
 const { loadCompanySeed, loadSelection } = require('../industry');
+const { boundaryOk, cjkBoundaryOk } = require('./text-boundary');
 
 const WATCH_LEVELS = Object.freeze({ none: 0, watch: 1, portfolio: 2 });
 const STATUS_VALUES = new Set(['private', 'listed', 'state', 'unknown']);
@@ -110,31 +111,6 @@ function index() {
 }
 
 function invalidateIndex() { indexVersion++; }
-
-function boundaryOk(text, start, length) {
-  const before = text[start - 1];
-  const after = text[start + length];
-  const word = ch => ch !== undefined && /[A-Za-z0-9]/.test(ch);
-  return !word(before) && !word(after);
-}
-
-// 中文没有词边界：“千亿航天”里藏着“亿航”，“高峰飞行”里藏着“峰飞”。短别名（≤3 字）的
-// 首字与前一字、末字与后一字若组成一个常见词，说明它只是更长词语的一部分，不算命中。
-const COMMON_WORDS = new Set([
-  '航天', '航空', '航线', '航道', '航运', '航母', '飞行', '飞机', '飞船', '飞天', '飞跃', '飞速', '天下', '天空', '天地', '天气', '天然',
-  '空间', '空中', '空域', '箭体', '千亿', '百亿', '十亿', '万亿', '数亿', '亿元', '终极', '积极', '北极', '南极', '极地', '极限',
-  '高峰', '顶峰', '巅峰', '登峰', '汇聚', '汇报', '沃土', '蓝天'
-]);
-
-function cjkBoundaryOk(text, start, length) {
-  if (length > 3) return true;
-  const before = text[start - 1];
-  const after = text[start + length];
-  const cjk = ch => ch !== undefined && /\p{Script=Han}/u.test(ch);
-  if (cjk(before) && COMMON_WORDS.has(before + text[start])) return false;
-  if (cjk(after) && COMMON_WORDS.has(text[start + length - 1] + after)) return false;
-  return true;
-}
 
 // 返回 Map<companyId, { name, count, first, surfaces:Set }>
 function matchText(text) {

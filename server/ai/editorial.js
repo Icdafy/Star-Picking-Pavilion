@@ -57,6 +57,7 @@ function normalizePrefilter(json, count) {
     if (!Number.isInteger(index) || index < 0 || index >= count || seen.has(index) || !PREFILTER_LABELS.has(label)) {
       throw parseFailure('预筛响应序号异常');
     }
+    if (label === 'PASS' && r.d !== 'A' && r.d !== 'B') throw parseFailure('预筛 PASS 缺少合法的行业领域');
     seen.set(index, {
       label,
       domain: r.d === 'A' ? 'lowaltitude' : r.d === 'B' ? 'aerospace' : null,
@@ -72,7 +73,10 @@ async function prefilterBatch(articles, settings) {
   const { value } = await withReceipt({
     task: 'prefilter',
     keyParts: [prompt.version, modelIdentity(settings), user],
-    validate: v => Array.isArray(v) && v.length === articles.length,
+    validate: v => Array.isArray(v) && v.length === articles.length && v.every(result => result
+      && PREFILTER_LABELS.has(result.label)
+      && (result.domain === null || ['lowaltitude', 'aerospace'].includes(result.domain))
+      && (result.label !== 'PASS' || ['lowaltitude', 'aerospace'].includes(result.domain))),
     call: async () => {
       const out = await chat([
         { role: 'system', content: prompt.text },

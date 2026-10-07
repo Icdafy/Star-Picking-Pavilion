@@ -12,6 +12,7 @@ const { structureItem } = require('../ai/normalize');
 const { settleAll } = require('../async-work');
 const { networkAccess } = require('../network-access');
 const { needsChinese } = require('../ai/translation');
+const { canQueueArticle } = require('../ai/relevance');
 const { dateFromUrl } = require('./loose-date');
 const { enrichArticle } = require('./article-content');
 const { publicationUpperBound } = require('./publication-date');
@@ -138,7 +139,10 @@ async function collectSource(source, settings, { enrich = enrichArticle, network
   const cutoff = Date.now() - settings.collect.keepDays * 86400e3;
   const prepared = items.map(item => ({ item, structured: structureItem(item, {
     sourceName: source.name, domain: source.domain === 'both' ? null : source.domain
-  }) })).filter(entry => entry.structured);
+  }) })).filter(entry => entry.structured && canQueueArticle({
+    ...entry.structured, tier: source.tier, intl: source.intl
+  }, settings));
+  const filtered = items.length - prepared.length;
   // 在入库前补查缺失发布时间；不依赖 API Key，网络等待与没有日期仍可收录。
   // HTTP 请求在事务外完成，避免长时间锁住 SQLite。
   let position = 0;
@@ -184,7 +188,7 @@ async function collectSource(source, settings, { enrich = enrichArticle, network
       fetch_count=fetch_count+1, item_count=item_count+?,
       consecutive_errors=0, next_fetch_at=NULL WHERE id=?`)
       .run(now(), added, source.id);
-    return { fetched: items.length, added, publicationRepaired };
+    return { fetched: items.length, added, filtered, publicationRepaired };
   });
 }
 

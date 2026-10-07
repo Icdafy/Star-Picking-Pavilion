@@ -9,13 +9,13 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('package, installer and lockfile versions stay synchronized for v0.2.24', () => {
+test('package, installer and lockfile versions stay synchronized for v0.2.25', () => {
   const packageJson = JSON.parse(read('package.json'));
   const packageLock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(packageJson.version, '0.2.24');
-  assert.equal(packageJson.shortVersionWindows, '0.2.24');
-  assert.equal(packageJson.build.buildVersion, '0.2.24');
+  assert.equal(packageJson.version, '0.2.25');
+  assert.equal(packageJson.shortVersionWindows, '0.2.25');
+  assert.equal(packageJson.build.buildVersion, '0.2.25');
   assert.equal(packageJson.legacyUpdaterBridgeVersion, undefined);
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
@@ -34,9 +34,9 @@ test('public release documentation and compliance artifacts are complete', () =>
   ]) assert.equal(fs.existsSync(path.join(root, file)), true, `missing ${file}`);
 
   assert.match(read('LICENSE'), /MIT License[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
-  assert.equal(require('../package.json').version, '0.2.24');
-  assert.equal(require('../package.json').shortVersionWindows, '0.2.24');
-  assert.equal(require('../package.json').build.buildVersion, '0.2.24');
+  assert.equal(require('../package.json').version, '0.2.25');
+  assert.equal(require('../package.json').shortVersionWindows, '0.2.25');
+  assert.equal(require('../package.json').build.buildVersion, '0.2.25');
   assert.match(read('CHANGELOG.md'), /\[0\.1\.3\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.2\].*2026-08-16/);
   assert.match(read('CHANGELOG.md'), /\[0\.1\.1\].*2026-08-16/);
@@ -70,15 +70,15 @@ test('public release documentation and compliance artifacts are complete', () =>
   assert.match(read('CHANGELOG.md'), /\[0\.2\.4\].*2026-10-01/);
   assert.match(read('CHANGELOG.md'), /\[0\.2\.5\].*2026-10-01/);
   assert.match(read('CHANGELOG.md'), /\[0\.2\.6\].*2026-10-05/);
-  assert.match(read('CHANGELOG.md'), /\[0\.2\.24\].*2026-10-07/);
+  assert.match(read('CHANGELOG.md'), /\[0\.2\.25\].*2026-10-07/);
   assert.match(
     read('RELEASE_NOTES.md'),
-    /v0\.2\.24[\s\S]*保留原文信息[\s\S]*更可靠的正文与日期[\s\S]*按模型能力发送图片[\s\S]*准确处理归组证据[\s\S]*让综述跟随实际报道[\s\S]*完整披露评测失败[\s\S]*已有情报、星标、归档/
+    /v0\.2\.25[\s\S]*行业判断完成后再展示[\s\S]*采集前过滤通用媒体噪声[\s\S]*拦截跨行业财经合集[\s\S]*避免关键词误命中[\s\S]*明确模型行业结论[\s\S]*升级自动复核旧库[\s\S]*星标、归档/
   );
-  assert.match(read('RELEASE_NOTES.md'), /v0\.2\.24[\s\S]*v0\.2\.24 验证记录[\s\S]*未签名/);
+  assert.match(read('RELEASE_NOTES.md'), /v0\.2\.25[\s\S]*v0\.2\.25 验证记录[\s\S]*未签名/);
   assert.match(read('RELEASE_NOTES.md'), /GitHub Actions 完整门禁/);
   assert.match(read('THIRD_PARTY_NOTICES.txt'), /cheerio@1\.2\.0/);
-  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.2\.24/);
+  assert.match(read('THIRD_PARTY_NOTICES.txt'), /摘星阁 \(Star-Picking-Pavilion\) 0\.2\.25/);
   assert.doesNotMatch(read('THIRD_PARTY_NOTICES.txt'), /UNKNOWN/);
 });
 
@@ -94,7 +94,7 @@ test('README documents installation, privacy, recovery and security truthfully',
   const readme = read('README.md');
   for (const required of [
     /Windows 10\/11.*x64/,
-    /Star-Picking-Pavilion-Setup-0\.2\.24\.exe/,
+    /Star-Picking-Pavilion-Setup-0\.2\.25\.exe/,
     /SmartScreen/,
     /Get-FileHash/,
     /云幄\s*·\s*常用网址/,
@@ -132,19 +132,19 @@ test('version verifier matches package, tag, installer and latest metadata', asy
   const { verifyVersion } = require('../scripts/verify-version');
   const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-version-'));
   t.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
-  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.2.24\n');
-  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.2.24.exe'), 'fixture');
+  await fs.promises.writeFile(path.join(directory, 'latest.yml'), 'version: 0.2.25\n');
+  await fs.promises.writeFile(path.join(directory, 'Star-Picking-Pavilion-Setup-0.2.25.exe'), 'fixture');
 
   assert.deepEqual(verifyVersion({
     packageJson: require('../package.json'),
-    tag: 'v0.2.24',
+    tag: 'v0.2.25',
     distDir: directory,
     requireArtifacts: true
   }), {
-    version: '0.2.24',
-    releaseVersion: '0.2.24',
-    tag: 'v0.2.24',
-    installer: 'Star-Picking-Pavilion-Setup-0.2.24.exe'
+    version: '0.2.25',
+    releaseVersion: '0.2.25',
+    tag: 'v0.2.25',
+    installer: 'Star-Picking-Pavilion-Setup-0.2.25.exe'
   });
   assert.throws(() => verifyVersion({
     packageJson: require('../package.json'),
@@ -156,17 +156,17 @@ test('version verifier matches package, tag, installer and latest metadata', asy
       ...require('../package.json'),
       shortVersionWindows: '0.1.99'
     },
-    tag: 'v0.2.24',
+    tag: 'v0.2.25',
     distDir: directory
   }), /Windows product version.*public release/i);
 });
 
-test('v0.2.24 updater metadata uses the public version without a bridge', () => {
+test('v0.2.25 updater metadata uses the public version without a bridge', () => {
   const { prepareUpdateMetadata } = require('../scripts/prepare-update-metadata');
-  const result = prepareUpdateMetadata({ packageJson: require('../package.json'), latestContent: 'version: 0.2.24\n' });
-  assert.equal(result.version, '0.2.24');
+  const result = prepareUpdateMetadata({ packageJson: require('../package.json'), latestContent: 'version: 0.2.25\n' });
+  assert.equal(result.version, '0.2.25');
   assert.equal(result.bridged, false);
-  assert.equal(result.content, 'version: 0.2.24\n');
+  assert.equal(result.content, 'version: 0.2.25\n');
 });
 
 test('CI and tag release workflows enforce every gate before publishing', () => {

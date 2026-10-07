@@ -75,6 +75,13 @@ async function launchNativeElectron(root, profile) {
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { noDefaults: true });
     const context = browser.contexts()[0];
     const page = context.pages()[0] || await context.waitForEvent('page', { timeout: 20000 });
+    // Interactions require a presented, unoccluded native window. A hidden or
+    // covered renderer can stop animation frames and stall click stability
+    // checks; keep the test window visible without changing its motion policy.
+    await evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      win.setAlwaysOnTop(true); win.show(); win.focus(); win.webContents.focus();
+    });
     return { evaluate, firstWindow: async () => page, close, process: () => child };
   } catch (error) {
     await close();

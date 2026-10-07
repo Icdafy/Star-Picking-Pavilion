@@ -17,6 +17,7 @@ const { db, now } = require('../db');
 const { loadSettings, loadScoring, loadBreakthroughs } = require('../config');
 const { chat, extractJson } = require('./deepseek');
 const kw = require('./keywords');
+const { DOMAINS, articleProfile } = require('./relevance');
 const lexicon = require('./lexicon');
 const calibration = require('./calibration');
 const { computeQuality, isFeatured, saturate } = require('./scoring');
@@ -278,12 +279,9 @@ async function analyzePending(onProgress, limit = 200) {
   // 第 0 步：词库粗过滤（省 token）。国外源与 T1 官方源标题常不带中文行业词，交给模型预筛。
   const candidates = [];
   for (const a of pending) {
-    let translated = {};
-    try { translated = JSON.parse(a.translation_json || '{}'); } catch {}
-    const text = `${a.title} ${a.summary_raw || ''} ${translated.titleZh || ''} ${translated.summaryZh || ''}`;
-    a._profile = a.tier === 'T2' ? kw.relevanceOf(`${a.title} ${(a.summary_raw || '').slice(0, 80)} ${translated.titleZh || ''}`) : kw.relevanceOf(text);
-    if (!a._profile.relevant && !(hasKey && (a.tier === 'T1' || a.intl))) {
-      markIrrelevant(a.id, 'LEXICON');
+    a._profile = articleProfile(a);
+    if (a._profile.blocked || (!a._profile.relevant && !(hasKey && (a.tier === 'T1' || a.intl)))) {
+      markIrrelevant(a.id, a._profile.blocked ? 'BLOCK' : 'LEXICON');
       analyzed++;
       continue;
     }
@@ -328,7 +326,7 @@ async function analyzePending(onProgress, limit = 200) {
         const r = results[k];
         prefilterFailures.delete(a.id);
         if (r.label === 'PASS') {
-          a._domain = r.domain || a._profile.domain || a.domain;
+          a._domain = r.domain;
           a._prefilter = 'PASS';
           relevantArts.push(a);
         } else if (r.label === 'BLOCK') {
@@ -490,7 +488,8 @@ function persistAnalysis(a, domain, outcome, { selection, breakthroughs, analyze
   const summary = u.summaryZh || normalize.cleanSummary(a.summary_raw || '', { plainText: true }).slice(0, 120) || '';
   const fullText = `${a.title || ''} ${displayTitle} ${summary} ${a.summary_raw || ''}`;
   const context = scoringContext({ ...a, ai_summary: summary });
-  const resolvedDomain = domain || context.lexicon.domain || a.domain || 'lowaltitude';
+  const resolvedDomain = domain || context.lexicon.domain;
+  if (!DOMAINS.has(resolvedDomain)) throw new Error('相关性判断缺少合法的行业领域');
   const structured = structureResult({ entities: u.entities, events: u.events }, fullText, a);
   const subjects = companies.resolveSubjects({
     title: `${a.title || ''} ${u.titleZh || ''}`,

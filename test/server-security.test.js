@@ -120,8 +120,8 @@ test('corrupt optional JSON fields degrade safely instead of breaking the feed o
   const sourceId = database.prepare(`INSERT INTO sources (name, type, url, tier, domain)
     VALUES (?, 'rss', ?, 'T2', 'both')`).run('损坏字段测试', `https://example.com/${Date.now()}`).lastInsertRowid;
   database.prepare(`INSERT INTO articles
-    (source_id, title, url, fetched_at, relevant, featured, quality_score, scores_json, tags_json)
-    VALUES (?, ?, ?, ?, 1, 1, '\"><img src=x onerror=alert(1)>', '{bad', '{bad')`).run(
+    (source_id, title, url, fetched_at, relevant, analyzed, domain, featured, quality_score, scores_json, tags_json)
+    VALUES (?, ?, ?, ?, 1, 1, 'aerospace', 1, '\"><img src=x onerror=alert(1)>', '{bad', '{bad')`).run(
     sourceId, '损坏可选字段不应破坏信息流', `https://example.com/article-${Date.now()}`, new Date().toISOString()
   );
   database.prepare(`INSERT INTO daily_reports (date, content_json, created_at)
@@ -149,9 +149,9 @@ test('feed JSON columns are clamped server-side so dirty values cannot reach the
   const sourceId = database.prepare(`INSERT INTO sources (name, type, url, tier, domain)
     VALUES (?, 'rss', ?, 'T2', 'both')`).run('钳制测试', `https://example.com/${Date.now()}`).lastInsertRowid;
   database.prepare(`INSERT INTO articles
-    (source_id, title, url, fetched_at, relevant, featured, quality_score,
+    (source_id, title, url, fetched_at, relevant, analyzed, domain, featured, quality_score,
      scores_json, tags_json, entities_json, events_json, breakthrough_signals_json)
-    VALUES (?, ?, ?, ?, 1, 1, 60, ?, ?, ?, ?, ?)`).run(
+    VALUES (?, ?, ?, ?, 1, 1, 'aerospace', 1, 60, ?, ?, ?, ?, ?)`).run(
     sourceId,
     '脏 JSON 列应在服务端被钳制',
     `https://example.com/article-${Date.now()}`,
