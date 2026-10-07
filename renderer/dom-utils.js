@@ -82,6 +82,80 @@
     return { position, velocity: envelope * frequency * (-a * sine + b * cosine) - decay * position };
   }
 
+  // The uploaded SVG keeps its original SMIL timeline. Its clock only runs
+  // while the pointer is over the mark; every exit returns to the first pose.
+  function createBrandLogo({ document: doc, window: win }) {
+    const mark = doc.querySelector('[data-brand-logo]');
+    if (!mark) return null;
+    const reduced = win.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const abort = new win.AbortController();
+    const listeners = [];
+    let svg = null, hovered = false, playing = false, disposed = false;
+    function listen(target, event, handler) {
+      target?.addEventListener?.(event, handler);
+      listeners.push(() => target?.removeEventListener?.(event, handler));
+    }
+    function canPlay() {
+      return !disposed && !doc.hidden && doc.hasFocus() && !reduced?.matches
+        && doc.documentElement.dataset.fxTier !== 'static';
+    }
+    function reset() {
+      if (!svg) return;
+      svg.pauseAnimations();
+      svg.setCurrentTime(0);
+      playing = false;
+    }
+    function sync() {
+      if (!svg) return;
+      if (!hovered || !canPlay()) { reset(); return; }
+      if (playing) return;
+      svg.setCurrentTime(0);
+      svg.unpauseAnimations();
+      playing = true;
+    }
+    function leave() { hovered = false; reset(); }
+    listen(mark, 'pointerenter', event => {
+      hovered = event.pointerType !== 'touch';
+      sync();
+    });
+    listen(mark, 'pointerleave', leave);
+    listen(mark, 'pointercancel', leave);
+    listen(win, 'blur', leave);
+    listen(doc, 'visibilitychange', () => { if (doc.hidden) leave(); });
+    listen(reduced, 'change', sync);
+    const observer = new win.MutationObserver(sync);
+    observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier'] });
+
+    const ready = win.fetch('/logo.svg', { signal: abort.signal }).then(async response => {
+      if (!response.ok) throw new Error('Logo asset unavailable');
+      const source = new win.DOMParser().parseFromString(await response.text(), 'image/svg+xml');
+      if (source.querySelector('parsererror') || source.documentElement.localName !== 'svg') {
+        throw new Error('Invalid logo SVG');
+      }
+      if (disposed) return;
+      svg = doc.importNode(source.documentElement, true);
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('focusable', 'false');
+      svg.removeAttribute('role');
+      svg.removeAttribute('aria-label');
+      // Pause before mounting and again synchronously after mounting, so the
+      // first paint cannot show an autoplay frame. The image remains a fallback.
+      svg.pauseAnimations();
+      mark.replaceChildren(svg);
+      reset();
+      hovered = mark.matches(':hover');
+      sync();
+    }).catch(() => { /* Keep the static first pose if the enhancement fails. */ });
+
+    return Object.freeze({ ready, dispose() {
+      disposed = true;
+      abort.abort();
+      leave();
+      observer.disconnect();
+      for (const remove of listeners) remove();
+    } });
+  }
+
   function createMotion(deps = {}) {
     const { document: doc = null, matchMedia = null, raf = null } = deps || {};
     const win = deps.window || doc?.defaultView;
@@ -705,6 +779,7 @@
     safeHttpUrl,
     findFocusKey,
     restoreFocusByKey,
+    createBrandLogo,
     createMotion,
     createInteractionMotion
   });

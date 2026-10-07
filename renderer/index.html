@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="intel.css">
 </head>
 <body>
-<!-- 深色主题只改变 Logo 的显示配色，原图轮廓和透明度保持。 -->
+<!-- 静态回退图的深色主题配色；矢量 Logo 直接通过 CSS 提亮弧线。 -->
 <svg class="brand-filters" width="0" height="0" aria-hidden="true" focusable="false">
   <defs>
     <filter id="brandLogoDark" color-interpolation-filters="sRGB">
@@ -54,7 +54,7 @@
 <!-- 桌面指挥栏：宽屏纵向组织，窄屏由 CSS 还原为品牌 + 顶部导航 -->
 <aside class="command-rail glass" aria-label="摘星阁指挥栏">
   <div class="brand rail-brand">
-    <img class="brand-mark" src="/logo.png" width="48" height="48" alt="" aria-hidden="true">
+    <span class="brand-mark" data-brand-logo aria-hidden="true"><img src="/logo-still.svg" width="48" height="48" alt=""></span>
     <div class="brand-text">
       <div class="brand-title-row">
         <h1>摘星阁</h1>

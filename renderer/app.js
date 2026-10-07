@@ -128,6 +128,8 @@ const motion = DomUtils.createMotion({
   raf: callback => requestAnimationFrame(callback)
 });
 const interactionMotion = DomUtils.createInteractionMotion({ document, window, motion });
+const brandLogo = DomUtils.createBrandLogo({ document, window });
+window.addEventListener('pagehide', () => brandLogo?.dispose(), { once: true });
 window.addEventListener('pagehide', () => interactionMotion.dispose(), { once: true });
 
 function scrollToTop() {
