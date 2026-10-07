@@ -8,7 +8,7 @@ const {
   Tray,
   shell,
   utilityProcess,
-  ipcMain,
+  ipcMain: nativeIpcMain,
   dialog,
   session,
   safeStorage,
@@ -17,6 +17,8 @@ const {
 } = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { createTrustedIpcMain, isTrustedDesktopSender } = require('./ipc-policy');
 const { migrateUserData, MigrationCancelledError } = require('./user-data-migration');
 const { createCredentialStore } = require('./credential-store');
 const { createCredentialIpcTracer } = require('./credential-ipc-trace');
@@ -57,6 +59,15 @@ try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未
 let serverProc = null;
 let serverController = null;
 let win = null;
+let rendererOrigin = null;
+const ipcMain = createTrustedIpcMain({
+  ipcMain: nativeIpcMain,
+  isTrusted: event => isTrustedDesktopSender(event, {
+    window: win,
+    origin: rendererOrigin,
+    recoveryUrl: pathToFileURL(path.join(__dirname, '..', 'renderer', 'startup-failure.html')).href
+  })
+});
 let latestUpdateStatus = null;
 let autoUpdateInitialized = false;
 let autoUpdateTimer = null;
@@ -318,6 +329,7 @@ function applyWindowTheme(theme) {
 
 async function createWindow(serverPort, initialTheme = 'dark') {
   const expectedOrigin = `http://127.0.0.1:${serverPort}`;
+  rendererOrigin = expectedOrigin;
   const startHidden = backgroundMode?.shouldStartHidden(process.argv) === true;
   const windowTheme = getWindowTheme(initialTheme);
   win = new BrowserWindow({

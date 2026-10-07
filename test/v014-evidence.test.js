@@ -75,6 +75,15 @@ test('public crawler rejects private addresses, alternate numeric IPs and redire
   assert.equal(isPublicAddress('8.8.8.8'),true);
   await assert.rejects(publicFetch('https://public.example',{fetchImpl:async()=>new Response('',{status:302,headers:{location:'http://127.0.0.1/private'}})}),/公开/);
 });
+
+test('public address checks use exact reserved prefixes without blocking neighboring public space', () => {
+  for (const address of ['192.0.0.9', '192.0.0.10', '192.0.3.1', '198.51.99.1', '198.51.101.1', '203.0.112.1', '203.0.114.1', '2001:2:1::1', '3fff:1000::1', '2606:4700::1111']) {
+    assert.equal(isPublicAddress(address), true, `${address} must remain reachable`);
+  }
+  for (const address of ['192.0.0.1', '192.0.2.1', '198.51.100.1', '203.0.113.1', '192.88.99.1', '2001:0db8::1', '2001:0002:0:ffff::1', '3fff::1', '3fff:0fff::1']) {
+    assert.equal(isPublicAddress(address), false, `${address} is not public destination space`);
+  }
+});
 test('crawler respects robots disallow and longest allow exceptions', () => {
   const robots='User-agent: *\nDisallow: /private\nAllow: /private/public';
   assert.equal(robotsAllowed(robots,'/private/x'),false);

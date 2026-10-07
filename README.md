@@ -2,25 +2,27 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.31 · 四种跟手风格与自定义
+## v0.2.32 · 全层审查与可靠性修复
 
-- **四种跟手风格**：设置 → 显示与排版 → 跟手动效，可选原有范围柔光、新增流星拖尾、星尘粒子与弹性光环。
-- **实时自定义**：每种风格独立保存尺寸，可选任意六位颜色与八组配色预设，调节 10—100% 强度；更改立即生效，重启后保留。
-- **流畅与轻量**：连续渐细光带、按移动距离生成的稀疏星尘、按实际时间推进的弹性光环；闲置后停止绘制，低性能档降低粒子数量与缓冲区分辨率，持续慢帧自动减少背景玻璃合成成本。保留减少动态效果、失焦／后台暂停与原生鼠标、表单和弹层操作。
+- **刊期完整**：提前打开的日报、周报、月报会在截止后重新生成，再保存定稿；内容变化时不沿用旧导语，无效的第 53 周返回明确错误。
+- **统计与实时更新**：并发请求和数字动画采用最新结果，列表忙碌时保留待刷新信号。
+- **清理结果可信**：请求接收时锁定维护任务，按编号确认完成，后台失败或等待超时如实显示；自动清理提示与实际开关一致。
+- **桌面与接口边界**：所有桌面 IPC 校验主窗口、主框架和页面；重复信源地址返回可处理的冲突提示；公开抓取使用准确的保留地址前缀；模型内容审核拒绝不再删参重发。
+- **运行时安全**：Electron 更新至 42.11.11，构建依赖同步安全修复，CI 与 Release 额外审计包含 Electron 的完整依赖树。
 
-版本、界面与更新元数据统一为 0.2.31，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。检查与发布证据见 [验证记录](docs/v0231-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.32，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。检查与发布证据见 [验证记录](docs/v0232-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.31.exe`，双击并按向导安装。v0.2.31 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.32.exe`，双击并按向导安装。v0.2.32 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.31.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.32.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

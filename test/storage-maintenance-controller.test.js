@@ -31,6 +31,44 @@ function elements() {
 
 const formatBytes = bytes => `${Number(bytes) / 1024} KB`;
 
+function pruneFixture({ snapshot, accepted = { started: true, pruneId: 7 } } = {}) {
+  const view = elements();
+  const controller = createStorageMaintenanceController({
+    elements: view, requestDatabase: async () => databaseSnapshot(snapshot),
+    pruneDatabase: async () => accepted, compactDatabase: async () => ({}),
+    getDesktopStorage: async () => desktopSnapshot(), clearDesktopCache: async () => ({}),
+    deleteLegacyData: async () => ({}), formatBytes, prunePollIntervalMs: 0
+  });
+  return { view, controller };
+}
+
+test('a failed background prune is reported as a failure and releases the button', async () => {
+  const { view, controller } = pruneFixture({ snapshot: { scheduler: { lastPrune: { id: 7, ok: false, error: '数据清理未完成' } } } });
+  await controller.load();
+  await assert.rejects(controller.prune(), /数据清理未完成/);
+  assert.match(view.pruneStatus.className, /fail/);
+  assert.equal(view.pruneButton.disabled, false);
+});
+
+test('an old completed prune cannot stand in for the newly accepted task', async () => {
+  const { view, controller } = pruneFixture({ snapshot: { scheduler: { lastPrune: { id: 6, ok: true } } } });
+  await assert.rejects(controller.prune(), /未能确认清理结果/);
+  assert.doesNotMatch(view.pruneStatus.textContent, /✓ 清理完成/);
+});
+
+test('prune polling exhaustion never reports success while the task is still running', async () => {
+  const { view, controller } = pruneFixture({ snapshot: { pruneRunning: true } });
+  await assert.rejects(controller.prune(), /未能确认清理结果/);
+  assert.doesNotMatch(view.pruneStatus.textContent, /✓ 清理完成/);
+});
+
+test('a busy or stopped prune request is displayed without a green success state', async () => {
+  const { view, controller } = pruneFixture({ accepted: { skipped: true, started: false, reason: 'busy' } });
+  await controller.prune();
+  assert.match(view.pruneStatus.textContent, /采集/);
+  assert.doesNotMatch(view.pruneStatus.className, /\bok\b/);
+});
+
 function databaseSnapshot(overrides = {}) {
   return {
     articles: 1234,

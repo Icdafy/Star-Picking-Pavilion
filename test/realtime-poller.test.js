@@ -247,3 +247,14 @@ test('回到前台的 visibilitychange 立即触发一轮轮询', async () => {
   await new Promise(resolve => realSetTimeout(resolve, 10));
   assert.equal(env.calls.feedProbe, 1);
 });
+
+test('a loading feed does not consume the signal needed by the next realtime probe', async () => {
+  const env = makeEnv({ loading: true, statsSequence: [{ today: 2 }, { today: 2 }], feedItems: [{ id: 'new' }] });
+  const poller = createRealtimePoller(env);
+  await poller.pollRealtime();
+  assert.equal(env.calls.feedProbe, 0);
+  env.state.loading = false;
+  await poller.pollRealtime();
+  assert.equal(env.calls.feedProbe, 1);
+  assert.equal(env.calls.loadFeed, 1);
+});

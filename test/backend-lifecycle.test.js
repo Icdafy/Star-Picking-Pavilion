@@ -38,7 +38,7 @@ function schedulerFixture(t, overrides = {}) {
     './ai/daily': { generateDaily() {} },
     './ai/reports': { generatePeriod() {}, previousPeriodKey() {}, enhanceLeads: async () => {} },
     './ai/receipts': { pruneReceipts() {} },
-    './retention': { pruneDatabase: () => ({ removedArticles: 0, removedReports: 0 }) },
+    './retention': { pruneDatabase: () => { events.push('prune'); return overrides.prune?.() || { removedArticles: 0, removedReports: 0 }; } },
     './config': { loadSettings: () => settings },
     './schedule-policy': require('../server/schedule-policy'),
     './db': { db: {}, DATABASE_PATH: 'fixture' },
@@ -49,6 +49,7 @@ function schedulerFixture(t, overrides = {}) {
     module, require: name => { if (!dependencies[name]) throw new Error(`Unexpected dependency ${name}`); return dependencies[name]; },
     console: { log() {}, warn() {}, error() {} },
     Date: FixtureDate,
+    setImmediate,
     setInterval: (callback, ms) => { const item = { callback, ms, active: true }; intervals.push(item); return item; },
     clearInterval: timer => { timer.active = false; },
     setTimeout: (callback, ms) => { if (ms <= 25) return setTimeout(callback, ms); const item = { callback, ms, dueAt: clock + ms }; timers.push(item); return item; },
@@ -147,6 +148,48 @@ test('failed pipelines release their lock and can be retried', async t => {
   failing = false;
   await scheduler.runPipeline();
   assert.equal(scheduler.getStatus().lastPipeline.ok, true);
+});
+
+test('a prune request reserves its lock before acknowledgment and completes exactly once', async t => {
+  const { scheduler, events } = schedulerFixture(t);
+  const accepted = scheduler.requestPrune();
+  assert.equal(accepted.started, true);
+  assert.equal(scheduler.getStatus().pruneRunning, true);
+  assert.equal(scheduler.requestPrune().started, false);
+  assert.equal((await scheduler.collectOnce()).reason, 'maintenance');
+  assert.equal((await scheduler.analyzeOnce()).reason, 'maintenance');
+  assert.equal(scheduler.compactOnce().skipped, true);
+  const completed = await accepted.completion;
+  assert.equal(completed.id, accepted.pruneId);
+  assert.equal(completed.ok, true);
+  assert.equal(events.filter(event => event === 'prune').length, 1);
+  assert.equal(scheduler.getStatus().pruneRunning, false);
+});
+
+test('busy prune requests do not claim acceptance, and shutdown drains an already accepted prune', async t => {
+  const gate = deferred(); t.after(() => gate.resolve());
+  const { scheduler } = schedulerFixture(t, { collect: () => gate.promise });
+  const pipeline = scheduler.runPipeline();
+  assert.equal(scheduler.requestPrune().started, false);
+  gate.resolve(); await pipeline;
+  const accepted = scheduler.requestPrune();
+  scheduler.stopScheduler();
+  await scheduler.waitForSchedulerIdle();
+  assert.equal((await accepted.completion).ok, true);
+  assert.equal(scheduler.requestPrune().reason, 'stopping');
+});
+
+test('background prune failures release the lock and expose an identifiable failure for retry', async t => {
+  let fail = true;
+  const { scheduler } = schedulerFixture(t, { prune: () => { if (fail) throw new Error('SQLITE_IOERR: private fixture path'); } });
+  const accepted = scheduler.requestPrune();
+  const failure = await accepted.completion;
+  assert.equal(failure.id, accepted.pruneId);
+  assert.equal(failure.ok, false);
+  assert.doesNotMatch(failure.error, /private|SQLITE_IOERR/);
+  assert.equal(scheduler.getStatus().pruneRunning, false);
+  fail = false;
+  assert.equal((await scheduler.requestPrune().completion).ok, true);
 });
 
 test('saved intervals replace existing timers without scheduling a second startup run', t => {

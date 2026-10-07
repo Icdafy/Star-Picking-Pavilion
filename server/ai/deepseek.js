@@ -20,8 +20,6 @@ const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 500;
 const MAX_RETRY_DELAY_MS = 30_000;
 
-// 各兼容服务（DeepSeek/硅基流动/火山方舟/Ollama…）对不识别参数的常见 400 报错形态
-const PARAM_ERROR_400 = /thinking|unknown parameter|unsupported|invalid.{0,24}param|unrecognized|参数/i;
 // 内容审核拒绝：服务端因内容主动拒绝，不是请求参数的问题，删参重发只会再撞一次墙
 const MODERATION_400 = /moderation|content[ _-]?filter|safety|敏感|违规|审核/i;
 
@@ -100,7 +98,7 @@ async function chat(messages, {
       if (res.status === 400) {
         const raw400 = (await readBoundedBody(res, maxResponseBytes)).toString('utf8');
         // 审核拒绝优先于参数匹配：即使文案碰巧含相似字样也不得重发
-        if (!PARAM_ERROR_400.test(raw400) && MODERATION_400.test(raw400)) {
+        if (MODERATION_400.test(raw400)) {
           throw new Error(`${label} HTTP 400: ${raw400.slice(0, 200)}`);
         }
         if ((payload.thinking || payload.response_format) && !thinkingDropped) {

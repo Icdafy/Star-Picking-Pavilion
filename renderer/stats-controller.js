@@ -20,6 +20,8 @@
 
     // 统计数字变化时做一次短促补间，避免刷新瞬间的跳字
     let activityRevision = -1;
+    let statsRequest = 0;
+    const statAnimations = new WeakMap();
     function renderActivity(schedule = {}) {
       if (Number.isFinite(schedule.revision)) {
         if (schedule.revision < activityRevision) return;
@@ -47,6 +49,8 @@
     }
 
     function setStat(el, value) {
+      const animation = (statAnimations.get(el) || 0) + 1;
+      statAnimations.set(el, animation);
       const target = Number(value);
       if (!Number.isFinite(target)) { el.textContent = '–'; return; }
       const previous = Number(el.dataset.value);
@@ -57,6 +61,7 @@
       }
       const startedAt = now();
       const tick = at => {
+        if (statAnimations.get(el) !== animation) return;
         const progress = Math.min(1, (at - startedAt) / 520);
         const eased = 1 - Math.pow(1 - progress, 3);
         el.textContent = Math.round(previous + (target - previous) * eased).toLocaleString('zh-CN');
@@ -66,8 +71,10 @@
     }
 
     async function refreshStats() {
+      const request = ++statsRequest;
       try {
         const s = await api('/api/stats');
+        if (request !== statsRequest) return;
         setStat(elements.statSources, s.sources);
         setStat(elements.statToday, s.today);
         setStat(elements.statFeatured, s.featuredToday);

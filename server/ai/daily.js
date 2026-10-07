@@ -4,7 +4,7 @@
 const { db, now } = require('../db');
 const { localDateString } = require('../date-time');
 const { loadScoring } = require('../config');
-const { buildDailyBundle } = require('../archive/daily-bundle');
+const { buildDailyBundle, resolveDailyWindow } = require('../archive/daily-bundle');
 const { HttpError } = require('../http-security');
 const { composeIssue } = require('./reports');
 
@@ -88,6 +88,14 @@ function isStaleEdition(report, date) {
   return Date.parse(localDateString()) - Date.parse(date) <= REBUILD_RECENT_DAYS * 86400e3;
 }
 
+function isUnfinishedSnapshot(report, date) {
+  const generatedAt = Date.parse(report?.generatedAt);
+  if (!Number.isFinite(generatedAt)) return false;
+  const end = Date.parse(resolveDailyWindow(date).end);
+  // 08:00 前打开的当天日报是草稿：期内短暂复用，跨过截止后补齐一次再冻结。
+  return generatedAt < end && (Date.now() >= end || Date.now() - generatedAt >= 30 * 60e3);
+}
+
 function generateDaily(dateStr, { overwrite = false } = {}) {
   // dateStr: YYYY-MM-DD（默认今天）
   const date = dateStr || localDateString();
@@ -95,7 +103,8 @@ function generateDaily(dateStr, { overwrite = false } = {}) {
     throw new HttpError(400, '日报日期不能晚于今天');
   }
   const existing = tryReadReport(date);
-  if (existing && !existing.corrupt && !overwrite && !isStaleEdition(existing, date)) {
+  if (existing && !existing.corrupt && !overwrite && !isStaleEdition(existing, date)
+    && !isUnfinishedSnapshot(existing, date)) {
     // 已有有效日报：默认不重生成，直接返回现有行
     return existing;
   }

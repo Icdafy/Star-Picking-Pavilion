@@ -30,6 +30,7 @@ let activeSchedule = null;
 let lastRun = null;        // 最近一次采集摘要
 let lastAnalyzeAt = null;  // 最近一次分析循环时间
 let lastPrune = null;      // 最近一次数据保留清理摘要
+let pruneSequence = 0;
 let lastCompact = null;    // 最近一次数据库深度压缩摘要
 let lastGroup = null;      // 最近一次事件归组摘要
 let lastHotAt = 0;         // 最近一次热点榜计算时间
@@ -68,12 +69,15 @@ function subscribeStatus(listener) {
 
 // ---------- 数据保留清理 ----------
 // 单轮有删除上限，剩余部分继续清，避免首次在大库上一次性长时间持锁
-function pruneOnce(trigger = 'cron') {
+function pruneBlocker() {
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (collectRunning || analyzeRunning || pipelineRunning) return { skipped: true, reason: 'busy' };
   if (pruneRunning) return { skipped: true, reason: '清理进行中' };
-  pruneRunning = true;
+  return null;
+}
+
+function executePrune(trigger, id) {
   try {
     const settings = loadSettings();
     let totalArticles = 0;
@@ -86,6 +90,7 @@ function pruneOnce(trigger = 'cron') {
       if (!result.hasMore) break;
     }
     lastPrune = {
+      id, ok: true,
       at: new Date().toISOString(), trigger,
       removedArticles: totalArticles, removedReports: totalReports,
       retentionDays: result.retentionDays, irrelevantRetentionDays: result.irrelevantRetentionDays
@@ -94,9 +99,37 @@ function pruneOnce(trigger = 'cron') {
       console.log(`[retention] 清理完成：文章 ${totalArticles} 条、日报 ${totalReports} 份`);
     }
     return lastPrune;
+  } catch (error) {
+    lastPrune = { id, ok: false, at: new Date().toISOString(), trigger, error: '数据清理未完成，请稍后重试并查看运行日志。' };
+    throw error;
   } finally {
     pruneRunning = false;
+    notifyStatus();
   }
+}
+
+function pruneOnce(trigger = 'cron') {
+  const blocked = pruneBlocker();
+  if (blocked) return blocked;
+  pruneRunning = true;
+  notifyStatus();
+  return executePrune(trigger, ++pruneSequence);
+}
+
+// 先预留维护锁再确认 202；重复请求及随后到来的采集不能抢走已接收的任务。
+function requestPrune(trigger = 'manual') {
+  const blocked = pruneBlocker();
+  if (blocked) return { ...blocked, started: false };
+  pruneRunning = true;
+  const pruneId = ++pruneSequence;
+  notifyStatus();
+  const completion = new Promise(resolve => {
+    setImmediate(() => {
+      try { resolve(executePrune(trigger, pruneId)); }
+      catch (error) { console.error('[maintenance:prune]', error); resolve(lastPrune); }
+    });
+  });
+  return { started: true, pruneId, completion };
 }
 
 // ---------- 数据库深度压缩 ----------
@@ -134,6 +167,7 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
+  if (pruneRunning) return { skipped: true, reason: 'maintenance' };
   if (collectRunning) return { skipped: true, reason: '采集进行中' };
   cancelCollectionTimer();
   collectRunning = true;
@@ -168,6 +202,7 @@ async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = 
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
+  if (pruneRunning) return { skipped: true, reason: 'maintenance' };
   if (analyzeRunning) return { skipped: true };
   analyzeRunning = true;
   notifyStatus();
@@ -370,6 +405,6 @@ async function waitForSchedulerIdle() {
 module.exports = {
   startScheduler, stopScheduler, waitForSchedulerIdle,
   refreshSchedulerSettings,
-  runPipeline, collectOnce, analyzeOnce, pruneOnce, compactOnce,
+  runPipeline, collectOnce, analyzeOnce, pruneOnce, requestPrune, compactOnce,
   getStatus, subscribeStatus
 };

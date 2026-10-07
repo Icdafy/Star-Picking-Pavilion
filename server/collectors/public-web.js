@@ -8,14 +8,20 @@ const CRAWLER_UA = `StarPickingPavilion/${require('../../package.json').version}
 
 function isPublicAddress(address) {
   if (net.isIP(address) === 4) {
-    const [a, b] = address.split('.').map(Number);
+    const [a, b, c, d] = address.split('.').map(Number);
     return !(a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254)
-      || (a === 172 && b >= 16 && b <= 31) || (a === 192 && [0, 168].includes(b))
-      || (a === 100 && b >= 64 && b <= 127) || (a === 198 && [18, 19, 51].includes(b))
-      || (a === 203 && b === 0));
+      || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+      || (a === 192 && b === 0 && (c === 2 || (c === 0 && ![9, 10].includes(d)))) || (a === 192 && b === 88 && c === 99)
+      || (a === 100 && b >= 64 && b <= 127) || (a === 198 && [18, 19].includes(b))
+      || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113));
   }
   // Globally routable IPv6 only; mapped/local/link-local/multicast are rejected.
-  return net.isIP(address) === 6 && /^[23][0-9a-f]{3}:/i.test(address) && !/^2001:db8:/i.test(address);
+  if (net.isIP(address) !== 6) return false;
+  const canonical = new URL(`http://[${address}]/`).hostname.slice(1, -1);
+  return /^[23][0-9a-f]{3}:/i.test(canonical)
+    && !/^2001:db8:/i.test(canonical)
+    && !/^2001:2:(?:0:|:)/i.test(canonical)
+    && !/^3fff:(?:[0-9a-f]{1,3}:|:)/i.test(canonical);
 }
 function publicUrl(value) {
   const u = new URL(value);

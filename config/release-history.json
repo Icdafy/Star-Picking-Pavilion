@@ -2,10 +2,17 @@
   "source": "https://github.com/Icdafy/Star-Picking-Pavilion/releases",
   "items": [
     {
+      "tag": "v0.2.32",
+      "name": "摘星阁 v0.2.32",
+      "publishedAt": null,
+      "body": "# 摘星阁 v0.2.32\n\n审查前端、后端、数据库、接口、桌面通信、网络采集、存储与更新链路，修复可复现的正确性和边界问题。\n\n- 日报、周报、月报提前打开时只缓存草稿，截止后重新生成完整定稿；当前日报草稿可定期刷新。刊期内容变化时不沿用旧的模型导语，无效的第 53 周返回明确错误。\n- 统计数字采用最新请求和动画结果，旧响应不再覆盖新星标数；列表忙碌时保留实时更新信号，下一轮继续刷新。\n- 手动清理先锁定任务再确认接收，避免任务抢占或重复接收。页面按任务编号确认结果，后台失败或等待超时如实提示，不再显示假成功；自动清理提示与实际开关一致。\n- 所有桌面 IPC 统一校验主窗口、主框架和允许的页面，设置、存储、归档、壁纸、更新与同步偏好读取共用同一边界。额外窗口和子框架不能读取或修改这些桌面功能。\n- 重复添加或修改信源地址返回明确的 409 冲突提示，历史信源可按原地址恢复；公开抓取采用准确的保留地址前缀，修复误拦公开地址并补齐 IPv6 文档及基准测试地址；模型内容审核拒绝不再因同时出现参数错误描述而删参重发。\n- Electron 升级至同一主版本的安全修复版 42.11.11，更新构建工具的受影响传递依赖。CI 与 Release 增加包含 Electron 的完整依赖审计门禁，避免开发依赖分类遗漏实际交付的桌面运行时。\n- 发布 SBOM 补入实际分发的 Electron 运行时及版本，完成后再次校验 CycloneDX 1.6 格式，仍不混入仅用于构建的工具依赖。\n- 版本、安装器、更新元数据与内置日志统一为 0.2.32，无新增运行依赖或数据库结构迁移；已有情报、星标、归档、模型密钥与设置保留，四种跟手风格及减少动态效果继续可用。\n\n审查范围、复现与发布证据见 [v0.2.32 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0232-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.32.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；可用附件 `SHA256SUMS.txt` 核对安装包。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.32.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n安装器、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.32"
+    },
+    {
       "tag": "v0.2.31",
       "name": "摘星阁 v0.2.31",
-      "publishedAt": null,
-      "body": "# 摘星阁 v0.2.31\n\n新增三种经过打磨的跟手动效，让每位使用者选择适合自己的风格。\n\n- 设置 → 显示与排版 → 跟手动效，保留范围柔光，新增流星拖尾、星尘粒子与弹性光环。流星为连续渐细的短光带；星尘稀疏散开、漂移并消散；光环带少许惯性与轻柔回弹，快速移动时适度舒展。\n- 每种风格独立保存尺寸，可选任意六位颜色、八组配色预设与 10—100% 动效强度；修改立即生效并自动保存，重启后恢复。已有柔光选择、尺寸和颜色保留。\n- 按帧合并鼠标输入，复用光点，限制轨迹与粒子数量；闲置后停止绘制，低性能档自动降低负担。四种样式持续掉帧时自动减少背景玻璃的合成开销，柔光保留主要光晕并减少次要装饰，保持跟手刷新。保留减少动态效果、高对比度、失焦和后台暂停，原生鼠标、表单、滚动与弹层操作保持可用。\n- 应用、安装器、更新元数据与内置日志统一为 0.2.31，无新增运行依赖；已有情报、星标、归档、模型密钥与设置保留。\n\n验证记录见 [v0.2.31 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0231-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.31.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；可用附件 `SHA256SUMS.txt` 核对安装包。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.31.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n安装器、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "publishedAt": "2026-10-07T15:57:52.000Z",
+      "body": "# 摘星阁 v0.2.31\r\n\r\n新增三种经过打磨的跟手动效，让每位使用者选择适合自己的风格。\r\n\r\n- 设置 → 显示与排版 → 跟手动效，保留范围柔光，新增流星拖尾、星尘粒子与弹性光环。流星为连续渐细的短光带；星尘稀疏散开、漂移并消散；光环带少许惯性与轻柔回弹，快速移动时适度舒展。\r\n- 每种风格独立保存尺寸，可选任意六位颜色、八组配色预设与 10—100% 动效强度；修改立即生效并自动保存，重启后恢复。已有柔光选择、尺寸和颜色保留。\r\n- 按帧合并鼠标输入，复用光点，限制轨迹与粒子数量；闲置后停止绘制，低性能档自动降低负担。四种样式持续掉帧时自动减少背景玻璃的合成开销，柔光保留主要光晕并减少次要装饰，保持跟手刷新。保留减少动态效果、高对比度、失焦和后台暂停，原生鼠标、表单、滚动与弹层操作保持可用。\r\n- 应用、安装器、更新元数据与内置日志统一为 0.2.31，无新增运行依赖；已有情报、星标、归档、模型密钥与设置保留。\r\n\r\n验证记录见 [v0.2.31 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0231-validation.md)。\r\n\r\n## 安装与校验\r\n\r\n下载 `Star-Picking-Pavilion-Setup-0.2.31.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；可用附件 `SHA256SUMS.txt` 核对安装包。\r\n\r\n```powershell\r\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.31.exe\r\nGet-Content .\\SHA256SUMS.txt\r\n```\r\n\r\n安装器、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。\r\n",
       "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.31"
     },
     {

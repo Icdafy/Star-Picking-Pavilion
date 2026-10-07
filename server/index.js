@@ -19,7 +19,7 @@ const { encodeWordDocument } = require('./export/word');
 const reports = require('./ai/reports');
 const { buildDailyBundle, serializeJsonl } = require('./archive/daily-bundle');
 const {
-  runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus,
+  runPipeline, requestPrune, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus,
   refreshSchedulerSettings, subscribeStatus
 } = require('./scheduler');
 const {
@@ -643,15 +643,9 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/maintenance/prune' && req.method === 'POST') {
         // 大清理可能持续很久：触发后立即 202 返回，后台异步执行，
         // HTTP 请求不再同步阻塞在删除循环上
-        setImmediate(() => {
-          try {
-            const result = pruneOnce('manual');
-            if (result && !result.skipped) invalidateStatsCache();
-          } catch (error) {
-            console.error('[maintenance:prune]', error);
-          }
-        });
-        return json(res, 202, { ok: true, started: true });
+        const { completion, ...result } = requestPrune('manual');
+        completion?.then(done => { if (done.ok) invalidateStatsCache(); });
+        return json(res, result.started ? 202 : 200, { ok: result.started, ...result });
       }
       if (p === '/api/maintenance/compact' && req.method === 'POST') {
         try {
@@ -679,6 +673,9 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/sources' && req.method === 'POST') {
         const b = await readJsonBody(req);
         const source = sanitizeSourceInput(b);
+        if (db.prepare('SELECT id FROM sources WHERE url=? AND removed_at IS NULL').get(source.url)) {
+          return json(res, 409, { error: '该信源地址已存在，请编辑已有信源。' });
+        }
         const removed = db.prepare('SELECT id FROM sources WHERE url=? AND removed_at IS NOT NULL').get(source.url);
         if (removed) {
           db.prepare(`UPDATE sources SET name=?, type=?, tier=?, domain=?, enabled=?, selector_json=?, note=?, intl=?,
@@ -701,6 +698,9 @@ const server = http.createServer(async (req, res) => {
         const cur = db.prepare('SELECT * FROM sources WHERE id=? AND removed_at IS NULL').get(Number(mSrc[1]));
         if (!cur) return json(res, 404, { error: '不存在' });
         const source = sanitizeSourceInput(b, cur);
+        if (db.prepare('SELECT id FROM sources WHERE url=? AND id<>?').get(source.url, cur.id)) {
+          return json(res, 409, { error: '该信源地址已存在，请编辑或恢复已有信源。' });
+        }
         db.prepare(`UPDATE sources SET name=?, type=?, url=?, tier=?, domain=?, enabled=?, selector_json=?, note=?, intl=? WHERE id=?`)
           .run(source.name, source.type, source.url, source.tier, source.domain,
             source.enabled ? 1 : 0, source.selector ? JSON.stringify(source.selector) : null, source.note, source.intl ? 1 : 0, cur.id);

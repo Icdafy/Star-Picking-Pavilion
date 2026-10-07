@@ -22,6 +22,9 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
+      - name: Install locked Electron runtime
+        run: node node_modules/electron/install.js
+
       - name: Verify tag and package version
         run: npm run verify:version -- --tag $env:GITHUB_REF_NAME
 
@@ -33,6 +36,9 @@ jobs:
 
       - name: Audit production dependencies
         run: npm run audit:runtime
+
+      - name: Audit Electron and build dependencies
+        run: npm run audit:toolchain
 
       - name: Verify third-party notices are current
         run: |
@@ -60,7 +66,9 @@ jobs:
           "$hash  Star-Picking-Pavilion-Setup-$releaseVersion.exe" | Set-Content -Encoding ascii -LiteralPath 'dist\SHA256SUMS.txt'
 
       - name: Generate CycloneDX SBOM
-        run: npx cyclonedx-npm --omit dev --spec-version 1.6 --output-reproducible --output-file dist/sbom.cdx.json --validate
+        run: |
+          npx cyclonedx-npm --omit dev --spec-version 1.6 --output-reproducible --output-file dist/sbom.cdx.json --validate
+          node scripts/complete-release-sbom.js dist/sbom.cdx.json
 
       - name: Publish GitHub Release
         env:

@@ -1,8 +1,8 @@
 {
   "name": "star-picking-pavilion",
   "productName": "摘星阁",
-  "version": "0.2.31",
-  "shortVersionWindows": "0.2.31",
+  "version": "0.2.32",
+  "shortVersionWindows": "0.2.32",
   "description": "摘星阁（Star-Picking-Pavilion）· 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
   "author": "摘星阁",
   "license": "MIT",
@@ -26,6 +26,7 @@
     "verify:version": "node scripts/verify-version.js",
     "notices": "node scripts/generate-third-party-notices.js",
     "audit:runtime": "npm audit --omit=dev --audit-level=high",
+    "audit:toolchain": "npm audit --audit-level=high",
     "audit:sources": "node scripts/audit-sources.js",
     "eval:selection": "node scripts/eval-selection.js",
     "eval:relations": "node scripts/eval-relations.js",
@@ -43,16 +44,17 @@
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "^6.0.0",
-    "electron": "^42.7.0",
+    "electron": "^42.11.11",
     "electron-builder": "^26.15.3",
     "playwright": "^1.61.1"
   },
   "overrides": {
+    "global-agent": "^4.1.3",
     "js-yaml": "^4.3.2",
     "undici": "^8.10.2"
   },
   "build": {
-    "buildVersion": "0.2.31",
+    "buildVersion": "0.2.32",
     "appId": "com.icdafy.star-picking-pavilion",
     "productName": "摘星阁",
     "executableName": "Star-Picking-Pavilion",

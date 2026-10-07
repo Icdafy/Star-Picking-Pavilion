@@ -148,3 +148,33 @@ test('refreshStats 后端失败时静默返回 undefined，不抛出', async () 
   const { ctrl } = createController({ stats: 'fail' });
   assert.equal(await ctrl.refreshStats(), undefined);
 });
+
+test('out-of-order statistics responses cannot undo a newer star count', async () => {
+  const elements = makeElements();
+  const pending = [];
+  const ctrl = createStatsController({
+    api: () => new Promise(resolve => pending.push(resolve)), state: { view: 'all' }, elements,
+    prefersReducedMotion: () => true, now: () => 0, frame: () => {}
+  });
+  const older = ctrl.refreshStats();
+  const newer = ctrl.refreshStats();
+  pending[1]({ sources: 2, today: 5, featuredToday: 3, starred: 1, aiConfigured: true });
+  await newer;
+  pending[0]({ sources: 1, today: 4, featuredToday: 2, starred: 0, aiConfigured: true });
+  await older;
+  assert.equal(elements.statToday.textContent, '5');
+  assert.equal(elements.tabStarredCount.textContent, '1');
+  assert.equal(elements.tabStarredCount.hidden, false);
+});
+
+test('an old number animation cannot overwrite a newer value', () => {
+  const { ctrl, elements, frames } = createController();
+  ctrl.setStat(elements.statToday, 0);
+  ctrl.setStat(elements.statToday, 100);
+  const oldFrame = frames.shift();
+  ctrl.setStat(elements.statToday, 200);
+  const newFrame = frames.shift();
+  newFrame(600);
+  oldFrame(650);
+  assert.equal(elements.statToday.textContent, '200');
+});

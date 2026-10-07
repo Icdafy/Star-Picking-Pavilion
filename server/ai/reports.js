@@ -63,6 +63,10 @@ function resolvePeriod(kind, key) {
     // ISO 第 1 周包含 1 月 4 日
     const jan4 = new Date(year, 0, 4);
     const monday = new Date(year, 0, 4 - ((jan4.getDay() || 7) - 1) + (week - 1) * 7);
+    const resolvedWeek = isoWeek(monday);
+    if (resolvedWeek.year !== year || resolvedWeek.week !== week) {
+      throw Object.assign(new Error('该年份不存在这一周'), { status: 400 });
+    }
     const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
     const last = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
     return { kind, key, start: monday.toISOString(), end: end.toISOString(),
@@ -279,12 +283,15 @@ function generatePeriod(kind, key, { overwrite = false } = {}) {
   const existing = readPeriod(kind, period.key);
   const finished = Date.parse(period.end) <= Date.now();
   // 已结束的刊期是定稿；进行中的刊期 30 分钟内复用，之后重新组稿（保留模型导语直到数据变化）
-  if (existing && !overwrite && (finished || Date.now() - Date.parse(existing.generatedAt) < 30 * 60e3)) return existing;
+  const generatedAt = Date.parse(existing?.generatedAt);
+  // 跨期后必须补齐截止前最后一批资料，再冻结；不能把期内草稿直接当作定稿。
+  const finalized = finished && generatedAt >= Date.parse(period.end);
+  if (existing && !overwrite && (finalized || (!finished && Date.now() - generatedAt < 30 * 60e3))) return existing;
   const issue = composeIssue({ start: period.start, end: new Date(Math.min(Date.parse(period.end), Date.now())).toISOString(),
     label: period.label, periodLabel: period.periodLabel, perSection: kind === 'monthly' ? 12 : 10, hotLimit: kind === 'monthly' ? 15 : 10,
     basis: 'released' });
   const content = { kind, key: period.key, finished, ...issue, window: { ...issue.window, periodEnd: period.end } };
-  if (existing?.leadSource === 'model' && existing.totals?.featured === content.totals.featured && existing.totals?.deals === content.totals.deals) {
+  if (existing?.leadSource === 'model' && leadInput(existing) === leadInput(content)) {
     content.lead = existing.lead;
     content.leadSource = 'model';
   }

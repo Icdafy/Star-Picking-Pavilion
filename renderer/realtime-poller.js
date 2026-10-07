@@ -75,10 +75,10 @@
       const signals = stats ? pollSignalsOf(stats) : null;
       if (startedContext !== lastPollContext) lastPollSignals = null;
       if (signals !== null && signals === lastPollSignals) return schedule();
-      lastPollSignals = signals;
-      lastPollContext = startedContext;
       // 仅信息流视图、非检索、非加载中才做增量探测
       if (!FEED_VIEWS.includes(state.view) || state.q || state.loading) return schedule();
+      lastPollSignals = signals;
+      lastPollContext = startedContext;
       try {
         const params = new URLSearchParams({ view: state.view, page: 0 });
         if (state.domain) params.set('domain', state.domain);

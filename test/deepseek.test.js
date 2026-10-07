@@ -308,6 +308,18 @@ test('a moderation-style 400 is never retried', async () => {
   assert.equal(zhCalls.n, 1, '中文审核拒绝同样不重发');
 });
 
+test('a content refusal still takes priority when its message also mentions a parameter', async () => {
+  let calls = 0;
+  await assert.rejects(chat([{ role: 'user', content: 'test' }], {
+    settings: settings(),
+    fetchImpl: async () => {
+      calls += 1;
+      return stubResponse({ status: 400, body: '{"error":"Invalid parameter: content rejected by moderation policy"}' });
+    }
+  }), /HTTP 400/);
+  assert.equal(calls, 1);
+});
+
 // ---------- L6：reasoning_content 兕底仅限被截断的输出 ----------
 
 test('reasoning_content is only used when the answer was truncated (finish_reason=length)', async () => {

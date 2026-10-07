@@ -91,7 +91,7 @@
       elements.hint.textContent = (
         `情报保留 ${snapshot.retentionDays} 天，无关内容保留 ${snapshot.irrelevantRetentionDays} 天`
         + ` · 当前可回收 ${Math.round(ratio * 100)}%`
-        + (snapshot.lastPruneAt ? ' · 已启用每日自动清理' : ' · 等待首次自动清理')
+        + (snapshot.scheduler?.activeSchedule?.enabled ? ' · 已启用每日自动清理' : ' · 自动清理未开启，可手动清理')
       );
     }
 
@@ -185,13 +185,19 @@
     );
 
     // 轮询维护快照直到后台清理结束：结束前刷新只能拿到清理前旧值
-    async function waitForPruneCompletion() {
+    async function waitForPruneCompletion(pruneId) {
       for (let attempt = 0; attempt < PRUNE_POLL_MAX_ATTEMPTS; attempt += 1) {
         await new Promise(resolve => { setTimeout(resolve, prunePollIntervalMs); });
         let snapshot = null;
         try { snapshot = await operations.requestDatabase(); } catch { continue; }
-        if (!isPruneRunning(snapshot)) return;
+        if (!isPruneRunning(snapshot)) {
+          const result = snapshot?.scheduler?.lastPrune;
+          if (pruneId != null && result?.id !== pruneId) continue;
+          if (result?.ok === false) throw new Error(result.error || '数据清理未完成，请稍后重试。');
+          return result;
+        }
       }
+      throw new Error('未能确认清理结果，请稍后刷新状态；已接收的后台任务会继续执行。');
     }
 
     async function prune() {
@@ -205,18 +211,21 @@
           // 202 异步契约：服务端后台执行，result 不再携带 skipped/removedArticles；
           // 保持按钮忙态与轮询，清理结束后再刷新数字，避免闪回清理前旧值
           setStatus('prune', '已开始清理，完成后自动刷新…', '', true);
-          await waitForPruneCompletion();
+          await waitForPruneCompletion(result.pruneId);
           await load();
           setStatus('prune', '✓ 清理完成', 'ok', false);
           return result;
         }
         // 旧同步契约兼容：直接读清理结果
         const feedback = result?.skipped
-          ? '清理已在进行中，请稍候'
+          ? result.reason === 'busy' ? '暂未清理：采集或分析正在进行，请稍后重试'
+            : result.reason === 'maintenance' ? '暂未清理：数据库正在维护，请稍后重试'
+              : result.reason === 'stopping' ? '暂未清理：服务正在退出'
+                : '清理已在进行中，请稍候'
           : (result?.removedArticles
             ? `✓ 已清理 ${result.removedArticles} 条`
             : '✓ 没有需要清理的内容');
-        setStatus('prune', feedback, 'ok', false);
+        setStatus('prune', feedback, result?.skipped ? '' : 'ok', false);
         await load();
         return result;
       } catch (error) {
