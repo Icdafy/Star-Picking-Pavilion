@@ -10,9 +10,10 @@
 // 评分输入故意不带信源名称与等级（AIHOT：不让名气替事件加分）；理解输入带信源，只用来理解材料。
 // 每一步的输出都在这里做形状校验与收口，下游只拿到干净的结构。
 const { chat, extractJson } = require('./deepseek');
-const { modelFor } = require('./model-policy');
+const { modelFor, modelIdentity } = require('./model-policy');
 const industry = require('../industry');
 const { withReceipt } = require('./receipts');
+const { stripTagMarkup } = require('../html-text');
 
 const PREFILTER_LABELS = new Set(['PASS', 'BLOCK', 'UNKNOWN']);
 const AUTHOR_ROLES = new Set(['principal', 'observer', 'relayer']);
@@ -31,7 +32,10 @@ function clip(value, max) {
 
 // 标题、摘要、正文里的 </item> 之类标记会破坏分隔：包进去之前抹掉
 function neutralize(value) {
-  return String(value || '').replace(/<\/?\s*(item|candidate)\b[^>]*>/gi, ' ');
+  const text = String(value || '').replace(/<\s*(\/?)\s*(item|candidate)\b/gi, '<$1$2');
+  const clean = stripTagMarkup(text, tag => /^<\/?(?:item|candidate)\b/i.test(tag) ? ' ' : tag);
+  // 纯文本可能把分隔符写在其它标签的属性内；这些仍是模型可见数据，也必须失活。
+  return clean.replace(/<(?=\/?(?:item|candidate)\b)/gi, '‹');
 }
 
 // ---------- 预筛 ----------
@@ -67,7 +71,7 @@ async function prefilterBatch(articles, settings) {
   const user = articles.map(prefilterItem).join('\n');
   const { value } = await withReceipt({
     task: 'prefilter',
-    keyParts: [prompt.version, modelFor(settings), user],
+    keyParts: [prompt.version, modelIdentity(settings), user],
     validate: v => Array.isArray(v) && v.length === articles.length,
     call: async () => {
       const out = await chat([
@@ -111,7 +115,7 @@ async function scorePass(article, pass, settings, vision) {
   const user = scoringItem(article, vision);
   const { value } = await withReceipt({
     task: `score-${pass}`,
-    keyParts: [prompt.version, modelFor(settings), user],
+    keyParts: [prompt.version, modelIdentity(settings), user],
     validate: v => v && Number.isFinite(v.score),
     call: async () => {
       const out = await chat([
@@ -198,7 +202,7 @@ async function understand(article, settings, vision) {
   const user = understandingItem(article, vision);
   const { value } = await withReceipt({
     task: 'understand',
-    keyParts: [prompt.version, modelFor(settings), user],
+    keyParts: [prompt.version, modelIdentity(settings), user],
     validate: v => v && typeof v.itemType === 'string',
     call: async () => {
       const out = await chat([

@@ -56,11 +56,11 @@ function normalizeTranslations(json, articles) {
 
 async function translateBatch(articles, settings) {
   const { chat, extractJson } = require('./deepseek');
-  const { modelFor } = require('./model-policy');
+  const { modelFor, modelIdentity } = require('./model-policy');
   const { withReceipt } = require('./receipts');
   const input = articles.map(a => ({ id: a.id, title: a.title, summary: String(a.summary_raw || '').slice(0, 2200) }));
   const user = JSON.stringify(input);
-  const { value } = await withReceipt({ task: 'translate-zh', keyParts: [VERSION, modelFor(settings), user],
+  const { value } = await withReceipt({ task: 'translate-zh', keyParts: [VERSION, modelIdentity(settings), user],
     validate: value => {
       try { normalizeTranslations({ items: value }, articles); return true; } catch { return false; }
     },

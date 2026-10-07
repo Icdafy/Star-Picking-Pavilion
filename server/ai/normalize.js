@@ -12,7 +12,8 @@
 //
 // 清洗结果会写回库并用 clean_version 打标，改了规则只要抬版本号，
 // 下一轮分析就会把历史数据顺带洗一遍，不需要全量重跑管线。
-const CLEAN_VERSION = 1;
+const CLEAN_VERSION = 2;
+const { stripMarkup } = require('../html-text');
 
 // 跟踪参数：这些键存在与否不改变文章内容，却让同一篇文章有无数个 URL。
 // 前缀型放 PREFIXES，精确型放 EXACT，避免误伤 `source_id` 这类真参数。
@@ -73,12 +74,6 @@ function safeCodePoint(code, fallback) {
   try { return String.fromCodePoint(code); } catch { return fallback; }
 }
 
-function stripMarkup(text) {
-  return String(text || '')
-    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]{0,400}>/g, ' ');
-}
-
 // 控制字符与零宽字符：采集回来的 HTML 里很常见，会让 bigram 相似度和去重键都失真
 function stripInvisible(text) {
   return String(text || '').replace(/[\p{Cc}\p{Cf}]/gu, ' ');
@@ -119,8 +114,8 @@ function stripSiteTail(title, sourceName) {
   return text;
 }
 
-function cleanTitle(raw, { sourceName = '' } = {}) {
-  let text = collapseSpace(foldFullWidthAlnum(stripInvisible(stripMarkup(decodeEntities(raw)))));
+function cleanTitle(raw, { sourceName = '', plainText = false } = {}) {
+  let text = collapseSpace(foldFullWidthAlnum(stripInvisible(plainText ? raw : decodeEntities(stripMarkup(raw)))));
   if (!text) return '';
   const source = collapseSpace(sourceName);
   // 信源名做前缀标记：`【东方财富】xxx`、`[新华社] xxx`
@@ -144,8 +139,8 @@ const BODY_TAILS = [
   /更多(精彩|资讯|内容)(请|尽)/, /举报\/反馈/, /\(?文章内容仅供参考/
 ];
 
-function cleanSummary(raw) {
-  let text = collapseSpace(foldFullWidthAlnum(stripInvisible(stripMarkup(decodeEntities(raw)))));
+function cleanSummary(raw, { plainText = false } = {}) {
+  let text = collapseSpace(foldFullWidthAlnum(stripInvisible(plainText ? raw : decodeEntities(stripMarkup(raw)))));
   if (!text) return '';
   for (const pattern of BODY_TAILS) {
     const match = pattern.exec(text);
@@ -160,7 +155,8 @@ function cleanSummary(raw) {
 
 // 采集适配器交上来的原始条目 → 统一结构。返回 null 表示这条不该入库。
 function structureItem(item, { sourceName = '', domain = null } = {}) {
-  const title = cleanTitle(item?.title, { sourceName });
+  const plainText = item?.textFormat === 'plain';
+  const title = cleanTitle(item?.title, { sourceName, plainText });
   const url = String(item?.url || '').trim();
   const canonicalUrl = canonicalizeUrl(url);
   if (!title || !canonicalUrl) return null;
@@ -168,7 +164,7 @@ function structureItem(item, { sourceName = '', domain = null } = {}) {
     title,
     url,
     canonicalUrl,
-    summaryRaw: cleanSummary(item?.summary),
+    summaryRaw: cleanSummary(item?.summary, { plainText }),
     publishedAt: item?.publishedAt || null,
     publicationPrecision: item?.publicationPrecision || null,
     publicationDateText: item?.publicationDateText || null,

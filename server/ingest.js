@@ -37,7 +37,7 @@ function sanitizeItem(item, source, at) {
   if (upstreamBackfill != null && typeof upstreamBackfill !== 'boolean') fail('raw._aihot.backfill 必须是布尔值');
   const structured = structureItem({ title, url: url.href, publishedAt,
     summary: text(item.summary, '摘要', 4000),
-    contentText: stripMarkup(decodeEntities(text(item.contentText, '正文', 12000))).trim()
+    contentText: decodeEntities(stripMarkup(text(item.contentText, '正文', 12000))).trim()
   }, { sourceName: source.name, domain: source.domain === 'both' ? null : source.domain });
   if (!structured) fail('清洗后标题或原文地址为空');
   const importedBackfill = Boolean(item.backfill || upstreamBackfill);

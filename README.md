@@ -2,26 +2,27 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机持续采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，每天、每周、每月出刊。
 
-## v0.2.23 · 发布时间与采集调度修复
+## v0.2.24 · AIHOT 引擎改进同步
 
-- **报道时间优先**：精选、全部动态及导出按新闻发布时间整理；事件发生时间作辅助说明。找不到发布日期的新闻按采集时间收录并标注“发布时间未确认”，跨年日期显示年份。
-- **修复旧闻漏读日期**：星河动力“完成24亿元D轮融资”的原文日期为 2025/09/30；补齐只写日期的原文发布信息，独立补查已入库缺失日期的旧记录，并撤销旧文错误的新近热度。
-- **保留日期精度**：支持年月日、年月、月日，不强求时分。月份级信息显示“仅确认月份”；月日缺年份时明确标注年份推定，不显示虚构的零点。
-- **准确等待采集间隔**：支持 1—720 的整数分钟。每轮完成后等待设定间隔，手动采集分析完成后重新计时；设置显示实际下次时间，并区分采集与后台分析造成的列表更新。
+- **原文保真**：Atom 纯文本、CDATA 和型号尖括号保留原意，HTML 属性不再污染标题摘要；空摘要、相对链接和 XML Base 正确处理。
+- **干净正文与准确日期**：排除直接隐藏的广告文字、伪配图与视频页面，恢复备用真图；英文日期跨夏令时一致，坏 JSON 日期不阻断整批。
+- **明确模型能力**：只对明确支持图片的模型做图片理解，设置说明同步；同名模型切换端点后使用该路由自己的回执。
+- **可恢复的事件研判**：候选须逐项完整回答；当前进展不受旧日期错误否决。综述跟随真实报道内容，更正或撤回使旧综述失效，失败重试，证据变化时不写回旧答复。
+- **透明评测**：关系评测同时报告覆盖率、成功准确率及计入失败的完整准确率，相同输入在本轮共享请求。
 
-版本、界面与更新元数据统一为 0.2.23，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。日期与调度修复、桌面检查和发布验证见 [验证记录](docs/v0223-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)及 `config/sources.default.json`，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。升级保留来源 ID、启停状态、统计、已有情报、星标、归档、密钥与设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.24，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。56 个上游提交的研究与适配判断见 [AIHOT 深度对照](docs/v0224-aihot-audit.md)，测试及发布见 [验证记录](docs/v0224-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)及 `config/sources.default.json`，历史版本见应用内更新日志及 [变更日志](CHANGELOG.md)。升级保留来源 ID、启停状态、统计、已有情报、星标、归档、密钥与设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.23.exe`，双击并按向导安装。v0.2.23 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.24.exe`，双击并按向导安装。v0.2.24 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.23.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.24.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

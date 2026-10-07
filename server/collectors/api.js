@@ -14,6 +14,7 @@
 const { fetchText } = require('./fetch-util');
 const { setTimeout: delay } = require('node:timers/promises');
 const lexicon = require('../ai/lexicon');
+const { stripMarkup, decodeEntities } = require('../ai/normalize');
 
 const EASTMONEY_SCHEME = 'eastmoney://';
 const PAGE_SIZE = 30;
@@ -114,10 +115,11 @@ function mapEastmoneyResponse(raw) {
     throw new Error('东财检索返回结构异常：缺少有效 cmsArticleWebOld 数组');
   }
   return articles.map(a => ({
-    title: String(a.title || '').replace(/<[^>]+>/g, '').trim(),
+    title: decodeEntities(stripMarkup(a.title, '')).trim(),
     url: validWebUrl(a.url),
-    summary: String(a.content || '').replace(/<[^>]+>/g, '').trim(),
-    publishedAt: a.date ? new Date(a.date.replace(' ', 'T') + '+08:00').toISOString() : null,
+    summary: decodeEntities(stripMarkup(a.content, '')).trim(),
+    textFormat: 'plain',
+    publishedAt: looseDateIso(a.date),
     image: (a.image && /^https?:\/\//.test(a.image)) ? a.image : null,
     // 检索线只是入口，真正的出版方是 mediaName（财联社、证券时报……）：热度按它计独立参与者
     publisherId: typeof a.mediaName === 'string' && a.mediaName.trim() && !/\p{Cc}/u.test(a.mediaName)
@@ -193,11 +195,18 @@ const { looseDateIso } = require('./loose-date');
 
 // 中文站点常见的两种日期写法；解不出就返回 null，交给入库时间兜底
 function parseCnDate(value) {
-  const s = String(value == null ? '' : value).trim();
+  let s;
+  try { s = String(value == null ? '' : value).trim(); } catch { return null; }
   if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00+08:00').toISOString();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return looseDateIso(`${s} 00:00:00`, '+08:00');
   // 带时间不带时区的写法按北京时间读，不随本机时区漂移
   return looseDateIso(s, '+08:00');
+}
+
+function epochIso(value, factor = 1) {
+  if (!Number.isFinite(value)) return null;
+  const date = new Date(value * factor);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
 // cninfo://检索词?column=szse|sse&stock=&category= —— 检索词可空（空=全量最新公告流）
@@ -226,10 +235,10 @@ function mapCninfoResponse(raw, spec) {
   if (!Array.isArray(list)) throw new Error('cninfo 返回结构异常：缺少 announcements 数组');
   const items = list.map(a => ({
     // isHLtitle=true 时命中词会被 <em> 包裹，入库前剥掉
-    title: String(a.announcementTitle || '').replace(/<[^>]+>/g, '').trim(),
+    title: decodeEntities(stripMarkup(a.announcementTitle, '')).trim(),
     url: resolveStaticAssetUrl('http://static.cninfo.com.cn/', a.adjunctUrl),
     summary: a.secName || a.secCode ? `${a.secName || ''}（${a.secCode || ''}）` : '',
-    publishedAt: Number.isFinite(a.announcementTime) ? new Date(a.announcementTime).toISOString() : null,
+    publishedAt: epochIso(a.announcementTime),
     image: null
   })).filter(a => a.title && a.url);
   return spec.keyword ? items.filter(buildGuard(spec.keyword)) : items;
@@ -319,12 +328,12 @@ function mapClsResponse(raw, spec) {
   const list = (parsed && parsed.data && parsed.data.roll_data) || (parsed && parsed.data);
   if (!Array.isArray(list)) throw new Error('cls 返回结构异常：缺少电报数组');
   const items = list.map(t => {
-    const content = String(t.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const content = decodeEntities(stripMarkup(t.content)).replace(/\s+/g, ' ').trim();
     return {
       title: String(t.title || '').trim() || content.slice(0, 60),
       url: t.id ? `https://www.cls.cn/detail/${t.id}` : null,
       summary: content,
-      publishedAt: Number.isFinite(t.ctime) ? new Date(t.ctime * 1000).toISOString() : null,
+      publishedAt: epochIso(t.ctime, 1000),
       image: null
     };
   }).filter(t => t.title && t.url);
@@ -441,7 +450,7 @@ function mapSzseIpoResponse(raw, spec, nowMs = Date.now()) {
     const industry = String(p.csrcind || '');
     if (!name || !status || !/^\d{1,10}$/.test(id)) return null;
     if (spec.industry && !industry.includes(spec.industry) && !(spec.keyword && name.includes(spec.keyword))) return null;
-    const publishedAt = /^\d{4}-\d{2}-\d{2}$/.test(p.updtdt || '') ? new Date(`${p.updtdt}T00:00:00+08:00`).toISOString() : null;
+    const publishedAt = /^\d{4}-\d{2}-\d{2}$/.test(p.updtdt || '') ? parseCnDate(p.updtdt) : null;
     const amount = Number(p.maramt);
     return {
       title: `${name}${board}IPO审核状态：${status}`,

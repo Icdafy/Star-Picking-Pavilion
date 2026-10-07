@@ -100,7 +100,9 @@ function relationMetrics(predictions, totalCases = predictions.length) {
     sampleSize: totalCases,
     evaluated: predictions.length,
     errors: Math.max(0, totalCases - predictions.length),
+    coverage: round(predictions.length / Math.max(1, totalCases)),
     accuracy: round(correct / Math.max(1, predictions.length)),
+    completeAccuracy: round(correct / Math.max(1, totalCases)),
     macroF1: round(RELATIONS.reduce((sum, r) => sum + perClass[r].f1, 0) / RELATIONS.length),
     confusionMatrix: matrix,
     perClass
@@ -108,7 +110,7 @@ function relationMetrics(predictions, totalCases = predictions.length) {
 }
 
 // “是否并入同一事件”：same 与 development 都会并入，置信度须达到门槛
-function mergeMetrics(predictions, threshold) {
+function mergeMetrics(predictions, threshold, totalCases = predictions.length) {
   let tp = 0, fp = 0, fn = 0, tn = 0;
   for (const p of predictions) {
     const gold = p.gold !== 'different';
@@ -117,8 +119,11 @@ function mergeMetrics(predictions, threshold) {
   }
   const precision = tp / Math.max(1, tp + fp);
   const recall = tp / Math.max(1, tp + fn);
-  return { threshold, tp, fp, fn, tn, precision: round(precision), recall: round(recall),
-    f1: round((2 * precision * recall) / Math.max(1e-9, precision + recall)), accuracy: round((tp + tn) / Math.max(1, tp + fp + fn + tn)) };
+  return { threshold, sampleSize: totalCases, evaluated: predictions.length,
+    errors: Math.max(0, totalCases - predictions.length), coverage: round(predictions.length / Math.max(1, totalCases)),
+    tp, fp, fn, tn, precision: round(precision), recall: round(recall),
+    f1: round((2 * precision * recall) / Math.max(1e-9, precision + recall)),
+    accuracy: round((tp + tn) / Math.max(1, predictions.length)), completeAccuracy: round((tp + tn) / Math.max(1, totalCases)) };
 }
 
 function asDoc(r) {
@@ -129,12 +134,19 @@ function asDoc(r) {
 async function evaluate(rows, { judgePair, concurrency = 4 } = {}) {
   const predictions = [];
   const failures = [];
+  // 只在本轮评测复用同输入的成功/失败，每个金标样本仍独立计分。
+  const answers = new Map();
   let cursor = 0;
   async function worker() {
     while (cursor < rows.length) {
       const row = rows[cursor++];
       try {
-        const verdict = await judgePair(asDoc(row.b), asDoc(row.a));
+        const input = [asDoc(row.b), asDoc(row.a)];
+        const key = JSON.stringify(input);
+        if (!answers.has(key)) answers.set(key, Promise.resolve().then(() => judgePair(...input)));
+        const verdict = await answers.get(key);
+        if (!RELATIONS.includes(verdict?.relation) || !Number.isFinite(verdict.confidence)
+          || verdict.confidence < 0 || verdict.confidence > 1) throw new Error('归组判断响应无效');
         predictions.push({ caseId: row.caseId, stratum: row.stratum, gold: row.gold, relation: verdict.relation, confidence: verdict.confidence });
       } catch (error) {
         failures.push({ caseId: row.caseId, error: String(error.message || error).slice(0, 200) });
@@ -166,7 +178,7 @@ async function main() {
     judgePair: async (doc, other) => (await judge(doc, [{ evidence: other }], settings))[0]
   });
   const metrics = relationMetrics(predictions, rows.length);
-  const merge = args.thresholds.map(t => mergeMetrics(predictions, t));
+  const merge = args.thresholds.map(t => mergeMetrics(predictions, t, rows.length));
   const prompt = `group-pair@${industry.renderPrompt('group-pair').version}`;
   const at = new Date().toISOString();
   const out = { label: args.label, at, split: args.split, seed: args.seed, prompt, metrics, merge, failures, predictions };
@@ -177,11 +189,12 @@ async function main() {
   const lines = [
     `# 事件关系校准 ${args.label || ''}`.trim(), '',
     `- 样本：${rows.length} 对（split=${args.split}，seed=${args.seed}）；提示词：${prompt}；失败 ${failures.length}`,
-    `- 准确率 ${metrics.accuracy} · macro-F1 ${metrics.macroF1}`, '',
+    `- 覆盖率 ${metrics.coverage} · 完整准确率（失败计入分母）${metrics.completeAccuracy}`, '',
+    `- 成功回答准确率 ${metrics.accuracy} · 成功回答 macro-F1 ${metrics.macroF1}`, '',
     '| 真实 \\ 预测 | same | development | different |', '|---|---:|---:|---:|',
     ...RELATIONS.map(g => `| ${g} | ${RELATIONS.map(p => metrics.confusionMatrix[g][p]).join(' | ')} |`), '',
-    '| 合并门槛 | 查准 | 查全 | F1 | 准确率 |', '|---:|---:|---:|---:|---:|',
-    ...merge.map(m => `| ${m.threshold} | ${m.precision} | ${m.recall} | ${m.f1} | ${m.accuracy} |`)
+    '| 合并门槛 | 查准 | 查全 | F1 | 成功准确率 | 完整准确率 | 覆盖率 |', '|---:|---:|---:|---:|---:|---:|---:|',
+    ...merge.map(m => `| ${m.threshold} | ${m.precision} | ${m.recall} | ${m.f1} | ${m.accuracy} | ${m.completeAccuracy} | ${m.coverage} |`)
   ];
   fs.writeFileSync(path.join(outDir, `relations-${stamp}.md`), `${lines.join('\n')}\n`);
   console.log(lines.join('\n'));

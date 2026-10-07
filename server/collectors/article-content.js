@@ -3,11 +3,14 @@ const cheerio = require('cheerio');
 const { publicUrl, fetchPage } = require('./public-web');
 const { parsePublicationDate } = require('./publication-date');
 const { networkAccess } = require('../network-access');
+const { removeHiddenContent } = require('./visible-content');
+const { isVideoPageUrl } = require('./video-url');
 
 function extractContent(html, url, options = {}) {
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html, { scriptingEnabled: false });
   // 元数据必须在移除脚本 / 页头之前读取；正文日期与事件日期各自保留。
   const publication = extractPublicationDate($, html, url, options);
+  removeHiddenContent($);
   const root = $('#js_content, #ContentBody, article, .article-content, .article_content, .TRS_Editor, #content, .news-content, .news_content').first();
   const content = root.length ? root : $('body');
   content.find('script,style,nav,header,footer,aside,form').remove();
@@ -20,6 +23,7 @@ function extractContent(html, url, options = {}) {
       || (Number(img.attr('height')) > 0 && Number(img.attr('height')) < 80)) return;
     try {
       const u = publicUrl(new URL(src, url).href).href;
+      if (isVideoPageUrl(u)) return;
       if (!images.some(i => i.url === u) && images.length < 6) images.push({ url: u, caption: alt });
     } catch {}
   });
@@ -81,6 +85,7 @@ function reprintSource(text) {
 }
 
 async function enrichArticle(article, { network = networkAccess, fetchPageImpl = fetchPage } = {}) {
+  if (isVideoPageUrl(article.url)) return { text: '', images: [], status: 'video-page' };
   // 补抓历史新闻正文也遵守海外等待；调用方可能只有数据库原始行，没有联表 intl。
   const intl = article.intl != null ? Boolean(article.intl) : article.source_id
     ? Boolean(require('../db').db.prepare('SELECT intl FROM sources WHERE id=?').get(article.source_id)?.intl) : false;
@@ -90,6 +95,7 @@ async function enrichArticle(article, { network = networkAccess, fetchPageImpl =
       ? { html: await require('./wechat').pacedPage(article.url), url: article.url }
       : await fetchPageImpl(article.url, { withUrl: true });
     const { html } = page;
+    if (isVideoPageUrl(page.url)) return { text: '', images: [], status: 'video-page' };
     if (isAccessChallenge(html)) throw new Error('访问验证，停止正文抓取');
     const content = extractContent(html, page.url, { nowMs: Date.parse(article.fetched_at) || Date.now() });
     return { ...content, status: content.text ? 'ok' : '正文为空' };

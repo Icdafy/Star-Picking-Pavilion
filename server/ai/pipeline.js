@@ -112,7 +112,7 @@ function heuristicAnalyze(a) {
       authorRole: a.tier === 'T1' ? 'principal' : 'relayer',
       tags: [],
       titleZh: translation.titleZh || '',
-      summaryZh: translation.summaryZh || normalize.cleanSummary(a.summary_raw || '').slice(0, 120) || a.title,
+      summaryZh: translation.summaryZh || normalize.cleanSummary(a.summary_raw || '', { plainText: true }).slice(0, 120) || a.title,
       editorialJudgment: (a.tier === 'T1' ? '官方一手 · ' : '') + (REASON_TEMPLATES[category] || ''),
       subjects: [],
       fact: null,
@@ -151,8 +151,10 @@ function refreshCleaning(rows) {
   let cleaned = 0;
   for (const row of rows) {
     if (row.clean_version >= normalize.CLEAN_VERSION) continue;
-    const title = normalize.cleanTitle(row.title, { sourceName: row.source_name }) || row.title;
-    const summary = normalize.cleanSummary(row.summary_raw);
+    // v1 及以后已落库为纯文本；不能把原文 <型号> 再当 HTML 删掉。
+    const plainText = row.clean_version >= 1;
+    const title = normalize.cleanTitle(row.title, { sourceName: row.source_name, plainText }) || row.title;
+    const summary = normalize.cleanSummary(row.summary_raw, { plainText });
     const canonicalUrl = row.canonical_url || normalize.canonicalizeUrl(row.url) || null;
     withTransaction(() => {
       update.run(title, summary || null, canonicalUrl, normalize.CLEAN_VERSION, row.id);
@@ -485,7 +487,7 @@ function persistAnalysis(a, domain, outcome, { selection, breakthroughs, analyze
   const category = industry.categoryOfItemType(itemType) || u.category || '企业动态';
   const axes = editorial.averagedAxes(passA, passB);
   const displayTitle = u.titleZh || a.title;
-  const summary = u.summaryZh || normalize.cleanSummary(a.summary_raw || '').slice(0, 120) || '';
+  const summary = u.summaryZh || normalize.cleanSummary(a.summary_raw || '', { plainText: true }).slice(0, 120) || '';
   const fullText = `${a.title || ''} ${displayTitle} ${summary} ${a.summary_raw || ''}`;
   const context = scoringContext({ ...a, ai_summary: summary });
   const resolvedDomain = domain || context.lexicon.domain || a.domain || 'lowaltitude';

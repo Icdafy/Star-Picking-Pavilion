@@ -336,7 +336,7 @@
       const active = providerRow(view.activeProvider);
       const activeModel = active?.models.find(model => model.id === view.activeModel);
       const noKey = active && !active.keyConfigured && !active.keyOptional;
-      const vision = !Array.isArray(activeModel?.input) || activeModel.input.includes('image');
+      const vision = Array.isArray(activeModel?.input) && activeModel.input.includes('image');
       const result = state.testResult;
       return `
         <div class="models-active">
@@ -421,8 +421,8 @@
                   <fieldset class="model-inputs">
                     <legend>输入类型</legend>
                     <label><input type="checkbox" checked disabled> 文本</label>
-                    <label><input type="checkbox" data-models-field="image" data-draft="${esc(draftKey)}" data-uid="${row.uid}"${image === false ? '' : ' checked'}${draft.busy ? ' disabled' : ''}> 图片</label>
-                    ${image === null ? '<small>未声明：按支持图片处理</small>' : ''}
+                    <label><input type="checkbox" data-models-field="image" data-draft="${esc(draftKey)}" data-uid="${row.uid}"${image === true ? ' checked' : ''}${draft.busy ? ' disabled' : ''}> 图片</label>
+                    ${image === null ? '<small>未声明：仅发送文本；确认支持图片后可勾选</small>' : ''}
                   </fieldset>
                 </div>` : ''}
               </div>`;

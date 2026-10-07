@@ -18,7 +18,7 @@ const { db, now } = require('../db');
 const industry = require('../industry');
 const { chat, extractJson } = require('./deepseek');
 const { withReceipt } = require('./receipts');
-const { modelFor } = require('./model-policy');
+const { modelFor, modelIdentity } = require('./model-policy');
 const { neutralize } = require('./editorial');
 const { SECTION_ORDER } = require('../archive/daily-bundle');
 const { localDateString } = require('../date-time');
@@ -318,7 +318,7 @@ async function rewriteLead(issue, settings, periodLabel) {
   const user = `<item id="0">\n${leadInput(issue)}\n</item>`;
   const { value } = await withReceipt({
     task: 'report-lead',
-    keyParts: [prompt.version, modelFor(settings), user],
+    keyParts: [prompt.version, modelIdentity(settings), user],
     validate: v => v && typeof v.lead === 'string' && v.lead.trim().length >= 20,
     call: async () => extractJson(await chat([
       { role: 'system', content: prompt.text },

@@ -14,11 +14,12 @@
 //   · 事件容量有上限，防止相似度误判串链吞掉半个库
 //   · 串行运行（调度器的分析锁），归组结果只在变化时写库
 const { db, now } = require('../db');
+const { createHash } = require('node:crypto');
 const { bigrams } = require('./cluster');
 const industry = require('../industry');
 const { chat, extractJson } = require('./deepseek');
 const { withReceipt } = require('./receipts');
-const { modelFor } = require('./model-policy');
+const { modelFor, modelIdentity } = require('./model-policy');
 const { neutralize } = require('./editorial');
 const { observedAt } = require('./companies');
 
@@ -100,12 +101,15 @@ class RecallPool {
     const consider = (index, overlapValue, count, flags) => {
       const other = this.docs[index];
       if (!other.storyId || other.id === doc.id) return;
-      const current = byStory.get(other.storyId) || { storyId: other.storyId, overlap: 0, shared: 0, eventKey: false, structural: false, compatible: true, evidence: other };
-      if (overlapValue > current.overlap) { current.overlap = overlapValue; current.shared = count; current.evidence = other; }
-      if (flags.eventKey) current.eventKey = true;
-      if (flags.structural) current.structural = true;
-      if (!compatible(doc, other)) current.compatible = false;
-      byStory.set(other.storyId, current);
+      // 相容性属于这篇具体证据，旧进展的不同日期不能否决当前进展的重复报道。
+      const candidate = { storyId: other.storyId, overlap: overlapValue, shared: count,
+        eventKey: Boolean(doc.eventKey && doc.eventKey === other.eventKey), structural: Boolean(flags.structural),
+        compatible: compatible(doc, other), evidence: other };
+      const rank = c => Number(c.eventKey && c.compatible) * 2 + Number(c.compatible);
+      const current = byStory.get(other.storyId);
+      const better = !current || rank(candidate) > rank(current)
+        || (rank(candidate) === rank(current) && candidate.overlap > current.overlap);
+      if (better) byStory.set(other.storyId, candidate);
     };
     for (const [index, count] of shared) {
       const other = this.docs[index];
@@ -114,7 +118,10 @@ class RecallPool {
       const structural = doc.actionClass && doc.actionClass === other.actionClass && [...doc.subjects].some(id => other.subjects.has(id));
       if (count >= Math.min(3, this.minShared) || structural) consider(index, value, count, { structural });
     }
-    for (const index of (doc.eventKey && this.byEventKey.get(doc.eventKey)) || []) consider(index, 0, 0, { eventKey: true });
+    for (const index of (doc.eventKey && this.byEventKey.get(doc.eventKey)) || []) {
+      const count = shared.get(index) || 0, smaller = Math.min(doc.grams.size, this.docs[index].grams.size);
+      consider(index, smaller ? count / smaller : 0, count, { eventKey: true });
+    }
     return [...byStory.values()].sort((a, b) =>
       Number(b.eventKey && b.compatible) - Number(a.eventKey && a.compatible) || b.overlap - a.overlap);
   }
@@ -135,12 +142,15 @@ function describe(doc) {
 }
 
 function normalizeJudgement(json, count) {
-  if (!json || !Array.isArray(json.results)) throw new Error('归组判断响应无效');
-  const out = Array.from({ length: count }, () => ({ relation: 'different', confidence: 0 }));
+  if (!json || !Array.isArray(json.results) || json.results.length !== count) throw new Error('归组判断响应无效：候选须逐项回答');
+  const out = new Array(count), seen = new Set();
   for (const r of json.results) {
     const index = Number(r?.c);
-    if (!Number.isInteger(index) || index < 0 || index >= count || !RELATIONS.has(r.relation)) continue;
-    const confidence = Math.max(0, Math.min(1, Number(r.confidence) || 0));
+    if (r?.c == null || !Number.isInteger(index) || index < 0 || index >= count || seen.has(index)
+      || !RELATIONS.has(r.relation) || typeof r.confidence !== 'number' || !Number.isFinite(r.confidence)
+      || r.confidence < 0 || r.confidence > 1) throw new Error('归组判断响应无效：序号、关系或置信度错误');
+    seen.add(index);
+    const confidence = r.confidence;
     out[index] = { relation: r.relation, confidence };
   }
   return out;
@@ -151,8 +161,9 @@ async function judge(doc, candidates, settings, confirmation = false) {
   const user = `<item id="NEW">\n${describe(doc)}\n</item>\n${candidates.map((c, i) => `<candidate id="${i}">\n${describe(c.evidence)}\n</candidate>`).join('\n')}`;
   const { value } = await withReceipt({
     task: confirmation ? 'group-confirm' : 'group',
-    keyParts: [prompt.version, modelFor(settings), user, confirmation ? 'independent-confirmation-v1' : 'initial'],
-    validate: v => Array.isArray(v) && v.length === candidates.length,
+    keyParts: [prompt.version, modelIdentity(settings), user, confirmation ? 'independent-confirmation-v2' : 'complete-initial-v2'],
+    validate: v => Array.isArray(v) && v.length === candidates.length && v.every(r => RELATIONS.has(r?.relation)
+      && typeof r.confidence === 'number' && Number.isFinite(r.confidence) && r.confidence >= 0 && r.confidence <= 1),
     call: async () => normalizeJudgement(extractJson(await chat([
       { role: 'system', content: prompt.text + (confirmation ? '\n这是独立复核：必须核对主体、轮次、任务批次、日期及完成状态。没有足够证据表明是同一事件或明确后续进展时返回 different。不要因为同公司或同赛道就合并。' : '') },
       { role: 'user', content: user }
@@ -169,7 +180,7 @@ const mainOrder = (a, b) =>
 
 function refreshStory(storyId) {
   const members = db.prepare(`SELECT ${ROW_COLUMNS}, a.featured, a.breakthrough_score FROM articles a JOIN sources s ON s.id = a.source_id
-    WHERE a.cluster_id = ?`).all(storyId).map(row => ({ ...docOf(row), row }));
+    WHERE a.cluster_id = ? AND a.relevant = 1`).all(storyId).map(row => ({ ...docOf(row), row }));
   if (!members.length) {
     db.prepare('DELETE FROM clusters WHERE id = ? AND merged_into IS NULL').run(storyId);
     return null;
@@ -423,38 +434,53 @@ function migrateLegacyClusters() {
 }
 
 // ---------- 事件综述 ----------
-async function digestStories({ settings = null } = {}) {
+function digestInput(storyId, prompt, settings) {
+  if (!db.prepare('SELECT id FROM clusters WHERE id=? AND merged_into IS NULL').get(storyId)) return null;
+  const reports = db.prepare(`SELECT a.id, a.title, a.title_zh, a.ai_summary, a.published_at, a.fetched_at, s.name AS source_name
+    FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.cluster_id = ? AND a.relevant = 1
+    ORDER BY COALESCE(a.published_at, a.fetched_at), a.id`).all(storyId);
+  const user = reports.slice(-8).map((r, i) => `<item id="${i}">来源：${neutralize(r.source_name)}\n报道时间：${r.published_at || '未确认'}\n标题：${neutralize(r.title_zh || r.title)}\n摘要：${neutralize(r.ai_summary).slice(0, 300)}</item>`).join('\n');
+  // 指纹覆盖全部成员，未送入最新八篇窗口的材料更正/撤回也使旧综述失效。
+  const hash = createHash('sha256').update(JSON.stringify([prompt.version, modelIdentity(settings), reports])).digest('hex');
+  return { user, hash, size: reports.length };
+}
+
+async function digestStories({ settings = null, call = chat, receipt = withReceipt } = {}) {
   const config = industry.loadSelection().stories;
   if (!settings?.ai?.apiKey || config.digestLimitPerRound <= 0) return { digested: 0 };
   const since = new Date(Date.now() - 3 * 86400e3).toISOString();
-  const stories = db.prepare(`SELECT id, size FROM clusters
-    WHERE merged_into IS NULL AND size >= ? AND size != digest_size AND latest_at >= ?
-    ORDER BY size DESC, latest_at DESC LIMIT ?`).all(config.digestMinReports, since, config.digestLimitPerRound);
+  const stories = db.prepare(`SELECT id, digest_hash, digest FROM clusters
+    WHERE merged_into IS NULL AND latest_at >= ? ORDER BY size DESC, latest_at DESC`).all(since);
   const prompt = industry.renderPrompt('story-digest');
-  let digested = 0;
+  let digested = 0, attempted = 0;
   for (const story of stories) {
-    const reports = db.prepare(`SELECT a.title, a.title_zh, a.ai_summary, s.name AS source_name FROM articles a JOIN sources s ON s.id = a.source_id
-      WHERE a.cluster_id = ? ORDER BY a.attention_score DESC, a.id LIMIT 8`).all(story.id);
-    const user = reports.map((r, i) => `<item id="${i}">来源：${neutralize(r.source_name)}\n标题：${neutralize(r.title_zh || r.title)}\n摘要：${neutralize(r.ai_summary).slice(0, 300)}</item>`).join('\n');
+    const input = digestInput(story.id, prompt, settings);
+    if (!input || input.hash === story.digest_hash) continue;
+    if (story.digest || story.digest_hash) db.prepare('UPDATE clusters SET digest=NULL,digest_hash=NULL,digest_size=0 WHERE id=?').run(story.id);
+    if (input.size < config.digestMinReports || attempted >= config.digestLimitPerRound) continue;
+    attempted++;
+    const { user } = input;
     try {
-      const { value } = await withReceipt({
+      const { value } = await receipt({
         task: 'digest',
-        keyParts: [prompt.version, modelFor(settings), user],
+        keyParts: [prompt.version, modelIdentity(settings), input.hash, user],
         validate: v => v && typeof v.digest === 'string' && v.digest.trim(),
-        call: async () => extractJson(await chat([
+        call: async () => extractJson(await call([
           { role: 'system', content: prompt.text },
           { role: 'user', content: user }
         ], { settings, model: modelFor(settings), maxTokens: 700 }))
       });
-      const digest = [...String(value.digest).trim()].slice(0, 240).join('');
+      if (typeof value?.digest !== 'string' || !value.digest.trim()) throw new Error('事件综述响应无效');
+      const digest = [...value.digest.trim()].slice(0, 240).join('');
       const title = typeof value.title === 'string' && value.title.trim() ? [...value.title.trim()].slice(0, 40).join('') : null;
-      db.prepare('UPDATE clusters SET digest = ?, title = COALESCE(?, title), digest_size = ?, digest_at = ? WHERE id = ?')
-        .run(digest, title, story.size, now(), story.id);
+      // 等待模型期间材料可能被更正或移出事件。旧答复保留回执，但不能覆盖当前证据。
+      if (digestInput(story.id, prompt, settings)?.hash !== input.hash) continue;
+      db.prepare('UPDATE clusters SET digest = ?, title = COALESCE(?, title), digest_size = ?, digest_at = ?, digest_hash = ? WHERE id = ? AND merged_into IS NULL')
+        .run(digest, title, input.size, now(), input.hash, story.id);
       digested++;
     } catch (error) {
       if (error?.budgetExceeded) break;
       console.warn(`[stories] 事件综述失败 #${story.id}:`, error.message);
-      db.prepare('UPDATE clusters SET digest_size = ? WHERE id = ?').run(story.size, story.id);
     }
   }
   return { digested };
@@ -465,6 +491,7 @@ module.exports = {
   consolidateStories,
   judge,
   digestStories,
+  digestInput,
   migrateLegacyClusters,
   mergeStories,
   refreshStory,

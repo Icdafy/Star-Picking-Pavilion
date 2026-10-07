@@ -5,7 +5,7 @@
 // 带时区的时间，以及单独的 ISO 日期（UTC 零点，与旧版行为一致）。
 
 // 时间后面跟着时区：“10:00Z”“10:00:00+08:00”“10:00:00 +0000”“10:00:00 GMT”
-const EXPLICIT_ZONE = /\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2}|GMT|UTC)\b/i;
+const EXPLICIT_ZONE = /\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:[AP]M\s*)?(?:Z|[+-]\d{2}:?\d{2}|GMT|UTC?|[EMP][SD]T|CDT)\b/i;
 
 function atOffset(y, mo, d, h, mi, s, utcOffset) {
   const p = n => String(n).padStart(2, '0');
@@ -25,7 +25,8 @@ function offsetMs(utcOffset) {
 
 function parseLooseDate(value, utcOffset = '+08:00') {
   if (value == null) return null;
-  const v = String(value).trim();
+  let v;
+  try { v = String(value).trim(); } catch { return null; }
   if (!v) return null;
   // 带时区的 ISO 同样先校验日历；Date.parse 会把 2 月 30 日静默顺延。
   const calendar = /^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/.exec(v);
@@ -37,8 +38,15 @@ function parseLooseDate(value, utcOffset = '+08:00') {
     const [y, mo, d] = v.split('-');
     return atOffset(y, mo, d, '00', '00', '00', '+00:00');
   }
+  const english = /\b([a-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?[,]?\s+(\d{4})\b/i.exec(v)
+    || /\b(\d{1,2})\s+([a-z]{3,9})\s+(\d{4})\b/i.exec(v)?.map((part, i, match) => i === 1 ? match[2] : i === 2 ? match[1] : part);
+  if (english) {
+    const month = Date.parse(`${english[1]} 1, ${english[3]} 00:00:00 GMT`);
+    if (!Number.isFinite(month) || !atOffset(english[3], new Date(month).getUTCMonth() + 1, english[2], 0, 0, 0, '+00:00')) return null;
+  }
+  const text = v.replace(/(\d)(st|nd|rd|th)\b/gi, '$1');
   if (EXPLICIT_ZONE.test(v)) {
-    const direct = Date.parse(v);
+    const direct = Date.parse(text);
     if (Number.isFinite(direct) && /\d{4}/.test(v)) return new Date(direct);
   }
   // 2026-09-26 / 2026/09/26 / 2026.9.26 / 2026-09-26T10:00 / 2026年9月26日 10:00，按信源时区读
@@ -47,11 +55,13 @@ function parseLooseDate(value, utcOffset = '+08:00') {
     const [, y, mo, d, h = '00', mi = '00', s = '00'] = m;
     return atOffset(y, mo, d, h, mi, s, utcOffset);
   }
-  // “Sep 26, 2026”：Date.parse 按本机时区读，取出年月日时分再放进信源时区
-  const en = Date.parse(v.replace(/(\d)(st|nd|rd|th)\b/, '$1'));
-  if (!Number.isFinite(en) || !/\d{4}/.test(v)) return null;
-  const local = new Date(en);
-  return atOffset(local.getFullYear(), local.getMonth() + 1, local.getDate(), local.getHours(), local.getMinutes(), local.getSeconds(), utcOffset);
+  // 用 UTC 读取英文墙钟，避免夏令时缺口把 02:30 自动推进到 03:30。
+  // CST 在中文新闻中通常指北京时间，按信源偏移读取，不能采用 Date.parse 的美国中部时区。
+  if (!english) return null;
+  const en = Date.parse(`${text.replace(/\bCST\b/gi, '').trim()} GMT`);
+  if (!Number.isFinite(en)) return null;
+  const utc = new Date(en);
+  return atOffset(utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate(), utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds(), utcOffset);
 }
 
 function looseDateIso(value, utcOffset = '+08:00') {

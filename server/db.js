@@ -268,6 +268,7 @@ function migrateV020(addCol) {
   addClusterCol('digest', 'TEXT');
   addClusterCol('digest_size', 'INTEGER NOT NULL DEFAULT 0');
   addClusterCol('digest_at', 'TEXT');
+  addClusterCol('digest_hash', 'TEXT');
   addClusterCol('merged_into', 'INTEGER');
   addClusterCol('created_at', 'TEXT');
 

@@ -169,7 +169,7 @@ function resolveActive(providers, activeProvider, model) {
 }
 
 function acceptsImages(entry) {
-  return !Array.isArray(entry?.input) || entry.input.includes('image');
+  return Array.isArray(entry?.input) && entry.input.includes('image');
 }
 
 function catalogEntries() {
