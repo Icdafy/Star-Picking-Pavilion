@@ -933,3 +933,9 @@ DomUtils.createMotion 增加 revealText、unfold、layoutChange：文字最多�
 #updatePill 使用上传 SVG 第一帧的几何，原始素材另存；演示 SMIL 进度不运行。按钮由 .update-slot 居中于工作区标识右侧剩余区域，默认图案不随进度变化，悬停／键盘焦点揭示真实数字和 pathLength=100 的外环，下载完成与错误保留重启／重试。旧 .update-core 与无限旋转规则由本版替代。Logo 放大并上移对齐名称。
 
 跟手表面覆盖全部视图、玻璃面板、导航、表单、披露与顶层弹层，最多两个表面、两个控件；装饰层裁切自身，不给滚动祖先增加 overflow，命中范围和正文保持。仅原本静态定位的元素添加装饰定位基准，固定／粘性定位、原生 modal 和锚定 popover 均保留原有定位，清理时撤销自己拥有的定位类。pointerEnabled、pointerSize（80—800px）与 pointerColor（六位 hex）通过共享偏好白名单持久化。大小、调色盘、精确输入与八组预设在显示与排版章节即时应用。鼠标停下即收敛停止 RAF，减少动态／后台／失焦／高对比度清理装饰。292 KiB、27 脚本、20 关键帧预算继续适用。
+
+## v0.2.31 跟手风格与尺寸
+
+pointerStyle 为 glow／comet／stars／ring；旧偏好缺省使用 glow，保留已有 pointerEnabled、pointerSize 和 pointerColor。流星的 pointerCometSize（80—800px 尾长）、星尘的 pointerStarsSize（2—18px）和光环的 pointerRingSize（12—160px 直径）独立保存；pointerOpacity 为 10—100%，颜色与强度共享。设置控件复用，按当前风格更新范围与标签，数字／滑块／调色盘／预设即时应用并自动保存。renderer 与主进程对全部 pointer 字段共用白名单和验证，不接受非法风格或越界值。
+
+DomUtils.createPointerEffects 在既有 dom-utils.js 边界内，由 createInteractionMotion 共用委托输入与环境监听。只采样 pointermove，布局或弹层产生的 pointerover 不唤醒轨迹；单个 RAF 合并输入、按实际时间推进物理与消散。流星 96 个逻辑点／连续渐细样条，星尘复用光点与 96 个槽（lite 档 36），缓冲区约 400 万像素上限；光环只更新 transform／opacity。闲置收敛即停 RAF，关闭、滚动、减少动态、失焦、隐藏、高对比度与销毁清理。透明手动 popover 只承载装饰，不截获命中；原生弹层焦点、Esc 和退出动画保留。范围柔光与新风格互斥；292 KiB、27 脚本、20 关键帧预算继续适用。

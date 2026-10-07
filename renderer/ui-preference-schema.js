@@ -17,6 +17,17 @@
   const TEXT_SCALES = new Set(['sm', 'md', 'lg', 'xl']);
   const AQUA_MODES = new Set(['mica', 'compat']);
   const AQUA_BACKGROUNDS = new Set(['fluid', 'wallpaper']);
+  const POINTER_STYLES = Object.freeze({
+    glow: Object.freeze({ field: 'pointerSize', min: 80, max: 800, label: '光晕大小', hint: '柔光照亮鼠标附近的表面，边缘反光轻轻跟随。' }),
+    comet: Object.freeze({ field: 'pointerCometSize', min: 80, max: 800, label: '尾迹长度', hint: '连续、渐细的流星尾迹，停下后自然消散。' }),
+    stars: Object.freeze({ field: 'pointerStarsSize', min: 2, max: 18, label: '星尘大小', hint: '稀疏星尘沿移动轨迹散开，停下后不再产生粒子。' }),
+    ring: Object.freeze({ field: 'pointerRingSize', min: 12, max: 160, label: '光环直径', hint: '轻盈光环带少许惯性，快速移动时舒展，停下后柔和收敛。' })
+  });
+  const POINTER_DEFAULTS = Object.freeze({
+    pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
+    pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40,
+    pointerColor: '#8b5cf6', pointerOpacity: 100
+  });
   // v0.2.8 原始状态：维护者当前已安装应用的设置（仅公开偏好，不含用户数据）。
   // 仅无本地设置的新用户使用；已有设置的缺省字段仍沿用旧版默认值。
   const DEFAULT_APPEARANCE = Object.freeze({
@@ -31,9 +42,7 @@
     aquaWallpaperFrost: 0,
     aquaWhale: false,
     aquaCritters: false,
-    pointerEnabled: true,
-    pointerSize: 320,
-    pointerColor: '#8b5cf6'
+    ...POINTER_DEFAULTS
   });
   const INITIAL_UI_PREFERENCES = Object.freeze({
     theme: 'light',
@@ -63,8 +72,13 @@
     'aquaWhale',
     'aquaCritters',
     'pointerEnabled',
+    'pointerStyle',
     'pointerSize',
+    'pointerCometSize',
+    'pointerStarsSize',
+    'pointerRingSize',
     'pointerColor',
+    'pointerOpacity',
     'view',
     'domain',
     'category',
@@ -139,9 +153,7 @@
       aquaWallpaperFrost: 0,
       aquaWhale: true,
       aquaCritters: true,
-      pointerEnabled: true,
-      pointerSize: 320,
-      pointerColor: '#8b5cf6',
+      ...POINTER_DEFAULTS,
       view: 'featured',
       domain: '',
       category: '',
@@ -301,8 +313,13 @@
         defaults.aquaCritters
       ),
       pointerEnabled: chooseValue(source.pointerEnabled, secondary.pointerEnabled, value => typeof value === 'boolean', defaults.pointerEnabled),
+      pointerStyle: chooseValue(source.pointerStyle, secondary.pointerStyle, value => typeof value === 'string' && Object.hasOwn(POINTER_STYLES, value), defaults.pointerStyle),
       pointerSize: chooseValue(source.pointerSize, secondary.pointerSize, value => isFiniteNumberInRange(value, 80, 800), defaults.pointerSize),
+      pointerCometSize: chooseValue(source.pointerCometSize, secondary.pointerCometSize, value => isFiniteNumberInRange(value, 80, 800), defaults.pointerCometSize),
+      pointerStarsSize: chooseValue(source.pointerStarsSize, secondary.pointerStarsSize, value => isFiniteNumberInRange(value, 2, 18), defaults.pointerStarsSize),
+      pointerRingSize: chooseValue(source.pointerRingSize, secondary.pointerRingSize, value => isFiniteNumberInRange(value, 12, 160), defaults.pointerRingSize),
       pointerColor: chooseValue(source.pointerColor, secondary.pointerColor, value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value), defaults.pointerColor),
+      pointerOpacity: chooseValue(source.pointerOpacity, secondary.pointerOpacity, value => isFiniteNumberInRange(value, 10, 100), defaults.pointerOpacity),
       view: chooseValue(source.view, secondary.view, value => VIEWS.has(value), defaults.view),
       domain: chooseValue(source.domain, secondary.domain, value => DOMAINS.has(value), defaults.domain),
       category: chooseValue(
@@ -354,8 +371,13 @@
     if (field === 'aquaWhale') return typeof value === 'boolean';
     if (field === 'aquaCritters') return typeof value === 'boolean';
     if (field === 'pointerEnabled') return typeof value === 'boolean';
+    if (field === 'pointerStyle') return typeof value === 'string' && Object.hasOwn(POINTER_STYLES, value);
     if (field === 'pointerSize') return isFiniteNumberInRange(value, 80, 800);
+    if (field === 'pointerCometSize') return isFiniteNumberInRange(value, 80, 800);
+    if (field === 'pointerStarsSize') return isFiniteNumberInRange(value, 2, 18);
+    if (field === 'pointerRingSize') return isFiniteNumberInRange(value, 12, 160);
     if (field === 'pointerColor') return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+    if (field === 'pointerOpacity') return isFiniteNumberInRange(value, 10, 100);
     if (field === 'view') return VIEWS.has(value);
     if (field === 'domain') return DOMAINS.has(value);
     if (field === 'category') return isValidCategory(value);
@@ -400,6 +422,7 @@
     UI_PREFERENCES_VERSION,
     UI_PREFERENCE_FIELDS,
     DEFAULT_APPEARANCE,
+    POINTER_STYLES,
     INITIAL_UI_PREFERENCES,
     TEXT_SCALES: Object.freeze([...TEXT_SCALES]),
     isPlainObject,

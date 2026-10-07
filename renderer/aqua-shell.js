@@ -79,7 +79,12 @@
       aquaWhale: typeof value.aquaWhale === 'boolean' ? value.aquaWhale : DEFAULTS.aquaWhale,
       aquaEnabled: typeof value.aquaEnabled === 'boolean' ? value.aquaEnabled : DEFAULTS.aquaEnabled,
       pointerEnabled: typeof value.pointerEnabled === 'boolean' ? value.pointerEnabled : DEFAULTS.pointerEnabled,
+      pointerStyle: Object.hasOwn(Schema.POINTER_STYLES, value.pointerStyle) ? value.pointerStyle : DEFAULTS.pointerStyle,
       pointerSize: clampNumber(value.pointerSize, 80, 800, DEFAULTS.pointerSize),
+      pointerCometSize: clampNumber(value.pointerCometSize, 80, 800, DEFAULTS.pointerCometSize),
+      pointerStarsSize: clampNumber(value.pointerStarsSize, 2, 18, DEFAULTS.pointerStarsSize),
+      pointerRingSize: clampNumber(value.pointerRingSize, 12, 160, DEFAULTS.pointerRingSize),
+      pointerOpacity: clampNumber(value.pointerOpacity, 10, 100, DEFAULTS.pointerOpacity),
       pointerColor: typeof value.pointerColor === 'string' && /^#[0-9a-f]{6}$/i.test(value.pointerColor)
         ? value.pointerColor.toLowerCase() : DEFAULTS.pointerColor,
       aquaCritters: typeof value.aquaCritters === 'boolean'
@@ -782,6 +787,11 @@
     }
 
     function syncControls() {
+      const pointerSpec = Schema.POINTER_STYLES[state.pointerStyle];
+      for (const id of ['setPointerSize', 'setPointerSizeNumber']) {
+        const input = byId(id);
+        if (input) { input.min = String(pointerSpec.min); input.max = String(pointerSpec.max); }
+      }
       for (const button of doc.querySelectorAll('[data-aqua-mode]')) {
         button.setAttribute('aria-pressed', String(button.dataset.aquaMode === state.aquaMode));
       }
@@ -798,8 +808,9 @@
         ['setAquaBrightness', 'outAquaBrightness', state.aquaBrightness, '%'],
         ['setAquaWallpaperBlur', 'outAquaWallpaperBlur', state.aquaWallpaperBlur, 'px'],
         ['setAquaWallpaperFrost', 'outAquaWallpaperFrost', state.aquaWallpaperFrost, '%'],
-        ['setPointerSize', 'outPointerSize', state.pointerSize, 'px'],
-        ['setPointerSizeNumber', null, state.pointerSize, 'px']
+        ['setPointerSize', 'outPointerSize', state[Schema.POINTER_STYLES[state.pointerStyle].field], 'px'],
+        ['setPointerSizeNumber', null, state[Schema.POINTER_STYLES[state.pointerStyle].field], 'px'],
+        ['setPointerOpacity', 'outPointerOpacity', state.pointerOpacity, '%']
       ];
       for (const [inputId, outputId, value, unit] of values) {
         const input = byId(inputId);
@@ -815,6 +826,9 @@
       if (whaleSwitch) whaleSwitch.checked = state.aquaWhale;
       if (critterSwitch) critterSwitch.checked = state.aquaCritters;
       if (byId('setPointerEnabled')) byId('setPointerEnabled').checked = state.pointerEnabled;
+      if (byId('setPointerStyle')) byId('setPointerStyle').value = state.pointerStyle;
+      if (byId('pointerSizeLabel')) byId('pointerSizeLabel').textContent = pointerSpec.label;
+      if (byId('pointerStyleHint')) byId('pointerStyleHint').textContent = pointerSpec.hint;
       for (const id of ['setPointerColor', 'setPointerColorHex']) {
         const input = byId(id);
         if (input && doc.activeElement !== input) input.value = state.pointerColor;
@@ -837,9 +851,14 @@
       root.dataset.aquaWhale = state.aquaWhale ? 'on' : 'off';
       root.dataset.aquaCritters = state.aquaCritters ? 'on' : 'off';
       root.dataset.pointerEnabled = state.pointerEnabled ? 'on' : 'off';
+      root.dataset.pointerStyle = state.pointerStyle;
       root.dataset.pointerSize = String(state.pointerSize);
+      root.dataset.pointerEffectSize = String(state[Schema.POINTER_STYLES[state.pointerStyle].field]);
+      root.dataset.pointerColor = state.pointerColor;
+      root.dataset.pointerOpacity = String(state.pointerOpacity / 100);
       root.style.setProperty('--pointer-size', `${state.pointerSize}px`);
       root.style.setProperty('--pointer-color', state.pointerColor);
+      root.style.setProperty('--pointer-opacity', String(state.pointerOpacity / 100));
       root.toggleAttribute('data-dsh-float', state.aquaMode === 'mica');
       root.toggleAttribute('data-dsh-compat', state.aquaMode === 'compat');
       root.style.setProperty('--aqua-user-blur', `${state.aquaBlur}px`);
@@ -957,20 +976,22 @@
       ['setAquaBrightness', 'aquaBrightness'],
       ['setAquaWallpaperBlur', 'aquaWallpaperBlur'],
       ['setAquaWallpaperFrost', 'aquaWallpaperFrost'],
-      ['setPointerSize', 'pointerSize'],
-      ['setPointerSizeNumber', 'pointerSize']
+      ['setPointerOpacity', 'pointerOpacity'],
+      ['setPointerSize', null],
+      ['setPointerSizeNumber', null]
     ];
     for (const [id, field] of ranges) {
       const input = byId(id);
       listen(input, 'input', () => {
         if (id === 'setPointerSizeNumber' && (!input.value || input.validity?.valid === false)) return;
-        update(field, Number(input.value));
+        update(field || Schema.POINTER_STYLES[state.pointerStyle].field, Number(input.value));
       });
-      listen(input, 'change', () => { syncControls(); schedulePersist(field, true); });
+      listen(input, 'change', () => { syncControls(); schedulePersist(field || Schema.POINTER_STYLES[state.pointerStyle].field, true); });
     }
 
     listen(byId('setAquaEnabled'), 'click', () => update('aquaEnabled', !state.aquaEnabled, { immediate: true }));
     listen(byId('setPointerEnabled'), 'change', event => update('pointerEnabled', event.currentTarget.checked, { immediate: true }));
+    listen(byId('setPointerStyle'), 'change', event => update('pointerStyle', event.currentTarget.value, { immediate: true }));
     for (const id of ['setPointerColor', 'setPointerColorHex']) {
       const input = byId(id);
       listen(input, 'input', () => {
@@ -983,7 +1004,7 @@
       if (button) update('pointerColor', button.dataset.pointerColor, { immediate: true });
     });
     listen(byId('btnPointerReset'), 'click', () => {
-      for (const field of ['pointerEnabled', 'pointerSize', 'pointerColor']) update(field, DEFAULTS[field], { immediate: true });
+      for (const field of FIELDS.filter(field => field.startsWith('pointer'))) update(field, DEFAULTS[field], { immediate: true });
     });
     listen(byId('setAquaWhale'), 'change', event => update(
       'aquaWhale',

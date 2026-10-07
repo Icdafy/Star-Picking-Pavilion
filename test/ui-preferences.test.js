@@ -28,7 +28,8 @@ const defaultAquaPreferences = Object.freeze({
   aquaWallpaperFrost: 0,
   aquaWhale: false,
   aquaCritters: false,
-  pointerEnabled: true, pointerSize: 320, pointerColor: '#8b5cf6'
+  pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
+  pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100
 });
 
 async function makeDirectory(t) {
@@ -101,7 +102,8 @@ test('normalizes every supported field and discards unknown fields', () => {
   }, { today: TODAY });
 
   assert.deepEqual(normalized, {
-    pointerEnabled: true, pointerSize: 320, pointerColor: '#8b5cf6',
+    pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
+    pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
     version: 2,
     theme: 'light',
     textScale: 'lg',

@@ -96,6 +96,11 @@ function validatePatch(patch, today) {
       throw new TypeError(`${field} is not a supported appearance value`);
     }
   }
+  for (const field of UiPreferenceSchema.UI_PREFERENCE_FIELDS.filter(field => field.startsWith('pointer'))) {
+    if (Object.hasOwn(patch, field) && !UiPreferenceSchema.isValidUiPreferenceValue(field, patch[field], CommonLinks, { today })) {
+      throw new TypeError(`${field} is not a supported pointer effect value`);
+    }
+  }
   if (
     Object.hasOwn(patch, 'view')
     && !UiPreferenceSchema.isValidUiPreferenceValue('view', patch.view, CommonLinks, { today })

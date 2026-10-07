@@ -451,11 +451,327 @@
     });
   }
 
+  function advancePointerAxis(value, elapsed, stiffness = 900, damping = 48) {
+    const decay = damping / 2, frequency = Math.sqrt(stiffness - decay * decay);
+    const envelope = Math.exp(-decay * elapsed);
+    const a = value.position - value.target, b = (value.velocity + decay * a) / frequency;
+    const cosine = Math.cos(frequency * elapsed), sine = Math.sin(frequency * elapsed);
+    const displacement = envelope * (a * cosine + b * sine);
+    value.position = value.target + displacement;
+    value.velocity = envelope * frequency * (-a * sine + b * cosine) - decay * displacement;
+    const settled = Math.abs(value.target - value.position) < .1 && Math.abs(value.velocity) < .8;
+    if (settled) { value.position = value.target; value.velocity = 0; }
+    return settled;
+  }
+
+  // 连续尾迹、星尘和光环共用一个按需 RAF。输入只采样，几何与绘制按帧合并。
+  // 参考 Cuberto 的速度形变和 Codrops 的短尾迹设计；实现不依赖第三方动画库。
+  function createPointerEffects({ document: doc, window: win } = {}) {
+    const noop = Object.freeze({ move() {}, clear() {}, sync() {}, dispose() {}, getSnapshot() { return {}; } });
+    if (!doc?.body || !win?.requestAnimationFrame) return noop;
+    const root = doc.documentElement;
+    const reduced = win.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const contrast = win.matchMedia?.('(forced-colors: active)');
+    const styles = { comet: [80, 800, 240], stars: [2, 18, 6], ring: [12, 160, 40] };
+    const pool = Array.from({ length: 96 }, () => ({ alive: false }));
+    const pending = [], trail = [], curve = new Float64Array(385 * 3);
+    const metrics = { frames: 0, totalMs: 0, maxMs: 0 };
+    const clock = () => win.performance?.now?.() || 0;
+    const axis = () => ({ position: 0, target: 0, velocity: 0 });
+    const x = axis(), y = axis();
+    let disposed = false, config = null, signature = '', frame = null, lastTime = 0;
+    let host = null, canvas = null, context = null, ring = null, sprites = null;
+    let width = 0, height = 0, ratio = 1, dirty = null, topLayer = null;
+    let cursor = null, present = false, carry = 0, seed = 0x02315a, slot = 0, orbitAngle = 0;
+    function allowed() {
+      return !disposed && !doc.hidden && !reduced?.matches && !contrast?.matches
+        && root.dataset.pointerEnabled !== 'off' && root.dataset.fxTier !== 'static'
+        && (typeof doc.hasFocus !== 'function' || doc.hasFocus());
+    }
+    function random() {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    }
+    function hide() {
+      if (!host) return;
+      if (host.matches?.(':popover-open')) host.hidePopover();
+      host.hidden = true;
+      if (ring) { ring.style.opacity = '0'; ring.style.willChange = ''; }
+    }
+    function clearPixels() {
+      if (context && dirty) context.clearRect(dirty.left, dirty.top, dirty.right - dirty.left, dirty.bottom - dirty.top);
+      dirty = null;
+    }
+    function reset() {
+      if (frame != null) win.cancelAnimationFrame(frame);
+      frame = null; lastTime = 0; carry = 0;
+      pending.length = 0; trail.length = 0;
+      pool.forEach(p => { p.alive = false; });
+      clearPixels(); hide();
+    }
+    function clear() { present = false; cursor = null; reset(); }
+    function resize() {
+      const nextWidth = Math.max(1, win.innerWidth || root.clientWidth || 1);
+      const nextHeight = Math.max(1, win.innerHeight || root.clientHeight || 1);
+      // 高 DPI / 4K 屏也只分配一个有上限的透明缓冲区；只清理实际绘制区域。
+      const nextRatio = Math.min(win.devicePixelRatio || 1, config.lite ? 1 : 1.5,
+        Math.sqrt(4_000_000 / (nextWidth * nextHeight)));
+      if (width === nextWidth && height === nextHeight && ratio === nextRatio) return;
+      width = nextWidth; height = nextHeight; ratio = nextRatio;
+      canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
+      context?.setTransform(ratio, 0, 0, ratio, 0, 0);
+      dirty = null;
+    }
+    function mount() {
+      if (host) { resize(); return true; }
+      host = doc.createElement('div'); host.className = 'pointer-effects';
+      host.setAttribute('aria-hidden', 'true'); host.hidden = true;
+      // 手动 popover 不夺取焦点；透明顶层让装饰在原生 dialog 上也能显示。
+      if (typeof host.showPopover === 'function') host.setAttribute('popover', 'manual');
+      canvas = doc.createElement('canvas'); canvas.className = 'pointer-trail-canvas';
+      ring = doc.createElement('span'); ring.className = 'pointer-orbit';
+      host.append(canvas, ring); doc.body.appendChild(host);
+      try { context = canvas.getContext('2d', { alpha: true, desynchronized: true }); } catch {}
+      if (!context && config.style !== 'ring') { host.remove(); host = null; return false; }
+      resize(); return true;
+    }
+    function show() {
+      host.hidden = false;
+      if (host.hasAttribute('popover') && !host.matches(':popover-open')) {
+        try { host.showPopover(); } catch { host.removeAttribute('popover'); }
+      }
+    }
+    function sprite(star) {
+      const image = doc.createElement('canvas'); image.width = image.height = 48;
+      const ctx = image.getContext('2d');
+      const gradient = ctx.createRadialGradient(24, 24, 0, 24, 24, 24);
+      gradient.addColorStop(0, config.color); gradient.addColorStop(.23, `${config.color}90`);
+      gradient.addColorStop(1, `${config.color}00`);
+      ctx.fillStyle = gradient; ctx.fillRect(0, 0, 48, 48);
+      ctx.fillStyle = config.color; ctx.beginPath();
+      if (star) {
+        for (let i = 0; i < 8; i++) {
+          const angle = i * Math.PI / 4, radius = i % 2 ? 3.2 : 13;
+          const px = 24 + Math.cos(angle) * radius, py = 24 + Math.sin(angle) * radius;
+          if (!i) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+      } else ctx.arc(24, 24, 6, 0, Math.PI * 2);
+      ctx.closePath(); ctx.fill(); return image;
+    }
+    function prepare() {
+      if (config.style !== 'ring' && context) sprites = [sprite(false), sprite(true)];
+      ring.style.width = ring.style.height = `${config.size}px`;
+      ring.hidden = config.style !== 'ring'; canvas.hidden = config.style === 'ring';
+      host.style.setProperty('--pointer-effect-opacity', String(config.opacity));
+      host.style.setProperty('--pointer-effect-color', config.color);
+    }
+    function schedule() {
+      if (frame != null) return;
+      if (!lastTime) lastTime = clock();
+      frame = win.requestAnimationFrame(tick);
+    }
+    function sync() {
+      const style = root.dataset.pointerStyle || 'glow';
+      const spec = Object.hasOwn(styles, style) ? styles[style] : null;
+      const color = /^#[0-9a-f]{6}$/i.test(root.dataset.pointerColor || '') ? root.dataset.pointerColor : '#8b5cf6';
+      const size = spec ? Math.max(spec[0], Math.min(spec[1], Number(root.dataset.pointerEffectSize) || spec[2])) : 320;
+      const opacity = Math.max(.1, Math.min(1, Number(root.dataset.pointerOpacity) || 1));
+      const next = [style, size, color, opacity, root.dataset.fxTier, root.dataset.theme].join('/');
+      if (!spec || !allowed()) { clear(); return; }
+      if (signature !== next) {
+        reset(); signature = next;
+        config = { style, size, color, opacity, lite: root.dataset.fxTier === 'lite' };
+        if (!mount()) return;
+        prepare();
+        if (present && cursor) { x.position = x.target = cursor.x; y.position = y.target = cursor.y; x.velocity = y.velocity = 0; }
+      }
+      if (host) resize();
+      if (present) { show(); schedule(); }
+    }
+    function move(event) {
+      if (event.pointerType === 'touch') { clear(); return; }
+      const px = event.clientX, py = event.clientY;
+      if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+      if (!Object.hasOwn(styles, root.dataset.pointerStyle) || !allowed()) { clear(); return; }
+      const now = clock();
+      present = true;
+      sync();
+      if (!host || !config) return;
+      const layer = event.target.closest?.('dialog[open], [popover]:popover-open') || null;
+      if (layer !== topLayer) {
+        topLayer = layer;
+        if (host.matches?.(':popover-open')) { host.hidePopover(); show(); }
+      }
+      let coalesced;
+      try { coalesced = event.getCoalescedEvents?.(); } catch {}
+      const samples = coalesced?.length ? coalesced.slice(-6) : [event];
+      for (const sample of samples) if (Number.isFinite(sample.clientX) && Number.isFinite(sample.clientY)) {
+        pending.push({ x: sample.clientX, y: sample.clientY, born: now });
+      }
+      if (samples[samples.length - 1] !== event) pending.push({ x: px, y: py, born: now });
+      if (pending.length > 32) pending.splice(0, pending.length - 32);
+      show(); schedule();
+    }
+    function emit(px, py, now, dx, dy) {
+      const capacity = config.lite ? 36 : 96;
+      const p = pool[slot++ % capacity];
+      p.alive = true; p.x = px; p.y = py; p.born = now;
+      p.life = 480 + random() * 360;
+      p.vx = (random() - .5) * 100 + dx * .09;
+      p.vy = (random() - .5) * 100 + dy * .09;
+      p.size = config.size * (.55 + random() * .65);
+      p.star = random() > .65; p.phase = random() * Math.PI;
+    }
+    function input(now) {
+      const stride = Math.max(1, Math.ceil(pending.length / 12));
+      let emitted = 0;
+      for (let i = stride - 1; i < pending.length; i += stride) accept(pending[i]);
+      if (pending.length && (pending.length - 1) % stride !== stride - 1) accept(pending[pending.length - 1]);
+      pending.length = 0;
+      function accept(point) {
+        if (!cursor || point.born - cursor.born > 180) {
+          cursor = { ...point }; x.position = x.target = point.x; y.position = y.target = point.y;
+          x.velocity = y.velocity = 0; carry = 0;
+          if (config.style === 'comet') trail.push(point);
+          return;
+        }
+        const dx = point.x - cursor.x, dy = point.y - cursor.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < .2) return;
+        if (config.style === 'comet') {
+          trail.push(point);
+          if (trail.length > 96) trail.shift();
+        } else if (config.style === 'stars') {
+          const spacing = Math.max(6, config.size * 1.3) * (config.lite ? 1.8 : 1);
+          const count = Math.min(Math.floor((carry + distance) / spacing), 24 - emitted);
+          for (let j = 0; j < count; j++) {
+            const fraction = Math.min(1, (spacing - carry + j * spacing) / distance);
+            emit(cursor.x + dx * fraction, cursor.y + dy * fraction, now, dx, dy);
+          }
+          emitted += count; carry = (carry + distance) % spacing;
+        }
+        cursor = { ...point }; x.target = point.x; y.target = point.y;
+      }
+    }
+    function bounds(px, py, radius) {
+      const left = Math.max(0, Math.floor(px - radius - 2)), top = Math.max(0, Math.floor(py - radius - 2));
+      const right = Math.min(width, Math.ceil(px + radius + 2)), bottom = Math.min(height, Math.ceil(py + radius + 2));
+      if (right <= left || bottom <= top) return;
+      if (!dirty) dirty = { left, top, right, bottom };
+      else { dirty.left = Math.min(dirty.left, left); dirty.top = Math.min(dirty.top, top); dirty.right = Math.max(dirty.right, right); dirty.bottom = Math.max(dirty.bottom, bottom); }
+    }
+    function drawComet(now) {
+      while (trail.length && now - trail[0].born > 520) trail.shift();
+      let length = 0;
+      for (let i = trail.length - 1; i > 0; i--) {
+        const newer = trail[i], older = trail[i-1];
+        const distance = Math.hypot(newer.x - older.x, newer.y - older.y);
+        if (length + distance > config.size) {
+          const fraction = (config.size - length) / distance;
+          trail[i-1] = { x: newer.x + (older.x - newer.x) * fraction,
+            y: newer.y + (older.y - newer.y) * fraction, born: newer.born + (older.born - newer.born) * fraction };
+          trail.splice(0, i - 1); break;
+        }
+        length += distance;
+      }
+      if (!trail.length) return false;
+      const head = trail[trail.length - 1];
+      const fade = Math.max(0, 1 - (now - head.born) / 520);
+      const thickness = Math.max(1.4, Math.min(3.8, config.size / 90));
+      // 连续样条一次填充为渐细带，消除逐段描边在接头处累积的亮点。
+      let count = 0, arcLength = 0;
+      const put = (px, py) => {
+        if (count) arcLength += Math.hypot(px - curve[(count-1)*3], py - curve[(count-1)*3+1]);
+        curve[count*3] = px; curve[count*3+1] = py; curve[count*3+2] = arcLength; count++;
+        bounds(px, py, thickness * 4);
+      };
+      for (let i = 0; i < trail.length - 1; i++) {
+        const a = trail[i-1] || trail[i], b = trail[i], c = trail[i+1], d = trail[i+2] || c;
+        for (let j = 0; j < 4; j++) {
+          const t = j / 4, t2 = t * t, t3 = t2 * t;
+          put(.5 * (2*b.x + (-a.x+c.x)*t + (2*a.x-5*b.x+4*c.x-d.x)*t2 + (-a.x+3*b.x-3*c.x+d.x)*t3),
+            .5 * (2*b.y + (-a.y+c.y)*t + (2*a.y-5*b.y+4*c.y-d.y)*t2 + (-a.y+3*b.y-3*c.y+d.y)*t3));
+        }
+      }
+      put(head.x, head.y);
+      if (count > 1) {
+        const gradient = context.createLinearGradient(curve[0], curve[1], head.x, head.y);
+        gradient.addColorStop(0, `${config.color}00`); gradient.addColorStop(.45, `${config.color}90`); gradient.addColorStop(1, config.color);
+        context.fillStyle = gradient;
+        for (const halo of config.lite ? [false] : [true, false]) {
+          context.globalAlpha = config.opacity * fade * (halo ? .13 : .9);
+          context.beginPath();
+          for (const side of [1, -1]) for (let n = 0; n < count; n++) {
+            const i = side === 1 ? n : count - 1 - n;
+            const previous = Math.max(0, i-1)*3, next = Math.min(count-1, i+1)*3;
+            const dx = curve[next] - curve[previous], dy = curve[next+1] - curve[previous+1];
+            const normal = Math.hypot(dx, dy) || 1;
+            const halfWidth = Math.pow(curve[i*3+2] / (arcLength || 1), .8) * thickness * (halo ? 1.8 : .5);
+            const px = curve[i*3] - dy / normal * halfWidth * side, py = curve[i*3+1] + dx / normal * halfWidth * side;
+            if (!n && side === 1) context.moveTo(px, py); else context.lineTo(px, py);
+          }
+          context.closePath(); context.fill();
+        }
+      }
+      context.globalAlpha = config.opacity * fade * .85;
+      context.drawImage(sprites[0], head.x - 10, head.y - 10, 20, 20); bounds(head.x, head.y, 12);
+      context.globalAlpha = 1; return true;
+    }
+    function drawStars(now) {
+      let live = false;
+      for (const p of pool) {
+        if (!p.alive) continue;
+        const age = (now - p.born) / p.life;
+        if (age >= 1) { p.alive = false; continue; }
+        live = true;
+        const seconds = (now - p.born) / 1000, drift = (1 - Math.exp(-seconds * 2.8)) / 2.8;
+        const px = p.x + p.vx * drift, py = p.y + p.vy * drift + seconds * seconds * 18;
+        const size = p.size * (1 - age * .35) * (p.star ? 1.8 : 1.1);
+        context.globalAlpha = config.opacity * Math.min(1, age * 12) * Math.pow(1 - age, 1.5) * (.82 + .18 * Math.sin(age * 5 + p.phase));
+        context.drawImage(sprites[p.star ? 1 : 0], px - size, py - size, size * 2, size * 2);
+        bounds(px, py, size + 1);
+      }
+      context.globalAlpha = 1; return live;
+    }
+    function drawRing(elapsed) {
+      const settledX = advancePointerAxis(x, elapsed), settledY = advancePointerAxis(y, elapsed);
+      const speed = Math.hypot(x.velocity, y.velocity), stretch = Math.min(.14, speed / 6500);
+      if (speed > 40) {
+        const targetAngle = Math.atan2(y.velocity, x.velocity) * 180 / Math.PI;
+        const delta = ((targetAngle - orbitAngle + 540) % 360 + 360) % 360 - 180;
+        orbitAngle += delta * (1 - Math.exp(-elapsed * 16));
+      }
+      ring.style.transform = `translate3d(${(x.position - config.size / 2).toFixed(2)}px, ${(y.position - config.size / 2).toFixed(2)}px, 0) rotate(${orbitAngle.toFixed(2)}deg) scale(${(1 + stretch).toFixed(3)}, ${(1 - stretch).toFixed(3)})`;
+      ring.style.opacity = String(config.opacity);
+      ring.style.willChange = settledX && settledY ? '' : 'transform';
+      return !settledX || !settledY;
+    }
+    function tick(now) {
+      frame = null;
+      if (!allowed() || !present || !host) { clear(); return; }
+      const started = clock(), elapsed = Math.max(0, (now - lastTime) / 1000);
+      lastTime = now; input(now); clearPixels();
+      const live = config.style === 'ring' ? drawRing(elapsed)
+        : config.style === 'comet' ? drawComet(now) : drawStars(now);
+      const cost = Math.max(0, clock() - started);
+      metrics.frames++; metrics.totalMs += cost; metrics.maxMs = Math.max(metrics.maxMs, cost);
+      if (live || pending.length) schedule();
+      else { lastTime = 0; if (config.style !== 'ring') hide(); }
+    }
+    return Object.freeze({ move, clear, sync,
+      getSnapshot() { return { ...metrics, style: config?.style || 'glow', present,
+        framePending: frame != null, points: trail.length, particles: pool.filter(p => p.alive).length,
+        width, height, ratio, x: x.position, y: y.position, targetX: x.target, targetY: y.target }; },
+      dispose() { if (disposed) return; clear(); disposed = true; host?.remove(); host = null; sprites = null; }
+    });
+  }
+
   // 高频交互的装饰层；委托监听，不为每张卡片安装事件或常驻 RAF。
   function createInteractionMotion({ document: doc, window: win, motion } = {}) {
     if (!doc || !win || !motion || !win.MutationObserver) return Object.freeze({ dispose() {} });
     const reduced = win.matchMedia?.('(prefers-reduced-motion: reduce)');
     const forcedColors = win.matchMedia?.('(forced-colors: active)');
+    const pointerEffects = createPointerEffects({ document: doc, window: win });
     const cleanups = [], groups = [], waves = new Map();
     const controlSelector = 'button:not(:disabled):not([aria-disabled="true"])';
     const hoverSelector = 'button, a, input, select, textarea, summary, label[for], .desktop-switch';
@@ -474,6 +790,7 @@
       && (typeof doc.hasFocus !== 'function' || doc.hasFocus());
     const full = () => canMove() && !forcedColors?.matches && doc.documentElement.dataset.fxTier === 'full'
       && doc.documentElement.dataset.pointerEnabled !== 'off';
+    const glowEnabled = () => full() && (!doc.documentElement.dataset.pointerStyle || doc.documentElement.dataset.pointerStyle === 'glow');
     function listen(target, event, handler, options) {
       target?.addEventListener?.(event, handler, options);
       cleanups.push(() => target?.removeEventListener?.(event, handler, options));
@@ -546,16 +863,7 @@
     function axis(position = 0) { return { position, target: position, velocity: 0 }; }
     function advance(value, elapsed, stiffness, damping) {
       // 解析解按真实墙钟前进：低帧率或长帧后仍稳定，不截断时间拖慢追光。
-      const decay = damping / 2, frequency = Math.sqrt(stiffness - decay * decay);
-      const envelope = Math.exp(-decay * elapsed);
-      const a = value.position - value.target, b = (value.velocity + decay * a) / frequency;
-      const cosine = Math.cos(frequency * elapsed), sine = Math.sin(frequency * elapsed);
-      const displacement = envelope * (a * cosine + b * sine);
-      value.position = value.target + displacement;
-      value.velocity = envelope * frequency * (-a * sine + b * cosine) - decay * displacement;
-      const settled = Math.abs(value.target - value.position) < .1 && Math.abs(value.velocity) < .8;
-      if (settled) { value.position = value.target; value.velocity = 0; }
-      return settled;
+      return advancePointerAxis(value, elapsed, stiffness, damping);
     }
     function makeSpan(className, parent) {
       const node = doc.createElement('span'); node.className = className;
@@ -614,7 +922,7 @@
     }
     function tick(now) {
       frame = null;
-      if (!full()) { clearGlow(); return; }
+      if (!glowEnabled()) { clearGlow(); return; }
       const elapsed = lastTime ? Math.max(0, (now - lastTime) / 1000) : 1 / 60;
       const lightSize = Number(doc.documentElement.dataset.pointerSize) || 320;
       lastTime = now;
@@ -636,7 +944,7 @@
         const settled = [advance(record.x, elapsed, 1100, 56), advance(record.y, elapsed, 1100, 56),
           advance(record.haloX, elapsed, 360, 34), advance(record.haloY, elapsed, 360, 34),
           advance(record.magnetX, elapsed, 700, 38), advance(record.magnetY, elapsed, 700, 38)].every(Boolean);
-        record.node.style.opacity = record.alpha.toFixed(3);
+        record.node.style.opacity = (record.alpha * (Number(doc.documentElement.dataset.pointerOpacity) || 1)).toFixed(3);
         if (record.follower) {
           const weight = record.kind === 'surface' ? 2.5 : .6;
           record.follower.style.translate = `${(record.magnetX.position * weight).toFixed(2)}px ${(record.magnetY.position * weight).toFixed(2)}px`;
@@ -654,8 +962,10 @@
       if (moving) schedule(); else lastTime = 0;
     }
     function onOver(event) {
+      // 布局或弹层改变也会触发 pointerover；轨迹只由实际移动采样，避免静止时被重新唤醒。
+      if (event.type === 'pointermove') pointerEffects.move(event);
       if (event.pointerType === 'touch') { clearGlow(); return; }
-      if (!full()) return;
+      if (!glowEnabled()) return;
       const nextSurface = event.target.closest?.(surfaceSelector) || null;
       const nextControl = event.target.closest?.(hoverSelector);
       const hoverControl = nextControl && !isUnavailable(nextControl) && nextControl.matches(hoverSelector) ? nextControl : null;
@@ -666,6 +976,7 @@
     }
     function onMove(event) { onOver(event); }
     function onOut(event) {
+      if (!event.relatedTarget) pointerEffects.clear();
       if (surface && !surface.contains(event.relatedTarget)) { leave(surfaces, surface); surface = null; }
       if (control && !control.contains(event.relatedTarget)) { leave(controls, control); control = null; }
     }
@@ -708,13 +1019,14 @@
     groups.forEach(({ group }) => resize?.observe(group));
     doc.fonts?.ready?.then(() => { if (!disposed) syncSizes(); }).catch(() => {});
     function settleEnvironment() {
-      if (!full()) clearGlow();
+      pointerEffects.sync();
+      if (!glowEnabled()) clearGlow();
       else if (surfaces.size || controls.size) schedule();
       if (!canMove()) { for (const button of waves.keys()) clearWave(button); }
       syncSizes();
     }
     const environment = new win.MutationObserver(settleEnvironment);
-    environment.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier', 'data-pointer-enabled', 'data-pointer-size', 'style'] });
+    environment.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier', 'data-theme', 'data-pointer-enabled', 'data-pointer-style', 'data-pointer-size', 'data-pointer-effect-size', 'data-pointer-color', 'data-pointer-opacity', 'style'] });
     // 原生 details、dialog 和 popover 保留浏览器的键盘、焦点及关闭语义。
     listen(doc, 'click', event => {
       const summary = event.target.closest?.('details > summary');
@@ -725,6 +1037,7 @@
       motion.layoutChange(details, () => { details.open = !details.open; }, details.querySelector('.release-body, .models-customized-body'));
     });
     for (const layer of doc.querySelectorAll('dialog, [popover]')) {
+      if (layer.classList.contains('pointer-effects')) continue;
       listen(layer, 'toggle', event => {
         const isOpen = layer.open || layer.matches(':popover-open');
         if (!isOpen) { motion.cancelTree(layer); return; }
@@ -758,17 +1071,22 @@
     listen(doc, 'pointerover', onOver, { passive: true });
     listen(doc, 'pointermove', onMove, { passive: true });
     listen(doc, 'pointerout', onOut, { passive: true });
-    listen(doc, 'scroll', clearGlow, { passive: true, capture: true });
-    listen(doc, 'pointercancel', clearGlow, { passive: true });
+    // 装饰顶层在原生 Escape 的关闭步骤之前退出，不抢占 dialog 的关闭语义。
+    listen(doc, 'keydown', event => { if (event.key === 'Escape') pointerEffects.clear(); }, { capture: true });
+    const clearPointer = () => { clearGlow(); pointerEffects.clear(); };
+    listen(doc, 'scroll', clearPointer, { passive: true, capture: true });
+    listen(doc, 'pointercancel', clearPointer, { passive: true });
     listen(doc, 'visibilitychange', settleEnvironment);
     listen(win, 'blur', settleEnvironment);
-    listen(win, 'resize', () => { clearGlow(); syncSizes(); }, { passive: true });
+    listen(win, 'resize', () => { clearPointer(); pointerEffects.sync(); syncSizes(); }, { passive: true });
     listen(reduced, 'change', settleEnvironment);
     listen(forcedColors, 'change', settleEnvironment);
     return Object.freeze({
+      getPointerSnapshot: pointerEffects.getSnapshot,
       dispose() {
         if (disposed) return;
         disposed = true;
+        pointerEffects.dispose();
         clearGlow();
         detached.disconnect();
         for (const button of waves.keys()) clearWave(button);
@@ -788,6 +1106,8 @@
     restoreFocusByKey,
     createBrandLogo,
     createMotion,
+    createPointerEffects,
+    advancePointerAxis,
     createInteractionMotion
   });
 });

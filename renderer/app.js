@@ -76,8 +76,13 @@ const state = {
   aquaEnabled: restoredPreferences.aquaEnabled,
   aquaCritters: restoredPreferences.aquaCritters,
   pointerEnabled: restoredPreferences.pointerEnabled,
+  pointerStyle: restoredPreferences.pointerStyle,
   pointerSize: restoredPreferences.pointerSize,
+  pointerCometSize: restoredPreferences.pointerCometSize,
+  pointerStarsSize: restoredPreferences.pointerStarsSize,
+  pointerRingSize: restoredPreferences.pointerRingSize,
   pointerColor: restoredPreferences.pointerColor,
+  pointerOpacity: restoredPreferences.pointerOpacity,
   view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,

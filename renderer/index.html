@@ -631,16 +631,21 @@
         <div class="pointer-lab" aria-labelledby="pointerHeading">
           <h3 id="pointerHeading">跟手动效</h3>
           <label class="desktop-switch">
-            <span class="switch-copy"><strong>全局追光</strong><small>所有板块、导航、表单和弹层都随鼠标轻柔追光。</small></span>
+            <span class="switch-copy"><strong>开启跟手动效</strong><small>在所有板块、导航、表单和弹层使用所选风格。</small></span>
             <input id="setPointerEnabled" type="checkbox" role="switch" checked>
             <span class="switch-track" aria-hidden="true"></span>
           </label>
           <div class="appearance-grid">
+            <label class="field appearance-control-wide" for="setPointerStyle"><span>跟手方式</span><select id="setPointerStyle" aria-describedby="pointerStyleHint">
+              <option value="glow">范围柔光</option><option value="comet">流星拖尾</option><option value="stars">星尘粒子</option><option value="ring">弹性光环</option>
+            </select></label>
+            <p class="hint appearance-control-wide" id="pointerStyleHint" aria-live="polite">柔光照亮鼠标附近的表面，边缘反光轻轻跟随。</p>
             <label class="appearance-control appearance-control-wide" for="setPointerSize">
-              <span class="appearance-label">光晕大小 <output id="outPointerSize">320px</output></span>
+              <span class="appearance-label"><span id="pointerSizeLabel">光晕大小</span> <output id="outPointerSize">320px</output></span>
               <input id="setPointerSize" type="range" min="80" max="800" step="1" value="320">
             </label>
             <label class="field" for="setPointerSizeNumber"><span>精确大小（px）</span><input id="setPointerSizeNumber" type="number" min="80" max="800" step="1" value="320"></label>
+            <label class="appearance-control" for="setPointerOpacity"><span class="appearance-label">动效强度 <output id="outPointerOpacity">100%</output></span><input id="setPointerOpacity" type="range" min="10" max="100" step="1" value="100"></label>
             <div class="pointer-color-controls">
               <label class="field" for="setPointerColor"><span>调色盘</span><input id="setPointerColor" type="color" value="#8b5cf6"></label>
               <label class="field" for="setPointerColorHex"><span>颜色值</span><input id="setPointerColorHex" type="text" value="#8b5cf6" maxlength="7" pattern="#[0-9A-Fa-f]{6}" spellcheck="false" aria-label="跟手动效十六进制颜色"></label>
@@ -657,7 +662,7 @@
             </div>
           </div>
           <div class="btn-row"><button class="btn-ghost btn-compact" id="btnPointerReset" type="button">恢复默认动效</button></div>
-          <p class="hint">80—800px 连续调整，可选任意颜色；修改立即预览并自动保存。鼠标停下后追光自然收敛；减少动态效果、失焦或窗口隐藏时停止。</p>
+          <p class="hint">每种风格独立记住尺寸，共用颜色与强度；修改立即生效并自动保存。停下后自然收敛，减少动态效果、失焦或窗口隐藏时停止。</p>
         </div>
       </div>
       <div class="glass card-pad appearance-lab" id="settingsAppearance" data-settings-section="settingsAppearance" aria-labelledby="heading-settingsAppearance">
