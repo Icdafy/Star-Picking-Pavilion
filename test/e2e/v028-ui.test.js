@@ -20,7 +20,9 @@ async function profile(t) {
       if (child.exitCode === null) await app.close().catch(() => {});
     }
     processes.delete(directory);
-    await fs.promises.rm(directory, { recursive: true, force: true });
+    // Chromium's DIPS database handles can outlive the process exit notification
+    // briefly on Windows; retain failure after a bounded cleanup retry.
+    await fs.promises.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
   return directory;
 }

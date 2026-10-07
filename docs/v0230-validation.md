@@ -29,4 +29,8 @@
 
 视觉复核另发现 CDP 截图会改变原生窗口的视口指标、丢失宽窗口下的悬停状态，造成截图中恢复箭头。为截图增加前后状态核对后确认这一现象；改用 Electron 原生 capturePage 后悬停保持且截图中的百分比与实时进度一致。产品代码没有因此变更，新增状态核对保留。
 
+首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37618077152) 对提交 `db9434f6e729f1d01c2292c0868b259125173a7b` 为 1029／1029 单元、33／34 桌面：本版更新专项通过，最后一项旧滚动条测试在 after 钩子删除临时 profile 时遇到 Windows Chromium `DIPS-wal` 文件占用（EBUSY）。该钩子原先没有清理重试，本版补为与其他桌面夹具一致的十次、100ms 起始间隔的有界重试，持久占用仍使测试失败。没有修改产品功能、功能断言、工作流或测试超时；首轮日志和结果保存在 main-ci-initial.log／json。
+
+清理修正后，旧安装偏好／滚动条测试与本版动效专项合计 3／3 通过，24.15 秒，零失败、零跳过；记录为 cleanup-and-update.log。
+
 main CI、tag Release 与公开附件核验待执行。原始证据保存在被忽略的 work/v0230/。本机不执行安装器，安装、启动、单实例、退出与卸载烟测由一次性 Windows CI 执行。
