@@ -726,7 +726,7 @@ main { order: 5; width: 100%; }
     padding: .2rem .35rem var(--sp-5);
     flex: 0 0 auto;
   }
-  .rail-brand .brand-mark { width: 2.55rem; height: 2.55rem; }
+  .rail-brand .brand-mark { width: 3.5rem; height: 3.5rem; }
   .rail-brand .brand-text h1 { font-size: var(--t-xl); }
   .rail-brand .brand-text p { max-width: 10.5rem; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-xs); letter-spacing: .12em; }
   .brand-badge { height: 1.15rem; padding-inline: .35rem; font-size: .62rem; }
@@ -975,6 +975,13 @@ main { order: 5; width: 100%; }
   background: var(--flag-soft); border-color: var(--flag-line);
 }
 .motion-control { position: relative; }
+.pointer-lab { margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--rail-line); }
+.pointer-color-controls { display: flex; align-items: end; gap: var(--sp-3); }
+.pointer-color-controls .field { min-width: 0; flex: 1; }
+.pointer-color-controls input[type="color"] { height: 2.4rem; width: 100%; padding: .2rem; cursor: pointer; }
+.pointer-palette { display: flex; flex-wrap: wrap; gap: .65rem; padding-block: .25rem; }
+.pointer-palette button { width: 2rem; height: 2rem; border: 3px solid var(--c-bg); border-radius: 50%; background: var(--swatch); box-shadow: 0 0 0 1px var(--glass-border-strong); cursor: pointer; }
+.pointer-palette button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--c-fg); }
 .motion-wave-host { overflow: hidden; }
 .press-wave {
   position: absolute; width: 36px; height: 36px; z-index: 2;
@@ -982,27 +989,26 @@ main { order: 5; width: 100%; }
   background: radial-gradient(circle, transparent 28%, currentColor 42%, transparent 62%);
   transform: translate(-50%, -50%); opacity: 0;
 }
-.motion-surface { overflow: hidden; isolation: isolate; }
+.motion-surface { isolation: isolate; }
+.motion-surface-positioned, .motion-hover-positioned { position: relative; }
 .motion-surface::before { opacity: 0; }
 .page-banner > .surface-light { position: absolute; inset: 0; z-index: 0; }
 .surface-light {
   position: absolute; inset: 0; z-index: -1;
   border-radius: inherit; overflow: hidden; pointer-events: none; opacity: 0;
-  --light-color: var(--accent);
+  --light-color: var(--pointer-color, var(--accent));
 }
-.card[data-domain="aerospace"] > .surface-light { --light-color: var(--second); }
-.card.is-featured > .surface-light { --light-color: var(--flag); }
 .surface-glow, .surface-halo, .surface-rim-light, .control-aura-light {
   position: absolute; top: 0; left: 0; pointer-events: none;
 }
 .surface-glow {
-  width: 320px; height: 320px;
+  width: var(--pointer-size, 320px); height: var(--pointer-size, 320px);
   background: radial-gradient(circle,
     color-mix(in srgb, var(--light-color) 12%, transparent) 0%,
     color-mix(in srgb, var(--light-color) 6%, transparent) 30%, transparent 70%);
 }
 .surface-halo {
-  width: 440px; height: 440px;
+  width: calc(var(--pointer-size, 320px) * 1.375); height: calc(var(--pointer-size, 320px) * 1.375);
   background: radial-gradient(circle, color-mix(in srgb, var(--light-color) 5%, transparent), transparent 68%);
 }
 .surface-rim {
@@ -1013,7 +1019,7 @@ main { order: 5; width: 100%; }
   mask-composite: exclude;
 }
 .surface-rim-light {
-  width: 380px; height: 380px;
+  width: calc(var(--pointer-size, 320px) * 1.1875); height: calc(var(--pointer-size, 320px) * 1.1875);
   background: radial-gradient(circle,
     color-mix(in srgb, var(--light-color) 80%, white) 0%,
     color-mix(in srgb, var(--light-color) 50%, transparent) 30%, transparent 70%);
@@ -1021,7 +1027,7 @@ main { order: 5; width: 100%; }
 [data-theme="dark"] .surface-glow {
   background: radial-gradient(circle, color-mix(in srgb, var(--light-color) 19%, transparent), transparent 70%);
 }
-.motion-hover-host { position: relative; isolation: isolate; overflow: hidden; }
+.motion-hover-host { isolation: isolate; overflow: hidden; }
 .control-aura {
   position: absolute; inset: -3px; z-index: -1; border-radius: inherit;
   pointer-events: none; opacity: 0; overflow: hidden;
@@ -1029,8 +1035,8 @@ main { order: 5; width: 100%; }
   box-shadow: inset 0 1px 0 var(--sheen);
 }
 .control-aura-light {
-  width: 160px; height: 160px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent), transparent 66%);
+  width: calc(var(--pointer-size, 320px) / 2); height: calc(var(--pointer-size, 320px) / 2);
+  background: radial-gradient(circle, color-mix(in srgb, var(--pointer-color, var(--accent)) 22%, transparent), transparent 66%);
 }
 .tab-indicator, .selection-indicator {
   background-image: linear-gradient(155deg, var(--sheen), transparent 44%),

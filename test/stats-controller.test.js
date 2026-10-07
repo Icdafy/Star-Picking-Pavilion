@@ -115,11 +115,23 @@ test('星标数超过 99 折叠为 99+，星标视图不弹降级横幅', async 
   assert.equal(elements.feedBanner.hidden, true);
 });
 
-test('后台分析显示分析中，调度页说明下次采集的实际时间', async () => {
+test('分析阶段属于同一采集任务，完成后显示下一次实际调度时间', async () => {
   const { ctrl, elements } = createController({ stats: { pipeline: { running: true, analyzeRunning: true, nextCollectAt: '2026-10-07T05:00:00Z', lastRun: { at: '2026-10-07T04:00:00Z' } } } });
   await ctrl.refreshStats();
-  assert.equal(elements.statStatusLabel.textContent, '分析中');
+  assert.equal(elements.statStatusLabel.textContent, '采集中');
+  assert.match(elements.collectScheduleStatus.textContent, /任务正在运行/);
+  ctrl.renderActivity({ revision: 2, activity: 'online', nextCollectAt: '2026-10-07T05:00:00Z', lastRun: { at: '2026-10-07T04:00:00Z' } });
   assert.match(elements.collectScheduleStatus.textContent, /下次自动采集.*最近采集完成/);
+});
+
+test('有待处理历史数据仍保持在线，迟到的统计状态不能覆盖最新任务推送', async () => {
+  const { ctrl, elements } = createController({ stats: { pending: 12, pipeline: { revision: 1, activity: 'online' } } });
+  ctrl.renderActivity({ revision: 2, activity: 'collecting' });
+  await ctrl.refreshStats();
+  assert.equal(elements.statStatusLabel.textContent, '采集中');
+  ctrl.renderActivity({ revision: 3, activity: 'online' });
+  assert.equal(elements.statStatusLabel.textContent, '在线');
+  assert.doesNotMatch(elements.statStatus.innerHTML, /busy/);
 });
 
 test('未配置 AI 且处于精选视图时展示降级横幅', async () => {

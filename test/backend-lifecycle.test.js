@@ -22,7 +22,7 @@ function schedulerFixture(t, overrides = {}) {
     constructor(...args) { super(...(args.length ? args : [clock])); }
     static now() { return clock; }
   }
-  const settings = { collect: { intervalMinutes: 10, analyzeIntervalSeconds: 75 }, ai: {}, dailyReportHour: 8 };
+  const settings = { collect: { automatic: overrides.automatic ?? true, intervalMinutes: 10, analyzeIntervalSeconds: 75 }, ai: {}, dailyReportHour: 8 };
   const dependencies = {
     'node-cron': { schedule: () => ({ stop() {}, destroy() {} }) },
     './collectors': { collectAll: async () => { events.push('collect'); await overrides.collect?.(); return { results: [], skipped: 0 }; } },
@@ -152,12 +152,12 @@ test('failed pipelines release their lock and can be retried', async t => {
 test('saved intervals replace existing timers without scheduling a second startup run', t => {
   const { scheduler, settings, intervals, timers } = schedulerFixture(t);
   scheduler.startScheduler();
-  assert.equal(intervals.filter(timer => timer.active).length, 1);
+  assert.equal(intervals.filter(timer => timer.active).length, 0);
   const startupCount = timers.filter(timer => timer.ms === 2500).length;
   settings.collect.intervalMinutes = 37;
   settings.collect.analyzeIntervalSeconds = 90;
   assert.equal(scheduler.refreshSchedulerSettings(), true);
-  assert.deepEqual(intervals.filter(timer => timer.active).map(timer => timer.ms), [90000]);
+  assert.deepEqual(intervals.filter(timer => timer.active).map(timer => timer.ms), []);
   assert.equal(timers.filter(timer => !timer.cancelled && timer.ms === 37 * 60000).length, 1);
   assert.equal(timers.filter(timer => timer.ms === 2500).length, startupCount);
   assert.equal(scheduler.refreshSchedulerSettings(), false);
@@ -172,31 +172,30 @@ test('1, 17, 37, 60, 90 and 720 minute schedules fire only at their exact deadli
     const fixture = schedulerFixture(t);
     fixture.settings.collect.intervalMinutes = minutes;
     fixture.scheduler.startScheduler();
-    await fixture.advance(2500); // 启动采集完成是下一次间隔的起点
-    assert.equal(fixture.events.filter(event => event === 'collect').length, 1);
+    assert.equal(fixture.events.filter(event => event === 'collect').length, 0);
     await fixture.advance(minutes * 60000 - 1);
-    assert.equal(fixture.events.filter(event => event === 'collect').length, 1);
+    assert.equal(fixture.events.filter(event => event === 'collect').length, 0);
     await fixture.advance(1);
-    assert.equal(fixture.events.filter(event => event === 'collect').length, 2);
+    assert.equal(fixture.events.filter(event => event === 'collect').length, 1);
     await fixture.advance(minutes * 60000);
-    assert.equal(fixture.events.filter(event => event === 'collect').length, 3);
+    assert.equal(fixture.events.filter(event => event === 'collect').length, 2);
     fixture.scheduler.stopScheduler();
     await fixture.advance(minutes * 60000);
-    assert.equal(fixture.events.filter(event => event === 'collect').length, 3);
+    assert.equal(fixture.events.filter(event => event === 'collect').length, 2);
   }
 });
 
 test('manual collection cancels the old deadline and waits a whole interval after completion', async t => {
   const fixture = schedulerFixture(t);
   fixture.scheduler.startScheduler();
-  await fixture.advance(2500 + 9 * 60000);
+  await fixture.advance(9 * 60000);
   await fixture.scheduler.runPipeline('manual');
   const count = () => fixture.events.filter(event => event === 'collect').length;
-  assert.equal(count(), 2);
+  assert.equal(count(), 1);
   await fixture.advance(60000); // 原来的自动采集时间
-  assert.equal(count(), 2);
+  assert.equal(count(), 1);
   await fixture.advance(9 * 60000);
-  assert.equal(count(), 3);
+  assert.equal(count(), 2);
 });
 
 test('long collection and interval changes cannot leave a second collection timer', async t => {
@@ -221,5 +220,51 @@ test('changing only analysis cadence preserves the current collection deadline',
   fixture.settings.collect.analyzeIntervalSeconds = 90;
   assert.equal(fixture.scheduler.refreshSchedulerSettings(), true);
   assert.equal(fixture.scheduler.getStatus().nextCollectAt, deadline);
-  assert.equal(fixture.intervals.filter(timer => timer.active && timer.ms === 90000).length, 1);
+  assert.equal(fixture.intervals.filter(timer => timer.active).length, 0);
+});
+
+test('default idle performs no collection, analysis or maintenance even after a day', async t => {
+  const fixture = schedulerFixture(t, { automatic: false });
+  fixture.scheduler.startScheduler();
+  await fixture.advance(24 * 60 * 60000);
+  assert.deepEqual(fixture.events, []);
+  assert.equal(fixture.intervals.length, 0);
+  assert.equal(fixture.timers.length, 0);
+  assert.equal(fixture.scheduler.getStatus().activity, 'online');
+  assert.equal(fixture.scheduler.getStatus().nextCollectAt, null);
+});
+
+test('one authoritative status covers collection, analysis and the tail, then becomes online', async t => {
+  const gate = deferred(); t.after(() => gate.resolve());
+  const fixture = schedulerFixture(t, { automatic: false, group: options => options.limit === 1000 ? gate.promise : undefined });
+  fixture.scheduler.startScheduler();
+  const states = [];
+  const unsubscribe = fixture.scheduler.subscribeStatus(status => states.push(status));
+  const run = fixture.scheduler.runPipeline('manual');
+  await tick();
+  assert.equal(fixture.scheduler.getStatus().activity, 'collecting');
+  assert.equal(states[0].activity, 'online');
+  assert.ok(states.slice(1).every(status => status.activity === 'collecting'));
+  assert.ok(states.some(status => status.collectRunning));
+  assert.ok(states.some(status => status.analyzeRunning));
+  gate.resolve(); await run;
+  assert.equal(states.at(-1).activity, 'online');
+  assert.ok(states.every((status, index) => index === 0 || status.revision > states[index - 1].revision));
+  assert.equal(fixture.scheduler.getStatus().nextCollectAt, null);
+  unsubscribe();
+});
+
+test('opting into automatic jobs runs the complete pipeline; turning off leaves no later timer', async t => {
+  const fixture = schedulerFixture(t, { automatic: false });
+  fixture.scheduler.startScheduler();
+  fixture.settings.collect.automatic = true;
+  fixture.scheduler.refreshSchedulerSettings();
+  await fixture.advance(10 * 60000);
+  assert.ok(fixture.events.includes('collect') && fixture.events.includes('analyze') && fixture.events.includes('tail'));
+  const completed = [...fixture.events];
+  fixture.settings.collect.automatic = false;
+  fixture.scheduler.refreshSchedulerSettings();
+  await fixture.advance(24 * 60 * 60000);
+  assert.deepEqual(fixture.events, completed);
+  assert.equal(fixture.scheduler.getStatus().nextCollectAt, null);
 });

@@ -12,6 +12,7 @@ const CommonLinks = require('../renderer/common-links');
 const { createUiPreferencesStore } = require('../electron/ui-preferences');
 
 const baseline = {
+  pointerEnabled: true, pointerSize: 320, pointerColor: '#8b5cf6',
   theme: 'light', textScale: 'md', aquaMode: 'mica', aquaEnabled: false,
   aquaBlur: 2, aquaFrost: 20, aquaHue: 40, aquaBrightness: 42,
   aquaBackground: 'fluid', aquaWallpaperBlur: 0, aquaWallpaperFrost: 0,

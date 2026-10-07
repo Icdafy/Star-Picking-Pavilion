@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
 // Use the real Electron entry point, backend, preload and renderer. Main-process
 // IPC provides the same native evaluate interface as the other desktop tests.
 // No startup retry or application/API interception hides a failed launch.
-async function launchNativeElectron(root, profile) {
+async function launchNativeElectron(root, profile, { startScheduler = false } = {}) {
   const port = await new Promise(resolve => {
     const server = net.createServer();
     server.listen(0, '127.0.0.1', () => {
@@ -29,7 +29,7 @@ async function launchNativeElectron(root, profile) {
     `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1'], {
     cwd: root,
     env: { ...process.env, STAR_PICKING_PAVILION_TEST_DATA_DIR: profile,
-      STAR_PICKING_PAVILION_NO_SCHEDULER: '1', STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE: '1' },
+      STAR_PICKING_PAVILION_NO_SCHEDULER: startScheduler ? '0' : '1', STAR_PICKING_PAVILION_DISABLE_AUTO_UPDATE: '1' },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   });
   let output = '', sequence = 0, browser, spawnError;

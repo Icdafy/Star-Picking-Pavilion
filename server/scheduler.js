@@ -1,7 +1,6 @@
 'use strict';
-// 调度：采集与分析解耦成两个独立循环，让评分「实时跟上」
-//   · 采集循环：每轮完成后等待 intervalMinutes 分钟 collectAll 入库
-//   · 分析循环：每 analyzeIntervalSeconds 秒轮询：判断与写作 → 事件归组 → 门槛重判 → 热点榜
+// 调度：默认在线待命。手动或明确开启的自动任务统一运行采集→分析，任务外不调用模型。
+//   · 自动循环：每轮完整结束后等待 intervalMinutes 分钟，默认关闭
 //   · 定时：每小时热度快照；每天 08:00 日报；每周一 10:00 周报；每月 1 日 10:30 月报（学 AIHOT 的刊期）
 //   · runPipeline：手动「立即采集分析」一次性全量（采集→抽干分析→归组），供 /api/collect 与脚本用
 // 模型只在这里的任务里被调用；读者打开页面只读库里已有的结果。
@@ -37,11 +36,35 @@ let lastHotAt = 0;         // 最近一次热点榜计算时间
 let lastEditorialAt = 0;   // 最近一次导语改写与事件综述
 let schedulerStarted = false;
 let collectTimer = null;
-let analyzeTimer = null;
-let startupTimer = null;
-let pruneTimer = null;
 let nextCollectAt = null;
 const cronTasks = new Set();
+const statusListeners = new Set();
+let statusRevision = 0;
+
+function getStatus() {
+  return {
+    revision: statusRevision,
+    activity: collectRunning || analyzeRunning || pipelineRunning ? 'collecting' : 'online',
+    running: collectRunning || analyzeRunning || pruneRunning || compactRunning || pipelineRunning,
+    schedulerStarted, schedulerStopping, pipelineRunning, activeSchedule, nextCollectAt, lastPipeline,
+    collectRunning, analyzeRunning, pruneRunning, compactRunning,
+    lastRun, lastAnalyzeAt, lastPrune, lastCompact, lastGroup
+  };
+}
+
+function notifyStatus() {
+  statusRevision += 1;
+  const status = getStatus();
+  for (const listener of statusListeners) {
+    try { listener(status); } catch { /* 已关闭的状态连接不能中断任务 */ }
+  }
+}
+
+function subscribeStatus(listener) {
+  statusListeners.add(listener);
+  listener(getStatus());
+  return () => statusListeners.delete(listener);
+}
 
 // ---------- 数据保留清理 ----------
 // 单轮有删除上限，剩余部分继续清，避免首次在大库上一次性长时间持锁
@@ -114,6 +137,7 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
   if (collectRunning) return { skipped: true, reason: '采集进行中' };
   cancelCollectionTimer();
   collectRunning = true;
+  notifyStatus();
   const started = Date.now();
   try {
     console.log(`[collect] 开始（${trigger}）`);
@@ -134,6 +158,7 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
     return lastRun;
   } finally {
     collectRunning = false;
+    notifyStatus();
     if (!pipelineRunning) scheduleNextCollection();
   }
 }
@@ -145,6 +170,7 @@ async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = 
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (analyzeRunning) return { skipped: true };
   analyzeRunning = true;
+  notifyStatus();
   try {
     const r = await analyzePending(null, limit);
     lastAnalyzeAt = new Date().toISOString();
@@ -178,6 +204,7 @@ async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = 
     return { ...r, group };
   } finally {
     analyzeRunning = false;
+    notifyStatus();
   }
 }
 
@@ -186,11 +213,10 @@ function runPipeline(trigger = 'manual') {
   if (schedulerStopping) return Promise.resolve({ skipped: true, reason: 'stopping' });
   if (pipelinePromise) return pipelinePromise;
   if (compactRunning) return Promise.resolve({ skipped: true, reason: 'maintenance' });
-  // 手动操作接管启动 / 自动采集计时，避免刚点完按钮又被旧计时器触发。
-  if (startupTimer) clearTimeout(startupTimer);
-  startupTimer = null;
+  // 一轮任务接管自动计时，避免刚完成又被旧计时器触发。
   cancelCollectionTimer();
   pipelineRunning = true;
+  notifyStatus();
   const started = Date.now();
   pipelinePromise = (async () => {
     try {
@@ -208,6 +234,7 @@ function runPipeline(trigger = 'manual') {
       pipelineRunning = false;
       pipelinePromise = null;
       scheduleNextCollection();
+      notifyStatus();
     }
   })();
   return pipelinePromise;
@@ -246,13 +273,14 @@ function cancelCollectionTimer() {
 function scheduleNextCollection() {
   cancelCollectionTimer();
   if (!schedulerStarted || schedulerStopping || collectRunning || pipelineRunning) return;
-  const intervalMs = activeSchedule?.collectionIntervalMs;
+  const intervalMs = activeSchedule?.enabled && activeSchedule.collectionIntervalMs;
   if (!intervalMs) return;
   nextCollectAt = new Date(Date.now() + intervalMs).toISOString();
   collectTimer = setTimeout(async () => {
     collectTimer = null;
     nextCollectAt = null;
-    try { await collectOnce('timer'); }
+    if (!activeSchedule?.enabled || schedulerStopping) return;
+    try { await runPipeline('timer'); }
     catch (error) { console.error('[collect]', error); }
     finally { if (!collectTimer) scheduleNextCollection(); }
   }, intervalMs);
@@ -261,17 +289,16 @@ function scheduleNextCollection() {
 function refreshSchedulerSettings() {
   if (!schedulerStarted || schedulerStopping) return false;
   const settings = loadSettings();
+  const enabled = settings.collect.automatic === true;
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   const analyzeMs = Math.max(20, settings.collect.analyzeIntervalSeconds || 75) * 1000;
-  if (activeSchedule?.collectionIntervalMs === intervalMs && activeSchedule?.analysisIntervalMs === analyzeMs) return false;
-  const collectionChanged = activeSchedule?.collectionIntervalMs !== intervalMs;
-  const analysisChanged = activeSchedule?.analysisIntervalMs !== analyzeMs;
-  activeSchedule = { collectionIntervalMs: intervalMs, analysisIntervalMs: analyzeMs };
+  if (activeSchedule?.enabled === enabled && activeSchedule?.collectionIntervalMs === intervalMs
+    && activeSchedule?.analysisIntervalMs === analyzeMs) return false;
+  const collectionChanged = activeSchedule?.enabled !== enabled || activeSchedule?.collectionIntervalMs !== intervalMs;
+  activeSchedule = { enabled, collectionIntervalMs: intervalMs, analysisIntervalMs: analyzeMs };
+  for (const task of cronTasks) enabled ? task.start?.() : task.stop?.();
   if (collectionChanged) scheduleNextCollection();
-  if (analysisChanged) {
-    if (analyzeTimer) clearInterval(analyzeTimer);
-    analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeMs);
-  }
+  notifyStatus();
   return true;
 }
 
@@ -282,66 +309,55 @@ function startScheduler() {
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   const interval = intervalMs / 60_000;
-  const analyzeSec = Math.max(20, settings.collect.analyzeIntervalSeconds || 75);
-
-  // 采集循环（完成后自调度，长轮次与手动触发不会压缩下一次等待时间）
-  refreshSchedulerSettings();
-  // 分析循环（秒级，setInterval 自调度；锁防重入）
   // 日报（每天定点纯代码生成）
   cronTasks.add(cron.schedule(`0 ${settings.dailyReportHour ?? 8} * * *`, () => {
+    if (!activeSchedule?.enabled || schedulerStopping) return;
     try { generateDaily(); console.log('[daily] 日报已生成'); }
     catch (e) { console.error('[daily]', e); }
   }));
   // 每小时第 5 分钟：事件热度快照（热点走势图）
   cronTasks.add(cron.schedule('5 * * * *', () => {
+    if (!activeSchedule?.enabled || schedulerStopping) return;
     try { snapshotHeat(); } catch (e) { console.error('[hot]', e); }
   }));
   // 周报：每周一 10:00 出上周；月报：每月 1 日 10:30 出上月
   cronTasks.add(cron.schedule('0 10 * * 1', () => {
+    if (!activeSchedule?.enabled || schedulerStopping) return;
     try { generatePeriod('weekly', previousPeriodKey('weekly'), { overwrite: true }); console.log('[report] 周报已生成'); }
     catch (e) { console.error('[report]', e); }
   }));
   cronTasks.add(cron.schedule('30 10 1 * *', () => {
+    if (!activeSchedule?.enabled || schedulerStopping) return;
     try { generatePeriod('monthly', previousPeriodKey('monthly'), { overwrite: true }); console.log('[report] 月报已生成'); }
     catch (e) { console.error('[report]', e); }
   }));
   // 保留清理（日报之后 25 分钟，避开采集与日报的忙时）
   cronTasks.add(cron.schedule(`25 ${settings.dailyReportHour ?? 8} * * *`, () => {
+    if (!activeSchedule?.enabled || schedulerStopping) return;
     try {
       pruneReceipts();
       const result = pruneOnce('cron');
       if (!result.skipped) compactOnce('cron', { mode: 'auto' });
     } catch (e) { console.error('[retention]', e); }
   }));
-  // 启动后先跑一轮全量
-  startupTimer = setTimeout(() => runPipeline('startup').catch(e => console.error('[pipeline]', e)), 2500);
-  // 启动清理放在首轮采集分析之后，避免和冷启动争 IO
-  pruneTimer = setTimeout(() => {
-    try {
-      const result = pruneOnce('startup');
-      if (!result.skipped) compactOnce('startup', { mode: 'auto' });
-    } catch (e) { console.error('[retention]', e); }
-  }, 90_000);
-  console.log(`[scheduler] 已启动：每 ${interval} 分钟采集，每 ${analyzeSec} 秒分析一批，每天 ${settings.dailyReportHour ?? 8}:00 出日报、${settings.dailyReportHour ?? 8}:25 清理过期数据`);
+  refreshSchedulerSettings();
+  console.log(settings.collect.automatic
+    ? `[scheduler] 自动调度：每轮完成后等待 ${interval} 分钟；每天 ${settings.dailyReportHour ?? 8}:00 出日报`
+    : '[scheduler] 在线待命：自动调度关闭，无启动采集或独立分析轮询');
 }
 
 function stopScheduler() {
   schedulerStopping = true;
   schedulerStarted = false;
   cancelCollectionTimer();
-  if (analyzeTimer) clearInterval(analyzeTimer);
-  if (startupTimer) clearTimeout(startupTimer);
-  if (pruneTimer) clearTimeout(pruneTimer);
   collectTimer = null;
-  analyzeTimer = null;
-  startupTimer = null;
-  pruneTimer = null;
   activeSchedule = null;
   for (const task of cronTasks) {
     task.stop?.();
     task.destroy?.();
   }
   cronTasks.clear();
+  notifyStatus();
   console.log('[scheduler] 已停止');
 }
 
@@ -355,22 +371,5 @@ module.exports = {
   startScheduler, stopScheduler, waitForSchedulerIdle,
   refreshSchedulerSettings,
   runPipeline, collectOnce, analyzeOnce, pruneOnce, compactOnce,
-  getStatus: () => ({
-    running: collectRunning || analyzeRunning || pruneRunning || compactRunning || pipelineRunning,
-    schedulerStarted,
-    schedulerStopping,
-    pipelineRunning,
-    activeSchedule,
-    nextCollectAt,
-    lastPipeline,
-    collectRunning,
-    analyzeRunning,
-    pruneRunning,
-    compactRunning,
-    lastRun,
-    lastAnalyzeAt,
-    lastPrune,
-    lastCompact,
-    lastGroup
-  })
+  getStatus, subscribeStatus
 };

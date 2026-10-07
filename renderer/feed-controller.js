@@ -124,7 +124,7 @@
           const emptyCopy = state.q ? '没有检索到相关情报，换个关键词试试'
             : state.view === 'starred' ? '还没有星标情报 —— 在任意卡片右下角点「星标」，收起来的情报不会被保留策略清理'
               : state.view === 'all' ? '暂无已确认的低空经济或商业航天动态，采集资料完成行业判断后会显示在这里'
-                : '暂无内容 —— 点击右上角刷新按钮立即采集，或等待定时任务';
+                : '暂无内容 —— 点击右上角刷新按钮开始采集分析';
           list.innerHTML = `<div class="empty-state glass">
         <div class="es-icon">${state.view === 'starred' && !state.q ? '尚 未 摘 星' : '风 平 浪 静'}</div>
         <p>${emptyCopy}</p>

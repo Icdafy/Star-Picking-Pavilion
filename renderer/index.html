@@ -87,13 +87,12 @@
   <div class="rail-footer">
     <span class="rail-live-dot" aria-hidden="true"></span>
     <span class="rail-footer-copy"><strong>本地情报工作区</strong><small>聚合 · 研判 · 归档</small></span>
+    <span class="update-slot">
     <button class="update-pill" id="updatePill" type="button" aria-label="检查更新" title="检查更新" hidden>
-      <svg class="update-ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="update-track" cx="26" cy="26" r="23"/><circle class="update-arc" cx="26" cy="26" r="23" pathLength="100" stroke-dashoffset="100" data-update-arc/></svg>
-      <span class="update-core">
-        <svg class="update-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" data-update-icon><path d="M10 3v9m-3-3 3 3 3-3M4 13v3h12v-3"/></svg>
-        <span class="update-value" data-update-value hidden></span><span class="update-caption" data-update-caption>更新</span>
-      </span>
+      <svg xmlns="http://www.w3.org/2000/svg" class="update-art" viewBox="0 0 1254 1254" aria-hidden="true"><defs><linearGradient id="update-blue" x1="10%" y1="0%" x2="90%" y2="100%" gradientUnits="objectBoundingBox"><stop stop-color="#5467FF"/><stop offset="1" stop-color="#4559F8"/></linearGradient><linearGradient id="update-track" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#D7D5EB"/><stop offset="1" stop-color="#E8E5F3"/></linearGradient><radialGradient id="update-disc" cx="46%" cy="35%" r="80%"><stop stop-color="#FAF8FF"/><stop offset="1" stop-color="#ECE8F8"/></radialGradient></defs><circle class="track" cx="627" cy="627" r="510" fill="none" stroke="url(#update-track)" stroke-width="76" /><circle class="progress update-arc" data-update-arc pathLength="100" stroke-dashoffset="100" cx="627" cy="627" r="510" fill="none" stroke="url(#update-blue)" stroke-width="76" stroke-linecap="round" transform="rotate(-90 627 627)" stroke-dasharray="100" opacity="0"></circle><g transform="translate(627 627)"><g class="center-scale" transform="scale(1)"><g transform="translate(-627 -627)"><circle class="disc" cx="627" cy="627" r="425" fill="url(#update-disc)" /><g class="arrows" data-update-icon transform="rotate(0 627 627)"><path d="M 467.6 525.4 A 189 189 0 0 1 799.6 550.1" fill="none" stroke="url(#update-blue)" stroke-width="48" stroke-linecap="round" /><path d="M 838.9536 501.6883 Q 862 492 857.2788 516.5502 L 836.7212 623.4498 Q 832 648 811.6025 633.5451 L 725.3975 572.4549 Q 705 558 728.0464 548.3117 Z" fill="url(#update-blue)" /><g transform="rotate(180 627 627)"><path d="M 467.6 525.4 A 189 189 0 0 1 799.6 550.1" fill="none" stroke="url(#update-blue)" stroke-width="48" stroke-linecap="round" /><path d="M 838.9536 501.6883 Q 862 492 857.2788 516.5502 L 836.7212 623.4498 Q 832 648 811.6025 633.5451 L 725.3975 572.4549 Q 705 558 728.0464 548.3117 Z" fill="url(#update-blue)" /></g></g></g></g></g></svg>
+      <span class="update-details"><span class="update-value" data-update-value hidden></span><span class="update-caption" data-update-caption>更新</span></span>
     </button>
+    </span>
     <span class="sr-only" id="updateProgress" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" hidden></span>
     <span class="sr-only" id="updateStatus" role="status" aria-live="polite"></span>
   </div>
@@ -110,7 +109,7 @@
     <div class="stat-divider"></div>
     <div class="stat"><span class="stat-num accent" id="statFeatured">–</span><span class="stat-label">今日精选</span></div>
     <div class="stat-divider"></div>
-    <div class="stat"><span class="stat-num" id="statStatus"><span class="pulse-dot"></span></span><span class="stat-label" id="statStatusLabel">待命</span></div>
+    <div class="stat"><span class="stat-num" id="statStatus"><span class="pulse-dot"></span></span><span class="stat-label" id="statStatusLabel">在线</span></div>
   </div>
 
   <div class="tower-actions">
@@ -149,7 +148,7 @@
       </div>
       <div class="lexicon-body" id="lexiconBody" aria-live="polite"></div>
     </div>
-    <button class="rt-toggle active" id="btnRealtime" title="实时更新：自动捕捉新情报并跟上评分" aria-pressed="true">
+    <button class="rt-toggle active" id="btnRealtime" title="实时刷新：同步已有情报，采集分析由任务开关控制" aria-pressed="true">
       <span class="rt-dot" aria-hidden="true"></span>实时
     </button>
     <button class="btn-icon palette-trigger" id="btnPalette" type="button" title="命令面板（Ctrl+K）：跳转、操作与检索" aria-label="打开命令面板" aria-haspopup="dialog" aria-controls="commandPalette">
@@ -374,7 +373,7 @@
     </header>
     <div class="src-toolbar glass">
       <div class="src-network-row">
-        <p id="sourceNetworkStatus" class="hint" role="status" aria-live="polite">外网信源会在网络可用时自动采集；国内信源持续运行。</p>
+        <p id="sourceNetworkStatus" class="hint" role="status" aria-live="polite">采集任务启动后，外网信源随网络可用性启用；待命时不发起采集。</p>
         <button class="btn-ghost btn-compact" id="btnDetectNetwork" type="button">检测网络</button>
       </div>
       <div class="src-summary" id="sourcesSummary" aria-live="polite"></div>
@@ -428,6 +427,11 @@
       </div>
       <div class="glass card-pad" id="settingsCollect" data-settings-section="settingsCollect" aria-labelledby="heading-settingsCollect">
         <h3 id="heading-settingsCollect" tabindex="-1">采集调度</h3>
+        <label class="desktop-switch">
+          <span class="switch-copy"><strong>自动采集分析</strong><small>默认关闭。开启后按下方间隔运行完整采集分析任务，并自动出刊与整理数据。</small></span>
+          <input id="setAutomaticCollect" type="checkbox" role="switch">
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
         <label class="field"><span>采集间隔（分钟）</span>
           <input id="setInterval" type="number" min="1" max="720" step="1">
         </label>
@@ -435,9 +439,9 @@
           <input id="setRsshub" type="text" placeholder="https://rsshub.app（填后 rsshub:// 型信源生效）">
         </label>
         <div class="btn-row"><button class="btn-primary" id="btnSaveCollect">保存</button></div>
-        <p class="hint">支持 1—720 的整数分钟，保存后立即生效。启动时先采集一次，每轮完成后按所填间隔等待；手动采集分析完成后重新计时。列表中的更新提示也可能来自已采集新闻的后台分析，不表示又发起了采集。</p>
+        <p class="hint">启动时保持在线待命，点击“立即采集分析”才会工作。自动调度支持 1—720 的整数分钟，保存后生效；启用后先等待所填间隔，每轮采集与分析全部完成后重新计时。关闭开关会取消后续自动任务，已开始的一轮完成后恢复在线。</p>
         <p class="hint" id="collectScheduleStatus" aria-live="polite"></p>
-        <p class="hint">日报每天 08:00、周报每周一 10:00、月报每月 1 日 10:30 自动出刊。信源等级 T1（官方一手）/T1.5（官方社媒）/T2（媒体聚合）决定入选门槛：同样一件事，官方原文的门槛更低。填入 RSSHub 地址后，可把公众号 / 媒体经 RSSHub 转成 RSS 接入（信源页提报 <code>rsshub://路由</code> 即可）。</p>
+        <p class="hint">开启自动调度后，日报每天 08:00、周报每周一 10:00、月报每月 1 日 10:30 自动出刊。信源等级 T1（官方一手）/T1.5（官方社媒）/T2（媒体聚合）决定入选门槛。填入 RSSHub 地址后，可把公众号 / 媒体经 RSSHub 转成 RSS 接入。</p>
         <h3 style="margin-top:1.5rem">情报备忘 <span class="muted">仅存本机</span></h3>
         <label class="field"><span>问题、建议或随手笔记</span>
           <textarea id="feedbackText" rows="3" placeholder="记录在本地情报库中，随时可以回看和删除"></textarea>
@@ -623,6 +627,37 @@
         </div>
         <p class="hint">调的是整套版面的比例尺，不只是字号：字号、行距、留白、圆角、栏宽按同一比例一起变，所以放大之后版面不会散架。也可以随时用 <code>Ctrl</code> <code>+</code> / <code>Ctrl</code> <code>-</code> 增减，<code>Ctrl</code> <code>0</code> 回到标准档。</p>
         <p class="hint">正文中文用<b>思源黑体</b>、英文与数字用 <b>Times New Roman</b>，字体随安装包内置，不依赖本机是否装过中文字体。</p>
+        <div class="pointer-lab" aria-labelledby="pointerHeading">
+          <h3 id="pointerHeading">跟手动效</h3>
+          <label class="desktop-switch">
+            <span class="switch-copy"><strong>全局追光</strong><small>所有板块、导航、表单和弹层都随鼠标轻柔追光。</small></span>
+            <input id="setPointerEnabled" type="checkbox" role="switch" checked>
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <div class="appearance-grid">
+            <label class="appearance-control appearance-control-wide" for="setPointerSize">
+              <span class="appearance-label">光晕大小 <output id="outPointerSize">320px</output></span>
+              <input id="setPointerSize" type="range" min="80" max="800" step="1" value="320">
+            </label>
+            <label class="field" for="setPointerSizeNumber"><span>精确大小（px）</span><input id="setPointerSizeNumber" type="number" min="80" max="800" step="1" value="320"></label>
+            <div class="pointer-color-controls">
+              <label class="field" for="setPointerColor"><span>调色盘</span><input id="setPointerColor" type="color" value="#8b5cf6"></label>
+              <label class="field" for="setPointerColorHex"><span>颜色值</span><input id="setPointerColorHex" type="text" value="#8b5cf6" maxlength="7" pattern="#[0-9A-Fa-f]{6}" spellcheck="false" aria-label="跟手动效十六进制颜色"></label>
+            </div>
+            <div class="pointer-palette appearance-control-wide" id="pointerPalette" role="group" aria-label="跟手动效配色预设">
+              <button type="button" data-pointer-color="#8b5cf6" aria-label="星云紫" aria-pressed="true" style="--swatch:#8b5cf6"></button>
+              <button type="button" data-pointer-color="#5467ff" aria-label="摘星蓝" aria-pressed="false" style="--swatch:#5467ff"></button>
+              <button type="button" data-pointer-color="#06b6d4" aria-label="冰川青" aria-pressed="false" style="--swatch:#06b6d4"></button>
+              <button type="button" data-pointer-color="#10b981" aria-label="翡翠绿" aria-pressed="false" style="--swatch:#10b981"></button>
+              <button type="button" data-pointer-color="#f59e0b" aria-label="琥珀金" aria-pressed="false" style="--swatch:#f59e0b"></button>
+              <button type="button" data-pointer-color="#f97316" aria-label="日落橙" aria-pressed="false" style="--swatch:#f97316"></button>
+              <button type="button" data-pointer-color="#f43f5e" aria-label="玫瑰红" aria-pressed="false" style="--swatch:#f43f5e"></button>
+              <button type="button" data-pointer-color="#ec4899" aria-label="桃花粉" aria-pressed="false" style="--swatch:#ec4899"></button>
+            </div>
+          </div>
+          <div class="btn-row"><button class="btn-ghost btn-compact" id="btnPointerReset" type="button">恢复默认动效</button></div>
+          <p class="hint">80—800px 连续调整，可选任意颜色；修改立即预览并自动保存。鼠标停下后追光自然收敛；减少动态效果、失焦或窗口隐藏时停止。</p>
+        </div>
       </div>
       <div class="glass card-pad appearance-lab" id="settingsAppearance" data-settings-section="settingsAppearance" aria-labelledby="heading-settingsAppearance">
         <div class="appearance-heading">

@@ -69,14 +69,16 @@ test('v0217 native desktop: theme contrast, spring tracking, semantic reveals, d
         const rgb = value => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3); };
         const luminance = color => rgb(color).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
         const contrast = (a, b) => { const l = [luminance(a), luminance(b)].sort((a, b) => b - a); return (l[0] + .05) / (l[1] + .05); };
-        const style = getComputedStyle(button), background = style.backgroundColor;
+        const style = getComputedStyle(button), background = getComputedStyle(document.documentElement).getPropertyValue('--c-bg');
+        const stops = [...button.querySelectorAll('#update-blue stop')].map(stop => getComputedStyle(stop).stopColor);
+        const disc = button.querySelector('#update-disc');
         const b = button.getBoundingClientRect(), footer = button.closest('.rail-footer').getBoundingClientRect();
-        return { color: style.color, stroke: getComputedStyle(arc).stroke, size: b.width,
+        return { color: style.color, stroke: stops.at(-1), size: b.width,
           strokeWidth: parseFloat(getComputedStyle(arc).strokeWidth), labelContrast: contrast(style.color, getComputedStyle(document.documentElement).getPropertyValue('--c-bg')),
-          ringContrast: contrast(getComputedStyle(arc).stroke, background), fits: b.left >= footer.left && b.right <= footer.right + 1,
-          background, coreBackground: getComputedStyle(button.querySelector('.update-core')).backgroundImage };
+          ringContrast: Math.min(...stops.map(stop => contrast(stop, background))), fits: b.left >= footer.left && b.right <= footer.right + 1,
+          background, coreBackground: disc.localName + '(' + [...disc.children].map(stop => getComputedStyle(stop).stopColor).join(',') + ')' };
       }, { theme, hue: palette.hue, mode, scale });
-      assert.ok(measured.fits && measured.size >= 46 && measured.strokeWidth >= 3.3, JSON.stringify(measured));
+      assert.ok(measured.fits && measured.size >= 46 && measured.strokeWidth === 76, JSON.stringify(measured));
       assert.ok(measured.labelContrast >= 4.5 && measured.ringContrast >= 3, `${theme}/${palette.id}/${mode}/${scale}: ${JSON.stringify(measured)}`);
       assert.notEqual(measured.coreBackground, 'none');
       colors.push({ theme, palette: palette.id, mode, scale, ...measured });
@@ -86,17 +88,19 @@ test('v0217 native desktop: theme contrast, spring tracking, semantic reveals, d
   }
   fs.writeFileSync(path.join(output, 'theme-contrast.json'), JSON.stringify(colors, null, 2));
   await page.evaluate(() => { applyTheme('dark', { persist: false }); applyTextScale('md', { persist: false }); document.getElementById('appViewport').scrollTop = 0; });
+  await page.waitForTimeout(300); // 等待缩放矩阵产生的滚动事件完成，随后才采样跟手。
+  await page.mouse.move(4, 10);
   const update = page.locator('#updatePill'), bounds = await update.boundingBox();
   await page.mouse.move(bounds.x + bounds.width * .8, bounds.y + bounds.height * .3);
   await page.waitForTimeout(130);
-  const tracking = await update.locator('.update-core').evaluate(node => ({ translate: node.style.translate, focus: document.hasFocus(), tier: document.documentElement.dataset.fxTier,
+  const tracking = await update.locator('.update-art').evaluate(node => ({ translate: node.style.translate, focus: document.hasFocus(), tier: document.documentElement.dataset.fxTier,
     light: node.parentElement.querySelector('.control-aura')?.outerHTML, pointer: window.v0217Pointer.slice(-4) }));
-  assert.ok(parseFloat(tracking.translate) > 0, 'update inner core follows the pointer: ' + JSON.stringify(tracking));
+  assert.ok(parseFloat(tracking.translate) > 0, 'supplied update art follows the pointer: ' + JSON.stringify(tracking));
   const fixed = await update.boundingBox();
   assert.ok(Math.abs(bounds.x - fixed.x) + Math.abs(bounds.y - fixed.y) < .5, 'hit region stays stationary');
-  await page.mouse.move(2, 910);
+  await page.mouse.move(4, 10);
   await page.waitForTimeout(700);
-  assert.equal(await update.locator('.update-core').evaluate(node => node.style.translate), '');
+  assert.equal(await update.locator('.update-art').evaluate(node => node.style.translate), '');
   assert.equal(await page.locator('.surface-light, .control-aura').count(), 0);
 
   await page.evaluate(() => document.querySelector('.tab[data-view="all"]').click());
@@ -109,7 +113,7 @@ test('v0217 native desktop: theme contrast, spring tracking, semantic reveals, d
   await page.mouse.move(hb.x + hb.width * .85, hb.y + hb.height * .6);
   await page.waitForTimeout(180);
   assert.ok(await header.locator('.banner-art').evaluate(node => parseFloat(node.style.translate) > 0), 'orbit art has spring parallax');
-  await page.mouse.move(2, 910); await page.waitForTimeout(500);
+  await page.mouse.move(4, 10); await page.waitForTimeout(500);
 
   const card = page.locator('#feedList .card').first();
   await card.locator('.dims-toggle').click();
@@ -148,7 +152,7 @@ test('v0217 native desktop: theme contrast, spring tracking, semantic reveals, d
   await page.waitForTimeout(500);
   assert.equal(await page.locator('#viewSettings [data-banner-reveal]').first().evaluate(node => node.getAnimations().length), 0);
   assert.equal(await page.locator('.surface-light, .control-aura, .press-wave').count(), 0);
-  assert.equal(await page.locator('#updatePill .update-core').evaluate(node => node.style.translate), '');
+  assert.equal(await page.locator('#updatePill .update-art').evaluate(node => node.style.translate), '');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.waitForFunction(() => { document.documentElement.getBoundingClientRect(); return !reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'full'; });
   await page.evaluate(() => document.getElementById('appViewport').scrollTo({ top: 1600, behavior: 'instant' }));

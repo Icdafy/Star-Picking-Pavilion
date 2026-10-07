@@ -20,7 +20,7 @@ const reports = require('./ai/reports');
 const { buildDailyBundle, serializeJsonl } = require('./archive/daily-bundle');
 const {
   runPipeline, pruneOnce, compactOnce, startScheduler, stopScheduler, waitForSchedulerIdle, getStatus,
-  refreshSchedulerSettings
+  refreshSchedulerSettings, subscribeStatus
 } = require('./scheduler');
 const {
   databaseStorageSnapshot,
@@ -462,6 +462,7 @@ function getLexiconPanel(nowMs = Date.now()) {
 }
 
 // ---------- 路由 ----------
+const activityStreams = new Set();
 const server = http.createServer(async (req, res) => {
   try {
     const activePort = server.address()?.port || REQUESTED_PORT;
@@ -490,6 +491,15 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/feed' && req.method === 'GET') return json(res, 200, queryFeed(u.searchParams));
       if (p === '/api/stats' && req.method === 'GET') return json(res, 200, getStats());
+      if (p === '/api/activity' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+        activityStreams.add(res);
+        const unsubscribe = subscribeStatus(status => {
+          if (!res.destroyed) res.write(`data: ${JSON.stringify(status)}\n\n`);
+        });
+        res.once('close', () => { unsubscribe(); activityStreams.delete(res); });
+        return;
+      }
       if (p === '/api/categories') return json(res, 200, CATEGORIES);
       // 核心词库 + 每个词在本地情报库中的命中条数（检索面板用）
       if (p === '/api/lexicon' && req.method === 'GET') return json(res, 200, getLexiconPanel());
@@ -597,6 +607,7 @@ const server = http.createServer(async (req, res) => {
 
       if (p === '/api/collect' && req.method === 'POST') {
         if (getStatus().schedulerStopping) return json(res, 503, { error: '服务正在退出' });
+        if (getStatus().compactRunning) return json(res, 409, { error: '数据库正在压缩，请稍后采集' });
         if (getStatus().pipelineRunning) return json(res, 202, { started: false, running: true });
         invalidateStatsCache();
         runPipeline('manual').catch(e => console.error(e));
@@ -794,6 +805,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 function closeHttpServer() {
+  for (const response of activityStreams) response.end();
+  activityStreams.clear();
   releaseHistory.dispose();
   return closeHttpServerGracefully(server);
 }

@@ -81,5 +81,5 @@ test('服务进程用的就是这套关闭逻辑，而不是自己再写一遍',
   const path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 'utf8');
   assert.match(source, /require\('\.\/http-close'\)/);
-  assert.match(source, /function closeHttpServer\(\) \{\s*releaseHistory\.dispose\(\);\s*return closeHttpServerGracefully\(server\);/);
+  assert.match(source, /function closeHttpServer\(\) \{\s*for \(const response of activityStreams\) response\.end\(\);\s*activityStreams\.clear\(\);\s*releaseHistory\.dispose\(\);\s*return closeHttpServerGracefully\(server\);/);
 });

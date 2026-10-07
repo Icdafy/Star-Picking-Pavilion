@@ -136,7 +136,8 @@ test('every Aqua field produces one minimal patch and rejects invalid enum, type
     ['aquaWallpaperBlur', 40],
     ['aquaWallpaperFrost', 100],
     ['aquaWhale', false],
-    ['aquaCritters', false]
+    ['aquaCritters', false],
+    ['pointerEnabled', false], ['pointerSize', 80], ['pointerSize', 800], ['pointerColor', '#19c7a8']
   ];
 
   for (const [field, value] of validCases) {
@@ -158,7 +159,9 @@ test('every Aqua field produces one minimal patch and rejects invalid enum, type
     ['aquaWallpaperBlur', Number.POSITIVE_INFINITY],
     ['aquaWallpaperFrost', -1],
     ['aquaWhale', 0],
-    ['aquaCritters', 'false']
+    ['aquaCritters', 'false'],
+    ['pointerEnabled', 'true'], ['pointerSize', 79], ['pointerSize', 801],
+    ['pointerSize', NaN], ['pointerColor', 'red'], ['pointerColor', '#fff'], ['pointerColor', 'url(https://example.com)']
   ];
   for (const [field, value] of invalidCases) {
     assert.equal(schema.isValidUiPreferenceValue(field, value, CommonLinks), false, field);

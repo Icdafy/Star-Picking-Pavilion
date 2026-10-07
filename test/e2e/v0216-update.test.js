@@ -99,27 +99,15 @@ test('workspace update button retains its position, real IPC, progress and motio
   });
   await page.evaluate(() => document.body.classList.remove('is-idle'));
   await status({ status: 'checking' });
-  assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'spin');
-  const loopDelta = await page.locator('.update-ring').evaluate(node => {
-    const animation = node.getAnimations()[0], current = animation.currentTime;
-    const duration = Number(animation.effect.getTiming().duration), frames = [];
-    animation.pause();
-    for (const time of [0, duration - 1]) {
-      animation.currentTime = time;
-      const matrix = new DOMMatrix(getComputedStyle(node).transform);
-      frames.push([matrix.a, matrix.b, matrix.c, matrix.d]);
-    }
-    animation.currentTime = current; animation.play();
-    return Math.max(...frames[0].map((value, i) => Math.abs(value - frames[1][i])));
-  });
-  assert.ok(loopDelta < .01, `indeterminate rotation must join smoothly at the loop boundary: ${loopDelta}`);
+  assert.equal(await page.locator('.update-art').evaluate(node => getComputedStyle(node).animationName), 'none');
+  assert.equal(await page.locator('.update-art animate, .update-art animateTransform').count(), 0, 'demo timelines must not simulate download progress');
   await page.evaluate(() => document.body.classList.add('is-idle'));
-  assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationPlayState), 'paused');
+  assert.equal(await page.locator('.update-art').evaluate(node => node.getAnimations({ subtree: true }).length), 0);
   await page.evaluate(() => document.body.classList.remove('is-idle'));
   for (const device of [[4, 8], [8, 4]]) {
     await capabilities(...device);
     assert.equal(await page.locator('html').getAttribute('data-fx-tier'), 'lite');
-    assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'none');
+    assert.equal(await page.locator('.update-art').evaluate(node => getComputedStyle(node).animationName), 'none');
   }
   await capabilities(8, 8);
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -127,7 +115,7 @@ test('workspace update button retains its position, real IPC, progress and motio
     document.documentElement.getBoundingClientRect();
     return reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'static';
   });
-  assert.equal(await page.locator('.update-ring').evaluate(node => getComputedStyle(node).animationName), 'none');
+  assert.equal(await page.locator('.update-art').evaluate(node => getComputedStyle(node).animationName), 'none');
   assert.equal(await page.locator('.update-arc').evaluate(node => getComputedStyle(node).transitionDuration), '0s');
   await page.emulateMedia({ forcedColors: 'active' });
   const forced = await page.locator('.update-arc').evaluate(node => getComputedStyle(node).stroke);

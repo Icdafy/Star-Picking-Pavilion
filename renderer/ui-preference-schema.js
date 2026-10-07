@@ -30,7 +30,10 @@
     aquaWallpaperBlur: 0,
     aquaWallpaperFrost: 0,
     aquaWhale: false,
-    aquaCritters: false
+    aquaCritters: false,
+    pointerEnabled: true,
+    pointerSize: 320,
+    pointerColor: '#8b5cf6'
   });
   const INITIAL_UI_PREFERENCES = Object.freeze({
     theme: 'light',
@@ -59,6 +62,9 @@
     'aquaWallpaperFrost',
     'aquaWhale',
     'aquaCritters',
+    'pointerEnabled',
+    'pointerSize',
+    'pointerColor',
     'view',
     'domain',
     'category',
@@ -133,6 +139,9 @@
       aquaWallpaperFrost: 0,
       aquaWhale: true,
       aquaCritters: true,
+      pointerEnabled: true,
+      pointerSize: 320,
+      pointerColor: '#8b5cf6',
       view: 'featured',
       domain: '',
       category: '',
@@ -291,6 +300,9 @@
         value => typeof value === 'boolean',
         defaults.aquaCritters
       ),
+      pointerEnabled: chooseValue(source.pointerEnabled, secondary.pointerEnabled, value => typeof value === 'boolean', defaults.pointerEnabled),
+      pointerSize: chooseValue(source.pointerSize, secondary.pointerSize, value => isFiniteNumberInRange(value, 80, 800), defaults.pointerSize),
+      pointerColor: chooseValue(source.pointerColor, secondary.pointerColor, value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value), defaults.pointerColor),
       view: chooseValue(source.view, secondary.view, value => VIEWS.has(value), defaults.view),
       domain: chooseValue(source.domain, secondary.domain, value => DOMAINS.has(value), defaults.domain),
       category: chooseValue(
@@ -341,6 +353,9 @@
     if (field === 'aquaEnabled') return typeof value === 'boolean';
     if (field === 'aquaWhale') return typeof value === 'boolean';
     if (field === 'aquaCritters') return typeof value === 'boolean';
+    if (field === 'pointerEnabled') return typeof value === 'boolean';
+    if (field === 'pointerSize') return isFiniteNumberInRange(value, 80, 800);
+    if (field === 'pointerColor') return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
     if (field === 'view') return VIEWS.has(value);
     if (field === 'domain') return DOMAINS.has(value);
     if (field === 'category') return isValidCategory(value);

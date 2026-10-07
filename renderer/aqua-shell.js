@@ -78,6 +78,10 @@
       ),
       aquaWhale: typeof value.aquaWhale === 'boolean' ? value.aquaWhale : DEFAULTS.aquaWhale,
       aquaEnabled: typeof value.aquaEnabled === 'boolean' ? value.aquaEnabled : DEFAULTS.aquaEnabled,
+      pointerEnabled: typeof value.pointerEnabled === 'boolean' ? value.pointerEnabled : DEFAULTS.pointerEnabled,
+      pointerSize: clampNumber(value.pointerSize, 80, 800, DEFAULTS.pointerSize),
+      pointerColor: typeof value.pointerColor === 'string' && /^#[0-9a-f]{6}$/i.test(value.pointerColor)
+        ? value.pointerColor.toLowerCase() : DEFAULTS.pointerColor,
       aquaCritters: typeof value.aquaCritters === 'boolean'
         ? value.aquaCritters
         : DEFAULTS.aquaCritters
@@ -793,7 +797,9 @@
         ['setAquaHue', 'outAquaHue', state.aquaHue, '°'],
         ['setAquaBrightness', 'outAquaBrightness', state.aquaBrightness, '%'],
         ['setAquaWallpaperBlur', 'outAquaWallpaperBlur', state.aquaWallpaperBlur, 'px'],
-        ['setAquaWallpaperFrost', 'outAquaWallpaperFrost', state.aquaWallpaperFrost, '%']
+        ['setAquaWallpaperFrost', 'outAquaWallpaperFrost', state.aquaWallpaperFrost, '%'],
+        ['setPointerSize', 'outPointerSize', state.pointerSize, 'px'],
+        ['setPointerSizeNumber', null, state.pointerSize, 'px']
       ];
       for (const [inputId, outputId, value, unit] of values) {
         const input = byId(inputId);
@@ -808,6 +814,14 @@
       const critterSwitch = byId('setAquaCritters');
       if (whaleSwitch) whaleSwitch.checked = state.aquaWhale;
       if (critterSwitch) critterSwitch.checked = state.aquaCritters;
+      if (byId('setPointerEnabled')) byId('setPointerEnabled').checked = state.pointerEnabled;
+      for (const id of ['setPointerColor', 'setPointerColorHex']) {
+        const input = byId(id);
+        if (input && doc.activeElement !== input) input.value = state.pointerColor;
+      }
+      for (const button of doc.querySelectorAll('[data-pointer-color]')) {
+        button.setAttribute('aria-pressed', String(button.dataset.pointerColor === state.pointerColor));
+      }
       const showWallpaper = state.aquaBackground === 'wallpaper';
       if (wallpaperControls) wallpaperControls.hidden = !showWallpaper;
       wallpaperOnly.forEach(node => { node.hidden = !showWallpaper; });
@@ -822,6 +836,10 @@
         : 'fluid';
       root.dataset.aquaWhale = state.aquaWhale ? 'on' : 'off';
       root.dataset.aquaCritters = state.aquaCritters ? 'on' : 'off';
+      root.dataset.pointerEnabled = state.pointerEnabled ? 'on' : 'off';
+      root.dataset.pointerSize = String(state.pointerSize);
+      root.style.setProperty('--pointer-size', `${state.pointerSize}px`);
+      root.style.setProperty('--pointer-color', state.pointerColor);
       root.toggleAttribute('data-dsh-float', state.aquaMode === 'mica');
       root.toggleAttribute('data-dsh-compat', state.aquaMode === 'compat');
       root.style.setProperty('--aqua-user-blur', `${state.aquaBlur}px`);
@@ -938,15 +956,35 @@
       ['setAquaHue', 'aquaHue'],
       ['setAquaBrightness', 'aquaBrightness'],
       ['setAquaWallpaperBlur', 'aquaWallpaperBlur'],
-      ['setAquaWallpaperFrost', 'aquaWallpaperFrost']
+      ['setAquaWallpaperFrost', 'aquaWallpaperFrost'],
+      ['setPointerSize', 'pointerSize'],
+      ['setPointerSizeNumber', 'pointerSize']
     ];
     for (const [id, field] of ranges) {
       const input = byId(id);
-      listen(input, 'input', () => update(field, Number(input.value)));
-      listen(input, 'change', () => schedulePersist(field, true));
+      listen(input, 'input', () => {
+        if (id === 'setPointerSizeNumber' && (!input.value || input.validity?.valid === false)) return;
+        update(field, Number(input.value));
+      });
+      listen(input, 'change', () => { syncControls(); schedulePersist(field, true); });
     }
 
     listen(byId('setAquaEnabled'), 'click', () => update('aquaEnabled', !state.aquaEnabled, { immediate: true }));
+    listen(byId('setPointerEnabled'), 'change', event => update('pointerEnabled', event.currentTarget.checked, { immediate: true }));
+    for (const id of ['setPointerColor', 'setPointerColorHex']) {
+      const input = byId(id);
+      listen(input, 'input', () => {
+        if (/^#[0-9a-f]{6}$/i.test(input.value)) update('pointerColor', input.value);
+      });
+      listen(input, 'change', () => { input.value = state.pointerColor; syncControls(); schedulePersist('pointerColor', true); });
+    }
+    listen(byId('pointerPalette'), 'click', event => {
+      const button = event.target.closest('[data-pointer-color]');
+      if (button) update('pointerColor', button.dataset.pointerColor, { immediate: true });
+    });
+    listen(byId('btnPointerReset'), 'click', () => {
+      for (const field of ['pointerEnabled', 'pointerSize', 'pointerColor']) update(field, DEFAULTS[field], { immediate: true });
+    });
     listen(byId('setAquaWhale'), 'change', event => update(
       'aquaWhale',
       Boolean(event.currentTarget.checked),

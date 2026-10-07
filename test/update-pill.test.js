@@ -7,6 +7,16 @@ const { spawnSync } = require('node:child_process');
 const { createUpdatePill } = require('../renderer/update-pill');
 const source = fs.readFileSync(path.join(__dirname, '../renderer/update-pill.js'), 'utf8');
 
+test('supplied SVG artwork preserves its source and uses its exact first-pose geometry in the update control', () => {
+  const original = fs.readFileSync(path.join(__dirname, '../renderer/update-progress-loop.svg'));
+  assert.equal(require('node:crypto').createHash('sha256').update(original).digest('hex'), '4ffe6297f8a0a32dcced1143ea3840b4e3969f506759ecbc5de4fcf03c86030d');
+  const still = fs.readFileSync(path.join(__dirname, '../renderer/update-progress-still.svg'), 'utf8');
+  assert.equal(still, original.toString().replace(/<animate(?:Transform)?\b[^>]*\/>/g, ''));
+  const html = fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'utf8');
+  for (const match of still.matchAll(/<path d="([^"]+)"/g)) assert.ok(html.includes(`d="${match[1]}"`));
+  assert.doesNotMatch(still, /<script|<foreignObject|(?:href|src)="https?:/);
+});
+
 test('update button is an isolated frozen UMD factory', () => {
   assert.doesNotMatch(source, /\bwindow\./);
   const result = spawnSync(process.execPath, ['-e', `delete globalThis.UpdatePill;const api=require(${JSON.stringify(require.resolve('../renderer/update-pill'))});process.stdout.write(JSON.stringify([typeof api.createUpdatePill,Object.isFrozen(api),Object.hasOwn(globalThis,'UpdatePill')]));`], { encoding: 'utf8' });

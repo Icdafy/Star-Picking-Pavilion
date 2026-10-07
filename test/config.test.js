@@ -31,6 +31,7 @@ test.after(async () => {
 test('fresh users get the captured 60 minute interval without creating a settings file', () => {
   assert.equal(fs.existsSync(SETTINGS_PATH), false);
   assert.equal(loadSettings().collect.intervalMinutes, 60);
+  assert.equal(loadSettings().collect.automatic, false);
   assert.equal(fs.existsSync(SETTINGS_PATH), false);
 });
 
@@ -99,6 +100,9 @@ test('insecure remote AI base URLs are rejected', () => {
 
 test('editable settings reject invalid numeric, URL, and model values', () => {
   const current = loadSettings();
+  assert.throws(() => applySettingsPatch(current, { collect: { automatic: 'true' } }), /布尔值/);
+  assert.equal(applySettingsPatch(current, { collect: { automatic: true } }).settings.collect.automatic, true);
+  assert.equal(applySettingsPatch(current, { collect: { automatic: false } }).settings.collect.automatic, false);
   assert.throws(() => applySettingsPatch(current, []), /设置请求体/);
   assert.throws(() => applySettingsPatch(current, { unexpected: true }), /设置字段/);
   assert.throws(() => applySettingsPatch(current, { ai: [] }), /AI 设置/);

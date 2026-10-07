@@ -19,6 +19,33 @@
     }
 
     // 统计数字变化时做一次短促补间，避免刷新瞬间的跳字
+    let activityRevision = -1;
+    function renderActivity(schedule = {}) {
+      if (Number.isFinite(schedule.revision)) {
+        if (schedule.revision < activityRevision) return;
+        activityRevision = schedule.revision;
+      }
+      const busy = schedule.activity ? schedule.activity === 'collecting'
+        : Boolean(schedule.collectRunning || schedule.analyzeRunning || schedule.pipelineRunning);
+      const label = busy ? '采集中' : '在线';
+      if (elements.statStatusLabel.textContent !== label) {
+        elements.statStatus.innerHTML = `<span class="pulse-dot${busy ? ' busy' : ''}"></span>`;
+        elements.statStatusLabel.textContent = label;
+      }
+      if (elements.btnRefresh) {
+        elements.btnRefresh.classList.toggle('spinning', busy);
+        elements.btnRefresh.disabled = busy;
+        elements.btnRefresh.setAttribute('aria-busy', String(busy));
+      }
+      if (elements.collectScheduleStatus) {
+        const date = value => new Date(value).toLocaleString('zh-CN', { hour12: false });
+        elements.collectScheduleStatus.textContent = busy ? '采集分析任务正在运行；全部完成后恢复在线。'
+          : schedule.nextCollectAt ? `下次自动采集：${date(schedule.nextCollectAt)}${schedule.lastRun?.at ? '；最近采集完成：' + date(schedule.lastRun.at) : ''}`
+          : schedule.activeSchedule?.enabled ? '在线待命，等待下一次自动任务。'
+          : '在线待命；自动采集关闭，点击“立即采集分析”才会开始工作。';
+      }
+    }
+
     function setStat(el, value) {
       const target = Number(value);
       if (!Number.isFinite(target)) { el.textContent = '–'; return; }
@@ -47,19 +74,7 @@
         const starredCount = elements.tabStarredCount;
         starredCount.hidden = !s.starred;
         starredCount.textContent = s.starred > 99 ? '99+' : String(s.starred || '');
-        const busy = s.pipeline?.running;
-        elements.statStatus.innerHTML = `<span class="pulse-dot${busy ? ' busy' : ''}"></span>`;
-        elements.statStatusLabel.textContent = s.pipeline?.collectRunning ? '采集中'
-          : s.pipeline?.analyzeRunning || s.pipeline?.pipelineRunning ? '分析中'
-          : busy ? '维护中' : (s.aiConfigured ? 'AI 在线' : '启发模式');
-        if (elements.collectScheduleStatus) {
-          const schedule = s.pipeline;
-          const label = value => new Date(value).toLocaleString('zh-CN', { hour12: false });
-          elements.collectScheduleStatus.textContent = schedule?.collectRunning ? '正在采集；完成后重新计算下一次自动采集时间。'
-            : schedule?.pipelineRunning ? '正在分析；完成后重新计算下一次自动采集时间。'
-            : schedule?.nextCollectAt ? `下次自动采集：${label(schedule.nextCollectAt)}${schedule.lastRun?.at ? '；最近采集完成：' + label(schedule.lastRun.at) : ''}`
-            : '自动采集尚未启动。';
-        }
+        renderActivity(s.pipeline);
         const banner = elements.feedBanner;
         // 星标是用户手动收的，与 AI 是否配置无关，这里不该弹降级提示
         if (!s.aiConfigured && state.view === 'featured') {
@@ -70,7 +85,7 @@
       } catch { /* 后端未就绪 */ }
     }
 
-    return Object.freeze({ setStat, refreshStats });
+    return Object.freeze({ setStat, refreshStats, renderActivity });
   }
 
   return Object.freeze({ createStatsController });

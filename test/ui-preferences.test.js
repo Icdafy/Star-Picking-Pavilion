@@ -27,7 +27,8 @@ const defaultAquaPreferences = Object.freeze({
   aquaWallpaperBlur: 0,
   aquaWallpaperFrost: 0,
   aquaWhale: false,
-  aquaCritters: false
+  aquaCritters: false,
+  pointerEnabled: true, pointerSize: 320, pointerColor: '#8b5cf6'
 });
 
 async function makeDirectory(t) {
@@ -100,6 +101,7 @@ test('normalizes every supported field and discards unknown fields', () => {
   }, { today: TODAY });
 
   assert.deepEqual(normalized, {
+    pointerEnabled: true, pointerSize: 320, pointerColor: '#8b5cf6',
     version: 2,
     theme: 'light',
     textScale: 'lg',

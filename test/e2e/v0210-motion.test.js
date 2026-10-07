@@ -224,7 +224,7 @@ test('v0210 Electron: pointer spotlight, bounded press waves and keyboard action
     await page.waitForTimeout(200);
     await page.screenshot({ path: path.join(evidence, `v0210-${theme}.png`) });
   }
-  await page.mouse.move(4, 80);
+  await page.mouse.move(4, 10); // 离开全部工作区表面，进入原生标题栏区域。
   await page.waitForTimeout(300); assert.equal(await page.locator('.surface-glow').count(), 0);
   await page.evaluate(() => {
     const buttons = ['btnTheme', 'btnRealtime', 'btnPalette', 'btnLexicon', 'btnRefresh'];
@@ -383,7 +383,7 @@ test('v0211 Electron: layered light and magnetic feedback follow input with boun
     assert.ok(await page.locator('.control-aura').count() <= 2);
     assert.ok(await page.locator('.surface-light').count() <= 2);
   }
-  await page.mouse.move(4, 80); await page.waitForTimeout(300);
+  await page.mouse.move(4, 10); await page.waitForTimeout(300);
   assert.equal(await page.locator('.surface-light, .control-aura, .motion-hover-host, .motion-surface').count(), 0);
   assert.deepEqual(errors, []);
 });

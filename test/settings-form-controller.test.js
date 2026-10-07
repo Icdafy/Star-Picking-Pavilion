@@ -38,6 +38,7 @@ class FakeInput extends EventTarget {
 
 function createElements() {
   return {
+    automatic: new FakeInput(),
     intervalMinutes: new FakeInput(),
     rsshubBase: new FakeInput(),
     retentionDays: new FakeInput(),
@@ -67,7 +68,7 @@ function settingsWithPrefix(prefix) {
 }
 
 test('the settings form no longer owns AI fields: those moved to the models section', () => {
-  assert.throws(() => SettingsFormController.createSettingsFormController({ elements: {}, request: async () => ({}) }), /intervalMinutes/);
+  assert.throws(() => SettingsFormController.createSettingsFormController({ elements: {}, request: async () => ({}) }), /automatic/);
   const controller = SettingsFormController.createSettingsFormController({ elements: createElements(), request: async () => ({}) });
   assert.deepEqual(Object.keys(controller).sort(), ['load', 'saveCollect', 'saveRetention']);
 });
@@ -129,7 +130,7 @@ test('successful saves mark unchanged submitted fields clean; failed saves keep 
   elements.intervalMinutes.fill('55');
   elements.rsshubBase.fill('https://saved-rsshub.example');
   await controller.saveCollect();
-  assert.deepEqual(calls[0].options.body, { collect: { intervalMinutes: 55, rsshubBase: 'https://saved-rsshub.example' } });
+  assert.deepEqual(calls[0].options.body, { collect: { automatic: false, intervalMinutes: 55, rsshubBase: 'https://saved-rsshub.example' } });
   elements.retentionDays.fill('120');
   failNext = true;
   await assert.rejects(controller.saveRetention(), /injected save failure/);

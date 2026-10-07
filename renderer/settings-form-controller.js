@@ -15,12 +15,13 @@
   else if (root) root.SettingsFormController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createSettingsFormModule() {
   const FIELD_NAMES = Object.freeze([
+    'automatic',
     'intervalMinutes',
     'rsshubBase',
     'retentionDays',
     'irrelevantRetentionDays'
   ]);
-  const COLLECT_FIELD_NAMES = Object.freeze(['intervalMinutes', 'rsshubBase']);
+  const COLLECT_FIELD_NAMES = Object.freeze(['automatic', 'intervalMinutes', 'rsshubBase']);
   const RETENTION_FIELD_NAMES = Object.freeze(['retentionDays', 'irrelevantRetentionDays']);
   const RETENTION_DEFAULTS = Object.freeze({ retentionDays: 180, irrelevantRetentionDays: 21 });
 
@@ -66,6 +67,8 @@
       const settings = await request('/api/settings');
       if (sequence !== latestLoadSequence) return settings;
 
+      if (canApplyLoad('automatic', prior)) elements.automatic.checked = settings.collect.automatic === true;
+
       if (canApplyLoad('intervalMinutes', prior)) {
         elements.intervalMinutes.value = settings.collect.intervalMinutes;
       }
@@ -89,6 +92,7 @@
       const result = await request('/api/settings', {
         body: {
           collect: {
+            automatic: elements.automatic.checked === true,
             intervalMinutes,
             rsshubBase: elements.rsshubBase.value.trim()
           }

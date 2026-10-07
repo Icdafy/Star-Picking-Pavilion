@@ -10,7 +10,6 @@
   function createUpdatePill({ desktop, pill, progress, live, motion } = {}) {
     if (!desktop || typeof desktop.onUpdateStatus !== 'function' || !pill) return null;
     const arc = pill.querySelector('[data-update-arc]');
-    const icon = pill.querySelector('[data-update-icon]');
     const value = pill.querySelector('[data-update-value]');
     const caption = pill.querySelector('[data-update-caption]');
     const states = ['idle', 'checking', 'current', 'available', 'downloading', 'downloaded', 'installing', 'error'];
@@ -40,6 +39,8 @@
       pill.hidden = !pendingUpdate;
       pill.dataset.state = status;
       pill.dataset.indeterminate = String(busy && !determinate);
+      pill.dataset.hasValue = String(determinate || status === 'downloaded' || status === 'error');
+      pill.dataset.hasProgress = String(determinate || status === 'downloaded');
       pill.classList.toggle('error', status === 'error');
       pill.classList.toggle('ready', status === 'downloaded');
       pill.disabled = status === 'installing';
@@ -49,23 +50,12 @@
       pill.title = status === 'error' ? `${message || '更新暂时不可用'}；点击重试` : label;
       arc?.setAttribute('stroke-dashoffset', String(determinate ? 100 - amount : complete ? 0 : busy ? 72 : 100));
       if (value) {
-        value.hidden = !determinate && status !== 'error';
-        value.textContent = determinate ? `${amount}%` : '!';
-      }
-      if (icon) {
-        if (determinate || status === 'error') icon.setAttribute('hidden', '');
-        else icon.removeAttribute('hidden');
-        icon.querySelector?.('path')?.setAttribute('d', status === 'current' ? 'm4 10 4 4 8-8'
-          : status === 'downloaded' ? 'M15.5 7A6 6 0 1 0 16 12M15.5 3v4H11'
-          : 'M10 3v9m-3-3 3 3 3-3M4 13v3h12v-3');
+        value.hidden = !determinate && status !== 'downloaded' && status !== 'error';
+        value.textContent = determinate ? `${amount}%` : status === 'downloaded' ? '100%' : '!';
       }
       if (caption) caption.textContent = ({ checking: '检查', downloading: '下载', downloaded: '重启', installing: '安装', error: '重试', current: '最新' })[status] || '更新';
       if (status !== previous && !pill.hidden) {
         motion?.revealText?.([caption].filter(Boolean));
-        if (icon && !determinate && status !== 'error') motion?.spring?.(icon, {
-          from: { transform: 'translateY(-3px) scale(.84)', opacity: '0' },
-          to: { transform: 'none', opacity: '1' }, duration: 260, restoreStyles: true
-        });
       }
       if (progress) {
         progress.hidden = status !== 'downloading';

@@ -56,5 +56,5 @@ test('database compaction is mutually exclusive and evaluated only after retenti
   assert.match(source, /function compactOnce\(trigger = 'manual'/);
   assert.match(source, /collectRunning \|\| analyzeRunning \|\| pruneRunning \|\| compactRunning/);
   assert.match(source, /pruneOnce\('cron'\)[\s\S]*compactOnce\('cron', \{ mode: 'auto' \}\)/);
-  assert.match(source, /pruneOnce\('startup'\)[\s\S]*compactOnce\('startup', \{ mode: 'auto' \}\)/);
+  assert.doesNotMatch(source, /startupTimer|pruneTimer|setInterval\(/, '待命时不得注册启动任务或独立分析轮询');
 });

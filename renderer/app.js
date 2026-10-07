@@ -75,6 +75,9 @@ const state = {
   aquaWhale: restoredPreferences.aquaWhale,
   aquaEnabled: restoredPreferences.aquaEnabled,
   aquaCritters: restoredPreferences.aquaCritters,
+  pointerEnabled: restoredPreferences.pointerEnabled,
+  pointerSize: restoredPreferences.pointerSize,
+  pointerColor: restoredPreferences.pointerColor,
   view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,
@@ -403,6 +406,7 @@ const statsController = StatsController.createStatsController({
     tabStarredCount: $('#tabStarredCount'),
     statStatus: $('#statStatus'),
     statStatusLabel: $('#statStatusLabel'),
+    btnRefresh: $('#btnRefresh'),
     feedBanner: $('#feedBanner'),
     collectScheduleStatus: $('#collectScheduleStatus')
   },
@@ -411,6 +415,12 @@ const statsController = StatsController.createStatsController({
   frame: callback => requestAnimationFrame(callback)
 });
 const { refreshStats } = statsController;
+// 后端状态推送与统计回退共用同一渲染入口；迟到的统计响应不能覆盖新状态。
+const activityStream = typeof window.EventSource === 'function' ? new window.EventSource('/api/activity') : null;
+activityStream?.addEventListener('message', event => {
+  try { statsController.renderActivity(JSON.parse(event.data)); } catch { /* 重连后会重放当前状态 */ }
+});
+window.addEventListener('pagehide', () => activityStream?.close(), { once: true });
 
 // ---------- 卡片渲染 ----------
 // 阶段 4：整卡模板迁为 index.html 的 <template id="cardTemplate">，
@@ -706,22 +716,23 @@ Object.assign(registryDeps, {
 
 // 手动采集
 $('#btnRefresh').addEventListener('click', async function () {
-  this.classList.add('spinning');
   try {
-    await api('/api/collect', { body: {} });
+    const result = await api('/api/collect', { body: {} });
+    await refreshStats();
+    if (result.started === false) return;
     toast('采集管线已启动，稍候自动刷新');
     const poll = setInterval(async () => {
       const s = await refreshStats();
-      if (s && !s.pipeline?.running && !s.pending) {
+      if (s && s.pipeline?.activity === 'online') {
         clearInterval(poll);
-        this.classList.remove('spinning');
         if (FEED_VIEWS.includes(state.view)) { loadFeed(); }
-        toast('采集分析完成');
+        if (s.pipeline.lastPipeline?.ok === false) toast('采集分析失败，请检查信源或模型设置', true);
+        else toast('采集分析完成');
       }
-    }, 4000);
-    setTimeout(() => { clearInterval(poll); this.classList.remove('spinning'); }, 300000);
+    }, 1000);
+    window.addEventListener('pagehide', () => clearInterval(poll), { once: true });
   } catch (e) {
-    this.classList.remove('spinning');
+    await refreshStats();
     toast('启动失败：' + e.message, true);
   }
 });

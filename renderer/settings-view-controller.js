@@ -108,6 +108,7 @@
 
     const settingsForm = SettingsFormController.createSettingsFormController({
       elements: {
+        automatic: $('#setAutomaticCollect'),
         intervalMinutes: $('#setInterval'),
         rsshubBase: $('#setRsshub'),
         retentionDays: $('#setRetentionDays'),

@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-[v0.2.27](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.27) 已发布为最新正式版，软件内 Logo 使用上传的 SVG 原稿，默认静止、悬停循环播放。精确提交 `9d48edc077ec9d171382bb04b7eab903bb2060ee` 的 main CI 与 tag Release 完整通过，六项公开附件重新下载核验通过，沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0227-validation.md)。
+v0.2.28 候选版已完成更新图标、工作状态同步、Logo 尺寸和全局跟手动效调整。发布前依次完成本地验证、精确 main 提交的 CI、tag Release 和六项公开附件复核；沿用 NotSigned 策略。验证记录见 [本版验证](docs/v0228-validation.md)。
 
 ## 发布前授权门槛
 
@@ -20,7 +20,7 @@
 ```powershell
 npm ci
 npm run releases:sync
-npm run verify:version -- --tag v0.2.27
+npm run verify:version -- --tag v0.2.28
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -29,11 +29,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.27 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.27.exe
+npm run verify:version -- --tag v0.2.28 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.28.exe
 ```
 
-v0.2.27 的签名状态预期为 `NotSigned`。
+v0.2.28 的签名状态预期为 `NotSigned`。
 
 ### 更新日志同步（每次发版必做）
 
@@ -82,25 +82,25 @@ v0.2.27 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.27
-git tag -a v0.2.27 -m "摘星阁 v0.2.27"
-git push origin v0.2.27
+npm run verify:version -- --tag v0.2.28
+git tag -a v0.2.28 -m "摘星阁 v0.2.28"
+git push origin v0.2.28
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会依次执行版本检查、单元测试、真实 Electron 测试、生产依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.27 Release 应包含：
+v0.2.28 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.27.exe`
-- `Star-Picking-Pavilion-Setup-0.2.27.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.28.exe`
+- `Star-Picking-Pavilion-Setup-0.2.28.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`
 - `THIRD_PARTY_NOTICES.txt`
 
-发布完成后将六项资产下载到work/v0227/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
+发布完成后将六项资产下载到work/v0228/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
 
 ## 回滚
 

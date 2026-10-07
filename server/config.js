@@ -30,8 +30,9 @@ const DEFAULT_SETTINGS = {
   },
   // —— 采集 ——
   collect: {
+    automatic: false,                  // 只有明确开启自动调度后才运行后台任务
     intervalMinutes: 60,               // v0.2.8 原始状态；已有 settings.json 的值优先
-    analyzeIntervalSeconds: 75,        // 分析循环间隔（秒）：持续给新采集项打分，实时跟上
+    analyzeIntervalSeconds: 75,        // 兼容已有配置；分析随采集任务运行，不再独立轮询
     keepDays: 30,                      // 入库保留天数（过老的抓取项直接丢弃）
     retentionDays: 180,                // 已入库情报的保留天数（到期自动清理，含 FTS 索引）
     irrelevantRetentionDays: 21,       // 判为无关的噪声保留天数（更短，避免噪声撑大库）
@@ -113,6 +114,7 @@ function normalizeSettings(raw, { existing = false } = {}) {
   settings.ai.maxBatchPrefilter = boundedInteger(settings.ai.maxBatchPrefilter, 1, 50, DEFAULT_SETTINGS.ai.maxBatchPrefilter);
   settings.ai.requestTimeoutMs = boundedInteger(settings.ai.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.ai.requestTimeoutMs);
   settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 1, 720, defaults.collect.intervalMinutes);
+  settings.collect.automatic = settings.collect.automatic === true;
   settings.collect.analyzeIntervalSeconds = boundedInteger(
     settings.collect.analyzeIntervalSeconds, 20, 3600, DEFAULT_SETTINGS.collect.analyzeIntervalSeconds
   );
@@ -179,7 +181,7 @@ function applySettingsPatch(currentSettings, patch) {
     throw new HttpError(400, '包含不支持的 AI 设置字段');
   }
   if (patch.collect && Object.keys(patch.collect).some(
-    key => !['intervalMinutes', 'rsshubBase', 'retentionDays', 'irrelevantRetentionDays'].includes(key)
+    key => !['automatic', 'intervalMinutes', 'rsshubBase', 'retentionDays', 'irrelevantRetentionDays'].includes(key)
   )) {
     throw new HttpError(400, '包含不支持的采集设置字段');
   }
@@ -232,6 +234,10 @@ function applySettingsPatch(currentSettings, patch) {
     }
   }
 
+  if (patch?.collect && Object.hasOwn(patch.collect, 'automatic')) {
+    if (typeof patch.collect.automatic !== 'boolean') throw new HttpError(400, '自动采集开关必须为布尔值');
+    settings.collect.automatic = patch.collect.automatic;
+  }
   if (patch?.collect && Object.hasOwn(patch.collect, 'intervalMinutes')) {
     const interval = Number(patch.collect.intervalMinutes);
     if (!Number.isInteger(interval) || interval < 1 || interval > 720) {

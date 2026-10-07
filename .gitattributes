@@ -1,0 +1,3 @@
+# Preserve the uploaded SVG source and its derived first frame byte for byte.
+renderer/update-progress-loop.svg -text
+renderer/update-progress-still.svg -text

@@ -458,8 +458,8 @@
     const forcedColors = win.matchMedia?.('(forced-colors: active)');
     const cleanups = [], groups = [], waves = new Map();
     const controlSelector = 'button:not(:disabled):not([aria-disabled="true"])';
-    const hoverSelector = '.tab, .pill, .chip, .icon-btn, .btn-icon, .btn-primary, .btn-ghost, .rt-toggle, .card-act, .common-links-category, .update-pill';
-    const surfaceSelector = '.card, .common-links-card, .page-banner';
+    const hoverSelector = 'button, a, input, select, textarea, summary, label[for], .desktop-switch';
+    const surfaceSelector = '.card, .common-links-card, .page-banner, .glass, .view, .app-stage, .release-entry, .src-row, .intel-card, .intel-story, .daily-paper, dialog, [popover]';
     const surfaces = new Map(), controls = new Map();
     const isUnavailable = element => element.disabled || (element.getAttribute('aria-disabled') === 'true' && !element.matches('.update-pill'));
     // 只在存在追光时监听节点移除，每次检查最多四个目标；不扫描内容树。
@@ -472,7 +472,8 @@
     const canMove = () => !disposed && !doc.hidden && !reduced?.matches
       && doc.documentElement.dataset.fxTier !== 'static'
       && (typeof doc.hasFocus !== 'function' || doc.hasFocus());
-    const full = () => canMove() && !forcedColors?.matches && doc.documentElement.dataset.fxTier === 'full';
+    const full = () => canMove() && !forcedColors?.matches && doc.documentElement.dataset.fxTier === 'full'
+      && doc.documentElement.dataset.pointerEnabled !== 'off';
     function listen(target, event, handler, options) {
       target?.addEventListener?.(event, handler, options);
       cleanups.push(() => target?.removeEventListener?.(event, handler, options));
@@ -523,6 +524,7 @@
       record.node.remove();
       record.follower?.style.removeProperty('translate');
       element.classList.remove(record.kind === 'surface' ? 'motion-surface' : 'motion-hover-host');
+      if (record.positioned) element.classList.remove(record.kind === 'surface' ? 'motion-surface-positioned' : 'motion-hover-positioned');
       records.delete(element);
       if (surface === element) surface = null;
       if (control === element) control = null;
@@ -576,7 +578,10 @@
         const node = makeSpan(kind === 'surface' ? 'surface-light' : 'control-aura', element);
         record = { kind, node, rect: element.getBoundingClientRect(), alpha: 0, targetAlpha: 1,
           x: axis(), y: axis(), haloX: axis(), haloY: axis(), magnetX: axis(), magnetY: axis(), timeout: null };
-        record.follower = kind === 'surface' ? element.querySelector('.banner-art')
+        // 固定浮层、粘性状态栏和返回顶部按钮保留各自定位；仅普通流元素需要装饰定位基准。
+        record.positioned = win.getComputedStyle(element).position === 'static' || element.classList.contains('motion-control');
+        if (record.positioned) element.classList.add(kind === 'surface' ? 'motion-surface-positioned' : 'motion-hover-positioned');
+        record.follower = kind === 'surface' ? element.querySelector(':scope > .banner-art')
           : element.querySelector('.update-core') || element.querySelector('.tab-glyph') || element.querySelector(':scope > svg');
         if (kind === 'surface') {
           record.halo = makeSpan('surface-halo', node);
@@ -611,6 +616,7 @@
       frame = null;
       if (!full()) { clearGlow(); return; }
       const elapsed = lastTime ? Math.max(0, (now - lastTime) / 1000) : 1 / 60;
+      const lightSize = Number(doc.documentElement.dataset.pointerSize) || 320;
       lastTime = now;
       let moving = false;
       // 每帧先完成当前两个命中区域的几何读取，再写装饰层；不扫描信息流。
@@ -636,12 +642,12 @@
           record.follower.style.translate = `${(record.magnetX.position * weight).toFixed(2)}px ${(record.magnetY.position * weight).toFixed(2)}px`;
         }
         if (record.kind === 'surface') {
-          record.glow.style.transform = `translate(${record.x.position - 160}px, ${record.y.position - 160}px)`;
-          record.halo.style.transform = `translate(${record.haloX.position - 220}px, ${record.haloY.position - 220}px)`;
-          record.rim.style.transform = `translate(${record.x.position - 190}px, ${record.y.position - 190}px)`;
+          record.glow.style.transform = `translate(${record.x.position - lightSize / 2}px, ${record.y.position - lightSize / 2}px)`;
+          record.halo.style.transform = `translate(${record.haloX.position - lightSize * .6875}px, ${record.haloY.position - lightSize * .6875}px)`;
+          record.rim.style.transform = `translate(${record.x.position - lightSize * .59375}px, ${record.y.position - lightSize * .59375}px)`;
         } else {
           record.node.style.transform = `translate(${record.magnetX.position}px, ${record.magnetY.position}px)`;
-          record.glow.style.transform = `translate(${record.x.position - 80}px, ${record.y.position - 80}px)`;
+          record.glow.style.transform = `translate(${record.x.position - lightSize / 4}px, ${record.y.position - lightSize / 4}px)`;
         }
         moving ||= fading || !settled;
       }
@@ -651,7 +657,7 @@
       if (event.pointerType === 'touch') { clearGlow(); return; }
       if (!full()) return;
       const nextSurface = event.target.closest?.(surfaceSelector) || null;
-      const nextControl = event.target.closest?.('button:not(:disabled)');
+      const nextControl = event.target.closest?.(hoverSelector);
       const hoverControl = nextControl && !isUnavailable(nextControl) && nextControl.matches(hoverSelector) ? nextControl : null;
       if (nextSurface !== surface) { leave(surfaces, surface); surface = nextSurface; }
       if (hoverControl !== control) { leave(controls, control); control = hoverControl; }
@@ -707,7 +713,7 @@
       syncSizes();
     }
     const environment = new win.MutationObserver(settleEnvironment);
-    environment.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier'] });
+    environment.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier', 'data-pointer-enabled', 'data-pointer-size', 'style'] });
     // 原生 details、dialog 和 popover 保留浏览器的键盘、焦点及关闭语义。
     listen(doc, 'click', event => {
       const summary = event.target.closest?.('details > summary');
