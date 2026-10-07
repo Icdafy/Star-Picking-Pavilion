@@ -50,6 +50,21 @@ async function sweep(page) {
     await page.waitForTimeout(10);
   }
 }
+async function measureInput(page) {
+  return page.evaluate(() => new Promise(resolve => {
+    const deltas = []; let previous = 0, count = 0;
+    function advance(now) {
+      if (previous && count > 20) deltas.push(now - previous);
+      previous = now;
+      const px = innerWidth * (.55 + .22 * Math.sin(count / 9)), py = innerHeight * (.58 + .09 * Math.sin(count / 4.5));
+      const target = document.elementFromPoint(px, py) || document.body;
+      target.dispatchEvent(new PointerEvent('pointermove', { clientX: px, clientY: py, pointerType: 'mouse', bubbles: true }));
+      if (++count < 100) requestAnimationFrame(advance);
+      else { deltas.sort((a,b) => a-b); resolve({ p95: deltas[Math.floor(deltas.length * .95)], mean: deltas.reduce((a,b) => a+b, 0) / deltas.length, frames: deltas.length, x: px, y: py }); }
+    }
+    requestAnimationFrame(advance);
+  }));
+}
 
 test('v0231 pointer settings switch styles live, preserve independent sizes and colors across restart and keep dialogs usable', { timeout: 150000 }, async t => {
   const env = await fixture(t);
@@ -134,29 +149,37 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
     }, { passive: true });
   });
   const records = [];
+  const toggle = page.locator('label.desktop-switch').filter({ has: page.locator('#setPointerEnabled') });
   for (const tier of ['full', 'lite']) for (const mode of ['comet', 'stars', 'ring']) {
     await style.selectOption(mode);
+    await toggle.click();
+    assert.equal(await page.locator('#setPointerEnabled').isChecked(), false);
+    await style.scrollIntoViewIfNeeded();
+    await page.evaluate(value => { document.documentElement.dataset.fxTier = value; }, tier);
+    await sweep(page);
+    const baseline = await measureInput(page);
+    assert.equal((await page.evaluate(() => interactionMotion.getPointerSnapshot())).framePending, false);
+    await toggle.click();
+    assert.equal(await page.locator('#setPointerEnabled').isChecked(), true);
+    await style.scrollIntoViewIfNeeded();
     await page.evaluate(value => { document.documentElement.dataset.fxTier = value; }, tier);
     await sweep(page);
     const before = await page.evaluate(() => interactionMotion.getPointerSnapshot());
-    const timing = await page.evaluate(() => new Promise(resolve => {
-      const deltas = []; let previous = 0, count = 0;
-      function advance(now) {
-        if (previous && count > 20) deltas.push(now - previous);
-        previous = now;
-        const px = innerWidth * (.55 + .22 * Math.sin(count / 9)), py = innerHeight * (.58 + .09 * Math.sin(count / 4.5));
-        const target = document.elementFromPoint(px, py) || document.body;
-        target.dispatchEvent(new PointerEvent('pointermove', { clientX: px, clientY: py, pointerType: 'mouse', bubbles: true }));
-        if (++count < 100) requestAnimationFrame(advance);
-        else { deltas.sort((a,b) => a-b); resolve({ p95: deltas[Math.floor(deltas.length * .95)], mean: deltas.reduce((a,b) => a+b, 0) / deltas.length, frames: deltas.length, x: px, y: py }); }
-      }
-      requestAnimationFrame(advance);
-    }));
+    const timing = await measureInput(page);
     const after = await page.evaluate(() => interactionMotion.getPointerSnapshot());
     const cost = (after.totalMs - before.totalMs) / Math.max(1, after.frames - before.frames);
+    const record = { tier, mode, baseline, ...timing, drawMeanMs: cost, maxDrawMs: after.maxMs };
+    records.push(record);
+    fs.writeFileSync(path.join(output, 'frame-measurements.json'), JSON.stringify(records, null, 2));
+    console.log('v0231 pointer timing: ' + JSON.stringify(record));
     assert.ok(after.points <= 96 && after.particles <= (tier === 'lite' ? 36 : 96));
     assert.ok(cost < 2, `${tier}/${mode}: drawing consumed ${cost.toFixed(3)}ms per frame`);
-    assert.ok(timing.p95 < 35 && timing.mean < 25, `${tier}/${mode}: ${JSON.stringify(timing)}`);
+    // Compare identical input with effects off/on. A slow native display clock
+    // cannot promise 40+ Hz even with no effects; it must still show bounded
+    // incremental frame cost. Keep the absolute limits on normal display clocks.
+    assert.ok(timing.mean <= baseline.mean + Math.max(2, baseline.mean * .1), `${tier}/${mode}: mean regression ${JSON.stringify(record)}`);
+    assert.ok(timing.p95 <= baseline.p95 + Math.max(4, baseline.mean * .25), `${tier}/${mode}: p95 regression ${JSON.stringify(record)}`);
+    if (baseline.mean <= 20) assert.ok(timing.p95 < 35 && timing.mean < 25, `${tier}/${mode}: ${JSON.stringify(record)}`);
     // The timed input is synthetic; reconcile the native cursor before testing
     // actual idle behavior so a later native hover cannot supply stale coordinates.
     await page.mouse.move(timing.x, timing.y);
@@ -174,7 +197,6 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
     });
     assert.equal((await page.evaluate(() => interactionMotion.getPointerSnapshot())).framePending, false,
       `${tier}/${mode}: target changes without pointer movement must not wake drawing`);
-    records.push({ tier, mode, ...timing, drawMeanMs: cost, maxDrawMs: after.maxMs });
   }
   await page.evaluate(() => { document.documentElement.dataset.fxTier = 'full'; });
   await style.selectOption('ring');
