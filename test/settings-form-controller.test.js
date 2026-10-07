@@ -45,6 +45,15 @@ function createElements() {
   };
 }
 
+test('采集间隔发送原值，1 / 17 / 37 / 720 分钟有效，空值与小数不能静默替换', async () => {
+  const elements = createElements(), values = [];
+  const form = SettingsFormController.createSettingsFormController({ elements, request: async (_, options) => { values.push(options.body.collect.intervalMinutes); return { ok: true }; } });
+  for (const minutes of [1, 17, 37, 720]) { elements.intervalMinutes.value = minutes; await form.saveCollect(); }
+  assert.deepEqual(values, [1, 17, 37, 720]);
+  for (const value of ['', '0', '1.5', '721', 'bad']) { elements.intervalMinutes.value = value; await assert.rejects(form.saveCollect(), /整数分钟/); }
+  assert.equal(values.length, 4);
+});
+
 function settingsWithPrefix(prefix) {
   return {
     ai: { model: 'deepseek-flash' },

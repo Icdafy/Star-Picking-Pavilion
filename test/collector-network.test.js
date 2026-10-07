@@ -33,7 +33,7 @@ test('离线和大陆受限网络完全跳过海外请求，手动采集也不�
   const network = { detect: async () => network.snapshot(), snapshot: () => ({ state: available ? 'available' : 'unavailable', available, country: 'CN' }) };
   try {
     for (const force of [false, true]) {
-      const result = await collectAll(null, { force, network });
+      const result = await collectAll(null, { force, network, enrich: async () => ({ status: 'unavailable' }) });
       assert.equal(result.skippedNetwork, 1);
       assert.equal(result.results.filter(x => x.error).length, 0);
       const summary = summarizeSourceResults(result.results);
@@ -45,7 +45,7 @@ test('离线和大陆受限网络完全跳过海外请求，手动采集也不�
     assert.deepEqual(db.prepare('SELECT * FROM sources WHERE id=?').get(id), prior);
     assert.equal(describeHealth(prior, Date.now(), network.snapshot()).state, 'network-wait');
     available = true;
-    const restored = await collectAll(null, { network });
+    const restored = await collectAll(null, { network, enrich: async () => ({ status: 'unavailable' }) });
     assert.equal(restored.skippedNetwork, 0);
     assert.equal(requests.international, 1);
     assert.equal(db.prepare('SELECT error_count FROM sources WHERE id=?').get(id).error_count, 0);

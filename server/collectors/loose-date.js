@@ -27,6 +27,12 @@ function parseLooseDate(value, utcOffset = '+08:00') {
   if (value == null) return null;
   const v = String(value).trim();
   if (!v) return null;
+  // 带时区的 ISO 同样先校验日历；Date.parse 会把 2 月 30 日静默顺延。
+  const calendar = /^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/.exec(v);
+  if (calendar) {
+    const check = new Date(Date.UTC(Number(calendar[1]), Number(calendar[2]) - 1, Number(calendar[3])));
+    if (check.getUTCFullYear() !== Number(calendar[1]) || check.getUTCMonth() + 1 !== Number(calendar[2]) || check.getUTCDate() !== Number(calendar[3])) return null;
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
     const [y, mo, d] = v.split('-');
     return atOffset(y, mo, d, '00', '00', '00', '+00:00');

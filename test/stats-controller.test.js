@@ -42,7 +42,8 @@ function makeElements() {
     tabStarredCount: { hidden: true, textContent: '' },
     statStatus: { innerHTML: '' },
     statStatusLabel: { textContent: '' },
-    feedBanner: { hidden: true, innerHTML: '' }
+    feedBanner: { hidden: true, innerHTML: '' },
+    collectScheduleStatus: { textContent: '' }
   };
 }
 
@@ -93,7 +94,7 @@ test('setStat 数值变化时做 520ms 补间，终点收敛到目标值', () =>
 
 test('refreshStats 刷新塔台数字、星标徽标与采集状态', async () => {
   const { ctrl, elements } = createController({
-    stats: { sources: 12, today: 30, featuredToday: 5, starred: 3, articles: 200, pipeline: { running: true }, aiConfigured: true }
+    stats: { sources: 12, today: 30, featuredToday: 5, starred: 3, articles: 200, pipeline: { running: true, collectRunning: true }, aiConfigured: true }
   });
   const s = await ctrl.refreshStats();
   assert.equal(s.today, 30);
@@ -112,6 +113,13 @@ test('星标数超过 99 折叠为 99+，星标视图不弹降级横幅', async 
   await ctrl.refreshStats();
   assert.equal(elements.tabStarredCount.textContent, '99+');
   assert.equal(elements.feedBanner.hidden, true);
+});
+
+test('后台分析显示分析中，调度页说明下次采集的实际时间', async () => {
+  const { ctrl, elements } = createController({ stats: { pipeline: { running: true, analyzeRunning: true, nextCollectAt: '2026-10-07T05:00:00Z', lastRun: { at: '2026-10-07T04:00:00Z' } } } });
+  await ctrl.refreshStats();
+  assert.equal(elements.statStatusLabel.textContent, '分析中');
+  assert.match(elements.collectScheduleStatus.textContent, /下次自动采集.*最近采集完成/);
 });
 
 test('未配置 AI 且处于精选视图时展示降级横幅', async () => {

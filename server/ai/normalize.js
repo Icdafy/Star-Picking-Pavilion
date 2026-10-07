@@ -170,6 +170,8 @@ function structureItem(item, { sourceName = '', domain = null } = {}) {
     canonicalUrl,
     summaryRaw: cleanSummary(item?.summary),
     publishedAt: item?.publishedAt || null,
+    publicationPrecision: item?.publicationPrecision || null,
+    publicationDateText: item?.publicationDateText || null,
     image: item?.image || null,
     images: Array.isArray(item?.images) ? item.images.slice(0,6) : [],
     contentText: typeof item?.contentText === 'string' ? item.contentText.slice(0,12000) : null,

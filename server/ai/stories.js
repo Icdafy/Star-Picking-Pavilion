@@ -50,7 +50,7 @@ function docOf(row) {
     tier: row.tier,
     attention: Number(row.attention_score ?? row.quality_score) || 0,
     observed: observedAt(row),
-    historical: Boolean(row.historical || row.imported_backfill),
+    historical: Boolean(row.historical || row.imported_backfill || row.publication_precision === 'month'),
     participantKey: row.participant_key || `source:${row.source_id}`,
     participantName: row.publisher_id || row.source_name || '',
     sourceName: row.source_name
@@ -64,7 +64,7 @@ function compatible(a, b) {
 }
 
 const ROW_COLUMNS = `a.id, a.source_id, a.title, a.title_zh, a.ai_summary, a.domain, a.category, a.cluster_id, a.event_key, a.events_json,
-  a.subjects_json, a.attention_score, a.quality_score, a.published_at, a.fetched_at, a.historical, a.imported_backfill, a.participant_key, a.publisher_id,
+  a.subjects_json, a.attention_score, a.quality_score, a.published_at, a.publication_precision, a.fetched_at, a.historical, a.imported_backfill, a.participant_key, a.publisher_id,
   s.name AS source_name, s.tier`;
 
 // ---------- 召回池 ----------

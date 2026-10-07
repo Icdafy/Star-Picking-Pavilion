@@ -100,7 +100,7 @@ test('an asynchronous redirect denial is awaited and private targets remain bloc
 function repairDb() {
   const db=new DatabaseSync(':memory:');
   db.exec(`CREATE TABLE articles(id INTEGER PRIMARY KEY,title TEXT,summary_raw TEXT,content_text TEXT,content_status TEXT,
-    published_at TEXT,fetched_at TEXT,events_json TEXT,event_key TEXT,event_date TEXT,event_schema_version INTEGER DEFAULT 2,
+    published_at TEXT,publication_precision TEXT,publication_date_text TEXT,fetched_at TEXT,events_json TEXT,event_key TEXT,event_date TEXT,event_schema_version INTEGER DEFAULT 2,
     analyzed INTEGER DEFAULT 1,relevant INTEGER DEFAULT 1,starred INTEGER DEFAULT 0,featured INTEGER DEFAULT 0,
     quality_score INTEGER DEFAULT 88,ai_summary TEXT DEFAULT '保留摘要',
     timing_repair_version INTEGER DEFAULT 0,timing_repair_attempts INTEGER DEFAULT 0,timing_repair_at TEXT,timing_repair_error TEXT)`);

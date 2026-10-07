@@ -10,7 +10,8 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-backoff-'));
 process.env.STAR_PICKING_PAVILION_DATA_DIR = dataDir;
 
 const { db, closeDatabase } = require('../server/db');
-const { collectAll, seedSources } = require('../server/collectors');
+const { collectAll: collectAllImpl, seedSources } = require('../server/collectors');
+const collectAll = (progress, options) => collectAllImpl(progress, { ...options, enrich: async () => ({ status: 'unavailable' }) });
 
 // 拒绝连接的回环端口：立刻失败，不产生真实网络流量
 let deadSourceSeq = 0;

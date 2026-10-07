@@ -45,6 +45,8 @@ function createFixture() {
       ai_reason TEXT,
       event_date TEXT, verification_json TEXT, events_json TEXT, vision_json TEXT,
       published_at TEXT,
+      publication_precision TEXT,
+      publication_date_text TEXT,
       fetched_at TEXT NOT NULL,
       domain TEXT,
       category TEXT,
@@ -274,7 +276,7 @@ test('research rows have a stable complete schema and sanitize unsafe URLs', () 
   const fields = [
     'schemaVersion', 'archiveDate', 'windowStart', 'windowEnd', 'articleId',
     'sourceId', 'sourceName', 'sourceTier', 'title', 'url', 'rawSummary',
-    'aiSummary', 'aiReason', 'publishedAt', 'fetchedAt', 'eventDate', 'reportedAt', 'eventStatus', 'timingReason', 'timingStatus', 'reportDelayDays', 'events', 'images', 'domain', 'category',
+    'aiSummary', 'aiReason', 'publishedAt', 'publicationPrecision', 'publicationDateText', 'fetchedAt', 'eventDate', 'reportedAt', 'eventStatus', 'timingReason', 'timingStatus', 'reportDelayDays', 'events', 'images', 'domain', 'category',
     'relevant', 'analyzed', 'scores', 'quality', 'heatAtCutoff', 'featured',
     'tags', 'clusterId', 'clusterSize', 'starred', 'lexiconTerms',
     'lexiconWeight', 'noiseHits', 'breakthroughScore', 'breakthroughBonus',

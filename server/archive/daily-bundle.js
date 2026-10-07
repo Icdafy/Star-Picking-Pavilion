@@ -11,7 +11,7 @@ const DAILY_RECORD_HARD_LIMIT = 20_000;
 // 只取 mapRecord 真正消费的列，不再 a.* 把整行拖进内存
 const DAILY_RECORD_COLUMNS = `
   a.id, a.source_id, a.title, a.url, a.summary_raw, a.ai_summary, a.ai_reason,
-  a.event_date, a.events_json, a.vision_json, a.published_at, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
+  a.event_date, a.events_json, a.vision_json, a.published_at, a.publication_precision, a.publication_date_text, a.fetched_at, a.domain, a.category, a.relevant, a.analyzed,
   a.scores_json, a.quality_score, a.featured, a.tags_json, a.cluster_id, a.starred,
   a.breakthrough_score, a.breakthrough_bonus, a.breakthrough_signals_json, a.scoring_version,
   a.title_zh, a.item_type, a.score_a, a.score_b, a.subjects_json, a.deal_json`;
@@ -133,6 +133,8 @@ function mapRecord(row, { date, window, scoring }) {
     aiSummary: row.ai_summary == null ? null : String(row.ai_summary),
     aiReason: row.ai_reason == null ? null : String(row.ai_reason),
     publishedAt,
+    publicationPrecision: row.publication_precision || null,
+    publicationDateText: row.publication_date_text || null,
     fetchedAt, ...timing,
     events: parseJson(row.events_json, [], Array.isArray),
     images: Array.isArray(vision.images) ? vision.images : [],

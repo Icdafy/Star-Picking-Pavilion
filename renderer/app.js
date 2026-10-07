@@ -401,7 +401,8 @@ const statsController = StatsController.createStatsController({
     tabStarredCount: $('#tabStarredCount'),
     statStatus: $('#statStatus'),
     statStatusLabel: $('#statStatusLabel'),
-    feedBanner: $('#feedBanner')
+    feedBanner: $('#feedBanner'),
+    collectScheduleStatus: $('#collectScheduleStatus')
   },
   prefersReducedMotion,
   now: () => performance.now(),

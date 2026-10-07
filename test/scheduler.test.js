@@ -10,10 +10,12 @@ const { collectionIntervalMs } = require('../server/schedule-policy');
 
 test('collection intervals remain accurate beyond the cron minute field', () => {
   assert.equal(collectionIntervalMs(10), 10 * 60 * 1000);
+  assert.equal(collectionIntervalMs(1), 60 * 1000);
+  assert.equal(collectionIntervalMs(37), 37 * 60 * 1000);
   assert.equal(collectionIntervalMs(720), 720 * 60 * 1000);
   assert.equal(collectionIntervalMs('bad'), 10 * 60 * 1000);
   assert.doesNotMatch(source, /cron\.schedule\(`\*\/\$\{interval\}/);
-  assert.match(source, /collectTimer = setInterval/);
+  assert.match(source, /collectTimer = setTimeout/);
   assert.match(source, /settings\.dailyReportHour \?\? 8/);
 });
 

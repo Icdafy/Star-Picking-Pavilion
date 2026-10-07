@@ -66,6 +66,11 @@ test('dateLabel 给出今天/昨天/月日三档相对标签', () => {
   assert.equal(dateLabel(older.toISOString()), `${older.getMonth() + 1}月${older.getDate()}日`);
 });
 
+test('去年新闻的日期分组显示年份，不能与今年同月日混淆', () => {
+  const date = new Date(new Date().getFullYear() - 1, 8, 30);
+  assert.equal(dateLabel(date.toISOString()), `${date.getFullYear()}年9月30日`);
+});
+
 test('hhmm 补零输出本地时分', () => {
   const d = new Date();
   d.setHours(5, 7, 0, 0);

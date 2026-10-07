@@ -259,6 +259,7 @@
       try {
         await Promise.all([
           settingsForm.load(),
+          refreshStats(),
           modelsSettings.load(),
           desktopSettings?.load(),
           dailyArchive?.load()
@@ -271,6 +272,7 @@
     $('#btnSaveCollect').addEventListener('click', async () => {
       try {
         await settingsForm.saveCollect();
+        await refreshStats();
         toast('采集设置已保存，采集间隔与 RSSHub 已生效');
       } catch (error) {
         toast('采集设置保存失败：' + error.message, true);

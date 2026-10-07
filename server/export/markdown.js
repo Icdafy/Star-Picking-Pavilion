@@ -81,6 +81,10 @@ function describeEntry(item) {
   if (Number.isFinite(breakthroughBonus) && breakthroughBonus > 0) {
     parts.push(`技术突破 +${Math.round(breakthroughBonus * 10) / 10}`);
   }
+  const publishedAt = item.publishedAt || item.published_at;
+  if (publishedAt) parts.push('报道发布 ' + flatten(item.publicationDateText || item.publication_date_text || publishedAt)
+    + ((item.publicationPrecision || item.publication_precision) === 'month' ? '（仅确认月份）' : ''));
+  else parts.push('发布时间未确认' + (item.fetchedAt || item.fetched_at ? '；采集时间 ' + flatten(item.fetchedAt || item.fetched_at) : ''));
   if (item.eventDate) parts.push('事件日期 ' + item.eventDate);
   if (Number.isFinite(item.reportDelayDays)) parts.push('报道时差 ' + item.reportDelayDays + ' 天');
   return parts;

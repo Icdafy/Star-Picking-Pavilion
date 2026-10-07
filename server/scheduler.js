@@ -1,6 +1,6 @@
 'use strict';
 // 调度：采集与分析解耦成两个独立循环，让评分「实时跟上」
-//   · 采集循环：每 intervalMinutes 分钟 collectAll 入库（默认 10 分钟）
+//   · 采集循环：每轮完成后等待 intervalMinutes 分钟 collectAll 入库
 //   · 分析循环：每 analyzeIntervalSeconds 秒轮询：判断与写作 → 事件归组 → 门槛重判 → 热点榜
 //   · 定时：每小时热度快照；每天 08:00 日报；每周一 10:00 周报；每月 1 日 10:30 月报（学 AIHOT 的刊期）
 //   · runPipeline：手动「立即采集分析」一次性全量（采集→抽干分析→归组），供 /api/collect 与脚本用
@@ -40,6 +40,7 @@ let collectTimer = null;
 let analyzeTimer = null;
 let startupTimer = null;
 let pruneTimer = null;
+let nextCollectAt = null;
 const cronTasks = new Set();
 
 // ---------- 数据保留清理 ----------
@@ -111,23 +112,29 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
   if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
   if (collectRunning) return { skipped: true, reason: '采集进行中' };
+  cancelCollectionTimer();
   collectRunning = true;
   const started = Date.now();
   try {
     console.log(`[collect] 开始（${trigger}）`);
-    const { results, skippedBackoff, skippedNetwork, network } = await collectAll(p =>
+    const { results, skippedBackoff, skippedNetwork, network, publicationRepair } = await collectAll(p =>
       p.error ? console.log(`  ✗ ${p.source}: ${p.error}`)
               : (p.added ? console.log(`  ✓ ${p.source}: 新增 ${p.added}`) : null), { force });
     const added = results.reduce((s, r) => s + (r.added || 0), 0);
     lastRun = {
       at: new Date().toISOString(), trigger, ms: Date.now() - started,
       collected: added, errors: results.filter(r => r.error).length,
-      backoffSkipped: skippedBackoff, networkSkipped: skippedNetwork, network
+      backoffSkipped: skippedBackoff, networkSkipped: skippedNetwork, network, publicationRepair
     };
+    if (publicationRepair?.repaired) {
+      computeHotRanking();
+      lastHotAt = Date.now();
+    }
     console.log(`[collect] 完成：新增 ${added} 条，退避跳过 ${skippedBackoff} 个源，等待外网 ${skippedNetwork} 个源，耗时 ${Math.round(lastRun.ms / 1000)}s`);
     return lastRun;
   } finally {
     collectRunning = false;
+    if (!pipelineRunning) scheduleNextCollection();
   }
 }
 
@@ -179,6 +186,10 @@ function runPipeline(trigger = 'manual') {
   if (schedulerStopping) return Promise.resolve({ skipped: true, reason: 'stopping' });
   if (pipelinePromise) return pipelinePromise;
   if (compactRunning) return Promise.resolve({ skipped: true, reason: 'maintenance' });
+  // 手动操作接管启动 / 自动采集计时，避免刚点完按钮又被旧计时器触发。
+  if (startupTimer) clearTimeout(startupTimer);
+  startupTimer = null;
+  cancelCollectionTimer();
   pipelineRunning = true;
   const started = Date.now();
   pipelinePromise = (async () => {
@@ -196,6 +207,7 @@ function runPipeline(trigger = 'manual') {
     } finally {
       pipelineRunning = false;
       pipelinePromise = null;
+      scheduleNextCollection();
     }
   })();
   return pipelinePromise;
@@ -225,17 +237,41 @@ async function executePipeline(trigger) {
   return { ...lastRun, analyzed: total, rescored: rescore.changed };
 }
 
+function cancelCollectionTimer() {
+  if (collectTimer) clearTimeout(collectTimer);
+  collectTimer = null;
+  nextCollectAt = null;
+}
+
+function scheduleNextCollection() {
+  cancelCollectionTimer();
+  if (!schedulerStarted || schedulerStopping || collectRunning || pipelineRunning) return;
+  const intervalMs = activeSchedule?.collectionIntervalMs;
+  if (!intervalMs) return;
+  nextCollectAt = new Date(Date.now() + intervalMs).toISOString();
+  collectTimer = setTimeout(async () => {
+    collectTimer = null;
+    nextCollectAt = null;
+    try { await collectOnce('timer'); }
+    catch (error) { console.error('[collect]', error); }
+    finally { if (!collectTimer) scheduleNextCollection(); }
+  }, intervalMs);
+}
+
 function refreshSchedulerSettings() {
   if (!schedulerStarted || schedulerStopping) return false;
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   const analyzeMs = Math.max(20, settings.collect.analyzeIntervalSeconds || 75) * 1000;
   if (activeSchedule?.collectionIntervalMs === intervalMs && activeSchedule?.analysisIntervalMs === analyzeMs) return false;
-  if (collectTimer) clearInterval(collectTimer);
-  if (analyzeTimer) clearInterval(analyzeTimer);
-  collectTimer = setInterval(() => collectOnce('timer').catch(e => console.error('[collect]', e)), intervalMs);
-  analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeMs);
+  const collectionChanged = activeSchedule?.collectionIntervalMs !== intervalMs;
+  const analysisChanged = activeSchedule?.analysisIntervalMs !== analyzeMs;
   activeSchedule = { collectionIntervalMs: intervalMs, analysisIntervalMs: analyzeMs };
+  if (collectionChanged) scheduleNextCollection();
+  if (analysisChanged) {
+    if (analyzeTimer) clearInterval(analyzeTimer);
+    analyzeTimer = setInterval(() => analyzeOnce('loop').catch(e => console.error('[analyze]', e)), analyzeMs);
+  }
   return true;
 }
 
@@ -248,7 +284,7 @@ function startScheduler() {
   const interval = intervalMs / 60_000;
   const analyzeSec = Math.max(20, settings.collect.analyzeIntervalSeconds || 75);
 
-  // 采集循环（setInterval 保证 60 分钟以上及非整除分钟的间隔仍准确）
+  // 采集循环（完成后自调度，长轮次与手动触发不会压缩下一次等待时间）
   refreshSchedulerSettings();
   // 分析循环（秒级，setInterval 自调度；锁防重入）
   // 日报（每天定点纯代码生成）
@@ -292,7 +328,7 @@ function startScheduler() {
 function stopScheduler() {
   schedulerStopping = true;
   schedulerStarted = false;
-  if (collectTimer) clearInterval(collectTimer);
+  cancelCollectionTimer();
   if (analyzeTimer) clearInterval(analyzeTimer);
   if (startupTimer) clearTimeout(startupTimer);
   if (pruneTimer) clearTimeout(pruneTimer);
@@ -325,6 +361,7 @@ module.exports = {
     schedulerStopping,
     pipelineRunning,
     activeSchedule,
+    nextCollectAt,
     lastPipeline,
     collectRunning,
     analyzeRunning,

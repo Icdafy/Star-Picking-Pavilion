@@ -6,6 +6,7 @@
 const cheerio = require('cheerio');
 const { fetchText } = require('./fetch-util');
 const { looseDateIso, dateFromUrl, listDateIso } = require('./loose-date');
+const { parsePublicationDate } = require('./publication-date');
 
 function parseHtml(html, source, { nowMs = Date.now() } = {}) {
   const $ = cheerio.load(html);
@@ -47,22 +48,26 @@ function parseHtml(html, source, { nowMs = Date.now() } = {}) {
     const ctx = cfg.date ? ($date?.length ? ($date.attr('datetime') || $date.text()) : '') : ($row.text() || '');
     const dateText = ctx.match(dateRe)?.[0] || '';
     const zone = cfg.utcOffset || '+08:00';
-    let publishedAt = cfg.date && $date?.length ? listDateIso(ctx, zone, nowMs) : null;
+    let publication = parsePublicationDate(cfg.date ? ctx : dateText, { nowMs, utcOffset: zone, url });
+    let publishedAt = publication?.publishedAt || (cfg.date && $date?.length ? listDateIso(ctx, zone, nowMs) : null);
     if (!publishedAt && cfg.dateParts) {
       const parts = ['year', 'month', 'day'].map(key => $row.find(cfg.dateParts[key]).first().text().match(/\d+/)?.[0]);
-      if (parts.every(Boolean)) publishedAt = looseDateIso(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`, zone);
+      if (parts.every(Boolean)) {
+        publication = parsePublicationDate(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`, { utcOffset: zone, url });
+        publishedAt = publication?.publishedAt || null;
+      }
     }
     if (!publishedAt && dateText) publishedAt = cfg.date ? listDateIso(dateText, zone, nowMs) : looseDateIso(dateText, zone);
     if (!publishedAt) publishedAt = dateFromUrl(url);
     // 首页封面往往没有时间，列表中的同一 URL 有完整日期；合并缺项而非丢弃后者。
     const prior = seen.get(url);
     if (prior) {
-      if (!prior.publishedAt && publishedAt) prior.publishedAt = publishedAt;
+      if (!prior.publishedAt && publishedAt) Object.assign(prior, publication || { publishedAt });
       if (!prior.summary && summary) prior.summary = summary;
       if (/[.…]{3}|…$/.test(prior.title) && !/[.…]{3}|…$/.test(title)) prior.title = title;
       return;
     }
-    const item = { title, url, summary, publishedAt };
+    const item = { title, url, summary, publishedAt, ...(publication || {}) };
     seen.set(url, item);
     items.push(item);
   });

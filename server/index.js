@@ -230,6 +230,8 @@ function articleRow(r, scoring, nowMs) {
     reason: r.ai_reason || null,
     image: r.image_url || null,
     publishedAt, fetchedAt, ...timing,
+    publicationPrecision: r.publication_precision || null,
+    publicationDateText: r.publication_date_text || null,
     images: Array.isArray(vision.images) ? vision.images.filter(i => i && typeof i.url === 'string' && typeof i.caption === 'string').slice(0, 4).map(i => ({url: i.url.slice(0,8192), caption:i.caption.slice(0,150), kind:String(i.kind || '').slice(0,20), sourceUrl:String(i.sourceUrl || r.url).slice(0,8192)})) : [],
     visionStatus: vision.status || null,
     domain: r.domain, category: r.category,
@@ -330,7 +332,7 @@ function queryFeed(q, { size = FEED_PAGE_SIZE, likeSearch = false } = {}) {
       // 按收藏时间倒序：用户的心智是「我最近收了什么」，不是「它什么时候发表」
       rows = db.prepare(buildSql('COALESCE(a.starred_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
     } else {
-      rows = db.prepare(buildSql('COALESCE(a.event_date, a.published_at, a.fetched_at) DESC, a.id DESC', '')).all(...params);
+      rows = db.prepare(buildSql('julianday(COALESCE(a.published_at, a.fetched_at)) DESC, a.id DESC', '')).all(...params);
     }
   } catch (error) {
     if (search && !likeSearch && [...search].length >= 3 && /fts5|MATCH|syntax error/i.test(error.message)) {

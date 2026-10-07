@@ -102,12 +102,14 @@ function itemOf(row) {
     storySize: row.cluster_size || null,
     breakthroughScore: Number(row.breakthrough_score) || 0,
     publishedAt: row.published_at,
+    publicationPrecision: row.publication_precision || null,
+    publicationDateText: row.publication_date_text || null,
     fetchedAt: row.fetched_at
   };
 }
 
 const ITEM_COLUMNS = `a.id, a.title, a.title_zh, a.url, a.ai_summary, a.ai_reason, a.summary_raw, a.domain, a.category,
-  a.attention_score, a.quality_score, a.featured, a.cluster_id, a.breakthrough_score, a.published_at, a.fetched_at,
+  a.attention_score, a.quality_score, a.featured, a.cluster_id, a.breakthrough_score, a.published_at, a.publication_precision, a.publication_date_text, a.fetched_at,
   s.name AS source_name, s.tier, cl.size AS cluster_size`;
 
 // fetched：按采集时间；released：按 max(采集, 归组完成)，尚未归组的资料等归组后进入当期

@@ -44,7 +44,7 @@
 
     function showNewFlash(n) {
       const f = elements.newFlash;
-      f.textContent = `🛰 ${n} 条新情报 · 点击查看`;
+      f.textContent = `🛰 ${n} 条情报已更新 · 点击查看`;
       f.hidden = false;
     }
     elements.newFlash.addEventListener('click', () => {

@@ -39,7 +39,7 @@
     const diff = Math.round((today - that) / 86400e3);
     if (diff === 0) return '今天';
     if (diff === 1) return '昨天';
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
+    return `${d.getFullYear() !== today.getFullYear() ? d.getFullYear() + '年' : ''}${d.getMonth() + 1}月${d.getDate()}日`;
   }
 
   function hhmm(iso) {

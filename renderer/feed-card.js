@@ -180,7 +180,7 @@
   //（自 app.js 迁入）
   // 时间轴只显示已经发生的时间：任何晚于收录时间的取值（上游写错的未来日期）都以收录时间为准
   const publishedTime = item => {
-    const time = item.eventDate ? item.eventDate + 'T00:00:00+08:00' : item.publishedAt || item.fetchedAt;
+    const time = item.publishedAt || item.reportedAt || item.fetchedAt;
     return item.fetchedAt && Date.parse(time) > Date.parse(item.fetchedAt) ? item.fetchedAt : time;
   };
   const starredTime = item => item.starredAt || item.fetchedAt;
@@ -252,8 +252,10 @@
         catTag.textContent = `${item.category}${typeLabel}`;
       } else catTag.remove();
       const publication = item.publishedAt || item.reportedAt;
-      q('.meta-time').textContent = publication ? `${timeAgo(publication)}发布` : '发布时间待确认';
-      q('.meta-time').setAttribute('title', publication ? `报道发布时间：${publication}` : `发布时间未知；收录时间：${item.fetchedAt || '未知'}`);
+      const coarseDate = publication && item.publicationPrecision && item.publicationPrecision !== 'time';
+      const publicationLabel = item.publicationDateText || publication;
+      q('.meta-time').textContent = publication ? coarseDate ? `${publicationLabel}发布${item.publicationPrecision === 'month' ? '（仅确认月份）' : ''}` : `${timeAgo(publication)}发布` : '发布时间未确认';
+      q('.meta-time').setAttribute('title', publication ? `报道发布时间：${coarseDate ? publicationLabel : publication}${item.publicationPrecision === 'month' ? '；仅确认月份，按该月排序' : ''}` : `发布时间未确认，按采集时间排序：${item.fetchedAt || '未知'}`);
       const breakthrough = breakthroughPresentation(item);
       q('.card-score-group').innerHTML =
         (breakthrough ? breakthroughBadgeHtml(breakthrough) : '') + scorePill(item);
@@ -362,7 +364,7 @@
       left.setAttribute('class', 'tl-left');
       const time = doc.createElement('span');
       time.setAttribute('class', 'tl-time');
-      time.textContent = hhmm(timeOf(item));
+      time.textContent = timeOf === publishedTime && item.publicationPrecision && item.publicationPrecision !== 'time' ? '—' : hhmm(timeOf(item));
       const dot = doc.createElement('i');
       const dotDomain = item.domain === 'lowaltitude' ? ' la' : item.domain === 'aerospace' ? ' ae' : '';
       dot.setAttribute('class', `tl-dot${dotDomain}`);
@@ -381,7 +383,7 @@
       const groups = [];
       let cur = null;
       for (const item of items) {
-        const label = dateLabel(timeOf(item));
+        const label = timeOf === publishedTime && item.publicationPrecision === 'month' ? `${item.publicationDateText}（仅确认月份）` : dateLabel(timeOf(item));
         if (!cur || cur.label !== label) {
           cur = { label, time: timeOf(item), items: [] };
           groups.push(cur);
@@ -431,7 +433,7 @@
     // 复用行时同步可能漂移的字段：左侧时刻随时间基准走
     function syncTimelineRow(row, item, timeOf) {
       const time = row.querySelector('.tl-time');
-      if (time) time.textContent = hhmm(timeOf(item));
+      if (time) time.textContent = timeOf === publishedTime && item.publicationPrecision && item.publicationPrecision !== 'time' ? '—' : hhmm(timeOf(item));
     }
 
     return Object.freeze({
@@ -592,6 +594,10 @@
     function prependFresh(items, { timeOf = publishedTime } = {}) {
       if (!Array.isArray(items) || !items.length) return 0;
       if (!list.querySelector('.date-group')) return 0;
+      // 同一天后来分析完成的旧报道也不能插到较新的报道上方。
+      // 整批预检后再改 DOM，回退不能留下已插入的一部分。
+      const firstTime = Date.parse(list.querySelector('.date-group').getAttribute('data-group-time'));
+      if (items.some(item => !(Date.parse(timeOf(item)) >= firstTime))) return 0;
       const groups = renderer.groupItems(items, timeOf);
       let applied = 0;
       const insertedRows = [];

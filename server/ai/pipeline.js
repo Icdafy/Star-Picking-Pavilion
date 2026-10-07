@@ -31,6 +31,7 @@ const deals = require('./deals');
 const { modelFor, acceptsImageInput } = require('./model-policy');
 const { analyzeImages } = require('./vision');
 const { enrichArticle } = require('../collectors/article-content');
+const { publicationUpperBound } = require('../collectors/publication-date');
 const { refreshEventTiming } = require('./event-timing-migration');
 const { repairTiming } = require('./timing-repair');
 const { reserveCall } = require('./receipts');
@@ -173,6 +174,9 @@ async function ensureContent(article, settings) {
     const content = await enrichArticle(article);
     // 网络恢复后可再补正文，不把等待状态永久当作正文已处理。
     if (content.status === 'network-wait') return { status: 'network-wait', images: [] };
+    // 自动采集与分析可并行；等待正文时另一条路径可能已补齐发布日期。
+    const publication = db.prepare('SELECT published_at,publication_precision,publication_date_text FROM articles WHERE id=?').get(article.id);
+    if (publication?.published_at) Object.assign(article, publication);
     article.content_text = content.text || article.content_text || '';
     article.content_status = content.status;
     article.publisher_id = content.publisherId || article.publisher_id || null;
@@ -180,9 +184,14 @@ async function ensureContent(article, settings) {
     try { priorImages = JSON.parse(article.images_json || '[]'); } catch {}
     const candidates = content.images.length ? content.images : priorImages.length ? priorImages : article.image_url ? [{ url: article.image_url }] : [];
     article.images_json = JSON.stringify(candidates);
-    if (content.publishedAt && !article.published_at) article.published_at = clampPublishedAt(content.publishedAt, article.fetched_at);
-    db.prepare('UPDATE articles SET content_text=?, content_status=?, images_json=?, publisher_id=?, published_at=? WHERE id=?')
-      .run(article.content_text, article.content_status, article.images_json, article.publisher_id, article.published_at, article.id);
+    if (content.publishedAt && !article.published_at) {
+      article.published_at = clampPublishedAt(content.publishedAt, article.fetched_at);
+      article.publication_precision = content.publicationPrecision || null;
+      article.publication_date_text = content.publicationDateText || null;
+    }
+    db.prepare('UPDATE articles SET content_text=?, content_status=?, images_json=?, publisher_id=?, published_at=?,publication_precision=?,publication_date_text=? WHERE id=?')
+      .run(article.content_text, article.content_status, article.images_json, article.publisher_id, article.published_at,
+        article.publication_precision || null, article.publication_date_text || null, article.id);
   }
   if (!settings) return {};
   let vision = {};
@@ -207,7 +216,7 @@ async function ensureContent(article, settings) {
 // 旧文不刷屏：发现时已发布超过 historicalHours 的资料按原文时间归档，不进“今天”、不计热度
 function isHistorical(article, selection) {
   if (article.imported_backfill) return true;
-  const published = Date.parse(article.published_at);
+  const published = publicationUpperBound(article.published_at, article.publication_precision);
   const fetched = Date.parse(article.fetched_at) || Date.now();
   return Number.isFinite(published) && fetched - published > selection.historicalHours * 3600e3;
 }
@@ -245,7 +254,7 @@ async function analyzePending(onProgress, limit = 200) {
   const backfilled = companies.backfillSubjects(300) + deals.backfillHistory(300).scanned;
 
   const pending = db.prepare(`
-    SELECT a.id, a.source_id, a.title, a.url, a.summary_raw, a.published_at, a.fetched_at, a.domain,
+    SELECT a.id, a.source_id, a.title, a.url, a.summary_raw, a.published_at, a.publication_precision, a.publication_date_text, a.fetched_at, a.domain,
            a.canonical_url, a.clean_version, a.image_url, a.content_text, a.content_status, a.images_json, a.vision_json, a.publisher_id, a.imported_backfill,
            a.prefilter_attempts, s.name AS source_name, s.tier, s.intl
            , a.translation_status, a.translation_json

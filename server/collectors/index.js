@@ -13,6 +13,9 @@ const { settleAll } = require('../async-work');
 const { networkAccess } = require('../network-access');
 const { needsChinese } = require('../ai/translation');
 const { dateFromUrl } = require('./loose-date');
+const { enrichArticle } = require('./article-content');
+const { publicationUpperBound } = require('./publication-date');
+const { needsPublicationCheck, savePublicationTime, repairPublicationTimes } = require('../publication-time');
 const rssAdapter = require('./rss');
 const htmlAdapter = require('./html');
 const apiAdapter = require('./api');
@@ -128,11 +131,36 @@ function seedSources() {
   console.log(`[collect] 种子信源同步（v${seedVersion}）：新增 ${added} 个`);
 }
 
-async function collectSource(source, settings) {
+async function collectSource(source, settings, { enrich = enrichArticle, network = networkAccess } = {}) {
   const adapter = ADAPTERS[source.type];
   if (!adapter) throw new Error(`未知信源类型: ${source.type}`);
   const items = await adapter.fetch(source, settings);
   const cutoff = Date.now() - settings.collect.keepDays * 86400e3;
+  const prepared = items.map(item => ({ item, structured: structureItem(item, {
+    sourceName: source.name, domain: source.domain === 'both' ? null : source.domain
+  }) })).filter(entry => entry.structured);
+  // 在入库前补查缺失发布时间；不依赖 API Key，网络等待与没有日期仍可收录。
+  // HTTP 请求在事务外完成，避免长时间锁住 SQLite。
+  let position = 0;
+  await settleAll(Array.from({ length: 2 }, async () => {
+    while (position < prepared.length) {
+      const entry = prepared[position++];
+      entry.existing = db.prepare('SELECT * FROM articles WHERE url=? OR canonical_url=? LIMIT 1')
+        .get(entry.structured.url, entry.structured.canonicalUrl);
+      if (entry.structured.publishedAt || entry.existing?.published_at
+        || (entry.existing && !needsPublicationCheck(entry.existing))) continue;
+      const content = await enrich({ ...entry.existing, url: entry.structured.url, intl: source.intl }, { network });
+      if (content.status === 'network-wait') continue;
+      entry.structured.publicationCheckedAt = now();
+      entry.structured.publishedAt = content.publishedAt || null;
+      entry.structured.publicationPrecision = content.publicationPrecision || null;
+      entry.structured.publicationDateText = content.publicationDateText || null;
+      entry.structured.contentText ||= content.text || null;
+      entry.structured.contentStatus = content.status === 'ok' ? 'ok' : null;
+      entry.structured.publisherId ||= content.publisherId || null;
+      if (content.images?.length) entry.structured.images = content.images;
+    }
+  }));
   return withTransaction(() => {
     // 请求期间用户可能停用、移除或改写信源；旧响应不能继续进入新配置。
     const current = db.prepare('SELECT enabled, removed_at, url, type, selector_json, intl FROM sources WHERE id=?').get(source.id);
@@ -140,17 +168,15 @@ async function collectSource(source, settings) {
       || current.type !== source.type || current.selector_json !== source.selector_json || current.intl !== source.intl) {
       return { fetched: items.length, added: 0, skipped: true };
     }
-    let added = 0;
-    for (const it of items) {
-      if (!it.title || !it.url) continue;
-      if (it.publishedAt && new Date(it.publishedAt).getTime() < cutoff) continue;
-      // 结构化 + 清洗放在入库之前：脏标题一旦落库，后面的预筛、聚类和去重
-      // 全都要带着它算，而清洗本身是纯代码，越早做越省事。
-      const structured = structureItem(it, {
-        sourceName: source.name,
-        domain: source.domain === 'both' ? null : source.domain
-      });
-      if (!structured) continue;
+    let added = 0, publicationRepaired = 0;
+    for (const { structured, existing } of prepared) {
+      if (existing) {
+        if (!existing.published_at && (structured.publishedAt || structured.publicationCheckedAt)) {
+          publicationRepaired += savePublicationTime(db, existing, structured, structured.publicationCheckedAt || now()) ? 1 : 0;
+        }
+        continue;
+      }
+      if (structured.publishedAt && publicationUpperBound(structured.publishedAt, structured.publicationPrecision) < cutoff) continue;
       const translationStatus = source.intl && needsChinese(structured.title, structured.summaryRaw) ? 'pending' : null;
       if (insertArticle({ sourceId: source.id, ...structured, translationStatus })) added++;
     }
@@ -158,13 +184,13 @@ async function collectSource(source, settings) {
       fetch_count=fetch_count+1, item_count=item_count+?,
       consecutive_errors=0, next_fetch_at=NULL WHERE id=?`)
       .run(now(), added, source.id);
-    return { fetched: items.length, added };
+    return { fetched: items.length, added, publicationRepaired };
   });
 }
 
 // 采集全部启用信源（带并发限制）
 // force=true 时忽略失败退避 —— 用户点「立即采集分析」意味着他要的就是现在全量重试一次
-async function collectAll(onProgress, { force = false, network = networkAccess } = {}) {
+async function collectAll(onProgress, { force = false, network = networkAccess, enrich = enrichArticle } = {}) {
   seedSources();
   const settings = loadSettings();
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
@@ -187,7 +213,7 @@ async function collectAll(onProgress, { force = false, network = networkAccess }
       const source = sources[idx++];
       const started = Date.now();
       try {
-        const r = await collectSource(source, settings);
+        const r = await collectSource(source, settings, { enrich, network });
         results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), ...r, ms: Date.now() - started });
         onProgress && onProgress({ source: source.name, ...r });
       } catch (e) {
@@ -209,7 +235,9 @@ async function collectAll(onProgress, { force = false, network = networkAccess }
     }
   }
   await settleAll(Array.from({ length: CONCURRENCY }, worker));
-  return { results, skipped, skippedBackoff, skippedNetwork, network: networkStatus };
+  const publicationRepair = await repairPublicationTimes(db, { enrich, network });
+  publicationRepair.repaired += results.reduce((sum, row) => sum + (row.publicationRepaired || 0), 0);
+  return { results, skipped, skippedBackoff, skippedNetwork, network: networkStatus, publicationRepair };
 }
 
-module.exports = { collectAll, seedSources, applySourceMigrations };
+module.exports = { collectAll, collectSource, seedSources, applySourceMigrations };

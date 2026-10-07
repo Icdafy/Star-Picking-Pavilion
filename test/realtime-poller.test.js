@@ -163,7 +163,7 @@ test('正在阅读时不打断：显示新情报横幅，点击后回顶刷新',
   await poller.pollRealtime();
   assert.equal(env.calls.loadFeed, 0);
   assert.equal(env.elements.newFlash.hidden, false);
-  assert.match(env.elements.newFlash.textContent, /2 条新情报/);
+  assert.match(env.elements.newFlash.textContent, /2 条情报已更新/);
   env.dispatchFlash('click');
   assert.equal(env.elements.newFlash.hidden, true);
   assert.equal(env.calls.scrollToTop, 1);

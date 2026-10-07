@@ -44,13 +44,14 @@ function eventTiming(raw, article) {
   const compact = value => String(value || '').replace(/\s+/g, ' ').trim();
   const quotePresent = evidence.length >= 6 && [article.title, article.summary_raw, article.content_text]
     .some(text => compact(text).includes(compact(evidence)));
-  const uniqueDates = new Set(datesIn(evidence, article.published_at));
+  const publicationAnchor = ['month', 'month-day'].includes(article.publication_precision) ? null : article.published_at;
+  const uniqueDates = new Set(datesIn(evidence, publicationAnchor));
   const supplied = raw?.w || raw?.time || raw?.date;
-  const resolved = supplied ? resolveEventDate(supplied, article.published_at)
+  const resolved = supplied ? resolveEventDate(supplied, publicationAnchor)
     : uniqueDates.size === 1 ? [...uniqueDates][0] : null;
   const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
-  const reportDay = article.published_at && Number.isFinite(Date.parse(article.published_at))
-    ? new Date(Date.parse(article.published_at) + 8 * 3600000).toISOString().slice(0, 10) : null;
+  const reportDay = publicationAnchor && Number.isFinite(Date.parse(publicationAnchor))
+    ? new Date(Date.parse(publicationAnchor) + 8 * 3600000).toISOString().slice(0, 10) : null;
   const past = resolved && resolved <= today && (!reportDay || resolved <= reportDay);
   // A quote spanning multiple event dates cannot bind a date to one action safely.
   const reason = !quotePresent ? 'missing-evidence' : uniqueDates.size > 1 ? 'ambiguous-date'
@@ -65,7 +66,7 @@ function timingFields(row) {
   const primary = Array.isArray(events) ? events[0] : null;
   const dated = primary && ['completed', 'failed'].includes(primary.status) && primary.evidence;
   const eventDate = dated ? dateOnly(primary.date) : null;
-  const reportDate = row.published_at && Number.isFinite(Date.parse(row.published_at))
+  const reportDate = !['month', 'month-day'].includes(row.publication_precision) && row.published_at && Number.isFinite(Date.parse(row.published_at))
     ? new Date(Date.parse(row.published_at) + 8 * 3600000).toISOString().slice(0, 10) : null;
   const validDate = eventDate && (!reportDate || eventDate <= reportDate) ? eventDate : null;
   const eventStatus = primary?.status || 'unknown';

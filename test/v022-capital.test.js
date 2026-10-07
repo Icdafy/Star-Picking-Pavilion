@@ -26,6 +26,18 @@ function article(title, { publishedAt = new Date().toISOString(), summary = '', 
   return { id };
 }
 
+test('融资报道的日期按北京时间显示和筛选，月份级记录不显示虚构日号', () => {
+  const day = article('商业航天日期核验企业完成A轮融资', { publishedAt: '2025-09-29T16:00:00Z', domain: 'aerospace' });
+  deals.recordDeal(day, deals.normalizeDeal({ company: '日期核验企业', round: 'A轮', amount: '1亿元', status: 'completed' }), { domain: 'aerospace' });
+  const rows = deals.listDeals({ since: '2025-09-30', domain: 'aerospace' });
+  assert.equal(rows.find(row => row.article?.id === day.id)?.date, '2025-09-30');
+  const month = article('商业航天月份核验企业完成B轮融资', { publishedAt: '2025-08-31T16:00:00Z', domain: 'aerospace' });
+  db.prepare("UPDATE articles SET publication_precision='month' WHERE id=?").run(month.id);
+  deals.recordDeal(month, deals.normalizeDeal({ company: '月份核验企业', round: 'B轮', amount: '2亿元', status: 'completed' }), { domain: 'aerospace' });
+  const result = deals.listDeals({ since: '2025-01-01', domain: 'aerospace' }).find(row => row.article?.id === month.id);
+  assert.equal(result.date, '2025-09'); assert.equal(result.datePrecision, 'month');
+});
+
 test('事件性质、阶段与金额量级：只做分档，不冒充精确金额', () => {
   assert.equal(deals.classifyKind({ round: 'A轮', text: '完成A轮融资' }), 'equity');
   assert.equal(deals.classifyKind({ round: '未披露', text: '金银河拟定增募资不超过15亿元' }), 'secondary');

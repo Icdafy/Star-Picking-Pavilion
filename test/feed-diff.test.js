@@ -46,6 +46,22 @@ function makeDiffList() {
 const day1 = '2026-08-01T09:30:00';
 const day2 = '2026-08-02T15:45:00';
 
+test('新闻时间轴始终以报道发布时间为主，无日期回落采集时间', () => {
+  assert.equal(FeedCard.publishedTime({ publishedAt: day2, fetchedAt: day2, eventDate: '2025-09-30' }), day2);
+  assert.equal(FeedCard.publishedTime({ fetchedAt: day2, eventDate: '2025-09-30' }), day2);
+  const { renderer } = makeRenderer();
+  const month = item('month', { publicationPrecision: 'month', publicationDateText: '2025年9月', publishedAt: '2025-08-31T16:00:00Z', fetchedAt: day2 });
+  assert.match(renderer.renderCard(month).querySelector('.meta-time').textContent, /2025年9月发布（仅确认月份）/);
+  assert.equal(renderer.timelineRow(month, FeedCard.publishedTime, 0).querySelector('.tl-time').textContent, '—');
+});
+
+test('同日较旧报道或混合批次不前置，也不能留下部分插入的条目', () => {
+  const { list, diff } = makeDiffList();
+  diff.reconcile([item('head', { publishedAt: '2026-08-01T10:00:00' })]);
+  assert.equal(diff.prependFresh([item('new', { publishedAt: '2026-08-01T11:00:00' }), item('late', { publishedAt: '2026-08-01T09:00:00' })]), 0);
+  assert.deepEqual(list.querySelectorAll('.card[data-id]').map(card => card.getAttribute('data-id')), ['head']);
+});
+
 // 收录时间默认跟随发布时间：时间轴不显示晚于收录时间的日期（v0.2.5），夹具不能自造“未来发布”
 function item(id, patch = {}) {
   return Object.assign({
@@ -131,7 +147,7 @@ test('publication age is independent of event date and unknown timing explains i
   const postponed = renderer.renderCard(item(3, {timingStatus:'postponed',eventStatus:'postponed'}));
   assert.equal(postponed.querySelector('.event-time-badge').textContent,'延期／暂停');
   const noPublication = renderer.renderCard(item(4, {publishedAt:null,eventDate:'2026-07-01',timingReason:'missing-publication'}));
-  assert.equal(noPublication.querySelector('.meta-time').textContent,'发布时间待确认');
+  assert.equal(noPublication.querySelector('.meta-time').textContent,'发布时间未确认');
   assert.equal(noPublication.querySelector('.event-time-badge').textContent,'报道日期待确认');
   const planned=renderer.renderCard(item(5,{timingStatus:'planned',eventStatus:'planned'}));
   assert.equal(planned.querySelector('.event-time-badge').textContent,'计划事件');

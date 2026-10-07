@@ -31,11 +31,17 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
     try {
       if (!row.content_text || !row.published_at) {
         const content = await enrich(row);
+        const publication = database.prepare('SELECT published_at,publication_precision,publication_date_text FROM articles WHERE id=?').get(row.id);
+        if (publication?.published_at) Object.assign(row, publication);
         row.content_text = content.text || row.content_text || '';
         row.content_status = content.status;
-        row.published_at ||= clampPublishedAt(content.publishedAt, row.fetched_at);
-        database.prepare('UPDATE articles SET content_text=?,content_status=?,published_at=? WHERE id=?')
-          .run(row.content_text,row.content_status,row.published_at,row.id);
+        if (!row.published_at && content.publishedAt) {
+          row.published_at = clampPublishedAt(content.publishedAt, row.fetched_at);
+          row.publication_precision = content.publicationPrecision || null;
+          row.publication_date_text = content.publicationDateText || null;
+        }
+        database.prepare('UPDATE articles SET content_text=?,content_status=?,published_at=?,publication_precision=?,publication_date_text=? WHERE id=?')
+          .run(row.content_text,row.content_status,row.published_at,row.publication_precision || null,row.publication_date_text || null,row.id);
       }
       const raw = await extract(row);
       if (!Array.isArray(raw)) throw new Error('事件补提取响应无效');

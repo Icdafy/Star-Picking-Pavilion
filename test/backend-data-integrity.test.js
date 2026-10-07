@@ -10,7 +10,8 @@ const http = require('node:http');
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-backend-integrity-'));
 process.env.STAR_PICKING_PAVILION_DATA_DIR = dataDir;
 const { db, closeDatabase } = require('../server/db');
-const { collectAll, seedSources } = require('../server/collectors');
+const { collectAll: collectAllImpl, seedSources } = require('../server/collectors');
+const collectAll = (progress, options) => collectAllImpl(progress, { ...options, enrich: async () => ({ status: 'unavailable' }) });
 const { withReceipt, reserveCall, buckets } = require('../server/ai/receipts');
 
 test.after(async () => { closeDatabase(); await fs.promises.rm(dataDir, { recursive: true, force: true }); });

@@ -81,11 +81,15 @@
     }
 
     async function saveCollect() {
+      const intervalMinutes = Number(elements.intervalMinutes.value);
+      if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 720) {
+        throw new Error('采集间隔请输入 1 至 720 的整数分钟');
+      }
       const submitted = snapshot();
       const result = await request('/api/settings', {
         body: {
           collect: {
-            intervalMinutes: Number(elements.intervalMinutes.value) || 30,
+            intervalMinutes,
             rsshubBase: elements.rsshubBase.value.trim()
           }
         }

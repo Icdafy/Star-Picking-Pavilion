@@ -430,12 +430,14 @@
       <div class="glass card-pad" id="settingsCollect" data-settings-section="settingsCollect" aria-labelledby="heading-settingsCollect">
         <h3 id="heading-settingsCollect" tabindex="-1">采集调度</h3>
         <label class="field"><span>采集间隔（分钟）</span>
-          <input id="setInterval" type="number" min="10" max="720" step="5">
+          <input id="setInterval" type="number" min="1" max="720" step="1">
         </label>
         <label class="field"><span>RSSHub 实例地址 <span class="muted">选填</span></span>
           <input id="setRsshub" type="text" placeholder="https://rsshub.app（填后 rsshub:// 型信源生效）">
         </label>
         <div class="btn-row"><button class="btn-primary" id="btnSaveCollect">保存</button></div>
+        <p class="hint">支持 1—720 的整数分钟，保存后立即生效。启动时先采集一次，每轮完成后按所填间隔等待；手动采集分析完成后重新计时。列表中的更新提示也可能来自已采集新闻的后台分析，不表示又发起了采集。</p>
+        <p class="hint" id="collectScheduleStatus" aria-live="polite"></p>
         <p class="hint">日报每天 08:00、周报每周一 10:00、月报每月 1 日 10:30 自动出刊。信源等级 T1（官方一手）/T1.5（官方社媒）/T2（媒体聚合）决定入选门槛：同样一件事，官方原文的门槛更低。填入 RSSHub 地址后，可把公众号 / 媒体经 RSSHub 转成 RSS 接入（信源页提报 <code>rsshub://路由</code> 即可）。</p>
         <h3 style="margin-top:1.5rem">情报备忘 <span class="muted">仅存本机</span></h3>
         <label class="field"><span>问题、建议或随手笔记</span>

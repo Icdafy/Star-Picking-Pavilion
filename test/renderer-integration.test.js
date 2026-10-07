@@ -922,7 +922,7 @@ test('星标视图的时间轴按收藏时间分组，不会按发布时间乱�
   // 阶段 4：starredTime/renderTimeline/分组逻辑随卡片渲染迁入 renderer/feed-card.js
   assert.match(feedCardSource, /const starredTime = item => item\.starredAt \|\| item\.fetchedAt;/);
   assert.match(feedCardSource, /function renderTimeline\(items, startIdx, timeOf = publishedTime\)/);
-  assert.match(feedCardSource, /const label = dateLabel\(timeOf\(item\)\);/);
+  assert.match(feedCardSource, /const label = timeOf === publishedTime[\s\S]*dateLabel\(timeOf\(item\)\);/);
   // 批 2：loadFeed 调用点随信息流控制器迁到 renderer/feed-controller.js；
   // 阶段 4 改为先选定时间基准再走 keyed diff 调和，星标时间轴语义不变
   assert.match(feedControllerSource, /const timeOf = state\.view === 'starred' \? starredTime : publishedTime;/);

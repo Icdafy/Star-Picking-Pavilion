@@ -59,6 +59,6 @@ test('时间轴不显示晚于收录时间的日期', () => {
   const fetchedAt = '2026-09-30T14:29:04.758Z';
   assert.equal(FeedCard.publishedTime({ publishedAt: '2026-11-01T16:00:00.000Z', fetchedAt }), fetchedAt);
   assert.equal(FeedCard.publishedTime({ eventDate: '2026-11-02', publishedAt: fetchedAt, fetchedAt }), fetchedAt);
-  assert.equal(FeedCard.publishedTime({ eventDate: '2026-09-28', fetchedAt }), '2026-09-28T00:00:00+08:00');
+  assert.equal(FeedCard.publishedTime({ eventDate: '2026-09-28', fetchedAt }), fetchedAt, '缺失报道日期时以采集时间整理，事件日期只作辅助');
   assert.equal(FeedCard.publishedTime({ publishedAt: '2026-09-30T08:00:00.000Z', fetchedAt }), '2026-09-30T08:00:00.000Z');
 });

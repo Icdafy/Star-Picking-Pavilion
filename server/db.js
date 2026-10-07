@@ -184,6 +184,9 @@ function migrate() {
   addCol('timing_repair_attempts', 'INTEGER NOT NULL DEFAULT 0');
   addCol('timing_repair_at', 'TEXT');
   addCol('timing_repair_error', 'TEXT');
+  addCol('publication_checked_at', 'TEXT');
+  addCol('publication_precision', 'TEXT');
+  addCol('publication_date_text', 'TEXT');
   addCol('ai_reason', 'TEXT');   // 情报研判（推荐理由 / 编者按）
   for (const name of ['content_text','images_json','vision_json','content_status','publisher_id','event_date']) addCol(name, 'TEXT');
   addCol('image_url', 'TEXT');   // 文章缩略图
@@ -416,12 +419,12 @@ function insertArticle(a) {
   const fetchedAt = now();
   return withTransaction(() => {
     const stmt = db.prepare(`INSERT OR IGNORE INTO articles
-      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id, imported_backfill, historical, translation_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (source_id, title, url, canonical_url, summary_raw, published_at, fetched_at, domain, image_url, clean_version, images_json, content_text, publisher_id, imported_backfill, historical, translation_status, publication_checked_at, content_status, publication_precision, publication_date_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const r = stmt.run(a.sourceId, a.title, a.url, canonicalUrl, a.summaryRaw || null,
       clampPublishedAt(a.publishedAt, fetchedAt), fetchedAt, a.domain || null, a.image || null,
       Number.isInteger(a.cleanVersion) ? a.cleanVersion : 0, JSON.stringify(a.images || []), a.contentText || null, a.publisherId || null,
-      a.importedBackfill ? 1 : 0, a.historical || a.importedBackfill ? 1 : 0, a.translationStatus || null);
+      a.importedBackfill ? 1 : 0, a.historical || a.importedBackfill ? 1 : 0, a.translationStatus || null, a.publicationCheckedAt || null, a.contentStatus || null, a.publicationPrecision || null, a.publicationDateText || null);
     if (r.changes > 0) {
       db.prepare('INSERT INTO articles_fts(rowid, title, summary) VALUES (?, ?, ?)')
         .run(r.lastInsertRowid, a.title, a.summaryRaw || '');

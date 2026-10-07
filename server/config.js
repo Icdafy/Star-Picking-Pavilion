@@ -112,7 +112,7 @@ function normalizeSettings(raw, { existing = false } = {}) {
   applyActiveModel(settings);
   settings.ai.maxBatchPrefilter = boundedInteger(settings.ai.maxBatchPrefilter, 1, 50, DEFAULT_SETTINGS.ai.maxBatchPrefilter);
   settings.ai.requestTimeoutMs = boundedInteger(settings.ai.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.ai.requestTimeoutMs);
-  settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 10, 720, defaults.collect.intervalMinutes);
+  settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 1, 720, defaults.collect.intervalMinutes);
   settings.collect.analyzeIntervalSeconds = boundedInteger(
     settings.collect.analyzeIntervalSeconds, 20, 3600, DEFAULT_SETTINGS.collect.analyzeIntervalSeconds
   );
@@ -234,8 +234,8 @@ function applySettingsPatch(currentSettings, patch) {
 
   if (patch?.collect && Object.hasOwn(patch.collect, 'intervalMinutes')) {
     const interval = Number(patch.collect.intervalMinutes);
-    if (!Number.isInteger(interval) || interval < 10 || interval > 720) {
-      throw new HttpError(400, '采集间隔必须是 10 到 720 分钟之间的整数');
+    if (!Number.isInteger(interval) || interval < 1 || interval > 720) {
+      throw new HttpError(400, '采集间隔必须是 1 到 720 分钟之间的整数');
     }
     settings.collect.intervalMinutes = interval;
   }

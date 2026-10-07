@@ -378,7 +378,8 @@ function dealRow(row) {
     investors: parseNames(row.investors_json),
     leadInvestors: parseNames(row.lead_investors_json),
     status: row.status,
-    date: row.deal_date || (row.article_published_at || row.first_seen_at || '').slice(0, 10),
+    date: row.deal_date || reportDate(row.article_published_at || row.first_seen_at, row.article_publication_precision),
+    datePrecision: row.deal_date ? 'day' : row.article_publication_precision || 'day',
     dateBasis: row.deal_date ? 'event' : row.article_published_at ? 'published' : 'discovered',
     firstSeenAt: row.first_seen_at,
     updatedAt: row.updated_at,
@@ -390,6 +391,13 @@ function dealRow(row) {
   deal.tier = tierOf(deal);
   deal.estimateCny = Number(deal.amountCny) > 0 ? Number(deal.amountCny) : estimateAmount(deal.amountText);
   return deal;
+}
+
+function reportDate(value, precision) {
+  const stamp = Date.parse(value);
+  if (!Number.isFinite(stamp)) return '';
+  const day = new Date(stamp + 8 * 3600e3).toISOString().slice(0, 10);
+  return precision === 'month' ? day.slice(0, 7) : day;
 }
 
 const SORTS = Object.freeze({
@@ -409,7 +417,7 @@ function listDeals({ days = 90, domain = null, companyId = null, watchedOnly = f
     params.push(seenWindow[0], seenWindow[1]);
   } else {
     const from = since || new Date(Date.now() - days * 86400e3).toISOString();
-    where.push('substr(COALESCE(d.deal_date, a.published_at, d.first_seen_at), 1, 10) >= ?');
+    where.push("COALESCE(d.deal_date, date(a.published_at, '+8 hours'), date(d.first_seen_at, '+8 hours')) >= ?");
     params.push(from.slice(0, 10));
     if (until) { where.push('d.first_seen_at < ?'); params.push(until); }
   }
@@ -424,13 +432,13 @@ function listDeals({ days = 90, domain = null, companyId = null, watchedOnly = f
     params.push(pattern, pattern, pattern, pattern);
   }
   const rows = db.prepare(`SELECT d.*, c.watch, c.status AS company_status, c.segment,
-      a.id AS article_id, a.title AS article_title, a.title_zh AS article_title_zh, a.url AS article_url, a.published_at AS article_published_at, s.name AS source_name
+      a.id AS article_id, a.title AS article_title, a.title_zh AS article_title_zh, a.url AS article_url, a.published_at AS article_published_at, a.publication_precision AS article_publication_precision, s.name AS source_name
     FROM deals d
     LEFT JOIN companies c ON c.id = d.company_id
     LEFT JOIN articles a ON a.id = d.first_article_id
     LEFT JOIN sources s ON s.id = a.source_id
     WHERE ${where.join(' AND ')}
-    ORDER BY substr(COALESCE(d.deal_date, a.published_at, d.first_seen_at), 1, 10) DESC, d.id DESC
+    ORDER BY COALESCE(d.deal_date, date(a.published_at, '+8 hours'), date(d.first_seen_at, '+8 hours')) DESC, d.id DESC
     LIMIT 1000`).all(...params);
   let deals = rows.map(dealRow);
   if (stage && STAGES[stage]) deals = deals.filter(d => d.stage === stage);
