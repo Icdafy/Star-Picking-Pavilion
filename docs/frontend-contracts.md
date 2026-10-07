@@ -939,3 +939,5 @@ DomUtils.createMotion 增加 revealText、unfold、layoutChange：文字最多�
 pointerStyle 为 glow／comet／stars／ring；旧偏好缺省使用 glow，保留已有 pointerEnabled、pointerSize 和 pointerColor。流星的 pointerCometSize（80—800px 尾长）、星尘的 pointerStarsSize（2—18px）和光环的 pointerRingSize（12—160px 直径）独立保存；pointerOpacity 为 10—100%，颜色与强度共享。设置控件复用，按当前风格更新范围与标签，数字／滑块／调色盘／预设即时应用并自动保存。renderer 与主进程对全部 pointer 字段共用白名单和验证，不接受非法风格或越界值。
 
 DomUtils.createPointerEffects 在既有 dom-utils.js 边界内，由 createInteractionMotion 共用委托输入与环境监听。只采样 pointermove，布局或弹层产生的 pointerover 不唤醒轨迹；单个 RAF 合并输入、按实际时间推进物理与消散。流星 96 个逻辑点／连续渐细样条，星尘复用光点与 96 个槽（lite 档 36），缓冲区约 400 万像素上限；光环只更新 transform／opacity。闲置收敛即停 RAF，关闭、滚动、减少动态、失焦、隐藏、高对比度与销毁清理。透明手动 popover 只承载装饰，不截获命中；原生弹层焦点、Esc 和退出动画保留。范围柔光与新风格互斥；292 KiB、27 脚本、20 关键帧预算继续适用。
+
+Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复用，避免整屏透明纹理。光环只分配其直径与发光边距。四种跟手样式共用 recordFrame，运行中积累四个超过 1／45 秒的慢帧（快帧抵消计数，超过 200ms 的暂停不计）后，data-pointer-composition=lite 自动移除背景玻璃／弹窗的昂贵模糊合成；柔光保留主要光晕，省略次要外晕／边缘蒙版。会话内记住检测结果，关闭动效／dispose 撤销提示。该提示不持久化、不改变用户材质参数或 fxTier。普通显卡路径与真实软件渲染的四种样式均执行相同开关对照门槛，软件诊断仅在忽略目录使用 --disable-gpu，正式启动与 CI 没有改动图形参数。

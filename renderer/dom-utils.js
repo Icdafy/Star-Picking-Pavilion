@@ -467,13 +467,13 @@
   // 连续尾迹、星尘和光环共用一个按需 RAF。输入只采样，几何与绘制按帧合并。
   // 参考 Cuberto 的速度形变和 Codrops 的短尾迹设计；实现不依赖第三方动画库。
   function createPointerEffects({ document: doc, window: win } = {}) {
-    const noop = Object.freeze({ move() {}, clear() {}, sync() {}, dispose() {}, getSnapshot() { return {}; } });
+    const noop = Object.freeze({ move() {}, clear() {}, sync() {}, recordFrame() {}, dispose() {}, getSnapshot() { return {}; } });
     if (!doc?.body || !win?.requestAnimationFrame) return noop;
     const root = doc.documentElement;
     const reduced = win.matchMedia?.('(prefers-reduced-motion: reduce)');
     const contrast = win.matchMedia?.('(forced-colors: active)');
     const styles = { comet: [80, 800, 240], stars: [2, 18, 6], ring: [12, 160, 40] };
-    const pool = Array.from({ length: 96 }, () => ({ alive: false }));
+    const pool = Array.from({ length: 96 }, () => ({ alive: false, drawX: 0, drawY: 0, drawSize: 0, drawAlpha: 0 }));
     const pending = [], trail = [], curve = new Float64Array(385 * 3);
     const metrics = { frames: 0, totalMs: 0, maxMs: 0 };
     const clock = () => win.performance?.now?.() || 0;
@@ -482,6 +482,8 @@
     let disposed = false, config = null, signature = '', frame = null, lastTime = 0;
     let host = null, canvas = null, context = null, ring = null, sprites = null;
     let width = 0, height = 0, ratio = 1, dirty = null, topLayer = null;
+    let bufferWidth = 0, bufferHeight = 0;
+    let slowFrames = 0, compositionLite = false;
     let cursor = null, present = false, carry = 0, seed = 0x02315a, slot = 0, orbitAngle = 0;
     function allowed() {
       return !disposed && !doc.hidden && !reduced?.matches && !contrast?.matches
@@ -496,6 +498,7 @@
       if (!host) return;
       if (host.matches?.(':popover-open')) host.hidePopover();
       host.hidden = true;
+      host.style.willChange = '';
       if (ring) { ring.style.opacity = '0'; ring.style.willChange = ''; }
     }
     function clearPixels() {
@@ -513,14 +516,30 @@
     function resize() {
       const nextWidth = Math.max(1, win.innerWidth || root.clientWidth || 1);
       const nextHeight = Math.max(1, win.innerHeight || root.clientHeight || 1);
-      // 高 DPI / 4K 屏也只分配一个有上限的透明缓冲区；只清理实际绘制区域。
+      // 视口只用来限幅；实际缓冲区按轨迹边界分配，不合成整屏透明纹理。
       const nextRatio = Math.min(win.devicePixelRatio || 1, config.lite ? 1 : 1.5,
         Math.sqrt(4_000_000 / (nextWidth * nextHeight)));
       if (width === nextWidth && height === nextHeight && ratio === nextRatio) return;
       width = nextWidth; height = nextHeight; ratio = nextRatio;
-      canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
-      context?.setTransform(ratio, 0, 0, ratio, 0, 0);
+      bufferWidth = bufferHeight = 0;
+      canvas.width = canvas.height = 1;
       dirty = null;
+    }
+    function placeCanvas() {
+      if (!dirty) return false;
+      const left = Math.floor(dirty.left / 32) * 32, top = Math.floor(dirty.top / 32) * 32;
+      const neededWidth = Math.min(width, Math.ceil((dirty.right - left) / 64) * 64);
+      const neededHeight = Math.min(height, Math.ceil((dirty.bottom - top) / 64) * 64);
+      // 64px 档位且只增长，移动时复用纹理，避免每帧调整 Canvas 大小。
+      if (neededWidth > bufferWidth || neededHeight > bufferHeight) {
+        bufferWidth = Math.max(bufferWidth, neededWidth); bufferHeight = Math.max(bufferHeight, neededHeight);
+        canvas.width = Math.round(bufferWidth * ratio); canvas.height = Math.round(bufferHeight * ratio);
+      }
+      host.style.width = `${bufferWidth}px`; host.style.height = `${bufferHeight}px`;
+      host.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+      host.style.willChange = 'transform';
+      context.setTransform(ratio, 0, 0, ratio, -left * ratio, -top * ratio);
+      return true;
     }
     function mount() {
       if (host) { resize(); return true; }
@@ -531,7 +550,7 @@
       canvas = doc.createElement('canvas'); canvas.className = 'pointer-trail-canvas';
       ring = doc.createElement('span'); ring.className = 'pointer-orbit';
       host.append(canvas, ring); doc.body.appendChild(host);
-      try { context = canvas.getContext('2d', { alpha: true, desynchronized: true }); } catch {}
+      try { context = canvas.getContext('2d', { alpha: true }); } catch {}
       if (!context && config.style !== 'ring') { host.remove(); host = null; return false; }
       resize(); return true;
     }
@@ -559,6 +578,7 @@
       ctx.closePath(); ctx.fill(); return image;
     }
     function prepare() {
+      bufferWidth = bufferHeight = 0; canvas.width = canvas.height = 1;
       if (config.style !== 'ring' && context) sprites = [sprite(false), sprite(true)];
       ring.style.width = ring.style.height = `${config.size}px`;
       ring.hidden = config.style !== 'ring'; canvas.hidden = config.style === 'ring';
@@ -570,6 +590,14 @@
       if (!lastTime) lastTime = clock();
       frame = win.requestAnimationFrame(tick);
     }
+    function recordFrame(elapsed, cost) {
+      if (!compositionLite) {
+        slowFrames = elapsed > 1 / 45 && elapsed < .2 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
+        if (slowFrames >= 4) compositionLite = true;
+      }
+      if (compositionLite && root.dataset.pointerEnabled !== 'off') root.dataset.pointerComposition = 'lite';
+      metrics.frames++; metrics.totalMs += cost; metrics.maxMs = Math.max(metrics.maxMs, cost);
+    }
     function sync() {
       const style = root.dataset.pointerStyle || 'glow';
       const spec = Object.hasOwn(styles, style) ? styles[style] : null;
@@ -577,6 +605,10 @@
       const size = spec ? Math.max(spec[0], Math.min(spec[1], Number(root.dataset.pointerEffectSize) || spec[2])) : 320;
       const opacity = Math.max(.1, Math.min(1, Number(root.dataset.pointerOpacity) || 1));
       const next = [style, size, color, opacity, root.dataset.fxTier, root.dataset.theme].join('/');
+      // 软件合成持续慢帧时只降低背景材质成本，轨迹和输入保持原有刷新率。
+      // 会话内记住检测结果，避免暂停、换样式或打开弹窗时反复切换材质。
+      if (root.dataset.pointerEnabled === 'off') delete root.dataset.pointerComposition;
+      else if (compositionLite) root.dataset.pointerComposition = 'lite';
       if (!spec || !allowed()) { clear(); return; }
       if (signature !== next) {
         reset(); signature = next;
@@ -694,6 +726,8 @@
         }
       }
       put(head.x, head.y);
+      bounds(head.x, head.y, 12);
+      if (!placeCanvas()) return true;
       if (count > 1) {
         const gradient = context.createLinearGradient(curve[0], curve[1], head.x, head.y);
         gradient.addColorStop(0, `${config.color}00`); gradient.addColorStop(.45, `${config.color}90`); gradient.addColorStop(1, config.color);
@@ -714,7 +748,7 @@
         }
       }
       context.globalAlpha = config.opacity * fade * .85;
-      context.drawImage(sprites[0], head.x - 10, head.y - 10, 20, 20); bounds(head.x, head.y, 12);
+      context.drawImage(sprites[0], head.x - 10, head.y - 10, 20, 20);
       context.globalAlpha = 1; return true;
     }
     function drawStars(now) {
@@ -725,11 +759,16 @@
         if (age >= 1) { p.alive = false; continue; }
         live = true;
         const seconds = (now - p.born) / 1000, drift = (1 - Math.exp(-seconds * 2.8)) / 2.8;
-        const px = p.x + p.vx * drift, py = p.y + p.vy * drift + seconds * seconds * 18;
-        const size = p.size * (1 - age * .35) * (p.star ? 1.8 : 1.1);
-        context.globalAlpha = config.opacity * Math.min(1, age * 12) * Math.pow(1 - age, 1.5) * (.82 + .18 * Math.sin(age * 5 + p.phase));
-        context.drawImage(sprites[p.star ? 1 : 0], px - size, py - size, size * 2, size * 2);
-        bounds(px, py, size + 1);
+        p.drawX = p.x + p.vx * drift; p.drawY = p.y + p.vy * drift + seconds * seconds * 18;
+        p.drawSize = p.size * (1 - age * .35) * (p.star ? 1.8 : 1.1);
+        p.drawAlpha = config.opacity * Math.min(1, age * 12) * Math.pow(1 - age, 1.5) * (.82 + .18 * Math.sin(age * 5 + p.phase));
+        bounds(p.drawX, p.drawY, p.drawSize + 1);
+      }
+      if (!placeCanvas()) return live;
+      for (const p of pool) {
+        if (!p.alive) continue;
+        context.globalAlpha = p.drawAlpha;
+        context.drawImage(sprites[p.star ? 1 : 0], p.drawX - p.drawSize, p.drawY - p.drawSize, p.drawSize * 2, p.drawSize * 2);
       }
       context.globalAlpha = 1; return live;
     }
@@ -741,7 +780,11 @@
         const delta = ((targetAngle - orbitAngle + 540) % 360 + 360) % 360 - 180;
         orbitAngle += delta * (1 - Math.exp(-elapsed * 16));
       }
-      ring.style.transform = `translate3d(${(x.position - config.size / 2).toFixed(2)}px, ${(y.position - config.size / 2).toFixed(2)}px, 0) rotate(${orbitAngle.toFixed(2)}deg) scale(${(1 + stretch).toFixed(3)}, ${(1 - stretch).toFixed(3)})`;
+      const padding = Math.ceil(config.size * .08) + 8;
+      host.style.width = host.style.height = `${config.size + padding * 2}px`;
+      host.style.transform = `translate3d(${(x.position - config.size / 2 - padding).toFixed(2)}px, ${(y.position - config.size / 2 - padding).toFixed(2)}px, 0)`;
+      host.style.willChange = settledX && settledY ? '' : 'transform';
+      ring.style.transform = `translate3d(${padding}px, ${padding}px, 0) rotate(${orbitAngle.toFixed(2)}deg) scale(${(1 + stretch).toFixed(3)}, ${(1 - stretch).toFixed(3)})`;
       ring.style.opacity = String(config.opacity);
       ring.style.willChange = settledX && settledY ? '' : 'transform';
       return !settledX || !settledY;
@@ -754,15 +797,15 @@
       const live = config.style === 'ring' ? drawRing(elapsed)
         : config.style === 'comet' ? drawComet(now) : drawStars(now);
       const cost = Math.max(0, clock() - started);
-      metrics.frames++; metrics.totalMs += cost; metrics.maxMs = Math.max(metrics.maxMs, cost);
+      recordFrame(elapsed, cost);
       if (live || pending.length) schedule();
       else { lastTime = 0; if (config.style !== 'ring') hide(); }
     }
-    return Object.freeze({ move, clear, sync,
-      getSnapshot() { return { ...metrics, style: config?.style || 'glow', present,
+    return Object.freeze({ move, clear, sync, recordFrame,
+      getSnapshot() { return { ...metrics, style: root.dataset.pointerStyle || 'glow', present,
         framePending: frame != null, points: trail.length, particles: pool.filter(p => p.alive).length,
-        width, height, ratio, x: x.position, y: y.position, targetX: x.target, targetY: y.target }; },
-      dispose() { if (disposed) return; clear(); disposed = true; host?.remove(); host = null; sprites = null; }
+        width, height, ratio, bufferWidth, bufferHeight, compositionLite, x: x.position, y: y.position, targetX: x.target, targetY: y.target }; },
+      dispose() { if (disposed) return; clear(); disposed = true; delete root.dataset.pointerComposition; host?.remove(); host = null; sprites = null; }
     });
   }
 
@@ -923,6 +966,7 @@
     function tick(now) {
       frame = null;
       if (!glowEnabled()) { clearGlow(); return; }
+      const started = win.performance?.now?.() || 0;
       const elapsed = lastTime ? Math.max(0, (now - lastTime) / 1000) : 1 / 60;
       const lightSize = Number(doc.documentElement.dataset.pointerSize) || 320;
       lastTime = now;
@@ -959,6 +1003,7 @@
         }
         moving ||= fading || !settled;
       }
+      pointerEffects.recordFrame(elapsed, Math.max(0, (win.performance?.now?.() || 0) - started));
       if (moving) schedule(); else lastTime = 0;
     }
     function onOver(event) {

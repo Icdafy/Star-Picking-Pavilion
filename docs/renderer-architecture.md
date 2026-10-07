@@ -55,6 +55,8 @@ index.html（Aqua 指挥舱静态外壳，27 条 <script src>，预算已用尽�
 
 v0.2.31 的 createPointerEffects 位于既有 dom-utils.js，createInteractionMotion 向其委托输入、环境同步和销毁，不新增脚本标签。aqua-shell.js 管理跟手方式、各风格独立尺寸、颜色与强度，并写入根元素；共享 ui-preference-schema.js 同时约束 renderer 与主进程的持久化补丁。新风格共用一个按需 RAF；Canvas 仅用于流星／星尘，光环由 CSS transform／opacity 驱动。装饰手动 popover 为顶层原生弹窗提供指针效果，始终 pointer-events:none，Esc 先清理装饰并继续原生关闭。
 
+装饰纹理按轨迹边界分配并以 64px 档位复用，保持约 400 万像素上限。四种样式共用 createPointerEffects.recordFrame 检测昂贵软件合成，用会话级 data-pointer-composition=lite 降低背景玻璃成本及柔光次要蒙版；不修改持久化材质或 fxTier，关闭／dispose 撤销提示。getPointerSnapshot 仅供诊断，报告四种样式的帧成本、池上限、缓冲区与合成降级状态。
+
 宽屏（70rem 起）使用纵向 `.command-rail`，中窄屏回落为顶部横向 tablist。
 `view-registry.js` 据布局方向切换 Up/Down 与 Left/Right，并维护 roving tabindex；
 宽屏 sticky top 以 `.tower` 为准，不再把纵向导航整高写进 `--nav-h`。

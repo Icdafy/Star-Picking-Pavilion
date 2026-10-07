@@ -150,10 +150,11 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
   });
   const records = [];
   const toggle = page.locator('label.desktop-switch').filter({ has: page.locator('#setPointerEnabled') });
-  for (const tier of ['full', 'lite']) for (const mode of ['comet', 'stars', 'ring']) {
+  for (const tier of ['full', 'lite']) for (const mode of ['comet', 'stars', 'ring', 'glow']) {
     await style.selectOption(mode);
     await toggle.click();
     assert.equal(await page.locator('#setPointerEnabled').isChecked(), false);
+    await page.waitForFunction(() => !document.documentElement.hasAttribute('data-pointer-composition'));
     await style.scrollIntoViewIfNeeded();
     await page.evaluate(value => { document.documentElement.dataset.fxTier = value; }, tier);
     await sweep(page);
@@ -168,11 +169,21 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
     const timing = await measureInput(page);
     const after = await page.evaluate(() => interactionMotion.getPointerSnapshot());
     const cost = (after.totalMs - before.totalMs) / Math.max(1, after.frames - before.frames);
-    const record = { tier, mode, baseline, ...timing, drawMeanMs: cost, maxDrawMs: after.maxMs };
+    const regionPixels = await page.locator('.pointer-effects').evaluate(node => node.clientWidth * node.clientHeight);
+    const record = { tier, mode, baseline, ...timing, drawMeanMs: cost, maxDrawMs: after.maxMs, regionPixels,
+      viewportPixels: after.width * after.height, bufferPixels: after.bufferWidth * after.bufferHeight * after.ratio * after.ratio,
+      compositionLite: after.compositionLite };
     records.push(record);
     fs.writeFileSync(path.join(output, 'frame-measurements.json'), JSON.stringify(records, null, 2));
     console.log('v0231 pointer timing: ' + JSON.stringify(record));
     assert.ok(after.points <= 96 && after.particles <= (tier === 'lite' ? 36 : 96));
+    if (mode === 'glow') {
+      assert.equal(await page.locator('.pointer-effects').evaluate(node => node.hidden), true);
+      assert.ok(await page.locator('.surface-light').count() <= 2 && await page.locator('.control-aura').count() <= 2);
+      assert.equal(after.frames > before.frames, tier === 'full', 'original glow draws only in the full tier');
+    }
+    assert.ok(record.regionPixels < record.viewportPixels * .75, `${tier}/${mode}: default effect must use a compact overlay`);
+    assert.ok(record.bufferPixels <= 4_100_000, `${tier}/${mode}: canvas allocation must stay bounded`);
     assert.ok(cost < 2, `${tier}/${mode}: drawing consumed ${cost.toFixed(3)}ms per frame`);
     // Compare identical input with effects off/on. A slow native display clock
     // cannot promise 40+ Hz even with no effects; it must still show bounded
@@ -188,6 +199,10 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
     const idleTrace = await page.evaluate(() => ({ now: performance.now(), events: window.__pointerTrace }));
     fs.writeFileSync(path.join(output, `idle-${tier}-${mode}.json`), JSON.stringify({ idle, ...idleTrace }, null, 2));
     assert.equal(idle.framePending, false, `${tier}/${mode}: idle RAF must stop ${idle.framePending ? JSON.stringify({ idle, ...idleTrace }) : ''}`);
+    if (mode === 'glow') {
+      await page.waitForTimeout(100);
+      assert.equal((await page.evaluate(() => interactionMotion.getPointerSnapshot())).frames, idle.frames, 'original glow must also stop drawing at rest');
+    }
     if (mode !== 'ring') assert.equal(idle.points + idle.particles, 0);
     await page.evaluate(() => {
       // A target can change under a stationary cursor (dialog or DOM changes).
@@ -237,6 +252,9 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
   assert.equal((await page.evaluate(() => interactionMotion.getPointerSnapshot())).framePending, false);
   await page.locator('#btnPointerReset').click();
   assert.equal(await style.inputValue(), 'glow');
+  const resetState = await page.evaluate(() => ({ hint: document.documentElement.dataset.pointerComposition,
+    detected: interactionMotion.getPointerSnapshot().compositionLite }));
+  assert.equal(resetState.hint, resetState.detected ? 'lite' : undefined);
   assert.equal(await page.locator('#setPointerSizeNumber').inputValue(), '320');
   assert.equal(await page.locator('#setPointerColorHex').inputValue(), '#8b5cf6');
   fs.writeFileSync(path.join(output, 'frame-measurements.json'), JSON.stringify(records, null, 2));
