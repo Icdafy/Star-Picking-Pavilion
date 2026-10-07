@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.26 统一更新全部应用 Logo，使用上传的 PNG 原图并生成多尺寸 Windows 图标。候选验证及正式发布证据见 [本版验证](docs/v0226-validation.md)，沿用 NotSigned 策略；公开发布只在精确 main 提交和 tag Release 全部门禁通过后完成。
+[v0.2.26](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.26) 已正式发布，全部应用 Logo 统一更新，软件内显示配色随主题自动变化。精确提交 `7bc694329a80422d9b776fa12eb9bfaa59dbe435` 的 main CI 和 tag Release 全部门禁通过，六项公开附件重新下载核验通过。完整验证见 [本版验证](docs/v0226-validation.md)，沿用 NotSigned 策略。
 
 ## 发布前授权门槛
 

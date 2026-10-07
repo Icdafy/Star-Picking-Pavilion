@@ -1,6 +1,12 @@
 # v0.2.26 发布状态
 
-全部应用 Logo 已替换为用户上传的图片，版本信息与内置日志已同步。候选验证及正式发布正在进行，完成后记录 main CI、Release 与六项公开附件的核验结果。详见 [本版验证](docs/v0226-validation.md)。
+全部应用 Logo 已统一替换为用户上传的图片，软件内 Logo 随浅色／深色主题即时变色，切回浅色恢复原图颜色。Windows 应用、窗口、托盘、通知、快捷方式和安装／卸载图标共用新版多尺寸资源。
+
+[v0.2.26](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.26) 已发布为最新正式版，无发布阻塞。精确提交 `7bc694329a80422d9b776fa12eb9bfaa59dbe435` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37578615967) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37579465336) 均完整通过：1024／1024 单元与集成、29／29 真实 Electron、0 生产漏洞、47 项声明、1,287 项包边界，以及一次性 Windows 安装／启动／单实例／退出／卸载。
+
+发布时间 2026-10-07T06:13:20Z，六项公开附件重新下载核验通过；公开安装器 100,438,480 B、0.2.26、NotSigned，SHA-256 为 `1515a6aca1c5deef869872700c7fe6cbb4297eb45671eec8d85307977afbf523`。原图、PE 图标资源、主题切换、更新元数据、54 条匿名更新日志与离线缓存恢复均已核验。已有情报、星标、归档、密钥与设置保留，无新增运行依赖。
+
+本机桌面首轮 28／29 通过，一项窗口重新显示后的焦点等待超时原样复核仍超时；独立 main／Release 均为 29／29，断言和工作流没有放宽。详见 [本版验证](docs/v0226-validation.md)。
 
 ---
 

@@ -23,6 +23,35 @@
 - 追加主题后的最终本地构建与包边界通过：1,287 项 ASAR 条目，app.asar 14,867,807 B，候选安装器 100,440,494 B。PE 产品／文件版本均为 0.2.26，产品名称“摘星阁”，签名状态 NotSigned。候选安装器 SHA-256 为 `2c79ee09b93948e0a4cf4f305f4f4fed286a71fde3eba94ab9d2a0630f5c32fd`。
 - ASAR 中的原图、HTML、主题样式、窗口和通知代码与最终源码逐字节一致；旧雷达 favicon 已从源码及安装包移除。tag、安装包与自动更新元数据的版本校验通过。
 
-精确 main 提交通过完整测试、构建与一次性 Windows 安装／启动／单实例／退出／卸载后，才创建正式 tag。Release 工作流再次执行全部门禁，发布后重新下载六项公开附件并核验摘要、PE 版本、图标资源与更新元数据。本机不运行安装器。正式 CI 与发布结果待补充。
+本机失败动效用例原样单测复核仍在同一处焦点等待超时；两轮结果均保留，没有用单测覆盖首轮完整矩阵结果。最终源码在独立 Windows CI 完整通过，断言和工作流没有放宽。
+
+## 正式 CI 与 tag
+
+精确提交 `7bc694329a80422d9b776fa12eb9bfaa59dbe435` 的 [main CI 37578615967](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37578615967) 全部门禁成功：1024／1024 单元与集成、29／29 真实 Electron、0 生产漏洞、47 项声明、构建与包边界，以及一次性 Windows 安装／启动／单实例／退出／卸载。
+
+main CI 包边界为 1,287 项，app.asar 14,880,314 B，候选安装器 100,438,480 B。该运行使用独立 Windows 环境；与本机候选字节数分别记录。
+
+在 main CI 完成后才推送注释 tag v0.2.26。tag 对象 `7dca552e77d8e107a5c010dff55af26ace216afd` 解引用为上述精确提交。正式 [Release 37579465336](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37579465336) 对同一提交再次完整成功：1024／1024 单元与集成、29／29 真实 Electron、生产审计、声明、构建、包边界、tag／产物版本及安装／启动／单实例／退出／卸载。SHA-256 与 CycloneDX 1.6 SBOM 生成后上传六项附件。本机不运行安装器。
 
 原始验证日志和截图保留于被 Git 忽略的 `work/v0226/`。
+
+## 公开附件验证
+
+[v0.2.26 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.26) 于 2026-10-07T06:13:20Z（北京时间 2026-10-07 14:13:20）发布，Release ID 405436917，非 draft、非 prerelease，并已核对为最新正式版。
+
+正式构建包边界为 1,287 项，app.asar 14,880,314 B，公开安装器 100,438,480 B，与 main CI 构建尺寸相同。六项公开附件重新下载到新的隔离目录 `work/v0226/public-assets-37579465336/`；文件尺寸、GitHub SHA-256 摘要和安装器校验清单全部一致，状态均为 uploaded。
+
+公开安装器 PE 产品／文件版本均为 0.2.26，产品名称为“摘星阁”，签名状态 NotSigned。PE 图标资源的七个尺寸逐帧与由上传原图生成的 ICO 一致。latest.yml 的版本、文件名、尺寸和两处 SHA-512 与公开安装器一致；SBOM 为 CycloneDX 1.6，包含 41 个生产组件，未包含构建／测试依赖。47 项第三方声明与源码一致。
+
+应用于 2026-10-07T06:15:24.580Z 匿名实际联网同步到 54 条更新日志，本版正文和发布时间与公开 Release 一致；随后从相同缓存恢复离线日志通过。
+
+| 公开附件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| latest.yml | 374 | 38eede576a48b8e92e1876cd724c934104e2b34b7a729fee9bb91da3cff06208 |
+| sbom.cdx.json | 81,352 | e9f6d4d723042f879d9a331f3358fc7adce83aed204e4bd89cb764f7f5acdc9a |
+| SHA256SUMS.txt | 106 | de0dcabcb730c3bf99e49050a3189681ed86588eda917db958408c43ea4e9dc4 |
+| Star-Picking-Pavilion-Setup-0.2.26.exe | 100,438,480 | 1515a6aca1c5deef869872700c7fe6cbb4297eb45671eec8d85307977afbf523 |
+| Star-Picking-Pavilion-Setup-0.2.26.exe.blockmap | 106,235 | 3a55fb8c1bad1b2547210eb7482edd854a9ec8554397fb19f10172420ceed207 |
+| THIRD_PARTY_NOTICES.txt | 6,347 | a149d241244b7e42262186b7138a5f7af9be95ec123d1baf6471567545864d58 |
+
+证据包括 main／Release 的完整 JSON 和日志、两轮本机动效等待失败、主题切换及采样记录、原图与 PE 图标核验、公开附件元数据与摘要、PE 元数据和匿名更新日志／离线缓存恢复。安装／启动／单实例／退出／卸载烟测仅在一次性 Windows CI 执行，本机未运行安装器。发布后文档提交只补足记录，tag 与六项附件保持已验证版本。
