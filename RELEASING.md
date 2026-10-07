@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.25 候选修复与验证记录见 [本版验证](docs/v0225-validation.md)。必须等待精确提交的 main CI 和 tag Release 全部门禁通过，并重新下载公开六项附件核验，才可确认正式发布。沿用 NotSigned 策略。
+[v0.2.25](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.25) 已正式发布，精确提交 `fe0fe2ea2dd1f372318c2bf9e1aaadddaadd6a93` 的 main CI 和 tag Release 全部门禁通过，六项公开附件重新下载核验通过。修复与完整验证记录见 [本版验证](docs/v0225-validation.md)，沿用 NotSigned 策略。
 
 ## 发布前授权门槛
 

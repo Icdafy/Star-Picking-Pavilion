@@ -2,7 +2,11 @@
 
 本版已定位并修复全部动态提前放行待判资料、通用财经合集被摘要片段放行、短别名误命中及模型领域缺失问题。升级在保留原文和星标的前提下复核旧库，修复热度、事件主条与综述。
 
-本机数据库隔离副本复核撤回 27 条通用合集，6,961 条原始记录全部保留；定向回归与真实 Electron 检查通过。全量回归及 GitHub Actions 正式发布验证进行中，详见 [本版验证](docs/v0225-validation.md)。
+[v0.2.25](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.25) 已发布为最新正式版。本机数据库隔离副本复核撤回 27 条通用合集，6,961 条原始记录全部保留；本版原生行业边界检查通过。
+
+[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37574718922) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37575499738) 对精确提交 `fe0fe2ea2dd1f372318c2bf9e1aaadddaadd6a93` 全部通过：1024／1024 单元与集成、29／29 真实 Electron、0 生产漏洞、47 项声明、1,287 项包边界及一次性 Windows 安装／启动／单实例／退出／卸载，用户数据保留。
+
+发布时间 2026-10-07T05:26:11Z，六项公开附件重新下载核验通过；公开安装器 99,614,785 B、0.2.25、NotSigned，SHA-256 为 `976f83d79c22f0b8b43b6d2f0a6beaeea1a7cce93ff8dbfde5a2996a585c890b`。应用实际同步 53 条日志并恢复离线缓存通过。本机桌面全量中的可见性等待失败与独立 CI 通过分别记录，详见 [本版验证](docs/v0225-validation.md)。
 
 # v0.2.24 发布状态（历史）
 
