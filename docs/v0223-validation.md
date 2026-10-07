@@ -33,4 +33,25 @@
 
 首轮 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37563832488) 在 UTC Windows 环境发现跨时区分组错误：卡片已显示 2025年9月30日，分组却为 9月29日。保留原断言，修正新闻日期格式化为北京时间，并新增实际 Electron 运行时依次切换 UTC、洛杉矶、上海的断言；本地原生复测 1/1 通过，三种时区均为 9月30日、时分同口径。
 
-最终 main 精确提交的 GitHub Actions、tag 发布工作流、安装烟测与公开附件下载校验将在实际完成后追加结果。正式发布使用既有受门禁保护的工作流，本机未运行安装器。
+## 正式发布结果
+
+发布代码提交为 `6138b7ad666b3052012b388d6087672aa8d80a91`，远端注释 tag `v0.2.23` 精确指向该提交。
+
+- [main CI 37564627600](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37564627600)：成功。993/993 单元与集成测试、27/27 原生桌面测试、0 运行依赖漏洞、第三方声明、构建、包边界，以及安装、启动、单实例、退出、卸载和用户数据保留全部通过。
+- [Release 工作流 37565483422](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/37565483422)：成功。在相同提交再次完整验证 993/993 与 27/27，完成标签与产物版本校验、安装烟测、SHA-256、CycloneDX 1.6 SBOM 和正式附件上传。
+- 正式包边界检查 1,281 项，ASAR 为 13,732,870 B，安装器为 99,608,046 B。生产包未包含数据库、日志、临时文件、验证目录、开发依赖或密钥。本机未运行安装器。
+
+[v0.2.23 Release](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.23) 于 `2026-10-07T03:16:49Z`（北京时间 11:16:49）发布，非 draft、非 prerelease，并核对为最新正式版。六项附件重新下载后的尺寸与 GitHub SHA-256 摘要均一致；安装器与 SHA256SUMS.txt 一致。PE 产品／文件版本均为 0.2.23，签名状态为预期的 NotSigned。latest.yml 的版本、文件名、尺寸和两处 SHA-512 均与实际安装器一致；SBOM 包含 41 个生产组件，未混入构建或测试依赖，第三方声明与源文件一致。
+
+应用于 `2026-10-07T03:18:21.910Z` 匿名实际联网同步到 51 条正式日志；本版正文与 RELEASE_NOTES.md 在统一换行后完全一致、发布时间一致，随后以空内置记录恢复相同的 51 条离线缓存。
+
+| 公开附件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| Star-Picking-Pavilion-Setup-0.2.23.exe | 99,608,046 | `970774e3d56957e39b6d520c982d620a52ba3f8edcf7ff20d42e5b6c5c1c16f2` |
+| Star-Picking-Pavilion-Setup-0.2.23.exe.blockmap | 105,950 | `a69a30c52a98f6cce41f64e8d6b9c327b54942b9bfa466d123298733f17db93e` |
+| latest.yml | 373 | `d2b97778dd78651867e79ddab772a4a79ca46e5019d0f03b360b96af4ceaeac3` |
+| SHA256SUMS.txt | 106 | `ccfb824f7bd690bed44a8640daf1242f12cd962eed70b9c15672ff40ea55dd63` |
+| sbom.cdx.json | 81,352 | `38315b869cb498092bb436c272ef064345d0f32aef7058ed3f5b13ef29daf3eb` |
+| THIRD_PARTY_NOTICES.txt | 6,347 | `6f400c39bcfdcea3be31adc42bb8a55ec799330a2a6e165701f078a02c892a0d` |
+
+正式验证证据：main-ci-final.json／log、release-ci-final.json／log、public-assets、public-verification.json、public-pe-verification.json、release-sync-verification.json 和 release-sync，均保留在被忽略的 work/v0223。
