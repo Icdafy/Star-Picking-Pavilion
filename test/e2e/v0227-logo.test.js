@@ -35,6 +35,21 @@ test('v0.2.27 logo stays still, loops only on hover and resets on exit', { timeo
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForSelector('[data-brand-logo] > svg');
+  console.log('Logo startup environment:', JSON.stringify(await page.evaluate(() => ({
+    focus: document.hasFocus(), hidden: document.hidden,
+    reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    tier: document.documentElement.dataset.fxTier
+  }))));
+  // Playback assertions require normal motion. Runner OS preferences may be
+  // reduced; that separate policy is verified explicitly later in this test.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    win.focus(); win.webContents.focus();
+  });
+  await page.waitForFunction(() => document.hasFocus() && !document.hidden
+    && !matchMedia('(prefers-reduced-motion: reduce)').matches
+    && document.documentElement.dataset.fxTier !== 'static');
   await page.waitForFunction(() => document.fonts.status === 'loaded');
   await page.mouse.move(700, 400);
   const initial = await page.evaluate(pose);
@@ -48,7 +63,17 @@ test('v0.2.27 logo stays still, loops only on hover and resets on exit', { timeo
 
   const mark = page.locator('[data-brand-logo]');
   await mark.hover();
-  await page.waitForFunction(() => document.querySelector('[data-brand-logo] > svg').getCurrentTime() > 0.8);
+  try {
+    await page.waitForFunction(() => document.querySelector('[data-brand-logo] > svg').getCurrentTime() > 0.8);
+  } catch (error) {
+    console.log('Logo hover environment:', JSON.stringify(await page.evaluate(() => {
+      const mark = document.querySelector('[data-brand-logo]'), svg = mark.querySelector('svg');
+      return { focus: document.hasFocus(), hidden: document.hidden, hover: mark.matches(':hover'),
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        tier: document.documentElement.dataset.fxTier, paused: svg.animationsPaused(), time: svg.getCurrentTime() };
+    })));
+    throw error;
+  }
   assert.equal((await page.evaluate(clock)).paused, false);
   assert.notDeepEqual(await page.evaluate(pose), initial, 'The actual SVG shapes must move');
   fs.mkdirSync(screenshots, { recursive: true });
