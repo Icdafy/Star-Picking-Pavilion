@@ -53,6 +53,9 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
     await app.close(); await fs.promises.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
   page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0]; win.setContentSize(1440, 920); win.focus(); win.webContents.focus();
+  });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => typeof syncFxTier === 'function' && document.getElementById('updatePill')?.dataset.state === 'idle');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -119,10 +122,19 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   await page.locator('#updatePill').focus();
   assert.equal(await page.locator('.update-details').evaluate(node => getComputedStyle(node).opacity), '1', 'keyboard access reveals progress');
 
-  const towerBefore = await page.locator('.tower').evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
-  await page.locator('.tower').hover({ position: { x: 10, y: 10 } });
-  const towerAfter = await page.locator('.tower').evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
-  assert.equal(towerAfter.position, 'sticky'); assert.deepEqual(towerAfter, towerBefore, 'tracking preserves sticky toolbar geometry');
+  for (const width of [1024, 1440]) {
+    await app.evaluate(({ BrowserWindow }, width) => {
+      const win = BrowserWindow.getAllWindows()[0]; win.setContentSize(width, 920); win.focus(); win.webContents.focus();
+    }, width);
+    await page.waitForFunction(width => innerWidth === width, width);
+    await page.waitForTimeout(300); await page.mouse.move(4, 10);
+    const expectedPosition = width === 1440 ? 'sticky' : 'relative';
+    const towerBefore = await page.locator('.tower').evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
+    assert.equal(towerBefore.position, expectedPosition, `native ${width}px responsive layout`);
+    await page.locator('.tower').hover({ position: { x: 10, y: 10 } });
+    const towerAfter = await page.locator('.tower').evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
+    assert.deepEqual(towerAfter, towerBefore, `tracking preserves ${width}px toolbar positioning and geometry`);
+  }
   await page.keyboard.press('Control+k');
   await page.waitForSelector('#commandPalette[open]'); await page.waitForTimeout(300);
   const dialog = page.locator('#commandPalette');
