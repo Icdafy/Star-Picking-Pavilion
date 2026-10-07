@@ -65,7 +65,8 @@ test('a daily report opened before 08:00 is finalized at its cutoff', t => {
   const final = daily.getDaily(date);
   assert.equal(final.total, 2);
   t.mock.timers.setTime(end + 3_600_000);
-  assert.deepEqual(daily.getDaily(date), final);
+  // Stored snapshots round-trip through JSON (UTC's -0 offset becomes 0).
+  assert.deepEqual(daily.getDaily(date), JSON.parse(JSON.stringify(final)));
 });
 
 test('rebuilding an unfinished daily report still preserves a corrupt stored row', t => {
