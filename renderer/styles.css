@@ -1004,7 +1004,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .rt-toggle.active { color: var(--accent-ink); border-color: var(--accent-line); }
 .rt-toggle.active .rt-dot { background: var(--c-green); box-shadow: 0 0 8px var(--c-green); animation: pulse 2.2s ease-in-out infinite; }
 
-/* 上传 SVG 的原始几何：默认保持第一帧，悬停才揭示真实下载进度。 */
+/* 上传 SVG 的原始几何：内芯持续旋转，外环始终跟随真实进度；悬停只切换内芯文字。 */
 .update-slot { flex: 1 1 0; min-width: 3.25rem; display: grid; place-items: center; align-self: stretch; }
 .update-pill {
   --update-accent: hsl(var(--aqua-user-hue) 58% 32%);
@@ -1021,8 +1021,13 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .update-art #update-track stop { stop-color: color-mix(in srgb, var(--c-bg) 70%, var(--update-accent)); }
 .update-art #update-disc stop { stop-color: color-mix(in srgb, var(--c-bg) 96%, var(--update-accent)); }
 .update-art #update-disc stop:last-child { stop-color: color-mix(in srgb, var(--c-bg) 86%, var(--update-accent)); }
-.update-art .progress { opacity: 0; }
-.update-pill[data-has-progress="true"]:is(:hover, :focus-visible) .progress { opacity: 1; }
+.update-art .progress { opacity: 0; transition: stroke-dashoffset 180ms linear; }
+.update-art .arrows { transform-box: view-box; transform-origin: 50% 50%; animation: update-arrows-spin 2.2s linear infinite; }
+.update-pill[data-has-progress="true"] .progress,
+.update-pill[data-indeterminate="true"] .progress { opacity: 1; }
+.update-pill[data-indeterminate="true"] .progress {
+  transform-box: view-box; transform-origin: 50% 50%; animation: update-ring-spin 1.6s linear infinite;
+}
 .update-pill[data-has-value="true"]:is(:hover, :focus-visible) .arrows { opacity: 0; }
 .update-pill[aria-disabled="true"] { cursor: progress; }
 .update-details { position: absolute; inset: 22%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; pointer-events: none; opacity: 0; }
@@ -1030,6 +1035,12 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
 .update-value { font: 700 .75rem/1.1 var(--font-mono); font-variant-numeric: tabular-nums; }
 .update-caption { display: none; font: 650 .5rem/1.1 var(--font-ui); }
 .update-pill:is(.ready, .error) .update-caption { display: block; }
+@keyframes update-arrows-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes update-ring-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .update-art .arrows, .update-pill[data-indeterminate="true"] .progress { animation: none; }
+  .update-art .progress { transition: none; }
+}
 @media (forced-colors: active) {
   .update-pill { color: ButtonText; background: ButtonFace; border-color: ButtonText; box-shadow: none; }
   .update-art :is(.track, .progress) { stroke: ButtonText; forced-color-adjust: none; }

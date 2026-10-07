@@ -2,10 +2,17 @@
   "source": "https://github.com/Icdafy/Star-Picking-Pavilion/releases",
   "items": [
     {
+      "tag": "v0.2.30",
+      "name": "摘星阁 v0.2.30",
+      "publishedAt": null,
+      "body": "# 摘星阁 v0.2.30\n\n调整更新图标的动效与进度显示。\n\n- 更新按钮出现后，中间箭头持续旋转，无需鼠标悬停；鼠标移入或键盘聚焦时，中间切换为实时下载百分比，移出后恢复旋转。\n- 外圈始终显示真实下载进度，与中间百分比使用同一份进度数据；悬停、聚焦与移出不重置外圈。尚未取得下载进度时显示等待动效，不显示虚构百分比；下载完成后外圈填满，悬停提示 100% 和重启。\n- 浅色、深色主题与四档界面缩放均适用，保留系统减少动态效果和窗口失焦时的动效降级，以及下载失败重试与重启安装入口。\n- 应用、安装器、更新元数据与内置日志统一为 0.2.30，无新增运行依赖；已有情报、星标、归档、模型密钥与设置保留。\n\n验证记录见 [v0.2.30 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0230-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.30.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；可用附件 `SHA256SUMS.txt` 核对安装包。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.30.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n安装器、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.30"
+    },
+    {
       "tag": "v0.2.29",
       "name": "摘星阁 v0.2.29",
-      "publishedAt": null,
-      "body": "# 摘星阁 v0.2.29\n\n修复设置卡片左上角光晕，统一全应用的西文、数字与符号字体。\n\n- 删除“存储治理”和“每日新闻资料库”两张卡片的专属圆环与光晕装饰，恢复普通设置卡片的背景与玻璃材质，浅色、深色主题一致。\n- 主界面、页面恢复和后端启动失败页面共用字体规则；西文、数字与符号优先采用 Times New Roman，原生表单、数字与日期输入、代码和快捷键文字采用相同字体。中文继续使用内置思源黑体。\n- 应用、安装器、更新元数据与内置日志统一为 0.2.29，无新增运行依赖；已有情报、星标、归档、模型密钥与设置保留。\n\n验证记录见 [v0.2.29 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0229-validation.md)。\n\n## 安装与校验\n\n下载 `Star-Picking-Pavilion-Setup-0.2.29.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；可用附件 `SHA256SUMS.txt` 核对安装包。\n\n```powershell\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.29.exe\nGet-Content .\\SHA256SUMS.txt\n```\n\n安装器、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。",
+      "publishedAt": "2026-10-07T11:17:47.000Z",
+      "body": "# 摘星阁 v0.2.29\r\n\r\n修复设置卡片左上角光晕，统一全应用的西文、数字与符号字体。\r\n\r\n- 删除“存储治理”和“每日新闻资料库”两张卡片的专属圆环与光晕装饰，恢复普通设置卡片的背景与玻璃材质，浅色、深色主题一致。\r\n- 主界面、页面恢复和后端启动失败页面共用字体规则；西文、数字与符号优先采用 Times New Roman，原生表单、数字与日期输入、代码和快捷键文字采用相同字体。中文继续使用内置思源黑体。\r\n- 应用、安装器、更新元数据与内置日志统一为 0.2.29，无新增运行依赖；已有情报、星标、归档、模型密钥与设置保留。\r\n\r\n验证记录见 [v0.2.29 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0229-validation.md)。\r\n\r\n## 安装与校验\r\n\r\n下载 `Star-Picking-Pavilion-Setup-0.2.29.exe`。沿用未签名策略，Windows SmartScreen 可能提示未知发布者；可用附件 `SHA256SUMS.txt` 核对安装包。\r\n\r\n```powershell\r\nGet-FileHash -Algorithm SHA256 .\\Star-Picking-Pavilion-Setup-0.2.29.exe\r\nGet-Content .\\SHA256SUMS.txt\r\n```\r\n\r\n安装器、blockmap、latest.yml、SHA256SUMS.txt、CycloneDX SBOM 与第三方声明由 GitHub Actions 完整门禁生成；安装、启动、单实例、退出和卸载烟测在一次性 Windows CI 执行。\r\n",
       "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.29"
     },
     {

@@ -2,24 +2,24 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.29 · 设置卡片与全局字体修复
+## v0.2.30 · 更新图标动效与进度显示
 
-- **设置卡片背景一致**：删除“存储治理”和“每日新闻资料库”左上角的专属圆环光晕，浅色、深色主题均与普通设置卡片共用玻璃材质。
-- **统一字体覆盖**：西文、数字与符号优先采用 Times New Roman，表单、数字与日期输入、代码、快捷键和两张恢复页面采用相同字体规则；中文使用内置思源黑体。
+- **持续动效**：更新按钮的中间箭头持续旋转，鼠标移入或键盘聚焦时显示实时下载百分比，移出后恢复旋转。
+- **外圈始终同步**：外圈跟随真实下载进度，悬停与移出均不重置；未知进度显示等待动效，下载完成填满并提示重启。保留减少动态效果、双主题与四档缩放。
 
-版本、界面与更新元数据统一为 0.2.29，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。检查与发布证据见 [验证记录](docs/v0229-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.30，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。检查与发布证据见 [验证记录](docs/v0230-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.29.exe`，双击并按向导安装。v0.2.29 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.30.exe`，双击并按向导安装。v0.2.30 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.29.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.30.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
