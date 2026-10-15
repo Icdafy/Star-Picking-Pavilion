@@ -159,9 +159,14 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
           .map(animation => animation.finished.catch(() => {})));
       });
       const popover = page.locator('#dailyExportMenu');
-      await popover.evaluate(node => node.showPopover());
+      // The entrance spring starts from the asynchronous toggle event, so wait
+      // for that event and the next frame before collecting animations.
+      await popover.evaluate(node => new Promise(resolve => {
+        node.addEventListener('toggle', () => requestAnimationFrame(() => requestAnimationFrame(resolve)), { once: true });
+        node.showPopover();
+      }));
       await popover.evaluate(async node => {
-        await Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {})));
+        await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
       });
       const before = await popover.evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
       await popover.hover({ position: { x: 5, y: 5 } });

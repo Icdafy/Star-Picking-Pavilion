@@ -954,7 +954,7 @@ main { order: 5; width: 100%; }
 /* v0.2.10：选择轨迹、局部追光与触压反馈。只移动装饰层，正文和命中区域保持稳定。 */
 .motion-segmented { position: relative; isolation: isolate; }
 .motion-segmented > button { position: relative; z-index: 1; font-weight: 600; }
-/* 双写类名压过分区原选中底色，只留滑块。 */
+/* 双写类名压过分区选中底色 */
 .motion-segmented.motion-segmented > button.active {
   background: transparent;
   border-color: transparent;
@@ -976,8 +976,7 @@ main { order: 5; width: 100%; }
   background: var(--flag-soft); border-color: var(--flag-line);
 }
 .motion-control { position: relative; }
-/* 连点不误选文字；链接与图片不拖出残影。 */
-button, summary, [role="tab"] { user-select: none; }
+button, summary, [role=tab] { user-select: none; }
 a, img { -webkit-user-drag: none; }
 .pointer-lab { margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--rail-line); }
 .pointer-effects, .pointer-effects:popover-open {
