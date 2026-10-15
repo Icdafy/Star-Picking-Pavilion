@@ -54,17 +54,21 @@
     }
 
     let searchTimer;
-    searchInput.addEventListener('input', e => {
+    // 拼音选词期间只更新清除按钮，不按半截拼音检索、也不切换视图；上屏后检索一次。
+    function onSearchInput(e) {
       syncSearchBox();
+      if (e?.isComposing) return;
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => {
-        state.q = e.target.value.trim();
+        state.q = String(e.target?.value ?? searchInput.value).trim();
         if (!FEED_VIEWS.includes(state.view)) {
           switchView('all', { persist: false });
         }
         else loadFeed();
       }, 350);
-    });
+    }
+    searchInput.addEventListener('input', onSearchInput);
+    searchInput.addEventListener('compositionend', onSearchInput);
 
     if (elements.searchClear) {
       elements.searchClear.addEventListener('click', () => {
@@ -177,10 +181,13 @@
     }
 
     if (lexiconFilter) {
-      lexiconFilter.addEventListener('input', event => {
+      const filterLexicon = event => {
+        if (event?.isComposing) return;
         lexiconState.filter = event.target.value;
         renderLexicon();
-      });
+      };
+      lexiconFilter.addEventListener('input', filterLexicon);
+      lexiconFilter.addEventListener('compositionend', filterLexicon);
     }
 
     if (elements.lexiconScopes) {

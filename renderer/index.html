@@ -885,7 +885,7 @@
   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 </button>
 
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- 阶段 4：信息流卡片整卡模板。此前 cardInner 是 app.js 里的字符串模板，
      现迁为 cloneNode(true) + 字段级填充；结构节点与旧输出逐字等价，

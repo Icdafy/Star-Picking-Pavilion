@@ -140,8 +140,10 @@ const brandLogo = DomUtils.createBrandLogo({ document, window });
 window.addEventListener('pagehide', () => brandLogo?.dispose(), { once: true });
 window.addEventListener('pagehide', () => interactionMotion.dispose(), { once: true });
 
-function scrollToTop() {
-  document.getElementById('appViewport').scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+// 切换视图时直接复位：新面板已在入场，不再在新内容上叠一段滚动动画。
+function scrollToTop(options) {
+  const instant = options?.instant === true || prefersReducedMotion();
+  document.getElementById('appViewport').scrollTo({ top: 0, behavior: instant ? 'instant' : 'smooth' });
 }
 
 // 氛围层空闲暂停：页面隐藏或失焦（document.hidden || !document.hasFocus()）
@@ -277,6 +279,26 @@ const feedDiffList = FeedCard.createFeedDiffList({
 });
 
 let toastTimer;
+let toastRemaining = 0;
+let toastDeadline = 0;
+// 窗口在后台或失焦时暂停计时：后台完成的保存、采集结果不会在用户看到前消失。
+function holdToast(ms) {
+  clearTimeout(toastTimer);
+  toastRemaining = ms;
+  if (document.hidden || !document.hasFocus()) { toastDeadline = 0; return; }
+  toastDeadline = Date.now() + ms;
+  toastTimer = setTimeout(() => { toastRemaining = 0; $('#toast').classList.remove('show'); }, ms);
+}
+function syncToastClock() {
+  if (!$('#toast').classList.contains('show') || !toastRemaining) return;
+  if (document.hidden || !document.hasFocus()) {
+    if (toastDeadline) toastRemaining = Math.max(0, toastDeadline - Date.now());
+    clearTimeout(toastTimer); toastDeadline = 0;
+  } else if (!toastDeadline) holdToast(Math.max(1600, toastRemaining));
+}
+document.addEventListener('visibilitychange', syncToastClock);
+window.addEventListener('blur', syncToastClock);
+window.addEventListener('focus', syncToastClock);
 function toast(msg, isError) {
   // 文本必须与消息完全一致：桌面端 E2E 会按前缀断言保存结果，图标一律走 CSS
   const el = $('#toast');
@@ -289,10 +311,8 @@ function toast(msg, isError) {
     duration: 140,
     restoreStyles: true
   });
-  clearTimeout(toastTimer);
-  // 驻留时长随字数走：短消息不晾着碍事，长消息让人读得完
-  const hold = Math.min(6000, 2400 + String(msg).length * 45);
-  toastTimer = setTimeout(() => el.classList.remove('show'), hold);
+  // 驻留时长随字数走：短消息不晾着碍事，长消息让人读得完；错误多留 1.5 秒
+  holdToast(Math.min(isError ? 7500 : 6000, 2400 + String(msg).length * 45 + (isError ? 1500 : 0)));
 }
 
 // ---------- 主题化确认 ----------

@@ -274,10 +274,13 @@
     });
 
     let searchTimer = null;
-    elements.search?.addEventListener('input', () => {
+    const filterSources = event => {
+      if (event?.isComposing) return;
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => { filter.q = String(elements.search.value || '').trim().slice(0, 60); renderList(); }, 160);
-    });
+    };
+    elements.search?.addEventListener('input', filterSources);
+    elements.search?.addEventListener('compositionend', filterSources);
     elements.status?.addEventListener('click', event => {
       const chip = event.target.closest('[data-source-status]');
       if (!chip) return;

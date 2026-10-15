@@ -294,7 +294,12 @@
       if (!focused) return -1;
       return items.findIndex(item => item === focused || item.contains?.(focused));
     }
-    function focusNav(delta) {
+    // 单次 J / K 平滑滚到条目，按住连发时直接跟随，减少动态效果与静态档不滚动动画。
+    function scrollBehavior(repeat) {
+      const reduced = document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      return repeat || reduced || document.documentElement?.dataset?.fxTier === 'static' ? 'auto' : 'smooth';
+    }
+    function focusNav(delta, repeat = false) {
       const items = navItems();
       if (!items.length) return false;
       const current = currentNavIndex(items);
@@ -302,7 +307,7 @@
       const item = items[next];
       if (!item.hasAttribute?.('tabindex')) item.setAttribute?.('tabindex', '-1');
       item.focus?.({ preventScroll: true });
-      item.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+      item.scrollIntoView?.({ block: 'center', behavior: scrollBehavior(repeat) });
       return true;
     }
     // 对焦点所在条目执行动作：按选择器找到条目里的控件并点击
@@ -319,6 +324,8 @@
     let goPendingAt = -Infinity;
 
     document.addEventListener('keydown', event => {
+      // 中文输入法选词期间的 Esc、字母和方向键属于输入法，不触发清空检索或单键导航。
+      if (event.isComposing || event.keyCode === 229) return;
       // Ctrl+K：命令面板优先（输入框里也可唤起，与各家 ⌘K 一致）；未接入面板时退回聚焦检索
       if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
         && String(event.key).toLowerCase() === 'k' && palette) {
@@ -394,8 +401,8 @@
       }
       if (key === 'g') { goPendingAt = now(); event.preventDefault(); return; }
       if (key === '?' && palette) { palette.open(''); event.preventDefault(); return; }
-      if (key === 'j') { if (focusNav(1)) event.preventDefault(); return; }
-      if (key === 'k') { if (focusNav(-1)) event.preventDefault(); return; }
+      if (key === 'j') { if (focusNav(1, event.repeat)) event.preventDefault(); return; }
+      if (key === 'k') { if (focusNav(-1, event.repeat)) event.preventDefault(); return; }
       // Enter 只在焦点落在条目本身时代为打开原文；落在条目里的按钮上时交给按钮自己
       const focusedIsItem = navItems().includes(document.activeElement);
       if (key === 'o' || (key === 'enter' && focusedIsItem)) {

@@ -780,10 +780,13 @@
         view.companyId = null;
         load();
       });
-      elements.search?.addEventListener('input', () => {
+      const searchCompanies = event => {
+        if (event?.isComposing) return;
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => { view.q = elements.search.value.trim().slice(0, 40); load(); }, 260);
-      });
+      };
+      elements.search?.addEventListener('input', searchCompanies);
+      elements.search?.addEventListener('compositionend', searchCompanies);
 
       // 收录公司表单
       elements.addButton?.addEventListener('click', () => {
@@ -905,7 +908,9 @@
           return sync();
         } catch { elements.meta.textContent = '读取更新日志失败，请点击同步日志重试。'; }
       }
-      elements.search.addEventListener('input', () => { query = elements.search.value.trim().toLowerCase(); render(); });
+      const searchReleases = event => { if (event?.isComposing) return; query = elements.search.value.trim().toLowerCase(); render(); };
+      elements.search.addEventListener('input', searchReleases);
+      elements.search.addEventListener('compositionend', searchReleases);
       elements.sync.addEventListener('click', sync);
       elements.list.addEventListener('toggle', event => {
         const tag = event.target.dataset?.releaseTag;

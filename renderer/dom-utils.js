@@ -82,6 +82,131 @@
     return { position, velocity: envelope * frequency * (-a * sine + b * cosine) - decay * position };
   }
 
+  // ---------- v0.2.33：刷新率自适应的弹簧内核 ----------
+  // 采样帧之间按 linear 插值时，11 个点在 144Hz 下会连成一条折线，速度
+  // 在每个采样点突变。支持 CSS linear() 时改为把解析弹簧压缩成一条
+  // 缓动曲线交给合成器逐帧求值：60/90/120/144/165/240Hz 的每一帧都落在
+  // 真实曲线上。弹簧以“无量纲时长 + 回弹量”描述（同 SwiftUI 的
+  // duration/bounce），保持既有 160/260/320ms 交互时限。
+  const SETTLE_EPSILON = .0005;
+  const easingCache = new Map();
+
+  // 单位位移弹簧（ω0 = 1）在 t 时刻剩余的位移；velocity 为朝向终点的初速度。
+  function springDisplacement(t, zeta, velocity) {
+    if (zeta < 1) {
+      const wd = Math.sqrt(1 - zeta * zeta);
+      return Math.exp(-zeta * t) * (Math.cos(wd * t) + ((zeta - velocity) / wd) * Math.sin(wd * t));
+    }
+    if (zeta === 1) return Math.exp(-t) * (1 + (1 - velocity) * t);
+    const root = Math.sqrt(zeta * zeta - 1), r1 = -zeta + root, r2 = -zeta - root;
+    const c2 = (-velocity - r1) / (r2 - r1);
+    return (1 - c2) * Math.exp(r1 * t) + c2 * Math.exp(r2 * t);
+  }
+
+  // 最后一次越过阈值的时刻即为静止时刻；上限 60 个自然周期，防止参数异常时死循环。
+  function springSettleTime(zeta, velocity) {
+    let settle = 0;
+    for (let t = 0; t <= 60; t += .01) {
+      if (Math.abs(springDisplacement(t, zeta, velocity)) > SETTLE_EPSILON) settle = t + .01;
+    }
+    return Math.max(.5, settle);
+  }
+
+  // Ramer–Douglas–Peucker：保留偏离直线超过容差的拐点，200 个采样压到 20 个左右。
+  function simplifyCurve(points, tolerance) {
+    if (points.length < 3) return points;
+    const [ax, ay] = points[0], [bx, by] = points[points.length - 1];
+    let index = 0, max = 0;
+    for (let i = 1; i < points.length - 1; i += 1) {
+      const [px, py] = points[i];
+      const distance = Math.abs((by - ay) * px - (bx - ax) * py + bx * ay - by * ax) / Math.hypot(by - ay, bx - ax);
+      if (distance > max) { max = distance; index = i; }
+    }
+    if (max <= tolerance) return [points[0], points[points.length - 1]];
+    return [...simplifyCurve(points.slice(0, index + 1), tolerance).slice(0, -1), ...simplifyCurve(points.slice(index), tolerance)];
+  }
+
+  // bounce ∈ [0, .6]：0 为临界阻尼，正值为欠阻尼回弹。velocity 以“每个
+  // 完整时长内走完的进度”为单位，供改向时继承正在播放的速度。
+  function springEasing({ bounce = .12, velocity = 0 } = {}) {
+    const b = Math.max(0, Math.min(.6, Number(bounce) || 0));
+    const v0 = Math.max(-8, Math.min(8, Number(velocity) || 0));
+    const key = `${b.toFixed(3)}/${v0.toFixed(2)}`;
+    if (easingCache.has(key)) return easingCache.get(key);
+    const zeta = 1 - b;
+    // 时长归一：先按零初速求出静止时刻，再把初速换算到同一时间尺度。
+    const baseSettle = springSettleTime(zeta, 0);
+    const settle = v0 ? springSettleTime(zeta, v0 / baseSettle) : baseSettle;
+    const samples = [];
+    for (let i = 0; i <= 200; i += 1) {
+      const x = i / 200;
+      samples.push([x, i === 200 ? 1 : 1 - springDisplacement(x * settle, zeta, v0 / baseSettle)]);
+    }
+    const stops = simplifyCurve(samples, .0015);
+    const easing = `linear(${stops.map(([x, y], i) => {
+      const value = Number(y.toFixed(4));
+      return i === 0 || i === stops.length - 1 ? String(value) : `${value} ${Number((x * 100).toFixed(2))}%`;
+    }).join(', ')})`;
+    if (easingCache.size > 64) easingCache.delete(easingCache.keys().next().value);
+    easingCache.set(key, easing);
+    return easing;
+  }
+
+  // 显示器刷新率探测：只在前台、聚焦时取 24 个 rAF 间隔的较快四分位（启动
+  // 负载或可变刷新率会拉长部分间隔）。启动 4 秒后复测一次并取较高值；窗口
+  // 跨显示器（resize）时强制重测并替换。结果写到 data-refresh-rate 供诊断，
+  // 并决定逐帧采样动画的关键帧密度。
+  function createFrameRateProbe({ document: doc, window: win } = {}) {
+    let hz = 60, measuring = false, measuredAt = -Infinity, disposed = false;
+    const listeners = [];
+    let confirmTimer = null;
+    // mode：'replace' 换屏后替换结果；'confirm' 不受 30 秒间隔限制但取较高值。
+    function measure(mode) {
+      const force = mode === 'replace';
+      if (disposed || measuring || !win?.requestAnimationFrame || doc?.hidden) return;
+      if (typeof doc?.hasFocus === 'function' && !doc.hasFocus()) return;
+      const now = win.performance?.now?.() || 0;
+      if (!mode && now - measuredAt < 30_000) return;
+      measuring = true;
+      const stamps = [];
+      const step = time => {
+        if (disposed) return;
+        stamps.push(time);
+        if (stamps.length < 25 && !doc?.hidden) { win.requestAnimationFrame(step); return; }
+        measuring = false;
+        const gaps = stamps.slice(1).map((value, index) => value - stamps[index]).filter(gap => gap > 2 && gap < 50).sort((a, b) => a - b);
+        if (gaps.length < 12) return;
+        // 四分位排除偶发长帧；吸附到常见档位，避免 143.9/144.2 来回抖动。
+        const raw = 1000 / gaps[gaps.length >> 2];
+        const common = [60, 75, 90, 100, 120, 144, 165, 180, 240, 280, 360];
+        const snapped = common.reduce((best, rate) => Math.abs(rate - raw) < Math.abs(best - raw) ? rate : best, 60);
+        const next = Math.abs(snapped - raw) / raw < .06 ? snapped : Math.round(raw);
+        hz = force ? next : Math.max(hz, next);
+        measuredAt = win.performance?.now?.() || 0;
+        if (doc?.documentElement?.dataset) doc.documentElement.dataset.refreshRate = String(hz);
+      };
+      win.requestAnimationFrame(step);
+    }
+    function listen(target, event, handler) {
+      target?.addEventListener?.(event, handler);
+      listeners.push(() => target?.removeEventListener?.(event, handler));
+    }
+    let resizeTimer = null;
+    listen(win, 'focus', () => measure());
+    listen(win, 'resize', () => {
+      win.clearTimeout?.(resizeTimer);
+      resizeTimer = win.setTimeout?.(() => measure('replace'), 600);
+    });
+    listen(doc, 'visibilitychange', () => { if (!doc.hidden) measure(); });
+    measure('replace');
+    confirmTimer = win?.setTimeout?.(() => measure('confirm'), 4000);
+    return Object.freeze({
+      get hz() { return hz; },
+      measure,
+      dispose() { disposed = true; win?.clearTimeout?.(resizeTimer); win?.clearTimeout?.(confirmTimer); listeners.splice(0).forEach(remove => remove()); }
+    });
+  }
+
   // The uploaded SVG keeps its original SMIL timeline. Its clock only runs
   // while the pointer is over the mark; every exit returns to the first pose.
   function createBrandLogo({ document: doc, window: win }) {
@@ -165,6 +290,12 @@
     let disposed = false;
     let media = null;
     try { media = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null; } catch {}
+    // linear() 只在真实 Chromium 里可用；单测与旧环境沿用采样帧与 bezier。
+    let curves = false;
+    try { curves = Boolean(win?.CSS?.supports?.('animation-timing-function', 'linear(0, .5 25%, 1)')); } catch {}
+    const refresh = deps.frameRate || (win?.requestAnimationFrame && doc ? createFrameRateProbe({ document: doc, window: win }) : null);
+    // 逐帧采样的关键帧密度跟随显示器：一帧一个采样点，10—48 之间。
+    const samplesFor = duration => Math.max(SPRING_SAMPLES, Math.min(48, Math.round(duration * (refresh?.hz || 60) / 1000)));
 
     function prefersReducedMotion() {
       try {
@@ -209,6 +340,17 @@
       }
     }
     function syncEnvironment() { if (shouldSkip()) cancelAll(); }
+    // 样式表里的 --spring-light 只有 6 段折线；同一弹簧内核生成约 20 个拐点的
+    // 曲线写到根节点，按压、悬停等 CSS 过渡在高刷屏上同样没有折角。静态档回到样式表。
+    const rootStyle = doc?.documentElement?.style;
+    function syncCurves() {
+      if (!curves || typeof rootStyle?.setProperty !== 'function') return;
+      if (fxTier() === 'static') rootStyle.removeProperty('--spring-light');
+      else rootStyle.setProperty('--spring-light', springEasing({ bounce: .2 }));
+    }
+    const tierObserver = curves && win?.MutationObserver ? new win.MutationObserver(syncCurves) : null;
+    tierObserver?.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-fx-tier'] });
+    syncCurves();
     media?.addEventListener?.('change', syncEnvironment);
     doc?.addEventListener?.('visibilitychange', syncEnvironment);
     win?.addEventListener?.('blur', syncEnvironment);
@@ -235,7 +377,7 @@
     // inline，动画结束后自然落定。fill 只取 backwards：delay 期内应用首帧，
     // 避免错峰延迟期以 inline 终态闪现；不用 forwards/both，终态由 inline
     // 保证，动画结束不留 fill 锁住合成层
-    function spring(el, { keyframes, from, to, duration, stiffness = 'medium', delay = 0, restoreStyles = false } = {}) {
+    function spring(el, { keyframes, from, to, duration, stiffness = 'medium', delay = 0, restoreStyles = false, bounce = .08 } = {}) {
       if (!el) return null;
       // 连续改向先读当前合成帧，再释放旧动画；弹窗连开和状态切换不会重跳首帧。
       let visual;
@@ -263,7 +405,7 @@
         const animation = el.animate(frames, {
           duration: total,
           delay: Number(delay) > 0 ? Number(delay) : 0,
-          easing: preBaked ? 'linear' : SPRING_EASING,
+          easing: preBaked ? 'linear' : curves ? springEasing({ bounce }) : SPRING_EASING,
           fill: 'backwards'
         });
         const record = { animation, original, restoreStyles, timeout: null };
@@ -309,8 +451,10 @@
 
     function fadeSlideIn(el, opts = {}) {
       const distance = Number(opts.distance) > 0 ? Number(opts.distance) : 6;
+      // linear() 可用时只给首尾两帧，回弹交给合成器逐帧求值的弹簧曲线。
       return spring(el, {
-        keyframes: fadeSlideFrames(distance),
+        ...(curves ? { from: { transform: `translateY(${distance}px)`, opacity: '0' }, bounce: .15 }
+          : { keyframes: fadeSlideFrames(distance) }),
         to: { transform: 'translateY(0)', opacity: '1' },
         duration: opts.duration,
         stiffness: opts.stiffness || 'medium',
@@ -415,8 +559,9 @@
       const trajectory = displacement.map((position, index) => ({ position,
         velocity: fxTier() === 'lite' ? 0 : Math.max(-2200, Math.min(2200, momentum?.[index] || 0))
       }));
-      const frames = Array.from({ length: SPRING_SAMPLES + 1 }, (_, i) => {
-        const t = i / SPRING_SAMPLES;
+      const samples = samplesFor(duration);
+      const frames = Array.from({ length: samples + 1 }, (_, i) => {
+        const t = i / samples;
         const offsets = trajectory.map(axis => t === 1 ? 0 : indicatorSpring(axis.position, axis.velocity, t * duration / 1000).position);
         return {
           offset: t,
@@ -439,9 +584,12 @@
       cancel,
       cancelAll,
       cancelTree,
+      frameRate: () => refresh?.hz || 60,
       dispose() {
         disposed = true;
         cancelAll();
+        if (!deps.frameRate) refresh?.dispose?.();
+        tierObserver?.disconnect();
         media?.removeEventListener?.('change', syncEnvironment);
         doc?.removeEventListener?.('visibilitychange', syncEnvironment);
         win?.removeEventListener?.('blur', syncEnvironment);
@@ -1151,6 +1299,8 @@
     restoreFocusByKey,
     createBrandLogo,
     createMotion,
+    createFrameRateProbe,
+    springEasing,
     createPointerEffects,
     advancePointerAxis,
     createInteractionMotion

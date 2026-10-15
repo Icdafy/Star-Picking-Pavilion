@@ -97,9 +97,15 @@ test('v0211: selection redirection carries the playing spring velocity into the 
   const next = motion.retargetIndicator(el, { x: 0, y: 300, width: 100, height: 40 });
   const transforms = next.keyframes.map(frame => Number(frame.transform.match(/translate\([^,]+, ([^)]+)px\)/)[1]));
   assert.equal(transforms[0], 128);
+  // v0.2.33: sample density follows the display (one keyframe per frame), so
+  // read the path at 30ms by offset instead of assuming the second sample.
+  const offsets = next.keyframes.map(frame => frame.offset);
+  const at = offset => { const i = offsets.findIndex(value => value >= offset);
+    const k = (offset - offsets[i - 1]) / (offsets[i] - offsets[i - 1]); return transforms[i - 1] + (transforms[i] - transforms[i - 1]) * k; };
+  assert.ok(next.keyframes.length >= 11 && next.keyframes.length <= 49);
   // A spring starting from rest would reach about 172px at 30ms. Momentum must
   // preserve forward travel, while the final sample commits the exact target.
-  assert.ok(transforms[1] > 185 && transforms[1] < 240, JSON.stringify(transforms));
+  assert.ok(at(.1) > 185 && at(.1) < 240, JSON.stringify(transforms));
   assert.equal(transforms.at(-1), 300);
   assert.equal(frames.filter(frame => frame.playState === 'running').length, 1);
   motion.dispose();

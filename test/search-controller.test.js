@@ -94,6 +94,22 @@ test('输入防抖 350ms 后落 state.q 并刷新信息流', t => {
   assert.equal(env.calls.loadFeed, 1);
 });
 
+test('v0.2.33：拼音选词期间不检索也不切视图，上屏后检索一次', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const env = makeEnv({ view: 'settings' });
+  const listeners = {};
+  env.elements.searchInput.addEventListener = (type, fn) => { listeners[type] = fn; };
+  createSearchController(env);
+  listeners.input({ target: { value: 'weix' }, isComposing: true });
+  t.mock.timers.tick(1000);
+  assert.equal(env.state.q, '');
+  assert.deepEqual(env.calls.switchView, []);
+  listeners.compositionend({ target: { value: '卫星' } });
+  t.mock.timers.tick(350);
+  assert.equal(env.state.q, '卫星');
+  assert.deepEqual(env.calls.switchView, [['all', { persist: false }]]);
+});
+
 test('非信息流视图检索时切到 all 而不直接 loadFeed', t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const env = makeEnv({ view: 'settings' });

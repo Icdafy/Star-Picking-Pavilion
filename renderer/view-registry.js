@@ -100,7 +100,7 @@
       // 先复位壳层与滚动，再让控制器写入新内容，避免 scrollTo 强制同步
       // 计算刚插入的整片内容布局（首次字体加载时尤其容易形成长任务）。
       if (typeof refreshStats === 'function') refreshStats();
-      if (typeof scrollToTop === 'function') scrollToTop();
+      if (typeof scrollToTop === 'function') scrollToTop({ instant: true });
       if (previous && previous !== entry && typeof previous.onLeave === 'function') previous.onLeave();
       if (entry && typeof entry.onEnter === 'function') entry.onEnter();
       // 页头文字分层入场；复用现有引擎，隐藏、失焦和减少动画时直接落定。

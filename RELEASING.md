@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-[v0.2.32](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.32) 已于北京时间 2026-10-08 01:16:28 发布。精确源码的 main CI 与 tag Release 全部门禁通过，六项公开附件匿名下载、摘要、PE 版本、全部 259 个包内应用文件、实际 Electron 42.11.11、SBOM 完整引用及应用匿名日志同步／离线恢复均已复核。沿用 NotSigned 策略，实网审计中的一个检索空结果单列披露；完整证据见 [本版验证](docs/v0232-validation.md)。
+v0.2.33 候选版升级前端运动内核（linear() 弹簧、刷新率自适应采样）并修补输入法、选中态与提示计时等细节，正在执行完整验证、精确 main CI、tag Release 与六项匿名下载复核。沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0233-validation.md)。
 
 ## 发布前授权门槛
 
@@ -21,7 +21,7 @@
 npm ci
 node node_modules/electron/install.js
 npm run releases:sync
-npm run verify:version -- --tag v0.2.32
+npm run verify:version -- --tag v0.2.33
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -31,11 +31,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.32 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.32.exe
+npm run verify:version -- --tag v0.2.33 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.33.exe
 ```
 
-v0.2.32 的签名状态预期为 `NotSigned`。
+v0.2.33 的签名状态预期为 `NotSigned`。
 
 ### 更新日志同步（每次发版必做）
 
@@ -84,25 +84,25 @@ v0.2.32 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.32
-git tag -a v0.2.32 -m "摘星阁 v0.2.32"
-git push origin v0.2.32
+npm run verify:version -- --tag v0.2.33
+git tag -a v0.2.33 -m "摘星阁 v0.2.33"
+git push origin v0.2.33
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会显式安装锁定的 Electron 二进制，再依次执行版本检查、单元测试、真实 Electron 测试、生产及完整工具链依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。SBOM 先生成生产 JS 图，再补入与锁文件一致的实际 Electron 运行时并重新校验 CycloneDX 1.6。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.32 Release 应包含：
+v0.2.33 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.32.exe`
-- `Star-Picking-Pavilion-Setup-0.2.32.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.33.exe`
+- `Star-Picking-Pavilion-Setup-0.2.33.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`
 - `THIRD_PARTY_NOTICES.txt`
 
-发布完成后将六项资产下载到work/v0232/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
+发布完成后将六项资产下载到work/v0233/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
 
 ## 回滚
 

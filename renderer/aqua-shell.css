@@ -954,7 +954,8 @@ main { order: 5; width: 100%; }
 /* v0.2.10：选择轨迹、局部追光与触压反馈。只移动装饰层，正文和命中区域保持稳定。 */
 .motion-segmented { position: relative; isolation: isolate; }
 .motion-segmented > button { position: relative; z-index: 1; font-weight: 600; }
-.motion-segmented > button.active {
+/* 双写类名压过分区原选中底色，只留滑块。 */
+.motion-segmented.motion-segmented > button.active {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
@@ -975,6 +976,9 @@ main { order: 5; width: 100%; }
   background: var(--flag-soft); border-color: var(--flag-line);
 }
 .motion-control { position: relative; }
+/* 连点不误选文字；链接与图片不拖出残影。 */
+button, summary, [role="tab"] { user-select: none; }
+a, img { -webkit-user-drag: none; }
 .pointer-lab { margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--rail-line); }
 .pointer-effects, .pointer-effects:popover-open {
   position: fixed; inset: auto; top: 0; left: 0; width: 1px; height: 1px; z-index: 2000;
@@ -1083,7 +1087,7 @@ body.is-idle :is(.press-wave, .surface-light, .control-aura) { display: none; }
 }
 @media (forced-colors: active) {
   .selection-indicator, .surface-light, .control-aura, .press-wave { display: none; }
-  .motion-segmented > button.active { background: Highlight; color: HighlightText; border-color: Highlight; }
+  .motion-segmented.motion-segmented > button.active { background: Highlight; color: HighlightText; border-color: Highlight; }
 }
 
 /* Settings: a persistent chapter index and one continuous editing column. */
