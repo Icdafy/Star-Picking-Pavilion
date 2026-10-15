@@ -2,7 +2,9 @@
 
 前端运动内核升级为 linear() 解析弹簧与刷新率自适应采样，修补输入法组合态检索、分段选中叠层、按钮文字误选、链接拖影与提示计时。
 
-候选验证与精确 main CI、tag Release、匿名下载复核进行中；完整证据见 [验证记录](docs/v0233-validation.md)。尚未声明正式发布。
+[v0.2.33](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.33) 已于 2026-10-16 02:40:08（北京时间）发布为最新正式版，无发布阻塞。标签提交 `faaf5359ac9ce5e6971bd7c472ee13996e8797e1` 的 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38785732060) 完整通过：1064／1064 单元与集成、37／37 真实 Electron、依赖审计、声明、1293 项包边界与一次性 Windows 安装／启动／单实例／退出／卸载。首次推送的标签在 CSS 体积门禁失败（本机混合换行少算回车），未发布即修正并重推。同一标签提交的 main CI 在既有端到端竞态失败，测试修复 `2bbccf14410391bbc75b772ad74431b813cb6f35` 后 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38787884848) 通过，产品代码未改。
+
+六项附件已匿名重新下载复核：安装器 101,307,935 B、产品与文件版本 0.2.33、NotSigned，SHA-256 为 `83e86a108e0958dcca279688dd3453545c95159f7f6965e647970081db71e1a4`，与 SHA256SUMS.txt 及 latest.yml 的版本、文件名、大小一致。完整证据与限制见 [验证记录](docs/v0233-validation.md)。
 
 ---
 

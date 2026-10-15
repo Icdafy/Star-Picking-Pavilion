@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.33 候选版升级前端运动内核（linear() 弹簧、刷新率自适应采样）并修补输入法、选中态与提示计时等细节，正在执行完整验证、精确 main CI、tag Release 与六项匿名下载复核。沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0233-validation.md)。
+[v0.2.33](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.33) 已于北京时间 2026-10-16 02:40:08 发布：前端运动内核改为 linear() 解析弹簧与刷新率自适应采样，并修补输入法、选中态与提示计时等细节。tag Release 与修正测试后的 main CI 全部门禁通过，六项公开附件匿名下载、摘要与 PE 版本已复核，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0233-validation.md)。
 
 ## 发布前授权门槛
 
