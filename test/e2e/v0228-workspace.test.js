@@ -159,6 +159,14 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
           .map(animation => animation.finished.catch(() => {})));
       });
       const popover = page.locator('#dailyExportMenu');
+      // Reach the menu the way a user does: over its anchor button. The menu is
+      // a DOM child of the glass toolbar, whose 2px hover lift is design, not
+      // tracking; settle that lift before measuring so only tracking is tested.
+      await page.locator('#btnExportDaily').hover();
+      await page.locator('.daily-toolbar').evaluate(async node => {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {})));
+      });
       // The entrance spring starts from the asynchronous toggle event, so wait
       // for that event and the next frame before collecting animations.
       await popover.evaluate(node => new Promise(resolve => {
