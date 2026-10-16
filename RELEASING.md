@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.36 修复新闻推送的时间规则（当前分钟时刻被跳过、免打扰吞掉固定时刻、未保存时状态不同步），并把推送设置改为点选与自动保存；发布由 tag 工作流完成，证据见 [本版验证](docs/v0236-validation.md)。
+[v0.2.36](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.36) 已于北京时间 2026-10-16 21:05:01 发布：修复新闻推送的时间规则（当前分钟时刻被跳过、免打扰吞掉固定时刻、未保存时状态不同步），推送设置改为点选与自动保存。tag Release 与 main CI 首轮全部门禁通过，六项公开附件下载与摘要已复核，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0236-validation.md)。
 
 ## 发布前授权门槛
 

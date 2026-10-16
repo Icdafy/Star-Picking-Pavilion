@@ -2,7 +2,7 @@
 
 新闻推送时间规则修复（当前分钟时刻、免打扰与固定时刻冲突、开关与时间不同步）与点选式推送设置面板。
 
-v0.2.36 正在经 tag 工作流发布，结果与证据见[验证记录](docs/v0236-validation.md)。
+[v0.2.36](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.36) 于2026-10-16 21:05:01（北京时间）发布为最新正式版，无发布阻塞。精确提交 `d7ea9ce` 的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38903585031)与[Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38903592818)首轮完整通过：1130/1130单元与集成、40/40真实Electron、零生产及完整依赖漏洞、47项声明、1299项包边界及一次性Windows安装/启动/单实例/退出/卸载。六项公开附件已下载复核：安装器101,338,666 B、产品与文件版本0.2.36、NotSigned，SHA-256 `4b3c1e379567c08333397dc8816f8e15350579512aa1311d5993c9802eac12cd` 与 SHA256SUMS 一致，latest.yml 的 SHA-512 与尺寸一致；用户数据保留。证据见[验证记录](docs/v0236-validation.md)。
 ---
 
 # v0.2.35 发布状态（历史）

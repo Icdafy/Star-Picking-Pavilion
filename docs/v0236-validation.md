@@ -40,3 +40,7 @@
 - 推送仍由本机摘星阁发出，电脑需要开机并运行摘星阁；到点后最多约 30 秒内推出（计时器每 30 秒检查一次）。
 - 添加时刻的分钟以 5 分钟为一档；已保存的非整 5 分钟时刻（例如旧版手填的 08:07）会原样保留并显示。
 - 本版没有向真实机器人发送消息；用户本机飞书机器人的绑定与连接信息不受升级影响。
+
+## 发布结果
+
+发布前本机通过 1130/1130 单元与集成、40/40 真实 Electron、构建、1299 项 ASAR 包边界与产物版本校验。精确提交 `d7ea9ce` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38903585031) 与 [tag Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38903592818) 首轮全部通过（1130 项单元与集成、40 项真实 Electron、零漏洞依赖审计、47 项声明差异、构建、包审计、版本、SBOM 与一次性 Windows 安装烟测），2026-10-16 21:05:01（北京时间）发布为最新正式版，非 draft、非 prerelease。六项附件下载到隔离目录复核：安装器 101,338,666 字节，产品与文件版本 0.2.36，NotSigned；SHA-256 `4b3c1e379567c08333397dc8816f8e15350579512aa1311d5993c9802eac12cd` 与 `SHA256SUMS.txt` 一致，`latest.yml` 的版本、文件名、尺寸与 SHA-512 一致。
