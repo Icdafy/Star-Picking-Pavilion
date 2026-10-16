@@ -6,6 +6,7 @@ const { DATA_DIR } = require('./db');
 const { HttpError, validateAiBaseUrl } = require('./http-security');
 const { getApiKey, setApiKey, getProviderKey } = require('./runtime-credentials');
 const catalog = require('./ai/model-catalog');
+const { DEFAULT_PUSH, normalizePushSettings } = require('./push/schedule');
 
 const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
@@ -40,7 +41,9 @@ const DEFAULT_SETTINGS = {
     rsshubBase: '',                    // RSSHub 实例地址（如 https://rsshub.app）；填后 rsshub:// 型信源生效
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
   },
-  dailyReportHour: 8                   // 每天 8 点生成日报
+  dailyReportHour: 8,                  // 每天 8 点生成日报
+  // —— 新闻推送（v0.2.35）：节奏与内容口径；机器人连接信息另经 safeStorage 加密保存 ——
+  push: DEFAULT_PUSH
 };
 
 function boundedInteger(value, minimum, maximum, fallback) {
@@ -131,6 +134,7 @@ function normalizeSettings(raw, { existing = false } = {}) {
   settings.collect.rsshubBase = normalizedRsshubBase(settings.collect.rsshubBase);
   settings.collect.userAgent = boundedText(settings.collect.userAgent, DEFAULT_SETTINGS.collect.userAgent, 500);
   settings.dailyReportHour = boundedInteger(settings.dailyReportHour, 0, 23, DEFAULT_SETTINGS.dailyReportHour);
+  settings.push = normalizePushSettings(raw?.push);
   return settings;
 }
 

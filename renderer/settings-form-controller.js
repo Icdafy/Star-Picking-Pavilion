@@ -7,7 +7,9 @@
      「自定义设置」：显示名称、API 地址、API 协议、模型目录）→ 模型目录编辑器（ID / 显示名称 /
      上下文窗口 / 最大输出 / 输入类型，「获取可用模型」询问表单当前显示的端点与密钥，勾选后采纳）→
      整行宽的「添加模型提供商」入口（分段切换：第三方目录 / 自定义模型 API，两个草稿互不丢失）。
-     摘星阁自己的补充只有一处：顶部「分析模型」选择，决定整条精选链用哪个模型。 */
+     摘星阁自己的补充只有一处：顶部「分析模型」选择，决定整条精选链用哪个模型。
+   createPushSettings —— v0.2.35「新闻推送」一节：飞书 / 钉钉 / QQ（OneBot v11）机器人验证码绑定、
+     推送节奏（每隔 N 分钟或每天定点、推送日、免打扰）、推送内容口径、立即推送与推送记录。 */
 
 (function exposeSettingsFormController(root, factory) {
   const api = factory();
@@ -1128,9 +1130,555 @@
     return Object.freeze({ load, render, state });
   }
 
+
+  // ======================================================================
+  // 新闻推送（v0.2.35）—— 绑定飞书 / 钉钉 / QQ 机器人，按自定节奏把新情报推到手机。
+  // 绑定是两步：填写连接信息 → 手机上收到 6 位验证码 → 回填验证码后才保存。
+  // 节奏与内容表单与采集表单同口径：用户正在改的字段不被迟到的加载覆盖。
+  // ======================================================================
+  const PUSH_GUIDES = Object.freeze({
+    feishu: Object.freeze({
+      steps: Object.freeze([
+        '在飞书新建或选择一个接收推送的群，打开 群设置 → 群机器人 → 添加机器人 → 自定义机器人，名称可填“摘星阁”（建议在电脑端添加，手机端同步收到消息）。',
+        '安全设置勾选“签名校验”并复制密钥；也可以改用“自定义关键词”，关键词填“摘星阁”。',
+        '复制 Webhook 地址，连同密钥粘贴到下方，点击“发送验证码”。'
+      ]),
+      fields: Object.freeze([
+        Object.freeze({ name: 'webhook', label: 'Webhook 地址', placeholder: 'https://open.feishu.cn/open-apis/bot/v2/hook/…', secret: true }),
+        Object.freeze({ name: 'secret', label: '签名校验密钥', placeholder: '选填，强烈建议填写', secret: true, optional: true })
+      ])
+    }),
+    dingtalk: Object.freeze({
+      steps: Object.freeze([
+        '在钉钉新建或选择一个接收推送的群，打开 群设置 → 机器人 → 添加机器人 → 自定义（通过 Webhook 接入），自定义机器人需在电脑端钉钉添加。',
+        '安全设置选择“加签”并复制以 SEC 开头的密钥；也可以选“自定义关键词”，关键词填“摘星阁”。',
+        '完成后复制 Webhook 地址，连同密钥粘贴到下方，点击“发送验证码”。'
+      ]),
+      fields: Object.freeze([
+        Object.freeze({ name: 'webhook', label: 'Webhook 地址', placeholder: 'https://oapi.dingtalk.com/robot/send?access_token=…', secret: true }),
+        Object.freeze({ name: 'secret', label: '加签密钥', placeholder: 'SEC 开头，选填，强烈建议填写', secret: true, optional: true })
+      ])
+    }),
+    qq: Object.freeze({
+      steps: Object.freeze([
+        'QQ 官方机器人自 2025 年 4 月起不再支持主动推送，摘星阁改用通行的 OneBot v11 协议：在本机或局域网部署 NapCat（推荐）、Lagrange 或 LLOneBot，登录一个用来发消息的 QQ 小号。',
+        '在其网络配置中新建“HTTP 服务器”（默认端口 3000）并设置 Token；用你的 QQ 与小号互加好友，或把小号拉进接收推送的群。',
+        '填写 HTTP 地址、Token 与接收消息的 QQ 号（或群号），点击“发送验证码”。'
+      ]),
+      fields: Object.freeze([
+        Object.freeze({ name: 'baseUrl', label: 'OneBot HTTP 地址', placeholder: 'http://127.0.0.1:3000' }),
+        Object.freeze({ name: 'accessToken', label: 'Access Token', placeholder: '与 NapCat 中设置的 Token 一致', secret: true, optional: true }),
+        Object.freeze({ name: 'targetType', label: '发送到', options: Object.freeze([['private', 'QQ 私聊'], ['group', 'QQ 群']]) }),
+        Object.freeze({ name: 'targetId', label: '接收的 QQ 号 / 群号', placeholder: '例如 12345678', numeric: true })
+      ])
+    })
+  });
+  const PUSH_TRIGGERS = Object.freeze({ schedule: '定时', 'catch-up': '补推', manual: '手动', test: '测试' });
+  const PUSH_FORM_FIELDS = Object.freeze(['interval', 'anchor', 'times', 'quiet', 'quietStart', 'quietEnd',
+    'scope', 'domain', 'maxItems', 'minHeat', 'skipEmpty']);
+
+  function formatPushMoment(value, now = new Date()) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const pad = number => String(number).padStart(2, '0');
+    const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const dayDiff = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+    const day = dayDiff === 0 ? '今天' : dayDiff === 1 ? '明天' : dayDiff === -1 ? '昨天' : `${date.getMonth() + 1}月${date.getDate()}日`;
+    return `${day} ${clock}`;
+  }
+
+  function describeCountdown(value, now = new Date()) {
+    const minutes = Math.round((new Date(value).getTime() - now.getTime()) / 60000);
+    if (!Number.isFinite(minutes)) return '';
+    if (minutes <= 1) return '即将推送';
+    if (minutes < 60) return `约 ${minutes} 分钟后`;
+    const hours = Math.floor(minutes / 60);
+    return hours < 24 ? `约 ${hours} 小时${minutes % 60 ? ` ${minutes % 60} 分` : ''}后` : `约 ${Math.round(hours / 24)} 天后`;
+  }
+
+  function pushPatchFromForm(form) {
+    const patch = {
+      mode: form.mode,
+      intervalMinutes: Number(form.interval),
+      anchor: form.anchor || '08:00',
+      weekdays: form.weekdays,
+      quietEnabled: form.quiet === true,
+      quietStart: form.quietStart || '23:00',
+      quietEnd: form.quietEnd || '07:30',
+      scope: form.scope,
+      domain: form.domain,
+      maxItems: Number(form.maxItems),
+      minHeat: Number(form.minHeat || 0),
+      skipEmpty: form.skipEmpty === true
+    };
+    if (form.mode === 'times') patch.times = String(form.times || '');
+    if (!patch.weekdays.length) return { error: '请至少选择一个推送日。' };
+    if (!Number.isInteger(patch.maxItems) || patch.maxItems < 1 || patch.maxItems > 20) return { error: '每次最多条数请输入 1 到 20 的整数。' };
+    if (!Number.isInteger(patch.minHeat) || patch.minHeat < 0 || patch.minHeat > 100) return { error: '最低热度请输入 0 到 100 的整数。' };
+    if (form.mode === 'times' && !patch.times.trim()) return { error: '请填写至少一个每天推送时刻，例如 08:30, 18:30。' };
+    return { patch };
+  }
+
+  function createPushSettings({ elements, request, toast = () => {}, confirm = async () => true, escapeHTML, now = () => new Date() } = {}) {
+    const required = ['enabled', 'nextRun', 'badge', 'channels', 'bindPanel', 'mode', 'interval', 'anchor', 'times',
+      'intervalField', 'anchorField', 'timesField', 'weekdays', 'quiet', 'quietStart', 'quietEnd', 'scope', 'domain',
+      'maxItems', 'minHeat', 'skipEmpty', 'save', 'preview', 'pushNow', 'status', 'previewList', 'lastRun', 'totals', 'history'];
+    if (!elements || typeof request !== 'function' || typeof escapeHTML !== 'function') {
+      throw new TypeError('push settings elements, request and escapeHTML are required');
+    }
+    for (const name of required) {
+      if (!elements[name]) throw new TypeError(`push settings element is required: ${name}`);
+    }
+    const esc = escapeHTML;
+    const state = { view: null, mode: 'interval', weekdays: [1, 2, 3, 4, 5, 6, 7], dirty: new Set(), revision: 0,
+      bind: null, busy: new Set(), channelStatus: {} };
+
+    function setStatus(text, tone = '') {
+      elements.status.textContent = text || '';
+      elements.status.className = `test-result desktop-settings-result${tone ? ` ${tone}` : ''}`;
+    }
+
+    function markDirty(name) {
+      state.dirty.add(name);
+      state.revision += 1;
+    }
+
+    // ---------- 渲染 ----------
+    function renderMode() {
+      for (const button of elements.mode.querySelectorAll('[data-push-mode]')) {
+        const on = button.dataset.pushMode === state.mode;
+        button.classList.toggle('active', on);
+        button.setAttribute('aria-checked', String(on));
+        button.tabIndex = on ? 0 : -1;
+      }
+      elements.intervalField.hidden = state.mode !== 'interval';
+      elements.anchorField.hidden = state.mode !== 'interval';
+      elements.timesField.hidden = state.mode !== 'times';
+    }
+
+    function renderWeekdays() {
+      for (const button of elements.weekdays.querySelectorAll('[data-weekday]')) {
+        const on = state.weekdays.includes(Number(button.dataset.weekday));
+        button.classList.toggle('active', on);
+        button.setAttribute('aria-pressed', String(on));
+      }
+    }
+
+    function fillForm(settings) {
+      const assign = (name, apply) => { if (!state.dirty.has(name)) apply(); };
+      assign('mode', () => { state.mode = settings.mode; });
+      assign('weekdays', () => { state.weekdays = [...settings.weekdays]; });
+      assign('interval', () => { elements.interval.value = String(settings.intervalMinutes); });
+      assign('anchor', () => { elements.anchor.value = settings.anchor; });
+      assign('times', () => { elements.times.value = settings.times.join(', '); });
+      assign('quiet', () => { elements.quiet.checked = settings.quietEnabled === true; });
+      assign('quietStart', () => { elements.quietStart.value = settings.quietStart; });
+      assign('quietEnd', () => { elements.quietEnd.value = settings.quietEnd; });
+      assign('scope', () => { elements.scope.value = settings.scope; });
+      assign('domain', () => { elements.domain.value = settings.domain; });
+      assign('maxItems', () => { elements.maxItems.value = String(settings.maxItems); });
+      assign('minHeat', () => { elements.minHeat.value = String(settings.minHeat); });
+      assign('skipEmpty', () => { elements.skipEmpty.checked = settings.skipEmpty === true; });
+      elements.quietStart.disabled = !elements.quiet.checked;
+      elements.quietEnd.disabled = !elements.quiet.checked;
+      renderMode();
+      renderWeekdays();
+    }
+
+    function channelCard(channel) {
+      const busy = state.busy.has(channel.id);
+      const status = state.channelStatus[channel.id];
+      const detail = channel.bound
+        ? `${channel.enabled ? '已绑定 · 推送中' : '已绑定 · 已暂停'}<br>${esc(channel.target || '')}<br>${esc(channel.security || '')}`
+        : channel.pending ? '验证码已发送，请在下方输入手机上收到的 6 位数字。'
+          : { feishu: '群机器人 Webhook，支持签名校验与消息卡片。', dingtalk: '群机器人 Webhook，支持加签与 Markdown。', qq: '经 NapCat / Lagrange 等 OneBot v11 服务推送到 QQ 私聊或群。' }[channel.id];
+      const actions = channel.bound
+        ? `<button class="btn-ghost" type="button" data-push-act="test" ${busy ? 'disabled' : ''}>发送测试</button>
+           <button class="btn-ghost" type="button" data-push-act="toggle" aria-pressed="${channel.enabled}" ${busy ? 'disabled' : ''}>${channel.enabled ? '暂停推送' : '恢复推送'}</button>
+           <button class="btn-ghost" type="button" data-push-act="rebind" ${busy ? 'disabled' : ''}>重新绑定</button>
+           <button class="btn-ghost" type="button" data-push-act="unbind" ${busy ? 'disabled' : ''}>解绑</button>`
+        : `<button class="${state.bind?.channel === channel.id ? 'btn-ghost' : 'btn-primary'}" type="button" data-push-act="bind" ${busy ? 'disabled' : ''}>${state.bind?.channel === channel.id ? '绑定中…' : '绑定'}</button>`;
+      return `<section class="maintenance-action-card" data-push-channel="${esc(channel.id)}" aria-label="${esc(channel.name)}">
+        <span class="maintenance-action-index">${channel.bound ? '● ' : ''}${esc(channel.shortName)}</span>
+        <div><h4>${esc(channel.name)}</h4><p>${detail}</p></div>
+        <div class="btn-row">${actions}</div>
+        <span class="test-result maintenance-action-status${status?.tone ? ` ${status.tone}` : ''}" role="status" aria-live="polite">${esc(status?.text || '')}</span>
+      </section>`;
+    }
+
+    function renderChannels() {
+      const channels = state.view?.channels || [];
+      elements.channels.innerHTML = channels.map(channelCard).join('');
+      const bound = channels.filter(channel => channel.bound);
+      elements.badge.textContent = bound.length ? `已绑定 ${bound.map(channel => channel.shortName).join(' · ')}` : '尚未绑定';
+    }
+
+    function bindField(field, values) {
+      const id = `pushBind-${field.name}`;
+      if (field.options) {
+        return `<label class="field"><span>${esc(field.label)}</span><select id="${id}" data-bind-field="${field.name}">${field.options
+          .map(([value, label]) => `<option value="${esc(value)}"${values[field.name] === value ? ' selected' : ''}>${esc(label)}</option>`).join('')}</select></label>`;
+      }
+      return `<label class="field"><span>${esc(field.label)}${field.optional ? ' <span class="muted">选填</span>' : ''}</span>
+        <input id="${id}" data-bind-field="${field.name}" type="${field.secret ? 'password' : 'text'}" ${field.numeric ? 'inputmode="numeric"' : ''}
+          autocomplete="off" spellcheck="false" placeholder="${esc(field.placeholder || '')}" value="${esc(values[field.name] || '')}"></label>`;
+    }
+
+    function renderBindPanel() {
+      const bind = state.bind;
+      const panel = elements.bindPanel;
+      if (!bind) {
+        panel.hidden = true;
+        panel.innerHTML = '';
+        return;
+      }
+      const channel = state.view?.channels.find(entry => entry.id === bind.channel);
+      const guide = PUSH_GUIDES[bind.channel];
+      const name = channel?.name || bind.channel;
+      const form = `<div class="field-row">${guide.fields.map(field => bindField(field, bind.values)).join('')}</div>`;
+      const codeStep = bind.step === 'code'
+        ? `<div class="field-row"><label class="field"><span>手机上收到的 6 位验证码 <span class="muted">10 分钟内有效</span></span>
+             <input id="pushBindCode" data-bind-code type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="例如 428193"></label></div>`
+        : '';
+      const buttons = bind.step === 'code'
+        ? `<button class="btn-primary" type="button" data-bind-act="verify" ${bind.busy ? 'disabled' : ''}>完成绑定</button>
+           <button class="btn-ghost" type="button" data-bind-act="send" ${bind.busy ? 'disabled' : ''}>重新发送验证码</button>`
+        : `<button class="btn-primary" type="button" data-bind-act="send" ${bind.busy ? 'disabled' : ''}>${bind.busy ? '发送中…' : '发送验证码'}</button>`;
+      panel.innerHTML = `<div><h4>绑定${/^[A-Za-z]/.test(name) ? ' ' : ''}${esc(name)}</h4>
+          <ol class="hint" style="margin:0 0 var(--sp-3);padding-left:1.25rem">${guide.steps.map(step => `<li>${esc(step)}</li>`).join('')}</ol>
+          ${form}${codeStep}</div>
+        <div class="btn-row">${buttons}<button class="btn-ghost" type="button" data-bind-act="cancel">取消</button></div>
+        <span class="test-result maintenance-action-status${bind.tone ? ` ${bind.tone}` : ''}" role="status" aria-live="polite">${esc(bind.message || '')}</span>`;
+      panel.hidden = false;
+    }
+
+    function renderSummary() {
+      const view = state.view;
+      if (!view) return;
+      const current = now();
+      const anyBound = view.channels.some(channel => channel.bound);
+      elements.enabled.checked = view.settings.enabled === true;
+      elements.enabled.disabled = !anyBound && !view.settings.enabled;
+      elements.nextRun.textContent = !view.settings.enabled ? '未开启'
+        : !anyBound || !view.channels.some(channel => channel.enabled) ? '没有启用的机器人'
+          : view.nextRunAt ? `${formatPushMoment(view.nextRunAt, current)}（${describeCountdown(view.nextRunAt, current)}）` : '没有可用的推送时刻';
+      elements.nextRun.title = view.schedule || '';
+      const last = view.history.find(entry => entry.trigger !== 'test' && entry.ok && !entry.skipped);
+      elements.lastRun.textContent = last ? `${formatPushMoment(last.at, current)} · ${last.channelName} ${last.count} 条` : '尚无推送';
+      elements.totals.textContent = `${view.totals.pushes} 次 · ${view.totals.items} 条`;
+      elements.history.innerHTML = view.history.slice(0, 8).map(entry => {
+        const outcome = !entry.ok ? `失败：${entry.error || '未知原因'}`
+          : entry.skipped ? '没有新情报，未打扰' : `已送达 ${entry.count} 条`;
+        return `<li class="note-item"><div class="note-body"><p>${esc(entry.channelName)} · ${esc(PUSH_TRIGGERS[entry.trigger] || entry.trigger)} · ${esc(outcome)}</p>
+          <span class="note-time">${esc(formatPushMoment(entry.at, current))}</span></div></li>`;
+      }).join('');
+      if (!elements.status.textContent && view.settings.enabled && !view.collectAutomatic) {
+        setStatus('提示：“采集调度”中的自动采集分析尚未开启，推送只会包含手动“立即采集分析”得到的新情报。', 'warning');
+      }
+    }
+
+    function render() {
+      if (!state.view) return;
+      fillForm(state.view.settings);
+      renderChannels();
+      renderBindPanel();
+      renderSummary();
+    }
+
+    async function load() {
+      const revision = state.revision;
+      try {
+        const view = await request('/api/push');
+        state.view = view;
+        if (revision === state.revision) state.dirty.clear();
+        render();
+        return view;
+      } catch (error) {
+        elements.channels.innerHTML = `<p class="muted">读取推送设置失败：${esc(error.message)}</p>`;
+        return null;
+      }
+    }
+
+    function adopt(view) {
+      if (view && Array.isArray(view.channels)) {
+        state.view = view;
+        render();
+      }
+    }
+
+    // ---------- 设置 ----------
+    function readForm() {
+      return {
+        mode: state.mode, weekdays: [...state.weekdays], interval: elements.interval.value, anchor: elements.anchor.value,
+        times: elements.times.value, quiet: elements.quiet.checked, quietStart: elements.quietStart.value, quietEnd: elements.quietEnd.value,
+        scope: elements.scope.value, domain: elements.domain.value, maxItems: elements.maxItems.value, minHeat: elements.minHeat.value,
+        skipEmpty: elements.skipEmpty.checked
+      };
+    }
+
+    async function save({ silent = false } = {}) {
+      const { patch, error } = pushPatchFromForm(readForm());
+      if (error) {
+        setStatus(error, 'fail');
+        throw new Error(error);
+      }
+      const revision = state.revision;
+      const view = await request('/api/push/settings', { body: patch });
+      if (revision === state.revision) state.dirty.clear();
+      adopt(view);
+      if (!silent) {
+        setStatus(`已保存：${view.schedule}。`, 'ok');
+        toast('新闻推送设置已保存');
+      }
+      return view;
+    }
+
+    async function toggleEnabled(enabled) {
+      const anyBound = state.view?.channels.some(channel => channel.bound);
+      if (enabled && !anyBound) {
+        elements.enabled.checked = false;
+        setStatus('请先在下方绑定至少一个机器人，再开启定时推送。', 'fail');
+        return;
+      }
+      elements.enabled.disabled = true;
+      try {
+        const { patch, error } = pushPatchFromForm(readForm());
+        const view = await request('/api/push/settings', { body: error ? { enabled } : { ...patch, enabled } });
+        state.dirty.clear();
+        adopt(view);
+        setStatus(enabled ? `定时推送已开启：${view.schedule}。` : '定时推送已关闭，已绑定的机器人保留。', enabled ? 'ok' : '');
+      } catch (failure) {
+        elements.enabled.checked = !enabled;
+        setStatus(`保存失败：${failure.message}`, 'fail');
+      } finally {
+        renderSummary();
+      }
+    }
+
+    async function showPreview() {
+      elements.preview.disabled = true;
+      try {
+        const preview = await request('/api/push/preview');
+        const list = elements.previewList;
+        if (!preview.items.length) {
+          list.hidden = true;
+          list.innerHTML = '';
+          setStatus('当前没有尚未推送的新情报；有新入选内容后会在下一次推送时送达。');
+          return preview;
+        }
+        list.innerHTML = preview.items.map((item, index) => `<li class="note-item"><div class="note-body"><p>${index + 1}. ${esc(item.title)}</p>
+          <span class="note-time">${esc([item.source, Number.isFinite(item.heat) ? `热度 ${Math.round(item.heat)}` : ''].filter(Boolean).join(' · '))}</span></div></li>`).join('');
+        list.hidden = false;
+        setStatus(`下一次推送预计包含 ${preview.items.length} 条（按当前已保存的推送内容设置）。`);
+        return preview;
+      } catch (error) {
+        setStatus(`预览失败：${error.message}`, 'fail');
+        return null;
+      } finally {
+        elements.preview.disabled = false;
+      }
+    }
+
+    async function pushNow() {
+      if (!state.view?.channels.some(channel => channel.enabled)) {
+        setStatus('请先绑定并启用至少一个机器人。', 'fail');
+        return null;
+      }
+      elements.pushNow.disabled = true;
+      setStatus('正在推送…');
+      try {
+        const result = await request('/api/push/run', { body: {} });
+        adopt(result.view);
+        const parts = (result.results || []).map(entry => {
+          const name = state.view.channels.find(channel => channel.id === entry.channel)?.shortName || entry.channel;
+          return !entry.ok ? `${name}失败：${entry.error}` : entry.skipped ? `${name}没有新情报` : `${name}已送达 ${entry.count} 条`;
+        });
+        const failed = (result.results || []).some(entry => !entry.ok);
+        setStatus(parts.join('；') || '没有可推送的机器人。', failed ? 'fail' : 'ok');
+        if (!failed) toast('推送已完成');
+        return result;
+      } catch (error) {
+        setStatus(`推送失败：${error.message}`, 'fail');
+        return null;
+      } finally {
+        elements.pushNow.disabled = false;
+      }
+    }
+
+    // ---------- 渠道 ----------
+    function openBind(id) {
+      const defaults = id === 'qq' ? { baseUrl: 'http://127.0.0.1:3000', targetType: 'private' } : {};
+      state.bind = { channel: id, step: 'form', values: defaults, busy: false, message: '', tone: '' };
+      renderChannels();
+      renderBindPanel();
+      elements.bindPanel.querySelector('[data-bind-field]')?.focus();
+    }
+
+    function readBindValues() {
+      const values = { ...state.bind.values };
+      for (const input of elements.bindPanel.querySelectorAll('[data-bind-field]')) values[input.dataset.bindField] = input.value.trim();
+      return values;
+    }
+
+    async function sendCode() {
+      const bind = state.bind;
+      bind.values = readBindValues();
+      bind.busy = true;
+      bind.message = '正在向机器人发送验证码…';
+      bind.tone = '';
+      renderBindPanel();
+      try {
+        const result = await request(`/api/push/channels/${bind.channel}/bind`, { body: bind.values });
+        if (state.bind !== bind) return result;
+        if (result.ok) {
+          bind.step = 'code';
+          bind.message = `验证码已发送到 ${result.target}，请查看手机。`;
+          bind.tone = 'ok';
+        } else {
+          bind.message = result.error || '发送失败';
+          bind.tone = 'fail';
+        }
+        return result;
+      } catch (error) {
+        bind.message = error.message;
+        bind.tone = 'fail';
+        return null;
+      } finally {
+        bind.busy = false;
+        if (state.bind === bind) {
+          renderBindPanel();
+          elements.bindPanel.querySelector(bind.step === 'code' ? '[data-bind-code]' : '[data-bind-field]')?.focus();
+        }
+      }
+    }
+
+    async function verifyCode() {
+      const bind = state.bind;
+      const code = elements.bindPanel.querySelector('[data-bind-code]')?.value.replace(/\s+/g, '') || '';
+      if (!/^\d{6}$/.test(code)) {
+        bind.message = '请输入手机上收到的 6 位数字验证码。';
+        bind.tone = 'fail';
+        renderBindPanel();
+        return null;
+      }
+      bind.values = readBindValues();
+      bind.busy = true;
+      renderBindPanel();
+      try {
+        const result = await request(`/api/push/channels/${bind.channel}/verify`, { body: { code } });
+        state.bind = null;
+        state.channelStatus[bind.channel] = { text: '绑定成功，手机上会收到一条确认消息。', tone: 'ok' };
+        adopt(result.view);
+        toast(`${state.view.channels.find(channel => channel.id === bind.channel)?.name || '机器人'}绑定成功`);
+        if (!state.view.settings.enabled) setStatus('绑定完成。设置好推送节奏后，打开上方“开启定时推送”即可。', 'ok');
+        return result;
+      } catch (error) {
+        bind.busy = false;
+        bind.message = error.message;
+        bind.tone = 'fail';
+        renderBindPanel();
+        return null;
+      }
+    }
+
+    async function channelAction(id, action) {
+      const channel = state.view?.channels.find(entry => entry.id === id);
+      if (!channel) return;
+      if (action === 'bind' || action === 'rebind') return openBind(id);
+      if (action === 'unbind' && !await confirm(`解绑后将删除本机加密保存的${channel.name}连接信息，并停止向它推送。`, { title: `解绑${channel.name}？`, okText: '解绑' })) return;
+      state.busy.add(id);
+      state.channelStatus[id] = { text: action === 'test' ? '正在发送测试消息…' : '正在保存…', tone: '' };
+      renderChannels();
+      try {
+        if (action === 'test') {
+          const result = await request(`/api/push/channels/${id}/test`, { body: {} });
+          state.channelStatus[id] = result.ok ? { text: '测试消息已发出，请查看手机。', tone: 'ok' } : { text: result.error, tone: 'fail' };
+          await load();
+        } else if (action === 'toggle') {
+          adopt(await request(`/api/push/channels/${id}/enabled`, { body: { enabled: !channel.enabled } }));
+          state.channelStatus[id] = { text: channel.enabled ? '已暂停向它推送。' : '已恢复推送。', tone: '' };
+        } else if (action === 'unbind') {
+          adopt(await request(`/api/push/channels/${id}`, { method: 'DELETE' }));
+          state.channelStatus[id] = { text: '已解绑，连接信息已从本机删除。', tone: '' };
+        }
+      } catch (error) {
+        state.channelStatus[id] = { text: error.message, tone: 'fail' };
+      } finally {
+        state.busy.delete(id);
+        renderChannels();
+        renderSummary();
+      }
+    }
+
+    // ---------- 接线 ----------
+    elements.channels.addEventListener('click', event => {
+      const button = event.target.closest('[data-push-act]');
+      const card = button?.closest('[data-push-channel]');
+      if (button && card) channelAction(card.dataset.pushChannel, button.dataset.pushAct).catch(() => {});
+    });
+    elements.bindPanel.addEventListener('click', event => {
+      const act = event.target.closest('[data-bind-act]')?.dataset.bindAct;
+      if (!act || !state.bind || state.bind.busy) return;
+      if (act === 'cancel') {
+        state.bind = null;
+        renderBindPanel();
+        renderChannels();
+      } else if (act === 'send') sendCode().catch(() => {});
+      else if (act === 'verify') verifyCode().catch(() => {});
+    });
+    elements.bindPanel.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.isComposing || !state.bind || state.bind.busy || event.target.tagName !== 'INPUT') return;
+      event.preventDefault();
+      (state.bind.step === 'code' ? verifyCode() : sendCode()).catch(() => {});
+    });
+    elements.mode.addEventListener('click', event => {
+      const button = event.target.closest('[data-push-mode]');
+      if (!button) return;
+      state.mode = button.dataset.pushMode;
+      markDirty('mode');
+      renderMode();
+    });
+    elements.mode.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      state.mode = state.mode === 'interval' ? 'times' : 'interval';
+      markDirty('mode');
+      renderMode();
+      elements.mode.querySelector(`[data-push-mode="${state.mode}"]`)?.focus();
+    });
+    elements.weekdays.addEventListener('click', event => {
+      const button = event.target.closest('[data-weekday]');
+      if (!button) return;
+      const day = Number(button.dataset.weekday);
+      state.weekdays = state.weekdays.includes(day) ? state.weekdays.filter(value => value !== day) : [...state.weekdays, day].sort();
+      markDirty('weekdays');
+      renderWeekdays();
+    });
+    for (const name of PUSH_FORM_FIELDS) {
+      elements[name].addEventListener(['quiet', 'skipEmpty', 'scope', 'domain', 'interval'].includes(name) ? 'change' : 'input', () => {
+        markDirty(name);
+        if (name === 'quiet') {
+          elements.quietStart.disabled = !elements.quiet.checked;
+          elements.quietEnd.disabled = !elements.quiet.checked;
+        }
+      });
+    }
+    elements.enabled.addEventListener('change', event => { toggleEnabled(event.currentTarget.checked).catch(() => {}); });
+    elements.save.addEventListener('click', () => { save().catch(error => setStatus(`保存失败：${error.message}`, 'fail')); });
+    elements.preview.addEventListener('click', () => { showPreview().catch(() => {}); });
+    elements.pushNow.addEventListener('click', () => { pushNow().catch(() => {}); });
+
+    return Object.freeze({ load, save, toggleEnabled, showPreview, pushNow, openBind, sendCode, verifyCode, channelAction, state });
+  }
+
   return Object.freeze({
     createSettingsFormController,
     createModelsSettings,
+    createPushSettings,
+    pushPatchFromForm,
+    formatPushMoment,
+    describeCountdown,
     parseCapacity,
     formatCapacity,
     apiKeyFailure,

@@ -47,7 +47,7 @@ function makeEl(selector, registry) {
   };
 }
 
-function createController({ feedback = [], feedbackDelete = 'ok' } = {}) {
+function createController({ feedback = [], feedbackDelete = 'ok', push = false } = {}) {
   const listeners = {};
   const els = new Map();
   const $ = selector => {
@@ -59,6 +59,7 @@ function createController({ feedback = [], feedbackDelete = 'ok' } = {}) {
   const formCalls = [];
   const statsCalls = [];
   const modelsOptions = [];
+  const pushOptions = [];
   const ctrl = createSettingsViewController({
     $,
     api: async (url, opts) => {
@@ -90,7 +91,13 @@ function createController({ feedback = [], feedbackDelete = 'ok' } = {}) {
       createModelsSettings: options => {
         modelsOptions.push(options);
         return { load: async () => formCalls.push('models-load') };
-      }
+      },
+      ...(push ? {
+        createPushSettings: options => {
+          pushOptions.push(options);
+          return { load: async () => formCalls.push('push-load') };
+        }
+      } : {})
     },
     focusTools: { findFocusKey: () => 'focus-key', restoreFocusByKey: () => true },
     motion: { fadeSlideIn() {}, staggerIn() {} },
@@ -105,7 +112,7 @@ function createController({ feedback = [], feedbackDelete = 'ok' } = {}) {
     DailyArchiveController: null
   });
   const fire = (selector, type, event = {}) => listeners[selector]?.[type]?.(event);
-  return { ctrl, $, toasts, requests, formCalls, statsCalls, fire, els, modelsOptions };
+  return { ctrl, $, toasts, requests, formCalls, statsCalls, fire, els, modelsOptions, pushOptions };
 }
 
 test('非安装版降级：桌面设置与每日归档控件禁用并给出说明', () => {
@@ -171,4 +178,18 @@ test('提交空备忘被拦下，有内容则写入并清空输入框', async ()
   assert.ok(env.requests.some(([url, opts]) => url === '/api/feedback' && opts?.body?.content === '一条备忘'));
   assert.equal(env.$('#feedbackText').value, '');
   assert.ok(env.toasts.some(([m]) => m === '已记入情报备忘'));
+});
+
+test('新闻推送一节装配到 #pushChannels 等控件，注入 api / confirm，并随设置页一起加载', async () => {
+  const { ctrl, $, formCalls, pushOptions } = createController({ push: true });
+  assert.equal(pushOptions.length, 1);
+  const [options] = pushOptions;
+  assert.equal(options.elements.channels, $('#pushChannels'));
+  assert.equal(options.elements.bindPanel, $('#pushBindPanel'));
+  assert.equal(options.elements.enabled, $('#pushEnabled'));
+  assert.equal(typeof options.request, 'function');
+  assert.equal(typeof options.confirm, 'function');
+  assert.equal(typeof options.escapeHTML, 'function');
+  await ctrl.loadSettings();
+  assert.ok(formCalls.includes('push-load'));
 });

@@ -193,6 +193,8 @@ function createModelRoutes({ loadSettings, coordinator, credentials, discoverMod
     return coordinator.transact(settings => {
       const id = textField(body.provider, { field: 'Provider ID', maximum: 40, required: true });
       if (!catalog.PROVIDER_ID.test(id)) throw badRequest('Provider ID 需以小写字母开头，之后可用小写字母、数字和短横线');
+      // push- 前缀留给新闻推送渠道的加密连接信息，与模型密钥共用同一个凭据包
+      if (id.startsWith('push-')) throw badRequest('push- 开头的 ID 已保留给新闻推送，请换一个 Provider ID');
       if (settings.ai.providers[id] || catalog.isCatalogProvider(id)) throw badRequest('已有提供商使用了这个 ID');
       const baseUrl = endpoint(body.baseUrl, { required: true });
       const api = protocol(body.api);

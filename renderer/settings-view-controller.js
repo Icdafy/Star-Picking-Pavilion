@@ -1,7 +1,7 @@
 'use strict';
 
 /* 摘星阁 · 设置视图控制器
-   阶段 3 批 2 自 app.js 抽离：模型（v0.2.3 重构，形制照搬 DSH Models 页）、采集、数据保留、桌面运行、
+   阶段 3 批 2 自 app.js 抽离：模型（v0.2.3 重构，形制照搬 DSH Models 页）、采集、新闻推送（v0.2.35）、数据保留、桌面运行、
    每日归档、存储治理与情报备忘的装配和接线。
    $、api、toast、桌面桥与各子控制器工厂一律走依赖注入。 */
 
@@ -127,6 +127,44 @@
       findFocusKey: focusTools.findFocusKey,
       restoreFocusByKey: focusTools.restoreFocusByKey,
       motion
+    });
+
+    const pushSettings = typeof SettingsFormController.createPushSettings !== 'function' ? null : SettingsFormController.createPushSettings({
+      elements: {
+        enabled: $('#pushEnabled'),
+        nextRun: $('#pushNextRun'),
+        badge: $('#pushBoundBadge'),
+        channels: $('#pushChannels'),
+        bindPanel: $('#pushBindPanel'),
+        mode: $('#pushMode'),
+        interval: $('#pushInterval'),
+        anchor: $('#pushAnchor'),
+        times: $('#pushTimes'),
+        intervalField: $('#pushIntervalField'),
+        anchorField: $('#pushAnchorField'),
+        timesField: $('#pushTimesField'),
+        weekdays: $('#pushWeekdays'),
+        quiet: $('#pushQuiet'),
+        quietStart: $('#pushQuietStart'),
+        quietEnd: $('#pushQuietEnd'),
+        scope: $('#pushScope'),
+        domain: $('#pushDomain'),
+        maxItems: $('#pushMaxItems'),
+        minHeat: $('#pushMinHeat'),
+        skipEmpty: $('#pushSkipEmpty'),
+        save: $('#btnSavePush'),
+        preview: $('#btnPushPreview'),
+        pushNow: $('#btnPushNow'),
+        status: $('#pushStatus'),
+        previewList: $('#pushPreview'),
+        lastRun: $('#pushLastRun'),
+        totals: $('#pushTotals'),
+        history: $('#pushHistory')
+      },
+      request: api,
+      toast,
+      confirm: confirmGlass,
+      escapeHTML: esc
     });
 
     const desktopSettings = (
@@ -262,6 +300,7 @@
           settingsForm.load(),
           refreshStats(),
           modelsSettings.load(),
+          pushSettings?.load(),
           desktopSettings?.load(),
           dailyArchive?.load()
         ]);
@@ -353,7 +392,7 @@
       }
     });
 
-    return Object.freeze({ loadSettings, loadModels: () => modelsSettings.load(),
+    return Object.freeze({ loadSettings, loadModels: () => modelsSettings.load(), loadPush: () => pushSettings?.load(),
       enter: () => navigation?.enter(), leave: () => navigation?.leave(), dispose: () => navigation?.dispose() });
   }
 

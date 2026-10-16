@@ -396,8 +396,8 @@
 
   <section id="viewSettings" class="view" role="tabpanel" hidden>
     <header class="page-banner glass" aria-labelledby="settingsHeroTitle">
-      <div class="banner-copy"><p class="banner-kicker" data-banner-reveal>YOUR WORKSPACE · 专属工作台</p><h2 class="view-title" id="settingsHeroTitle" data-banner-reveal>让摘星阁，更合你的习惯</h2><p class="banner-description" data-banner-reveal>从模型与采集，到阅读与界面氛围，为每一天的研判找到舒适节奏。</p></div>
-      <div class="banner-aside"><span class="banner-tag">设置 · 九个章节</span><span class="banner-caption">按你的节奏运行</span></div>
+      <div class="banner-copy"><p class="banner-kicker" data-banner-reveal>YOUR WORKSPACE · 专属工作台</p><h2 class="view-title" id="settingsHeroTitle" data-banner-reveal>让摘星阁，更合你的习惯</h2><p class="banner-description" data-banner-reveal>从模型、采集与手机推送，到阅读与界面氛围，为每一天的研判找到舒适节奏。</p></div>
+      <div class="banner-aside"><span class="banner-tag">设置 · 十个章节</span><span class="banner-caption">按你的节奏运行</span></div>
       <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
     <div class="settings-layout">
@@ -407,12 +407,13 @@
           <a href="#modelsCard" data-settings-target="modelsCard" aria-current="location"><span class="settings-nav-number" aria-hidden="true">01</span>模型</a>
           <a href="#settingsSelection" data-settings-target="settingsSelection"><span class="settings-nav-number" aria-hidden="true">02</span>精选标准</a>
           <a href="#settingsCollect" data-settings-target="settingsCollect"><span class="settings-nav-number" aria-hidden="true">03</span>采集调度</a>
-          <a href="#settingsArchive" data-settings-target="settingsArchive"><span class="settings-nav-number" aria-hidden="true">04</span>每日新闻资料库</a>
-          <a href="#settingsStorage" data-settings-target="settingsStorage"><span class="settings-nav-number" aria-hidden="true">05</span>存储治理</a>
-          <a href="#settingsDesktop" data-settings-target="settingsDesktop"><span class="settings-nav-number" aria-hidden="true">06</span>桌面运行</a>
-          <a href="#settingsDisplay" data-settings-target="settingsDisplay"><span class="settings-nav-number" aria-hidden="true">07</span>显示与排版</a>
-          <a href="#settingsAppearance" data-settings-target="settingsAppearance"><span class="settings-nav-number" aria-hidden="true">08</span>界面氛围</a>
-          <a href="#settingsShortcuts" data-settings-target="settingsShortcuts"><span class="settings-nav-number" aria-hidden="true">09</span>键盘快捷键</a>
+          <a href="#settingsPush" data-settings-target="settingsPush"><span class="settings-nav-number" aria-hidden="true">04</span>新闻推送</a>
+          <a href="#settingsArchive" data-settings-target="settingsArchive"><span class="settings-nav-number" aria-hidden="true">05</span>每日新闻资料库</a>
+          <a href="#settingsStorage" data-settings-target="settingsStorage"><span class="settings-nav-number" aria-hidden="true">06</span>存储治理</a>
+          <a href="#settingsDesktop" data-settings-target="settingsDesktop"><span class="settings-nav-number" aria-hidden="true">07</span>桌面运行</a>
+          <a href="#settingsDisplay" data-settings-target="settingsDisplay"><span class="settings-nav-number" aria-hidden="true">08</span>显示与排版</a>
+          <a href="#settingsAppearance" data-settings-target="settingsAppearance"><span class="settings-nav-number" aria-hidden="true">09</span>界面氛围</a>
+          <a href="#settingsShortcuts" data-settings-target="settingsShortcuts"><span class="settings-nav-number" aria-hidden="true">10</span>键盘快捷键</a>
         </div>
       </nav>
     <div class="settings-grid">
@@ -450,6 +451,109 @@
         <div class="btn-row"><button class="btn-ghost" id="btnFeedback">记下</button></div>
         <ul class="note-list" id="feedbackList" aria-live="polite"></ul>
         <p class="hint">条目保存在本机 <code>star-picking-pavilion.db</code> 中，不会上传，也不会随情报保留策略被清理。</p>
+      </div>
+      <div class="glass card-pad daily-archive-card" id="settingsPush" data-settings-section="settingsPush" aria-labelledby="heading-settingsPush">
+        <div class="daily-archive-heading">
+          <div>
+            <span class="daily-archive-kicker">MOBILE NEWS PUSH</span>
+            <h3 id="heading-settingsPush" tabindex="-1">新闻推送 <span class="muted">飞书 · 钉钉 · QQ 机器人</span></h3>
+            <p>绑定手机上的机器人后，摘星阁按你定的节奏（每小时、每几小时或每天固定时刻）把新入选的情报按热度排好推送到手机；同一事件只推一次，没有新情报时不打扰。</p>
+          </div>
+          <span class="daily-archive-cutoff" id="pushBoundBadge">尚未绑定</span>
+        </div>
+        <div class="daily-archive-master">
+          <label class="desktop-switch daily-archive-switch">
+            <span class="switch-copy">
+              <strong>开启定时推送</strong>
+              <small>默认关闭。至少绑定一个机器人后可开启，开启后从下一个推送时刻开始计时。</small>
+            </span>
+            <input id="pushEnabled" type="checkbox" role="switch">
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <div class="daily-archive-next">
+            <span>下一次推送</span>
+            <strong id="pushNextRun">未开启</strong>
+          </div>
+        </div>
+        <h3 style="margin-top:1.5rem" id="pushChannelsHeading">① 绑定手机机器人 <span class="muted">验证码确认后才会保存</span></h3>
+        <div class="maintenance-action-grid" id="pushChannels" aria-labelledby="pushChannelsHeading" aria-live="polite"></div>
+        <section class="maintenance-action-card" id="pushBindPanel" style="margin-top:.625rem" aria-live="polite" hidden></section>
+        <h3 style="margin-top:1.5rem">② 推送节奏 <span class="muted">时间由你掌握</span></h3>
+        <div class="cat-chips period-switch" id="pushMode" role="radiogroup" aria-label="推送方式">
+          <button class="chip" type="button" role="radio" data-push-mode="interval" aria-checked="true">每隔一段时间</button>
+          <button class="chip" type="button" role="radio" data-push-mode="times" aria-checked="false">每天固定时刻</button>
+        </div>
+        <div class="field-row" style="margin-top:var(--sp-3)">
+          <label class="field" id="pushIntervalField"><span>推送间隔</span>
+            <select id="pushInterval">
+              <option value="15">每 15 分钟</option>
+              <option value="30">每 30 分钟</option>
+              <option value="60">每 1 小时</option>
+              <option value="120">每 2 小时</option>
+              <option value="180">每 3 小时</option>
+              <option value="240">每 4 小时</option>
+              <option value="360">每 6 小时</option>
+              <option value="480">每 8 小时</option>
+              <option value="720">每 12 小时</option>
+              <option value="1440">每天一次</option>
+            </select>
+          </label>
+          <label class="field" id="pushAnchorField"><span>起始时刻 <span class="muted">按此对齐</span></span>
+            <input id="pushAnchor" type="time" step="60">
+          </label>
+          <label class="field" id="pushTimesField" hidden><span>每天推送时刻 <span class="muted">逗号分隔，最多 12 个</span></span>
+            <input id="pushTimes" type="text" inputmode="numeric" placeholder="08:30, 12:30, 18:30" autocomplete="off">
+          </label>
+        </div>
+        <div class="field"><span>推送日</span>
+          <div class="cat-chips period-switch" id="pushWeekdays" role="group" aria-label="推送日">
+            <button class="chip" type="button" data-weekday="1" aria-pressed="true">周一</button>
+            <button class="chip" type="button" data-weekday="2" aria-pressed="true">周二</button>
+            <button class="chip" type="button" data-weekday="3" aria-pressed="true">周三</button>
+            <button class="chip" type="button" data-weekday="4" aria-pressed="true">周四</button>
+            <button class="chip" type="button" data-weekday="5" aria-pressed="true">周五</button>
+            <button class="chip" type="button" data-weekday="6" aria-pressed="true">周六</button>
+            <button class="chip" type="button" data-weekday="7" aria-pressed="true">周日</button>
+          </div>
+        </div>
+        <label class="desktop-switch">
+          <span class="switch-copy"><strong>免打扰时段</strong><small>落在这段时间里的推送自动跳过，新情报顺延到下一次一起推。</small></span>
+          <input id="pushQuiet" type="checkbox" role="switch">
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+        <div class="field-row">
+          <label class="field"><span>免打扰开始</span><input id="pushQuietStart" type="time" step="60"></label>
+          <label class="field"><span>免打扰结束</span><input id="pushQuietEnd" type="time" step="60"></label>
+        </div>
+        <h3 style="margin-top:1.5rem">③ 推送内容</h3>
+        <div class="field-row">
+          <label class="field"><span>推送范围</span>
+            <select id="pushScope"><option value="featured">精选情报（双评分入选）</option><option value="relevant">全部相关动态</option></select>
+          </label>
+          <label class="field"><span>关注领域</span>
+            <select id="pushDomain"><option value="all">低空经济 + 商业航天</option><option value="lowaltitude">只看低空经济</option><option value="aerospace">只看商业航天</option></select>
+          </label>
+          <label class="field"><span>每次最多条数</span><input id="pushMaxItems" type="number" min="1" max="20" step="1"></label>
+          <label class="field"><span>最低热度 <span class="muted">0 表示不限</span></span><input id="pushMinHeat" type="number" min="0" max="100" step="1"></label>
+        </div>
+        <label class="desktop-switch">
+          <span class="switch-copy"><strong>没有新情报时不打扰</strong><small>关闭后，到点没有新情报也会发一条“本时段暂无新情报”。</small></span>
+          <input id="pushSkipEmpty" type="checkbox" role="switch">
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+        <div class="btn-row">
+          <button class="btn-primary" id="btnSavePush" type="button">保存推送设置</button>
+          <button class="btn-ghost" id="btnPushPreview" type="button">预览本期内容</button>
+          <button class="btn-ghost" id="btnPushNow" type="button">立即推送一次</button>
+        </div>
+        <p id="pushStatus" class="test-result desktop-settings-result" role="status" aria-live="polite"></p>
+        <ol class="note-list" id="pushPreview" aria-label="本期待推送情报" hidden></ol>
+        <div class="daily-archive-status-grid" aria-label="推送状态">
+          <div><span>最近推送</span><strong id="pushLastRun">尚无推送</strong></div>
+          <div><span>累计送达</span><strong id="pushTotals">0 次 · 0 条</strong></div>
+        </div>
+        <ul class="note-list" id="pushHistory" aria-label="推送记录"></ul>
+        <p class="hint">推送由本机摘星阁直接发给机器人，不经过任何第三方服务器；Webhook、加签密钥与 Token 经 Windows 安全加密保存在本机，界面只显示掩码。推送内容来自已采集分析的情报，建议同时开启“采集调度”中的自动采集分析，并在“桌面运行”中开启后台运行与登录启动，让电脑开机即按时推送。飞书 / 钉钉若使用“自定义关键词”安全设置，请把关键词设为“摘星阁”。</p>
       </div>
       <div class="glass card-pad daily-archive-card" id="settingsArchive" data-settings-section="settingsArchive" aria-labelledby="heading-settingsArchive">
         <div class="daily-archive-heading">

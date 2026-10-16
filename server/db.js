@@ -392,6 +392,29 @@ CREATE TABLE IF NOT EXISTS model_usage (
   bucket TEXT PRIMARY KEY,                 -- h:YYYY-MM-DDTHH | d:YYYY-MM-DD
   calls INTEGER NOT NULL DEFAULT 0
 );
+
+-- v0.2.35 新闻推送：每个渠道各自记录已推送的资料与事件簇，同一事件不会重复推到手机
+CREATE TABLE IF NOT EXISTS push_deliveries (
+  channel TEXT NOT NULL,                   -- feishu | dingtalk | qq
+  article_id INTEGER NOT NULL,
+  cluster_id INTEGER,
+  pushed_at TEXT NOT NULL,
+  PRIMARY KEY (channel, article_id)
+);
+CREATE INDEX IF NOT EXISTS idx_push_deliveries_cluster ON push_deliveries(channel, cluster_id);
+CREATE INDEX IF NOT EXISTS idx_push_deliveries_at ON push_deliveries(pushed_at);
+
+CREATE TABLE IF NOT EXISTS push_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at TEXT NOT NULL,
+  trigger TEXT NOT NULL,                   -- schedule | catch-up | manual | test
+  channel TEXT NOT NULL,
+  ok INTEGER NOT NULL,
+  skipped INTEGER NOT NULL DEFAULT 0,
+  item_count INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  duration_ms INTEGER
+);
 `);
   // v0.2.2：融资事件性质（equity | ipo | ma | secondary | debt），一级市场视图默认只看前三类
   const dealCols = new Set(db.prepare('PRAGMA table_info(deals)').all().map(c => c.name));

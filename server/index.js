@@ -32,6 +32,8 @@ const { VISIBLE_INDUSTRY_SQL } = require('./ai/relevance');
 const { heatScore } = require('./ai/scoring');
 const { discoverModels, testConnection } = require('./ai/deepseek');
 const { createModelRoutes } = require('./model-routes');
+const { createPushService } = require('./push/service');
+const { createPushRoutes } = require('./push/routes');
 const { CATEGORIES } = require('./ai/pipeline');
 const { handleIntelRoute } = require('./intel-routes');
 const { ingestItems } = require('./ingest');
@@ -464,6 +466,17 @@ function getLexiconPanel(nowMs = Date.now()) {
   return lexiconCache.value;
 }
 
+// ---------- 新闻推送 ----------
+// 选稿复用信息流的同一个行映射（中文标题、摘要、热度口径一致），连接信息与模型密钥走同一条加密凭据通道
+const pushService = createPushService({
+  db,
+  loadSettings,
+  coordinator: settingsUpdateCoordinator,
+  credentials: runtimeCredentials,
+  mapRow: row => articleRow(row, loadScoring(), Date.now())
+});
+const pushRoutes = createPushRoutes({ service: pushService });
+
 // ---------- 路由 ----------
 const activityStreams = new Set();
 const server = http.createServer(async (req, res) => {
@@ -775,6 +788,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (await modelRoutes.handle({ req, res, pathname: p, json, readJsonBody })) return;
+      if (await pushRoutes.handle({ req, res, pathname: p, json, readJsonBody })) return;
 
       if (await handleIntelRoute({ req, res, url: u, json, readJsonBody, queryFeed })) {
         if (req.method !== 'GET') invalidateStatsCache();
@@ -828,9 +842,9 @@ function notifyStoppedAndExit(stopped) {
 }
 
 const shutdownLifecycle = createServerShutdownLifecycle({
-  stopScheduler,
+  stopScheduler: () => { pushService.stop(); stopScheduler(); },
   closeHttpServer,
-  waitForSchedulerIdle,
+  waitForSchedulerIdle: async () => { await Promise.all([waitForSchedulerIdle(), pushService.waitForIdle()]); },
   closeDatabase,
   notifyStoppedAndExit,
   onError: error => {
@@ -866,5 +880,8 @@ server.listen(REQUESTED_PORT, '127.0.0.1', () => {
   console.log(`[server:ready]${JSON.stringify(ready)}`);
   console.log(`[server] 摘星阁后端已启动: http://127.0.0.1:${port}`);
   if (process.env.STAR_PICKING_PAVILION_NO_SCHEDULER !== '1'
-    && process.env.WINDCATCHER_NO_SCHEDULER !== '1') startScheduler();
+    && process.env.WINDCATCHER_NO_SCHEDULER !== '1') {
+    startScheduler();
+    pushService.start();
+  }
 });
