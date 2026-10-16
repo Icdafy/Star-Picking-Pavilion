@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-[v0.2.35](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.35) 新增设置页「新闻推送」：飞书、钉钉与 QQ（OneBot v11）机器人验证码绑定与自定节奏推送，正在执行完整发布验证。沿用 NotSigned 策略；证据见 [本版验证](docs/v0235-validation.md)。
+[v0.2.35](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.35) 已于北京时间 2026-10-16 19:04:18 发布：设置页新增「新闻推送」，支持飞书、钉钉与 QQ（OneBot v11）机器人验证码绑定与自定节奏推送。tag Release 与 main CI 全部门禁通过，六项公开附件下载与摘要已复核，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0235-validation.md)。
 
 ## 发布前授权门槛
 
