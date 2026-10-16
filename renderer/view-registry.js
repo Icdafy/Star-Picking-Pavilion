@@ -17,7 +17,9 @@
       preferenceActions, scrollToTop, refreshStats,
       isRailLayout = () => false,
       // 液态玻璃阶段 3（可选）：切换后目标面板的入场动画引擎
-      motion
+      motion,
+      // v0.2.38（可选）：极光引擎的方向入场
+      fluid
     } = deps;
     if (typeof $ !== 'function' || typeof $$ !== 'function') {
       throw new TypeError('view registry requires $ and $$ query helpers');
@@ -67,7 +69,8 @@
 
     function switchView(view, { persist = true } = {}) {
       const entry = views.get(view);
-      const previous = views.get(state.view);
+      const previousView = state.view;
+      const previous = views.get(previousView);
       if (previous?.tab) motion?.cancelTree?.($(previous.tab));
       state.view = view;
       if (persist && preferenceActions) preferenceActions.remember('view', view);
@@ -92,7 +95,13 @@
       // 改由注入的 motion 引擎只对切换后显示的目标面板播一次 fadeSlideIn
       //（transform + opacity，约 260ms）；其余面板不动，reduced 偏好与
       // static 档在引擎内部自动跳过；未注入 motion 时静默退化为无入场动画
-      if (entry && entry.tab && motion && typeof motion.fadeSlideIn === 'function') {
+      // v0.2.38 流体设计：从下方的标签切过来时内容自下而上到达，反之自上而下，
+      // 由极光引擎带一点回弹；引擎缺席或处于静止档时回到原来的淡入。
+      const order = $$('.tab').map(t => t.dataset.view);
+      const direction = order.indexOf(view) >= order.indexOf(previous ? previousView : view) ? 1 : -1;
+      const entered = entry && entry.tab && previous !== entry && typeof fluid?.enterView === 'function'
+        && fluid.enterView($(entry.tab), direction);
+      if (!entered && entry && entry.tab && motion && typeof motion.fadeSlideIn === 'function') {
         try { motion.fadeSlideIn($(entry.tab), { duration: 260 }); } catch { /* 动画是增强层 */ }
       }
       const filters = $('#feedFilters');

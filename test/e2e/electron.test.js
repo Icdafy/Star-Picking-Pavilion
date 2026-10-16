@@ -38,6 +38,7 @@ const EXPECTED_UI_PREFERENCE_KEYS = [
   'commonLinksFavorites',
   'dailyDate',
   'domain',
+  'fluidMode',
   'linksCategory',
   'pointerColor',
   'pointerCometSize',

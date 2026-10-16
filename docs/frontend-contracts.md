@@ -6,7 +6,7 @@
 > 逐条核对后再动手；任何一条被破坏，`npm test` 会立即报出来。
 >
 > 当前统计口径：Aqua 外壳升级后，页面实际加载的三份 CSS 合计约 235.5 KiB，
-> 早期模块化记录中的文件体积为历史值；当前页面脚本为 27 条，预算 27/27 已用尽。
+> 早期模块化记录中的文件体积为历史值；当前页面脚本为 28 条（v0.2.38 新增极光引擎），预算 28/28 已用尽。
 
 ---
 
@@ -814,11 +814,11 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 | 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| 页面实际加载的全部本地 CSS | ≈ 293,800 B（CRLF 口径，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置、v0.2.4 命令面板、v0.2.36 推送面板；v0.2.37 设置页统一行面板净回收约 7 KiB） | ≤ 296 KiB |
-| index.html `<script>` 标签总数 | 27（v0.2.0 新增合并后的 intel-views.js） | ≤ 27 |
+| 页面实际加载的全部本地 CSS | ≈ 314,700 B（CRLF 口径，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置、v0.2.4 命令面板、v0.2.36 推送面板、v0.2.37 设置页统一行面板；v0.2.38 新增 fluid.css 约 20 KiB） | ≤ 320 KiB |
+| index.html `<script>` 标签总数 | 28（v0.2.0 新增合并后的 intel-views.js；v0.2.38 新增极光引擎 aurora-engine.js） | ≤ 28 |
 | 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
-| 全部已加载 CSS 的 `backdrop-filter` 声明 | 9 | ≤ 10 |
+| 全部已加载 CSS 的 `backdrop-filter` 声明 | 10（v0.2.38 下拉选项面板 `::picker(select)`） | ≤ 10 |
 
 除数字预算外还有定性护栏。其一（阶段 2 新增，液态玻璃阶段 4 登记）：
 transition 过渡属性白名单断言「transition 只过渡合成层
@@ -965,3 +965,19 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 除“新闻推送”外的十个章节改用推送面板的同一套结构：章节头 `.set-head`（`.set-kicker` + h3 + 一句话说明 + `.set-badge`）→ 可选状态区 `.set-hero`（开关所在行；含已勾选开关时以 `:has()` 自动转为强调色）→ 行面板 `.set-panel > .set-row`（左列 7rem 标签、右列 `.set-row-body`；`.set-action` 为“说明 + 行尾按钮”的三列行）→ 分步标题 `.set-step > h4`。原 `.push-panel / .push-opt / .push-hero / .push-step` 提升为上述通用类，推送专属的时刻表、频道行与徽标规则保留 `.push-*`。窄容器（`@container app (max-width:45rem)`）下行面板改为上下排列。设置目录去掉编号，宽屏显示分组标题 `.settings-nav-group`（情报处理 / 送达与归档 / 外观 / 系统），章节由 10 个增至 11 个（情报备忘独立）；章节 DOM 顺序必须与目录一致。
 
 保存语义：开关、点选胶囊（`SettingsFormController.presetChips`，aria-pressed 切换按钮）、数字框与文本框的 `change`（回车或失焦）即保存，且只提交被改动的字段（`saveCollect(fields)` / `saveRetention(fields)`）；保存被拒时 toast 原因并以 `discard(fields)` 清除脏标记后读回服务器值。保留天数的空值、小数与越界一律拒绝，不再回落默认值。“恢复默认外观”只复位 `aqua*` 参数（不含 `aquaEnabled`），跟手动效有独立的“恢复默认动效”。动态背景 / 跟手动效关闭时，`.aqua-only` / `.pointer-only` 从属行经 `:root[data-aqua-enabled="off"]` / `[data-pointer-enabled="off"]` 收起。外观预览卡、存储统计卡片网格与维护卡片网格退役，页面 CSS 净减约 7 KiB；脚本（27）、关键帧（20）与预算上限（296 KiB）不变。
+
+## v0.2.38 流体设计与极光引擎
+
+流体设计由三部分组成：凝光视效（通透材质 + 轮廓光、点击涟漪、彗星追光、下拉压暗）、流体动效（果冻滑动、边界橡皮筋、方向入场）与柔性反馈（按压收缩、松手回弹、拖拽拉伸、水滴连桥）。运行时全部位于 `renderer/aurora-engine.js`（全局 `AuroraEngine`，第 28 个脚本边界，位于 dom-utils 之后、aqua-shell 之前）；样式全部位于最后加载的 `renderer/fluid.css`，只追加令牌与覆盖层，不新增关键帧。
+
+- **融合帧时钟**：涟漪以外的逐帧任务（柔性物理、连桥、果冻滑动）登记到同一个按需 RAF；无任务即停，不常驻。涟漪、彗星追光与方向入场走 WAAPI（合成层）。所有运动只写 `translate` / `scale` 独立变换属性与 `opacity`，与既有 `transform` 动画互不覆盖。
+- **档位**：根节点 `data-fluid` = full / lite / off，由 `resolveFluidLevel` 决定：用户档位（偏好字段 `fluidMode`：auto / full / lite / off，经 aqua-shell 写入 `data-fluid-mode`）优先；auto 档在 `data-fx-tier=lite`、电量 ≤ 20% 且未充电、或运行中约 120 帧内超过 34% 掉帧（>1.85 帧预算）时降为 lite，20 秒后试探恢复。系统减少动态效果、`fx-tier=static` 一律 off；失焦、隐藏与强制配色立即撤销全部效果。`data-fluid-material=solid` 在系统“降低透明度”或强制配色时把玻璃改回实底。
+- **凝光材质**：仅云母模式下调 `--glass-bg*` / `--card-bg` 的不透明度（仍随磨砂度变化），`.glass::after` 改为 1px 渐变轮廓光，`.card::before` 常亮；动态背景关闭时 body 使用静态的四点极光底色，不产生绘制开销。浮出层（词库、导出菜单、下拉面板）使用更实的 `--fluid-picker-bg`。
+- **涟漪**：在 `.card, .glass, .common-links-card, .release-entry, .daily-item, .set-panel, .glass-dialog, .maintenance-action-card` 的非控件处按下时生成；完整档光核 + 3 圈环，轻盈档 1 圈；同时最多 3 个，1.6 秒寿命上限后移除并撤销宿主类。按钮自身仍由 dom-utils 的 press-wave 负责（光核化，峰值不透明度 .38）。
+- **柔性反馈**：`.searchbox, button, select, summary, a.btn-*, .settings-nav a` 按下时按尺寸缩小（最多 8.5%），松手低阻尼回弹。`DRAG_GROUPS` 中的按钮移动超过 8px 后进入拖拽：橡皮筋位移、沿速度方向拉伸，靠近 34px 内的同组邻居被吸引并在所在面板的 z-index:-1 SVG 层画 metaball 连桥，重叠时邻居淡出让字；松手后吞掉一次 click（360ms 内），Esc / pointercancel / 失焦取消。选中项被拖动时滑动选择块同步 `translate`。
+- **果冻滑动**：仅由真实输入（滚轮、滚动键、拖动视口滚动条）触发，程序滚动（导航跳转、scrollIntoView）不触发。可见块（`JELLY_SELECTOR`，最多 28 个）按与手势位置的距离滞后，速度越快增益与刚度越大；到达顶部或底部继续滚轮时按橡皮筋拉开（约 50px 内）再回弹。完整档专属。
+- **彗星追光**：注册 `--fluid-comet` / `--fluid-glint`（`CSS.registerProperty`）与 `--fluid-p`；悬停 / 聚焦循环、改值单次、拖动时锁定在滑块处并显示弥散光。
+- **下拉压暗**：`.fluid-scrim` 位于 `#appViewport` 内（随滚动定位），`:has(select:open)`、导出菜单或词库打开时淡入；原生 select 在 `@supports (appearance: base-select)` 下改为可定制选择器（玻璃面板、延迟 90ms 弹出、选中高亮、箭头翻转），弹窗遮罩先于面板到达。
+- **悬浮控件**：顶栏、筛选栏、指挥栏、设置目录与各页工具条统一 `--fluid-bar-radius`（1.5rem）与浮起阴影，栏内控件统一 `--fluid-ctl-h`（2.375rem）与胶囊圆角。
+
+视图切换经 view-registry 的可选依赖 `fluid.enterView(panel, direction)`：按侧栏顺序向下切换时内容自下而上到达，反之自上而下；引擎不可用或静止时回到原 `fadeSlideIn`。预算：CSS ≤ 320 KiB、脚本 28、关键帧 20、backdrop-filter 10（新增的一处为 `::picker(select)`）。

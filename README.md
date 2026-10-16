@@ -2,26 +2,27 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.37 · 设置页重新设计：改动即生效
+## v0.2.38 · 流体设计：为流畅而生
 
-- **一眼看懂**：除新闻推送外的设置章节统一为“标题与一句话说明 → 状态区 → 标签 | 选项”的行面板，目录按情报处理、送达与归档、外观、系统分组；配置路径、提示词版本与权重表收进“高级”。
-- **改完就生效**：自动采集开关、采集间隔、RSSHub 地址、保留期限点一下或回车即保存，并弹出一句回执；保存被拒时说明原因并恢复原值。
-- **逻辑修正**：清空保留天数不再被悄悄换成默认值；“恢复默认外观”不再关掉动态背景或重置跟手动效；每日清理与日报随“自动采集”运行这一点直接写在页面上。
-- **少走弯路**：没有模型密钥时一键“填入密钥”；每日资料库按钮写明“选择文件夹并开启”；显示里可直接切换深浅主题。
+- **凝光视效**：卡片和面板更通透，背后的颜色与光影透进来，边缘一圈高光收住轮廓；点按卡片泛起一圈圈涟漪，下拉选项先压暗背景再浮现，滑杆上有彗星般的指引光。
+- **柔性反馈**：按钮按下向内收、松手 Q 弹；搜索框每点一下都会向内一缩；工具栏按钮能随手拖动，拖近邻居时像水滴一样相连。
+- **流体滑动**：滚动时界面随手势与速度像果冻一样回弹，从哪里滑哪里先到；切换页面时内容从切换方向进入。
+- **悬浮控件**：顶栏、筛选栏、侧栏与各页工具条统一圆角与高度，切换更连贯。
+- **极光引擎**：全部动画合并到一个按需帧时钟；“设置 → 氛围与动效 → 流体设计”可选自动适配、完整、轻盈或关闭。
 
-版本、界面与更新元数据统一为 0.2.37，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0237-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与全部设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.38，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0238-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与全部设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.37.exe`，双击并按向导安装。v0.2.37 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.38.exe`，双击并按向导安装。v0.2.38 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.37.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.38.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

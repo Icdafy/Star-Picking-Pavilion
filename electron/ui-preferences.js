@@ -96,6 +96,9 @@ function validatePatch(patch, today) {
       throw new TypeError(`${field} is not a supported appearance value`);
     }
   }
+  if (Object.hasOwn(patch, 'fluidMode') && !UiPreferenceSchema.isValidUiPreferenceValue('fluidMode', patch.fluidMode, CommonLinks, { today })) {
+    throw new TypeError('fluidMode must be auto, full, lite or off');
+  }
   for (const field of UiPreferenceSchema.UI_PREFERENCE_FIELDS.filter(field => field.startsWith('pointer'))) {
     if (Object.hasOwn(patch, field) && !UiPreferenceSchema.isValidUiPreferenceValue(field, patch[field], CommonLinks, { today })) {
       throw new TypeError(`${field} is not a supported pointer effect value`);

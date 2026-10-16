@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="aqua-shell.css">
 <link rel="stylesheet" href="intel.css">
+<link rel="stylesheet" href="fluid.css">
 </head>
 <body>
 <!-- 静态回退图的深色主题配色；矢量 Logo 直接通过 CSS 提亮弧线。 -->
@@ -628,9 +629,27 @@
           <div>
             <span class="set-kicker">VISUAL EFFECTS</span>
             <h3 id="heading-settingsAppearance" tabindex="-1">氛围与动效</h3>
-            <p>玻璃质感、动态背景与鼠标跟随效果，只影响观感。系统开启“减少动态效果”时会自动静止。</p>
+            <p>流体设计、玻璃质感、动态背景与鼠标跟随效果，只影响观感。系统开启“减少动态效果”时会自动静止。</p>
           </div>
           <button class="btn-ghost btn-compact" id="btnAquaReset" type="button" title="恢复玻璃与背景的默认参数，不改变开关与跟手动效">恢复默认外观</button>
+        </div>
+        <div class="set-step fluid-lab" aria-labelledby="fluidHeading">
+          <h4 id="fluidHeading">流体设计</h4>
+          <div class="set-panel">
+            <div class="set-row">
+              <span>动效档位</span>
+              <div class="set-row-body">
+                <div class="appearance-segments" role="group" aria-label="流体设计档位">
+                  <button type="button" data-fluid-mode="auto" aria-pressed="true">自动适配</button>
+                  <button type="button" data-fluid-mode="full" aria-pressed="false">完整</button>
+                  <button type="button" data-fluid-mode="lite" aria-pressed="false">轻盈</button>
+                  <button type="button" data-fluid-mode="off" aria-pressed="false">关闭</button>
+                </div>
+                <small id="fluidModeHint" aria-live="polite">按本机刷新率、性能与电量自动选择。</small>
+              </div>
+            </div>
+            <p class="fluid-lab-note">点按卡片会泛起涟漪光；按钮按下会向内收、松手回弹，拖着工具栏里的按钮还能和邻居像水滴一样相融；滑动时界面随手势与速度轻轻回弹；拖动滑杆时光随指尖移动。</p>
+          </div>
         </div>
         <div class="set-step">
           <h4>玻璃面板</h4>
@@ -1105,6 +1124,7 @@
 <script src="common-links-controller.js"></script>
 <script src="store.js"></script>
 <script src="view-registry.js"></script>
+<script src="aurora-engine.js"></script>
 <script src="dsh-aqua-engine.js"></script>
 <script src="aqua-shell.js"></script>
 <script src="app.js"></script>

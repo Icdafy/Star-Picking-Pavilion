@@ -83,6 +83,7 @@ const state = {
   pointerRingSize: restoredPreferences.pointerRingSize,
   pointerColor: restoredPreferences.pointerColor,
   pointerOpacity: restoredPreferences.pointerOpacity,
+  fluidMode: restoredPreferences.fluidMode,
   view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,
@@ -136,6 +137,11 @@ const motion = DomUtils.createMotion({
   raf: callback => requestAnimationFrame(callback)
 });
 const interactionMotion = DomUtils.createInteractionMotion({ document, window, motion });
+// v0.2.38 极光引擎：流体设计的融合渲染层（涟漪、柔性反馈、果冻滑动、彗星追光、下拉压暗）。
+const auroraEngine = window.AuroraEngine
+  ? window.AuroraEngine.createAuroraEngine({ document, window, motion, springEasing: DomUtils.springEasing })
+  : null;
+window.addEventListener('pagehide', () => auroraEngine?.dispose(), { once: true });
 const brandLogo = DomUtils.createBrandLogo({ document, window });
 window.addEventListener('pagehide', () => brandLogo?.dispose(), { once: true });
 window.addEventListener('pagehide', () => interactionMotion.dispose(), { once: true });
@@ -636,6 +642,7 @@ const viewRegistry = ViewRegistry.createViewRegistry({
   isRailLayout: () => window.matchMedia('(min-width: 70rem)').matches,
   // 阶段 3（液态玻璃）：视图切换入场改经 motion 引擎，不再强制重排重放
   motion,
+  fluid: auroraEngine,
   refreshStats: () => registryDeps.refreshStats && registryDeps.refreshStats()
 });
 const { syncTabIndicator, syncNavHeight } = viewRegistry;
@@ -650,7 +657,7 @@ viewRegistry.registerView({ id: 'daily', tab: '#viewDaily', onEnter: () => regis
 viewRegistry.registerView({ id: 'releases', tab: '#viewReleases', onEnter: () => releaseLog.load() });
 viewRegistry.registerView({ id: 'links', tab: '#viewLinks', onEnter: () => registryDeps.renderCommonLinks() });
 viewRegistry.registerView({ id: 'sources', tab: '#viewSources', onEnter: () => registryDeps.loadSources() });
-viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => { settingsViewController.enter(); registryDeps.loadSettings(); loadIndustryInfo(); }, onLeave: () => settingsViewController.leave() });
+viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => { settingsViewController.enter(); registryDeps.loadSettings(); loadIndustryInfo(); auroraEngine?.refresh(); }, onLeave: () => settingsViewController.leave() });
 
 // 设置页“精选标准”：行业包的门槛、内容类型权重、提示词版本与本小时 / 今日调用量（只读）
 async function loadIndustryInfo() {

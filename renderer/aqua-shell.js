@@ -89,7 +89,8 @@
         ? value.pointerColor.toLowerCase() : DEFAULTS.pointerColor,
       aquaCritters: typeof value.aquaCritters === 'boolean'
         ? value.aquaCritters
-        : DEFAULTS.aquaCritters
+        : DEFAULTS.aquaCritters,
+      fluidMode: Schema.FLUID_MODES.includes(value.fluidMode) ? value.fluidMode : DEFAULTS.fluidMode
     };
   }
 
@@ -839,6 +840,9 @@
       for (const button of doc.querySelectorAll('[data-pointer-color]')) {
         button.setAttribute('aria-pressed', String(button.dataset.pointerColor === state.pointerColor));
       }
+      for (const button of doc.querySelectorAll('[data-fluid-mode]')) {
+        button.setAttribute('aria-pressed', String(button.dataset.fluidMode === state.fluidMode));
+      }
       const showWallpaper = state.aquaBackground === 'wallpaper';
       if (wallpaperControls) wallpaperControls.hidden = !showWallpaper;
       wallpaperOnly.forEach(node => { node.hidden = !showWallpaper; });
@@ -859,6 +863,7 @@
       root.dataset.pointerEffectSize = String(state[Schema.POINTER_STYLES[state.pointerStyle].field]);
       root.dataset.pointerColor = state.pointerColor;
       root.dataset.pointerOpacity = String(state.pointerOpacity / 100);
+      root.dataset.fluidMode = state.fluidMode;
       root.style.setProperty('--pointer-size', `${state.pointerSize}px`);
       root.style.setProperty('--pointer-color', state.pointerColor);
       root.style.setProperty('--pointer-opacity', String(state.pointerOpacity / 100));
@@ -993,6 +998,9 @@
     }
 
     listen(byId('setAquaEnabled'), 'click', () => update('aquaEnabled', !state.aquaEnabled, { immediate: true }));
+    for (const button of doc.querySelectorAll('[data-fluid-mode]')) {
+      listen(button, 'click', () => update('fluidMode', button.dataset.fluidMode, { immediate: true }));
+    }
     listen(byId('setPointerEnabled'), 'change', event => update('pointerEnabled', event.currentTarget.checked, { immediate: true }));
     listen(byId('setPointerStyle'), 'change', event => update('pointerStyle', event.currentTarget.value, { immediate: true }));
     for (const id of ['setPointerColor', 'setPointerColorHex']) {

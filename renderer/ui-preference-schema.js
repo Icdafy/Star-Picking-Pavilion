@@ -17,6 +17,8 @@
   const TEXT_SCALES = new Set(['sm', 'md', 'lg', 'xl']);
   const AQUA_MODES = new Set(['mica', 'compat']);
   const AQUA_BACKGROUNDS = new Set(['fluid', 'wallpaper']);
+  // v0.2.38 流体设计档位：auto 按刷新率、硬件、电量与实测掉帧自动选择。
+  const FLUID_MODES = new Set(['auto', 'full', 'lite', 'off']);
   const POINTER_STYLES = Object.freeze({
     glow: Object.freeze({ field: 'pointerSize', min: 80, max: 800, label: '光晕大小', hint: '柔光照亮鼠标附近的表面，边缘反光轻轻跟随。' }),
     comet: Object.freeze({ field: 'pointerCometSize', min: 80, max: 800, label: '尾迹长度', hint: '连续、渐细的流星尾迹，停下后自然消散。' }),
@@ -42,7 +44,8 @@
     aquaWallpaperFrost: 0,
     aquaWhale: false,
     aquaCritters: false,
-    ...POINTER_DEFAULTS
+    ...POINTER_DEFAULTS,
+    fluidMode: 'auto'
   });
   const INITIAL_UI_PREFERENCES = Object.freeze({
     theme: 'light',
@@ -79,6 +82,7 @@
     'pointerRingSize',
     'pointerColor',
     'pointerOpacity',
+    'fluidMode',
     'view',
     'domain',
     'category',
@@ -154,6 +158,7 @@
       aquaWhale: true,
       aquaCritters: true,
       ...POINTER_DEFAULTS,
+      fluidMode: 'auto',
       view: 'featured',
       domain: '',
       category: '',
@@ -320,6 +325,7 @@
       pointerRingSize: chooseValue(source.pointerRingSize, secondary.pointerRingSize, value => isFiniteNumberInRange(value, 12, 160), defaults.pointerRingSize),
       pointerColor: chooseValue(source.pointerColor, secondary.pointerColor, value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value), defaults.pointerColor),
       pointerOpacity: chooseValue(source.pointerOpacity, secondary.pointerOpacity, value => isFiniteNumberInRange(value, 10, 100), defaults.pointerOpacity),
+      fluidMode: chooseValue(source.fluidMode, secondary.fluidMode, value => FLUID_MODES.has(value), defaults.fluidMode),
       view: chooseValue(source.view, secondary.view, value => VIEWS.has(value), defaults.view),
       domain: chooseValue(source.domain, secondary.domain, value => DOMAINS.has(value), defaults.domain),
       category: chooseValue(
@@ -378,6 +384,7 @@
     if (field === 'pointerRingSize') return isFiniteNumberInRange(value, 12, 160);
     if (field === 'pointerColor') return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
     if (field === 'pointerOpacity') return isFiniteNumberInRange(value, 10, 100);
+    if (field === 'fluidMode') return FLUID_MODES.has(value);
     if (field === 'view') return VIEWS.has(value);
     if (field === 'domain') return DOMAINS.has(value);
     if (field === 'category') return isValidCategory(value);
@@ -423,6 +430,7 @@
     UI_PREFERENCE_FIELDS,
     DEFAULT_APPEARANCE,
     POINTER_STYLES,
+    FLUID_MODES: Object.freeze([...FLUID_MODES]),
     INITIAL_UI_PREFERENCES,
     TEXT_SCALES: Object.freeze([...TEXT_SCALES]),
     isPlainObject,

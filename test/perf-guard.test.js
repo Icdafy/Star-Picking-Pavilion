@@ -26,11 +26,13 @@ test('样式表体积不超过预算，膨胀必须先被护栏拦下', () => {
   // 两个一等视图（intel.css，约 18 KiB，发布前已确认 styles.css 无死规则可清），
   // 基线约 259 KiB，上限上调到 275 KiB；v0.2.3 设置页「模型」一节照搬 DeepSeek Harness Models 页
   // （约 15 KiB）与可读性、动效升级（约 3 KiB），上限上调到 292 KiB；v0.2.36 新闻推送改为点选面板
-  // （约 4 KiB，字体分片索引无损压缩回收约 2 KiB），上限上调到 296 KiB；再超时应先清理重复覆盖和死规则。
+  // （约 4 KiB，字体分片索引无损压缩回收约 2 KiB），上限上调到 296 KiB；v0.2.38 流体设计新增独立的
+  // fluid.css（约 14 KiB：凝光材质、悬浮控件、涟漪、彗星追光、下拉压暗），上限上调到 320 KiB，
+  // 关键帧与滤镜仍各自受下面的护栏约束；再超时应先清理重复覆盖和死规则。
   const bytes = stylesheetFiles.reduce((total, file) => total + fs.statSync(file).size, 0);
   assert.ok(
-    bytes <= 296 * 1024,
-    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 296 KB 总预算`
+    bytes <= 320 * 1024,
+    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 320 KB 总预算`
   );
 });
 
@@ -47,8 +49,9 @@ test('index.html 脚本标签总数受控，Aqua 官方引擎保持单一独立�
   // 再超说明模块又在碎片化，应合并职责相近的模块。
   // v0.2.0 新增两个一等视图：表示层与两个视图控制器合并为单一的 intel-views.js，
   // 净增一个边界到 27。
+  // v0.2.38 新增极光引擎 aurora-engine.js（流体设计的融合渲染层），净增一个边界到 28。
   const scriptCount = [...html.matchAll(/<script\b/gi)].length;
-  assert.ok(scriptCount <= 27, `脚本标签已有 ${scriptCount} 个，上限 27 个`);
+  assert.ok(scriptCount <= 28, `脚本标签已有 ${scriptCount} 个，上限 28 个`);
 });
 
 test('样式表动画关键帧数量受控，动效不无限堆叠', () => {
