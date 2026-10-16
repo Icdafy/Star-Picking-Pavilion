@@ -73,4 +73,9 @@ node scripts/benchmark-database.js
 
 ## 发布验证
 
-本机1106/1106单元与集成通过（40.7秒），生产与完整工具链均零漏洞，47项第三方声明、62条内置历史及版本一致校验通过。本地候选包1293项ASAR检查通过，app.asar 15,010,540 B，安装器101,315,628 B、NotSigned。首次整套回归仅因三个既有测试文件仍断言旧版本号失败，同步为0.2.34后整套1106项全过。真实Electron完整39/39通过（557.9秒），其中160组布局及新双源门闩、启动请求/统计同时失败后重试均通过。包内238个server/renderer/electron源与工作区原始字节一致，62条历史正文一致；本地SBOM校验42组件及Electron42.11.11。精确提交云端门禁与正式附件将在完成后回填。
+本机1106/1106单元与集成通过（40.7秒），生产与完整工具链均零漏洞，47项第三方声明、62条内置历史及版本一致校验通过。本地候选包1293项ASAR检查通过，app.asar 15,010,540 B，安装器101,315,628 B、NotSigned。首次整套回归仅因三个既有测试文件仍断言旧版本号失败，同步为0.2.34后整套1106项全过。真实Electron完整39/39通过（557.9秒），其中160组布局及新双源门闩、启动请求/统计同时失败后重试均通过。包内238个server/renderer/electron源与工作区原始字节一致，62条历史正文一致；本地SBOM校验42顶层/47含嵌套组件及Electron42.11.11。精确提交 `b8315d47e0187dfb730f66f97f1a38d18637697d` 的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38883177307)及[Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38883186228)均完整通过，云端同为1106/1106与39/39，安装、启动、单实例、退出、卸载及用户数据保留通过。
+
+2026-10-16 18:03:01（北京时间）正式发布为Latest，非draft/prerelease。六项附件匿名重新下载：安装器101,313,253 B、PE产品/文件版本0.2.34、NotSigned，SHA-256 `db52a278015e36d9fd9ffc0212155e5416fbe52c319ba70a9ca284d2ca22e13b`；SHA256SUMS、latest.yml版本/文件名/大小/真实SHA-512一致，发布正文与RELEASE_NOTES一致，SBOM1.6的47组件（42顶层+5嵌套）及全部引用含实际Electron42.11.11，第三方声明一致。未在本机运行安装器。
+
+
+公开安装器另经7-Zip纯静态提取（未执行安装器/应用）：app.asar 15,024,452 B，SHA-256 `74a58d4afb753ca2277e1fc1f57a9bca1bb84ef66eeab10c342cf60aa84722ce`；1293条目，server75/renderer144/electron19共238源与发布tag逐项核对，106原始字节相同、132仅CRLF/LF差异，内容差异/缺失/额外均0。46份生产依赖manifest、根及资源白名单、嵌入密钥扫描、法律声明通过；62条内置历史与tag JSON、当前正文与tag RELEASE_NOTES及公开Release一致。六附件均按GitHub asset.digest复核，SBOM1.6 schema与47组件非空唯一引用及本地锁定图一致。两次匿名下载安装器SHA-256一致。

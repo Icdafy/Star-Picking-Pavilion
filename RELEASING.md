@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-[v0.2.34](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.34) 完成采集分析流水与数据库、退出可靠性优化，正在执行完整发布验证。沿用 NotSigned 策略；证据见 [本版验证](docs/v0234-validation.md)。
+[v0.2.34](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.34) 已于北京时间2026-10-16 18:03:01发布，main CI与tag Release全部通过，六项公开附件匿名下载、摘要、PE版本与更新元数据已复核。沿用NotSigned策略；完整证据见[本版验证](docs/v0234-validation.md)。
 
 ## 发布前授权门槛
 
