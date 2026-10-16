@@ -2,7 +2,7 @@
 
 流体设计：凝光视效（通透材质、轮廓光、涟漪、彗星追光、下拉压暗）、流体动效（果冻滑动、方向入场）、柔性反馈（按压回弹、拖拽水滴）与极光引擎。
 
-v0.2.38 正在经 tag 工作流发布，结果与证据见[验证记录](docs/v0238-validation.md)。
+[v0.2.38](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.38) 于2026-10-17 02:45:55（北京时间）发布为最新正式版，无发布阻塞。精确提交 `beabd7d` 的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38947999040)与[Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38948009891)首轮完整通过；本地 1143/1143 单元与集成、40/40 真实 Electron、零生产依赖漏洞、1301 项包边界。六项公开附件齐全：安装器 101,356,070 B，SHA-256 `b631b68f102fa6f6a302fd972ff89ee66ce591bd197d7d95197bc56e554fb162`，latest.yml 指向 0.2.38；用户数据保留。证据见[验证记录](docs/v0238-validation.md)。
 ---
 
 # v0.2.37 发布状态（历史）

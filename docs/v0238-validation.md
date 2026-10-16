@@ -39,6 +39,10 @@ v0.2.38 为整个摘星阁引入“流体设计”——凝光视效、流体动
 - 轻盈档：按压回弹与单圈涟漪保留，拖拽无连桥，果冻滑动关闭。关闭档：无涟漪、无按压缩放、无压暗，下拉回到原生样式。
 - 全程无页面错误或控制台错误。
 
+## 发布
+
+提交 `beabd7d`、tag `v0.2.38`：[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38947999040) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38948009891) 首轮通过，2026-10-17 02:45:55（北京时间）发布为 Latest。六项附件：安装器 101,356,070 B（SHA-256 `b631b68f102fa6f6a302fd972ff89ee66ce591bd197d7d95197bc56e554fb162`，与 SHA256SUMS.txt 一致）、blockmap、latest.yml（version 0.2.38、size 一致）、SHA256SUMS.txt、CycloneDX SBOM、第三方声明。
+
 ## 限制
 
 - 下拉玻璃面板依赖 Chromium 的 `appearance: base-select`；不支持时自动保留原生下拉，仍有压暗。

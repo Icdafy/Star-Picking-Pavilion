@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.38 引入流体设计（凝光视效、流体动效、柔性反馈）与极光引擎融合渲染层，新增“流体设计”档位偏好；发布由 tag 工作流完成，证据见 [本版验证](docs/v0238-validation.md)。
+[v0.2.38](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.38) 已于北京时间 2026-10-17 02:45:55 发布：引入流体设计（凝光视效、流体动效、柔性反馈）与极光引擎融合渲染层，新增“流体设计”档位偏好。tag Release 与 main CI 全部门禁通过，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0238-validation.md)。
 
 ## 发布前授权门槛
 
