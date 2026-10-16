@@ -126,7 +126,8 @@
       escapeHTML: esc,
       findFocusKey: focusTools.findFocusKey,
       restoreFocusByKey: focusTools.restoreFocusByKey,
-      motion
+      motion,
+      badge: $('#modelsBadge')
     });
 
     const pushSettings = typeof SettingsFormController.createPushSettings !== 'function' ? null : SettingsFormController.createPushSettings({
@@ -281,10 +282,106 @@
       return storageMaintenance.load().catch(() => null);
     }
 
+    // —— v0.2.37 自动采集与保留期限：开关、点选、回车即保存，失败时读回服务器上的值 ——
+    const Form = SettingsFormController;
+    function renderPresets(selector, group, presets, current) {
+      if (typeof Form.presetChips !== 'function' || !presets) return;
+      $(selector).innerHTML = Form.presetChips(group, presets, current, esc);
+    }
+    function intervalText() {
+      return Form.describeInterval?.($('#setInterval').value) || `${$('#setInterval').value} 分钟`;
+    }
+    function renderCollect() {
+      const automatic = $('#setAutomaticCollect').checked === true;
+      renderPresets('#collectIntervalChips', 'interval', Form.COLLECT_INTERVAL_PRESETS, Number($('#setInterval').value));
+      $('#collectHeroTitle').textContent = !automatic ? '已关闭'
+        : $('#setInterval').value ? `每 ${intervalText()}采集一次` : '已开启';
+    }
+    function renderRetention() {
+      renderPresets('#retentionChips', 'retention', Form.RETENTION_PRESETS, Number($('#setRetentionDays').value));
+      renderPresets('#irrelevantRetentionChips', 'irrelevant', Form.IRRELEVANT_RETENTION_PRESETS,
+        Number($('#setIrrelevantRetentionDays').value));
+    }
+
+    async function loadForm() {
+      try { return await settingsForm.load(); } finally { renderCollect(); renderRetention(); }
+    }
+
+    async function saveCollectField(field, describe) {
+      try {
+        await settingsForm.saveCollect([field]);
+        toast(describe());
+        await refreshStats();
+      } catch (error) {
+        toast('自动采集设置保存失败：' + error.message, true);
+        await settingsForm.discard?.([field]).catch(() => {});
+      }
+      renderCollect();
+    }
+
+    async function saveRetentionField(field, label, input) {
+      try {
+        await settingsForm.saveRetention([field]);
+        toast(`${label}改为保留 ${input.value} 天`);
+        loadMaintenance();
+      } catch (error) {
+        toast('保留期限保存失败：' + error.message, true);
+        await settingsForm.discard?.([field]).catch(() => {});
+      }
+      renderRetention();
+    }
+
+    const describeAutomatic = () => ($('#setAutomaticCollect').checked
+      ? `自动采集已开启：每 ${intervalText()}采集一次，首轮在一个间隔后开始`
+      : '自动采集已关闭：之后只在点击“立即采集分析”时工作');
+    const describeInterval = () => `采集间隔已改为每 ${intervalText()}，下一轮起按新间隔计时`;
+    const describeRsshub = () => ($('#setRsshub').value.trim() ? 'RSSHub 地址已保存，rsshub:// 信源下一轮生效' : '已清除 RSSHub 地址');
+
+    $('#setAutomaticCollect').addEventListener('change', () => saveCollectField('automatic', describeAutomatic));
+    $('#setInterval').addEventListener('change', () => saveCollectField('intervalMinutes', describeInterval));
+    $('#setRsshub').addEventListener('change', () => saveCollectField('rsshubBase', describeRsshub));
+    $('#collectIntervalChips').addEventListener('click', event => {
+      const chip = event.target.closest?.('[data-preset="interval"]');
+      if (!chip || chip.getAttribute('aria-pressed') === 'true') return;
+      $('#setInterval').value = chip.dataset.value;
+      saveCollectField('intervalMinutes', describeInterval);
+    });
+
+    const retentionInputs = [
+      ['#retentionChips', 'retention', '#setRetentionDays', 'retentionDays', '相关情报'],
+      ['#irrelevantRetentionChips', 'irrelevant', '#setIrrelevantRetentionDays', 'irrelevantRetentionDays', '无关内容']
+    ];
+    for (const [chips, group, selector, field, label] of retentionInputs) {
+      $(selector).addEventListener('change', () => saveRetentionField(field, label, $(selector)));
+      $(chips).addEventListener('click', event => {
+        const chip = event.target.closest?.(`[data-preset="${group}"]`);
+        if (!chip || chip.getAttribute('aria-pressed') === 'true') return;
+        $(selector).value = chip.dataset.value;
+        saveRetentionField(field, label, $(selector));
+      });
+    }
+
+    // 显示 → 深浅主题：与顶栏主题按钮同源（点它切换，含圆形揭开动画），并跟随 Alt+T 等外部切换
+    const themeRoot = doc?.documentElement;
+    function syncThemeOptions() {
+      const current = themeRoot?.dataset.theme === 'dark' ? 'dark' : 'light';
+      for (const button of $('#themeOptions').querySelectorAll?.('[data-theme-choice]') || []) {
+        button.setAttribute('aria-pressed', String(button.dataset.themeChoice === current));
+      }
+    }
+    $('#themeOptions').addEventListener('click', event => {
+      const button = event.target.closest?.('[data-theme-choice]');
+      if (button && themeRoot && themeRoot.dataset.theme !== button.dataset.themeChoice) $('#btnTheme').click?.();
+    });
+    if (themeRoot && win?.MutationObserver) {
+      new win.MutationObserver(syncThemeOptions).observe(themeRoot, { attributes: true, attributeFilter: ['data-theme'] });
+      syncThemeOptions();
+    }
+
     async function loadSettings() {
       try {
         await Promise.all([
-          settingsForm.load(),
+          loadForm(),
           refreshStats(),
           modelsSettings.load(),
           pushSettings?.load(),
@@ -295,26 +392,6 @@
       loadMaintenance();
       loadFeedback();
     }
-
-    $('#btnSaveCollect').addEventListener('click', async () => {
-      try {
-        await settingsForm.saveCollect();
-        await refreshStats();
-        toast('采集设置已保存，采集间隔与 RSSHub 已生效');
-      } catch (error) {
-        toast('采集设置保存失败：' + error.message, true);
-      }
-    });
-
-    $('#btnSaveRetention').addEventListener('click', async () => {
-      try {
-        await settingsForm.saveRetention();
-        toast('数据保留设置已保存');
-        loadMaintenance();
-      } catch (error) {
-        toast('数据保留设置保存失败：' + error.message, true);
-      }
-    });
 
     $('#btnPruneNow').addEventListener('click', async () => {
       try {
@@ -340,7 +417,7 @@
       const list = $('#feedbackList');
       try {
         const notes = await api('/api/feedback');
-        list.innerHTML = notes.map(note => `
+        list.innerHTML = notes.length ? notes.map(note => `
       <li class="note-item" data-id="${note.id}">
         <div class="note-body">
           <p>${esc(note.content)}</p>
@@ -348,7 +425,7 @@
         </div>
         <button class="note-remove" data-act="remove-note" type="button"
           aria-label="删除这条备忘">删除</button>
-      </li>`).join('');
+      </li>`).join('') : '<li class="note-empty">还没有备忘。写下的内容会按时间倒序列在这里。</li>';
       } catch {
         list.innerHTML = '';
       }
@@ -366,7 +443,7 @@
       }
     });
 
-    $('#btnFeedback').addEventListener('click', async () => {
+    async function addNote() {
       const t = $('#feedbackText').value.trim();
       if (!t) return toast('请先写点什么', true);
       try {
@@ -375,8 +452,14 @@
         toast('已记入情报备忘');
         loadFeedback();
       } catch (error) {
-        toast('反馈保存失败：' + error.message, true);
+        toast('备忘保存失败：' + error.message, true);
       }
+    }
+    $('#btnFeedback').addEventListener('click', addNote);
+    $('#feedbackText').addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey) || event.isComposing) return;
+      event.preventDefault();
+      addNote();
     });
 
     return Object.freeze({ loadSettings, loadModels: () => modelsSettings.load(), loadPush: () => pushSettings?.load(),

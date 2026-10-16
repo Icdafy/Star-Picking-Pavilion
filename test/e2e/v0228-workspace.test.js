@@ -247,19 +247,19 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
       await page.keyboard.press('Escape');
     }
   }
-  await page.locator('[data-settings-target="settingsDisplay"]').click();
+  await page.locator('[data-settings-target="settingsAppearance"]').click();
   await page.locator('#setPointerSizeNumber').scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   await page.locator('#setPointerSizeNumber').hover();
-  await page.waitForFunction(() => document.querySelector('#settingsDisplay .surface-glow'));
+  await page.waitForFunction(() => document.querySelector('#settingsAppearance .surface-glow'));
   await page.waitForTimeout(500);
-  const restingCenter = await page.locator('#settingsDisplay .surface-glow').evaluate(node => {
+  const restingCenter = await page.locator('#settingsAppearance .surface-glow').evaluate(node => {
     const style = getComputedStyle(node), matrix = new DOMMatrixReadOnly(style.transform);
     return { x: matrix.m41 + parseFloat(style.width) / 2, y: matrix.m42 + parseFloat(style.height) / 2 };
   });
   await page.locator('#setPointerSizeNumber').fill('520');
   await page.waitForFunction(center => {
-    const node = document.querySelector('#settingsDisplay .surface-glow'); if (!node) return false;
+    const node = document.querySelector('#settingsAppearance .surface-glow'); if (!node) return false;
     const style = getComputedStyle(node), matrix = new DOMMatrixReadOnly(style.transform);
     return style.width === '520px' && Math.abs(matrix.m41 + 260 - center.x) < .05 && Math.abs(matrix.m42 + 260 - center.y) < .05;
   }, restingCenter);
@@ -273,8 +273,8 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   await page.waitForTimeout(300);
   const paletteBounds = await page.locator('#pointerPalette').boundingBox();
   await page.mouse.move(paletteBounds.x + paletteBounds.width / 2, paletteBounds.y - 15);
-  await page.waitForFunction(() => document.querySelector('#settingsDisplay .surface-glow'));
-  assert.equal(await page.locator('#settingsDisplay .surface-glow').evaluate(node => getComputedStyle(node).width), '520px');
+  await page.waitForFunction(() => document.querySelector('#settingsAppearance .surface-glow'));
+  assert.equal(await page.locator('#settingsAppearance .surface-glow').evaluate(node => getComputedStyle(node).width), '520px');
   await page.locator('#pointerPalette').scrollIntoViewIfNeeded();
   await page.mouse.move(900, 620);
   await page.screenshot({ path: path.join(output, 'pointer-settings-light.png') });

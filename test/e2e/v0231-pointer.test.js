@@ -155,7 +155,8 @@ test('v0231 real pointer animation remains bounded, settles when idle and stops 
     await toggle.click();
     assert.equal(await page.locator('#setPointerEnabled').isChecked(), false);
     await page.waitForFunction(() => !document.documentElement.hasAttribute('data-pointer-composition'));
-    await style.scrollIntoViewIfNeeded();
+    // v0.2.37：关闭后从属选项收起，以开关本身作为滚动锚点
+    await toggle.scrollIntoViewIfNeeded();
     await page.evaluate(value => { document.documentElement.dataset.fxTier = value; }, tier);
     await sweep(page);
     const baseline = await measureInput(page);

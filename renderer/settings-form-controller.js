@@ -26,6 +26,25 @@
   const COLLECT_FIELD_NAMES = Object.freeze(['automatic', 'intervalMinutes', 'rsshubBase']);
   const RETENTION_FIELD_NAMES = Object.freeze(['retentionDays', 'irrelevantRetentionDays']);
   const RETENTION_DEFAULTS = Object.freeze({ retentionDays: 180, irrelevantRetentionDays: 21 });
+  const COLLECT_INTERVAL_PRESETS = Object.freeze([
+    [15, '15 分钟'], [30, '30 分钟'], [60, '1 小时'], [120, '2 小时'], [180, '3 小时'], [360, '6 小时'], [720, '12 小时']
+  ]);
+  const RETENTION_PRESETS = Object.freeze([[30, '30 天'], [90, '90 天'], [180, '半年'], [365, '1 年'], [1095, '3 年']]);
+  const IRRELEVANT_RETENTION_PRESETS = Object.freeze([[7, '7 天'], [14, '14 天'], [21, '21 天'], [30, '30 天'], [60, '60 天']]);
+
+  function describeInterval(minutes) {
+    const value = Number(minutes);
+    if (!Number.isInteger(value) || value < 1) return '';
+    return value % 60 === 0 ? `${value / 60} 小时` : `${value} 分钟`;
+  }
+
+  // 设置页通用的点选组：与“新闻推送”同一套 .period-switch 胶囊；每个都是可 Tab 到的切换按钮
+  function presetChips(group, presets, current, esc = String) {
+    return presets.map(([value, label]) => {
+      const on = Number(current) === value;
+      return `<button class="chip${on ? ' active' : ''}" type="button" aria-pressed="${on}" data-preset="${esc(group)}" data-value="${value}">${esc(label)}</button>`;
+    }).join('');
+  }
 
   function createSettingsFormController({ elements, request } = {}) {
     if (!elements || typeof request !== 'function') {
@@ -85,45 +104,68 @@
       return settings;
     }
 
-    async function saveCollect() {
-      const intervalMinutes = Number(elements.intervalMinutes.value);
-      if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 720) {
-        throw new Error('采集间隔请输入 1 至 720 的整数分钟');
+    // v0.2.37 起设置页改为“改动即保存”：开关、点选与回车各自只提交自己的字段，
+    // 不再把别处尚未确认的输入一并带走；不带参数时仍提交整组（兼容旧调用）。
+    function pick(names, allowed) {
+      const list = names === undefined ? allowed : [].concat(names);
+      if (!list.length || list.some(name => !allowed.includes(name))) {
+        throw new TypeError(`unknown settings fields: ${list.join(', ')}`);
       }
+      return list;
+    }
+
+    function wholeDays(name, min, label) {
+      const text = String(elements[name].value).trim();
+      const days = Number(text);
+      if (!text || !Number.isInteger(days) || days < min || days > 3650) {
+        throw new Error(`${label}请输入 ${min} 至 3650 的整数天`);
+      }
+      return days;
+    }
+
+    async function submit(fields, values) {
       const submitted = snapshot();
-      const result = await request('/api/settings', {
-        body: {
-          collect: {
-            automatic: elements.automatic.checked === true,
-            intervalMinutes,
-            rsshubBase: elements.rsshubBase.value.trim()
-          }
-        }
-      });
-      for (const name of COLLECT_FIELD_NAMES) {
-        markSynchronizedIfUnchanged(name, submitted);
-      }
+      const result = await request('/api/settings', { body: { collect: values } });
+      for (const name of fields) markSynchronizedIfUnchanged(name, submitted);
       return result;
     }
 
-    async function saveRetention() {
-      const submitted = snapshot();
-      const result = await request('/api/settings', {
-        body: {
-          collect: {
-            retentionDays: Number(elements.retentionDays.value) || RETENTION_DEFAULTS.retentionDays,
-            irrelevantRetentionDays:
-              Number(elements.irrelevantRetentionDays.value) || RETENTION_DEFAULTS.irrelevantRetentionDays
-          }
+    async function saveCollect(names) {
+      const fields = pick(names, COLLECT_FIELD_NAMES);
+      const values = {};
+      if (fields.includes('automatic')) values.automatic = elements.automatic.checked === true;
+      if (fields.includes('intervalMinutes')) {
+        const intervalMinutes = Number(elements.intervalMinutes.value);
+        if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 720) {
+          throw new Error('采集间隔请输入 1 至 720 的整数分钟');
         }
-      });
-      for (const name of RETENTION_FIELD_NAMES) {
-        markSynchronizedIfUnchanged(name, submitted);
+        values.intervalMinutes = intervalMinutes;
       }
-      return result;
+      if (fields.includes('rsshubBase')) values.rsshubBase = elements.rsshubBase.value.trim();
+      return submit(fields, values);
     }
 
-    return Object.freeze({ load, saveCollect, saveRetention });
+    // 空值、小数与越界一律拒绝：此前清空输入框会被静默替换成默认天数
+    async function saveRetention(names) {
+      const fields = pick(names, RETENTION_FIELD_NAMES);
+      const values = {};
+      if (fields.includes('retentionDays')) values.retentionDays = wholeDays('retentionDays', 7, '情报保留天数');
+      if (fields.includes('irrelevantRetentionDays')) {
+        values.irrelevantRetentionDays = wholeDays('irrelevantRetentionDays', 1, '无关内容保留天数');
+      }
+      return submit(fields, values);
+    }
+
+    // 保存被拒后放弃这些字段上的本地改动，重新读回服务器上的值（否则脏标记会挡住回滚）
+    function discard(names) {
+      for (const name of pick(names, FIELD_NAMES)) {
+        fieldStates[name].dirty = false;
+        fieldStates[name].revision += 1;
+      }
+      return load();
+    }
+
+    return Object.freeze({ load, saveCollect, saveRetention, discard });
   }
 
   // ======================================================================
@@ -286,7 +328,7 @@
   // ======================================================================
   function createModelsSettings({
     root, picker, request, toast = () => {}, confirm = async () => true,
-    escapeHTML, findFocusKey = () => null, restoreFocusByKey = () => false, motion = null
+    escapeHTML, findFocusKey = () => null, restoreFocusByKey = () => false, motion = null, badge = null
   } = {}) {
     if (!root || typeof request !== 'function' || typeof escapeHTML !== 'function') {
       throw new TypeError('models settings requires root, request and escapeHTML');
@@ -356,12 +398,20 @@
               <span class="sr-only">选择分析模型</span>
               <select id="modelsActiveSelect" data-models-act="select-active" data-focus-key="models-active"${state.activeBusy ? ' disabled' : ''}>${groups}</select>
             </label>
-            <button class="btn-ghost" type="button" id="btnTestModel" data-models-act="test-active" data-focus-key="models-test"${state.testBusy ? ' disabled' : ''}>${state.testBusy ? '测试中…' : '测试连接'}</button>
+            <button class="btn-ghost" type="button" id="btnTestModel" data-models-act="test-active" data-focus-key="models-test"${state.testBusy || noKey ? ' disabled' : ''}${noKey ? ' title="先填入 API 密钥才能测试"' : ''}>${state.testBusy ? '测试中…' : '测试连接'}</button>
           </div>
           <p class="models-active-status${result ? (result.ok ? ' ok' : ' fail') : ''}${noKey && !result ? ' warn' : ''}" id="modelTestResult" role="status" aria-live="polite">${result
             ? esc(result.ok ? `✓ 连接正常 · ${result.model} · ${formatLatency(result.latencyMs)}` : `✗ ${result.error}`)
-            : noKey ? '该提供商还没有 API 密钥：分析会退回关键词启发式，请在下方编辑它并填入密钥。' : ''}</p>
+            : noKey ? `还没有 ${esc(active.displayName)} 的 API 密钥，精选暂用关键词规则。 <button class="btn-primary btn-compact" type="button" data-models-act="fill-key" data-provider="${esc(active.provider)}" data-focus-key="models-fill-key">填入密钥</button>` : ''}</p>
         </div>`;
+    }
+
+    function renderBadge() {
+      if (!badge || !state.view) return;
+      const active = providerRow(state.view.activeProvider);
+      const ready = Boolean(active && (active.keyConfigured || active.keyOptional));
+      badge.textContent = ready ? '已就绪' : '缺少密钥';
+      badge.className = `set-badge ${ready ? 'ok' : 'warn'}`;
     }
 
     function capacityInput(draftKey, row, field, placeholder, labelText, position) {
@@ -516,7 +566,7 @@
               <span class="model-row-identity">
                 <span class="model-row-name">${esc(row.displayName)}</span>
                 ${row.declared ? '<span class="model-row-tag">自定义</span>' : ''}
-                ${row.active ? '<span class="model-row-tag is-active">分析中</span>' : ''}
+                ${row.active ? '<span class="model-row-tag is-active" title="分析模型来自这个提供商">当前使用</span>' : ''}
                 ${dotHtml(row)}
               </span>
               <span class="model-row-actions">
@@ -598,6 +648,7 @@
         ${state.saved ? `<p class="models-saved" role="status" aria-live="polite">${esc(state.saved)}</p>` : ''}
         <ul class="model-rows">${rowsHtml()}</ul>
         <div class="models-add">${addHtml()}</div>`;
+      renderBadge();
       restoreFocusByKey(root, focusKey);
       rememberSignatures();
       if (motion && pendingEntrances.size) {
@@ -988,6 +1039,15 @@
       switch (act) {
         case 'retry': load(); break;
         case 'edit': openEditor(target.getAttribute('data-provider')); break;
+        case 'fill-key': {
+          // 警告里的“填入密钥”：直接展开当前提供商的编辑卡并把光标放进密钥框（已展开时不收起）
+          const provider = target.getAttribute('data-provider');
+          if (state.editing !== provider) openEditor(provider);
+          const input = root.querySelector(`.model-row[data-provider="${CSS.escape(provider)}"] input[data-models-field="apiKey"]`);
+          input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+          input?.focus({ preventScroll: true });
+          break;
+        }
         case 'remove': removeProvider(target.getAttribute('data-provider')); break;
         case 'open-add': openAdd(); break;
         case 'add-mode': {
@@ -1293,7 +1353,7 @@
     }
 
     function option(label, body, hint = '') {
-      return `<div class="push-opt"><span>${esc(label)}</span><div class="push-opt-body">${body}${hint ? `<small>${esc(hint)}</small>` : ''}</div></div>`;
+      return `<div class="set-row"><span>${esc(label)}</span><div class="set-row-body">${body}${hint ? `<small>${esc(hint)}</small>` : ''}</div></div>`;
     }
 
     function timeOptions(from, to, step, selected) {
@@ -1515,7 +1575,7 @@
           <span class="note-time">${esc(formatPushMoment(entry.at, current))}</span></div></li>`;
       }).join('') : '<li class="note-item"><div class="note-body"><p class="muted">还没有推送记录。</p></div></li>';
       if (!elements.status.textContent && on && !view.collectAutomatic) {
-        setStatus('提示：“采集调度”里的自动采集分析尚未开启，推送只会包含手动“立即采集分析”得到的新情报。', 'warning');
+        setStatus('提示：“自动采集”尚未开启，推送只会包含手动“立即采集分析”得到的新情报。', 'warning');
       }
     }
 
@@ -1893,6 +1953,11 @@
     modelRowsFailure,
     providerDraft,
     rowPayload,
-    draftRow
+    draftRow,
+    presetChips,
+    describeInterval,
+    COLLECT_INTERVAL_PRESETS,
+    RETENTION_PRESETS,
+    IRRELEVANT_RETENTION_PRESETS
   });
 });

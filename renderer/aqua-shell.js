@@ -821,7 +821,10 @@
       }
       const whaleSwitch = byId('setAquaWhale');
       const enabledSwitch = byId('setAquaEnabled');
-      if (enabledSwitch) { enabledSwitch.setAttribute('aria-pressed', String(state.aquaEnabled)); enabledSwitch.textContent = state.aquaEnabled ? '氛围：开启' : '氛围：关闭'; }
+      if (enabledSwitch) {
+        enabledSwitch.setAttribute('aria-pressed', String(state.aquaEnabled));
+        enabledSwitch.title = state.aquaEnabled ? '动态背景：开启' : '动态背景：关闭';
+      }
       const critterSwitch = byId('setAquaCritters');
       if (whaleSwitch) whaleSwitch.checked = state.aquaWhale;
       if (critterSwitch) critterSwitch.checked = state.aquaCritters;
@@ -1017,14 +1020,19 @@
       { immediate: true }
     ));
 
+    // “恢复默认外观”只复位玻璃与背景参数：动态背景的开关是用户的显式选择，
+    // 跟手动效另有自己的“恢复默认动效”，此前这里会把两者一并改掉。
+    const AQUA_RESET = Object.freeze(Object.fromEntries(
+      FIELDS.filter(field => field.startsWith('aqua') && field !== 'aquaEnabled').map(field => [field, DEFAULTS[field]])
+    ));
     listen(byId('btnAquaReset'), 'click', () => {
       wallpaperRequest += 1;
-      Object.assign(state, DEFAULTS);
-      onChange({ ...DEFAULTS });
-      pendingPatch = { ...DEFAULTS };
+      Object.assign(state, AQUA_RESET);
+      onChange({ ...AQUA_RESET });
+      pendingPatch = { ...pendingPatch, ...AQUA_RESET };
       apply();
       flushPersist();
-      setStatus('已恢复默认氛围');
+      setStatus('已恢复默认外观');
     });
 
     listen(byId('btnAquaWallpaperClear'), 'click', async () => {

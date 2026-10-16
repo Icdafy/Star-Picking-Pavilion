@@ -47,7 +47,7 @@ function makeEl(selector, registry) {
   };
 }
 
-function createController({ feedback = [], feedbackDelete = 'ok', push = false } = {}) {
+function createController({ feedback = [], feedbackDelete = 'ok', push = false, rejectSave = false } = {}) {
   const listeners = {};
   const els = new Map();
   const $ = selector => {
@@ -83,10 +83,18 @@ function createController({ feedback = [], feedbackDelete = 'ok', push = false }
     refreshStats: () => statsCalls.push('refresh'),
     Desktop: null,   // 非安装版：桌面设置/每日归档走降级分支
     SettingsFormController: {
+      ...require('../renderer/settings-form-controller'),
       createSettingsFormController: () => ({
         load: async () => formCalls.push('load'),
-        saveCollect: async () => formCalls.push('saveCollect'),
-        saveRetention: async () => formCalls.push('saveRetention')
+        saveCollect: async names => {
+          formCalls.push(['saveCollect', names]);
+          if (rejectSave) throw new Error('采集间隔请输入 1 至 720 的整数分钟');
+        },
+        saveRetention: async names => {
+          formCalls.push(['saveRetention', names]);
+          if (rejectSave) throw new Error('情报保留天数请输入 7 至 3650 的整数天');
+        },
+        discard: async names => formCalls.push(['discard', names])
       }),
       createModelsSettings: options => {
         modelsOptions.push(options);
@@ -97,7 +105,7 @@ function createController({ feedback = [], feedbackDelete = 'ok', push = false }
           pushOptions.push(options);
           return { load: async () => formCalls.push('push-load') };
         }
-      } : {})
+      } : { createPushSettings: undefined })
     },
     focusTools: { findFocusKey: () => 'focus-key', restoreFocusByKey: () => true },
     motion: { fadeSlideIn() {}, staggerIn() {} },
@@ -192,4 +200,68 @@ test('新闻推送一节装配到 #pushChannels 等控件，注入 api / confirm
   assert.equal(typeof options.escapeHTML, 'function');
   await ctrl.loadSettings();
   assert.ok(formCalls.includes('push-load'));
+});
+
+const tick = () => new Promise(resolve => setImmediate(resolve));
+
+test('v0.2.37 自动采集改动即保存：开关、胶囊、回车各自只提交自己的字段，并刷新状态标题', async () => {
+  const env = createController();
+  await env.ctrl.loadSettings();
+  env.$('#setInterval').value = '60';
+  env.$('#setAutomaticCollect').checked = true;
+  await env.fire('#setAutomaticCollect', 'change');
+  assert.deepEqual(env.formCalls.at(-1), ['saveCollect', ['automatic']]);
+  assert.match(env.toasts.at(-1)[0], /自动采集已开启：每 1 小时采集一次/);
+  assert.equal(env.$('#collectHeroTitle').textContent, '每 1 小时采集一次');
+  assert.match(env.$('#collectIntervalChips').innerHTML, /data-value="60"[^>]*>1 小时/);
+  assert.match(env.$('#collectIntervalChips').innerHTML, /aria-pressed="true" data-preset="interval" data-value="60"/);
+
+  const chip = { dataset: { value: '30' }, getAttribute: () => 'false' };
+  env.fire('#collectIntervalChips', 'click', { target: { closest: selector => (selector === '[data-preset="interval"]' ? chip : null) } });
+  await tick(); await tick();
+  assert.equal(env.$('#setInterval').value, '30');
+  assert.deepEqual(env.formCalls.at(-1), ['saveCollect', ['intervalMinutes']]);
+  assert.equal(env.$('#collectHeroTitle').textContent, '每 30 分钟采集一次');
+
+  env.$('#setRsshub').value = '';
+  await env.fire('#setRsshub', 'change');
+  assert.deepEqual(env.formCalls.at(-1), ['saveCollect', ['rsshubBase']]);
+  assert.equal(env.toasts.at(-1)[0], '已清除 RSSHub 地址');
+  assert.ok(!env.formCalls.some(call => Array.isArray(call) && call[1] === undefined), '不得再整组提交');
+});
+
+test('v0.2.37 保存被拒时提示原因并读回服务器值（discard），保留期限胶囊同样即点即存', async () => {
+  const env = createController({ rejectSave: true });
+  env.$('#setInterval').value = '0';
+  await env.fire('#setInterval', 'change');
+  assert.deepEqual(env.toasts.at(-1), ['自动采集设置保存失败：采集间隔请输入 1 至 720 的整数分钟', true]);
+  assert.deepEqual(env.formCalls.at(-1), ['discard', ['intervalMinutes']]);
+
+  const ok = createController();
+  const chip = { dataset: { value: '365' }, getAttribute: () => 'false' };
+  ok.fire('#retentionChips', 'click', { target: { closest: selector => (selector === '[data-preset="retention"]' ? chip : null) } });
+  await tick(); await tick();
+  assert.equal(ok.$('#setRetentionDays').value, '365');
+  assert.deepEqual(ok.formCalls.find(call => call[0] === 'saveRetention'), ['saveRetention', ['retentionDays']]);
+  assert.ok(ok.toasts.some(([message]) => message === '相关情报改为保留 365 天'));
+  assert.match(ok.$('#retentionChips').innerHTML, /aria-pressed="true" data-preset="retention" data-value="365">1 年/);
+
+  await env.fire('#setIrrelevantRetentionDays', 'change');
+  assert.deepEqual(env.formCalls.at(-1), ['discard', ['irrelevantRetentionDays']]);
+  assert.match(env.toasts.at(-1)[0], /^保留期限保存失败：/);
+});
+
+test('情报备忘：空列表给出提示，Ctrl+Enter 与按钮同样记下', async () => {
+  const env = createController();
+  await env.ctrl.loadSettings();
+  await tick();
+  assert.match(env.$('#feedbackList').innerHTML, /还没有备忘/);
+  env.$('#feedbackText').value = '待核实：某型号取证时间';
+  let prevented = false;
+  env.fire('#feedbackText', 'keydown', { key: 'Enter', ctrlKey: true, preventDefault: () => { prevented = true; } });
+  await tick();
+  assert.equal(prevented, true);
+  assert.ok(env.requests.some(([url, opts]) => url === '/api/feedback' && opts?.body?.content === '待核实：某型号取证时间'));
+  env.$('#feedbackText').value = '普通回车换行';
+  env.fire('#feedbackText', 'keydown', { key: 'Enter', preventDefault: () => assert.fail('plain Enter must insert a newline') });
 });

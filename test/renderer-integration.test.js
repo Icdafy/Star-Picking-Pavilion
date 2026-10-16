@@ -168,7 +168,10 @@ test('设置页通过竞态安全控制器加载和保存全部可编辑字段',
   assert.match(settingsViewSource, /settingsForm\.load\(\)/);
   assert.match(settingsViewSource, /SettingsFormController\.createModelsSettings/);
   assert.match(settingsViewSource, /modelsSettings\.load\(\)/);
-  assert.match(settingsViewSource, /settingsForm\.saveCollect\(\)/);
+  // v0.2.37：改动即保存，每个控件只提交自己的字段
+  assert.match(settingsViewSource, /settingsForm\.saveCollect\(\[field\]\)/);
+  assert.match(settingsViewSource, /\$\('#setAutomaticCollect'\)\.addEventListener\('change'/);
+  assert.doesNotMatch(html, /id="btnSaveCollect"/);
 });
 
 test('设置页提供可访问的桌面运行开关', () => {
@@ -194,7 +197,7 @@ test('界面展示后端的安全错误消息并捕获设置保存失败', () =>
   assert.match(settingsViewSource, /采集设置保存失败：/);
   assert.match(dailyViewSource, /重新生成失败：/);
   assert.match(sourcesControllerSource, /信源操作失败：/);
-  assert.match(settingsViewSource, /反馈保存失败：/);
+  assert.match(settingsViewSource, /备忘保存失败：/);
 });
 
 test('日报导航使用本地日历日期而不是 UTC 日期切片', () => {
@@ -768,7 +771,8 @@ test('信源卡片展示失败退避状态并提供立即重试', () => {
 test('设置页提供数据保留配置与本地库体积视图', () => {
   assert.match(html, /id="setRetentionDays"[^>]*type="number"[^>]*min="7"[^>]*max="3650"/);
   assert.match(html, /id="setIrrelevantRetentionDays"[^>]*type="number"[^>]*min="1"[^>]*max="3650"/);
-  assert.match(html, /id="btnSaveRetention"/);
+  assert.match(html, /id="retentionChips"/);
+  assert.match(html, /id="irrelevantRetentionChips"/);
   assert.match(html, /id="btnPruneNow"/);
   for (const id of ['msArticles', 'msTotal', 'msExpiring']) {
     assert.ok(html.includes(`id="${id}"`), `缺少统计位 ${id}`);
@@ -776,10 +780,10 @@ test('设置页提供数据保留配置与本地库体积视图', () => {
   // 批 2：存储治理与保留设置接线随设置视图控制器迁出
   assert.match(settingsViewSource, /requestDatabase: \(\) => api\('\/api\/maintenance'\)/);
   assert.match(settingsViewSource, /'\/api\/maintenance\/prune'/);
-  assert.match(settingsViewSource, /await settingsForm\.saveRetention\(\)/);
+  assert.match(settingsViewSource, /await settingsForm\.saveRetention\(\[field\]\)/);
   assert.match(settingsFormController, /RETENTION_FIELD_NAMES/);
-  assert.match(settingsFormController, /retentionDays: Number\(elements\.retentionDays\.value\)/);
-  assert.ok(css.includes('.maintenance-stats'), '缺少 .maintenance-stats 样式');
+  assert.match(settingsFormController, /values\.retentionDays = wholeDays\('retentionDays', 7,/);
+  assert.ok(css.includes('.storage-summary'), '缺少 .storage-summary 样式');
 });
 
 test('v0.0.12 数据维护面板分离数据库、缓存、迁移残留和旧库操作', () => {
@@ -797,7 +801,7 @@ test('v0.0.12 数据维护面板分离数据库、缓存、迁移残留和旧库
   assert.match(settingsViewSource, /Desktop\.clearManagedCache/);
   assert.match(settingsViewSource, /Desktop\.deleteLegacyData/);
   assert.ok(css.includes('.storage-breakdown'), '缺少存储明细网格');
-  assert.ok(css.includes('.maintenance-action-grid'), '缺少维护操作网格');
+  assert.ok(css.includes('.set-action'), '缺少维护操作行');
 });
 
 test('v0.0.13 settings expose the complete daily research archive workflow', () => {

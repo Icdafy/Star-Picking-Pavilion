@@ -156,7 +156,12 @@
       elements.enabled.checked = confirmed.enabled;
       elements.enabled.disabled = settingBusy;
       elements.chooseButton.disabled = settingBusy;
+      // 选定文件夹会同时开启自动归档（主进程 enable），按钮文字要把这一步说出来
+      elements.chooseButton.textContent = configured
+        ? (confirmed.enabled ? '更改文件夹' : '更改文件夹并开启')
+        : '选择文件夹并开启';
       elements.saveButton.disabled = !configured || busy === 'save';
+      elements.saveButton.title = configured ? '' : '先选择保存位置';
       elements.retryButton.disabled = (
         !confirmed.enabled
         || confirmed.pendingDates.length === 0

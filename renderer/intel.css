@@ -229,15 +229,15 @@ button.deal-company:hover { color: var(--accent-ink); }
 .issue-company-board .muted { font-size: var(--t-xs); }
 
 /* ---------- 设置 · 精选标准 ---------- */
-.industry-thresholds { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--t-sm); margin-bottom: var(--sp-3); }
+.industry-info .weight-table { margin-top: var(--sp-2); }
+.industry-info .set-more { justify-self: stretch; margin-top: .3125rem; }
+.industry-info p b { color: var(--flag-ink); font-variant-numeric: tabular-nums; }
 .threshold-chip { padding: .0625rem .5625rem; border-radius: 99px; background: var(--flag-soft); color: var(--flag-ink); font-variant-numeric: tabular-nums; }
 .weight-table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
 .weight-table th, .weight-table td { padding: .3125rem .5rem; border-bottom: 1px solid var(--rail-line); text-align: center; }
 .weight-table th[scope="row"] { text-align: left; font-weight: 700; color: var(--c-fg); }
 .weight-table th[scope="row"] small { display: block; font-weight: 400; color: var(--c-fg-faint); font-size: var(--t-xs); }
 .weight-table thead th { color: var(--c-fg-faint); font-weight: 700; font-size: var(--t-xs); }
-.industry-budget, .industry-prompts { font-size: var(--t-sm); color: var(--c-fg-dim); margin-top: var(--sp-3); line-height: 1.8; }
-.industry-budget b { color: var(--flag-ink); }
 .industry-prompts code { font-size: var(--t-xs); margin-right: .25rem; }
 
 /* ---------- 一级市场 · 概览（v0.2.2） ---------- */

@@ -396,72 +396,110 @@
 
   <section id="viewSettings" class="view" role="tabpanel" hidden>
     <header class="page-banner glass" aria-labelledby="settingsHeroTitle">
-      <div class="banner-copy"><p class="banner-kicker" data-banner-reveal>YOUR WORKSPACE · 专属工作台</p><h2 class="view-title" id="settingsHeroTitle" data-banner-reveal>让摘星阁，更合你的习惯</h2><p class="banner-description" data-banner-reveal>从模型、采集与手机推送，到阅读与界面氛围，为每一天的研判找到舒适节奏。</p></div>
-      <div class="banner-aside"><span class="banner-tag">设置 · 十个章节</span><span class="banner-caption">按你的节奏运行</span></div>
+      <div class="banner-copy"><p class="banner-kicker" data-banner-reveal>SETTINGS · 设置</p><h2 class="view-title" id="settingsHeroTitle" data-banner-reveal>让摘星阁，更合你的习惯</h2><p class="banner-description" data-banner-reveal>开关与选项改动后立即生效，无需另行保存；标着“高级”的内容平时可以不管。</p></div>
+      <div class="banner-aside"><span class="banner-tag">改动即时生效</span><span class="banner-caption">设置只保存在本机</span></div>
       <div class="banner-art" aria-hidden="true"><span></span></div>
     </header>
     <div class="settings-layout">
       <nav class="settings-nav glass" id="settingsNav" aria-label="设置章节">
-        <p class="settings-nav-label">快速定位</p>
         <div class="settings-nav-items">
-          <a href="#modelsCard" data-settings-target="modelsCard" aria-current="location"><span class="settings-nav-number" aria-hidden="true">01</span>模型</a>
-          <a href="#settingsSelection" data-settings-target="settingsSelection"><span class="settings-nav-number" aria-hidden="true">02</span>精选标准</a>
-          <a href="#settingsCollect" data-settings-target="settingsCollect"><span class="settings-nav-number" aria-hidden="true">03</span>采集调度</a>
-          <a href="#settingsPush" data-settings-target="settingsPush"><span class="settings-nav-number" aria-hidden="true">04</span>新闻推送</a>
-          <a href="#settingsArchive" data-settings-target="settingsArchive"><span class="settings-nav-number" aria-hidden="true">05</span>每日新闻资料库</a>
-          <a href="#settingsStorage" data-settings-target="settingsStorage"><span class="settings-nav-number" aria-hidden="true">06</span>存储治理</a>
-          <a href="#settingsDesktop" data-settings-target="settingsDesktop"><span class="settings-nav-number" aria-hidden="true">07</span>桌面运行</a>
-          <a href="#settingsDisplay" data-settings-target="settingsDisplay"><span class="settings-nav-number" aria-hidden="true">08</span>显示与排版</a>
-          <a href="#settingsAppearance" data-settings-target="settingsAppearance"><span class="settings-nav-number" aria-hidden="true">09</span>界面氛围</a>
-          <a href="#settingsShortcuts" data-settings-target="settingsShortcuts"><span class="settings-nav-number" aria-hidden="true">10</span>键盘快捷键</a>
+          <p class="settings-nav-group">情报处理</p>
+          <a href="#modelsCard" data-settings-target="modelsCard" aria-current="location">AI 模型</a>
+          <a href="#settingsCollect" data-settings-target="settingsCollect">自动采集</a>
+          <a href="#settingsSelection" data-settings-target="settingsSelection">精选标准</a>
+          <p class="settings-nav-group">送达与归档</p>
+          <a href="#settingsPush" data-settings-target="settingsPush">新闻推送</a>
+          <a href="#settingsArchive" data-settings-target="settingsArchive">每日资料库</a>
+          <p class="settings-nav-group">外观</p>
+          <a href="#settingsDisplay" data-settings-target="settingsDisplay">显示</a>
+          <a href="#settingsAppearance" data-settings-target="settingsAppearance">氛围与动效</a>
+          <p class="settings-nav-group">系统</p>
+          <a href="#settingsDesktop" data-settings-target="settingsDesktop">桌面运行</a>
+          <a href="#settingsStorage" data-settings-target="settingsStorage">存储与清理</a>
+          <a href="#settingsShortcuts" data-settings-target="settingsShortcuts">快捷键</a>
+          <a href="#settingsNotes" data-settings-target="settingsNotes">情报备忘</a>
         </div>
       </nav>
     <div class="settings-grid">
-      <div class="glass card-pad models-card" id="modelsCard" data-settings-section="modelsCard" aria-labelledby="heading-modelsCard">
-        <h3 id="heading-modelsCard" tabindex="-1">模型 <span class="muted">填入各提供商的 API 密钥即可使用其模型</span></h3>
-        <div id="modelsSection" class="models-section" aria-live="polite"></div>
-        <p class="hint">精选链：预筛 → 同一标准独立评分两次（两次之和 ≥ 2 × 信源门槛才入选）→ 内容理解（自洽标题、答案先行摘要、推荐理由、主体公司、融资事件）→ 事件归组与热度。每一步都使用上方选定的<strong>分析模型</strong>，默认 DeepSeek V4.1 Flash（<code>deepseek-flash</code>）；所选模型未声明图片输入时自动跳过图片理解，换回视觉模型后补做。提示词与门槛在 <code>config/industry/</code>，付费调用有回执复用与每小时 / 每天预算熔断。密钥只经 Windows 安全加密保存在本机，界面与接口永远只显示「是否已配置」。</p>
-      </div>
-      <div class="glass card-pad industry-card" id="settingsSelection" data-settings-section="settingsSelection" aria-labelledby="heading-settingsSelection">
-        <h3 id="heading-settingsSelection" tabindex="-1">精选标准 <span class="muted">行业包 config/industry</span></h3>
-        <div id="industryInfo" class="industry-info" aria-live="polite"><p class="muted">正在读取…</p></div>
-        <p class="hint">门槛与权重改在 <code>config/industry/selection.json</code>、<code>taxonomy.json</code>，评分标准写在 <code>prompts/selection-score.md</code>；改完下一轮分析即生效，已判过的资料按保存的两次评分立即重判入选。用自己标注的样本校准：<code>npm run eval:selection</code>。</p>
-      </div>
-      <div class="glass card-pad" id="settingsCollect" data-settings-section="settingsCollect" aria-labelledby="heading-settingsCollect">
-        <h3 id="heading-settingsCollect" tabindex="-1">采集调度</h3>
-        <label class="desktop-switch">
-          <span class="switch-copy"><strong>自动采集分析</strong><small>默认关闭。开启后按下方间隔运行完整采集分析任务，并自动出刊与整理数据。</small></span>
-          <input id="setAutomaticCollect" type="checkbox" role="switch">
-          <span class="switch-track" aria-hidden="true"></span>
-        </label>
-        <label class="field"><span>采集间隔（分钟）</span>
-          <input id="setInterval" type="number" min="1" max="720" step="1">
-        </label>
-        <label class="field"><span>RSSHub 实例地址 <span class="muted">选填</span></span>
-          <input id="setRsshub" type="text" placeholder="https://rsshub.app（填后 rsshub:// 型信源生效）">
-        </label>
-        <div class="btn-row"><button class="btn-primary" id="btnSaveCollect">保存</button></div>
-        <p class="hint">启动时保持在线待命，点击“立即采集分析”才会工作。自动调度支持 1—720 的整数分钟，保存后生效；启用后先等待所填间隔，每轮采集与分析全部完成后重新计时。关闭开关会取消后续自动任务，已开始的一轮完成后恢复在线。</p>
-        <p class="hint" id="collectScheduleStatus" aria-live="polite"></p>
-        <p class="hint">开启自动调度后，日报每天 08:00、周报每周一 10:00、月报每月 1 日 10:30 自动出刊。信源等级 T1（官方一手）/T1.5（官方社媒）/T2（媒体聚合）决定入选门槛。填入 RSSHub 地址后，可把公众号 / 媒体经 RSSHub 转成 RSS 接入。</p>
-        <h3 style="margin-top:1.5rem">情报备忘 <span class="muted">仅存本机</span></h3>
-        <label class="field"><span>问题、建议或随手笔记</span>
-          <textarea id="feedbackText" rows="3" placeholder="记录在本地情报库中，随时可以回看和删除"></textarea>
-        </label>
-        <div class="btn-row"><button class="btn-ghost" id="btnFeedback">记下</button></div>
-        <ul class="note-list" id="feedbackList" aria-live="polite"></ul>
-        <p class="hint">条目保存在本机 <code>star-picking-pavilion.db</code> 中，不会上传，也不会随情报保留策略被清理。</p>
-      </div>
-      <div class="glass card-pad daily-archive-card push-card" id="settingsPush" data-settings-section="settingsPush" aria-labelledby="heading-settingsPush">
-        <div class="daily-archive-heading">
+      <div class="glass card-pad set-card models-card" id="modelsCard" data-settings-section="modelsCard" aria-labelledby="heading-modelsCard">
+        <div class="set-head">
           <div>
-            <span class="daily-archive-kicker">MOBILE NEWS PUSH</span>
+            <span class="set-kicker">AI MODEL</span>
+            <h3 id="heading-modelsCard" tabindex="-1">AI 模型</h3>
+            <p>填入 API 密钥后，精选评分、中文标题摘要与事件归组都由下方选定的模型完成；没有密钥时退回关键词规则。</p>
+          </div>
+          <span class="set-badge" id="modelsBadge">读取中</span>
+        </div>
+        <div id="modelsSection" class="models-section" aria-live="polite"></div>
+        <details class="set-more">
+          <summary>工作原理与费用</summary>
+          <p class="hint">每条新内容先预筛，再由同一模型独立评分两次，平均分达到信源门槛才进入精选，随后生成标题、摘要与推荐理由并归入事件。所选模型不支持图片时会跳过图片理解。付费调用有回执复用，并按每小时 / 每天预算自动熔断（用量见“精选标准”）。密钥经 Windows 安全加密只存在本机，界面只显示是否已配置。</p>
+        </details>
+      </div>
+      <div class="glass card-pad set-card" id="settingsCollect" data-settings-section="settingsCollect" aria-labelledby="heading-settingsCollect">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">AUTO COLLECT</span>
+            <h3 id="heading-settingsCollect" tabindex="-1">自动采集</h3>
+            <p>按固定间隔从全部信源采集并分析新内容。关闭时摘星阁只在你点顶部“立即采集分析”（Alt+R）时工作。</p>
+          </div>
+        </div>
+        <section class="set-hero" id="collectHero" aria-label="自动采集状态">
+          <label class="desktop-switch">
+            <span class="switch-copy">
+              <small>自动采集分析</small>
+              <strong id="collectHeroTitle">正在读取…</strong>
+              <small id="collectScheduleStatus" aria-live="polite"></small>
+            </span>
+            <input id="setAutomaticCollect" type="checkbox" role="switch" aria-describedby="collectScheduleStatus">
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </section>
+        <div class="set-panel">
+          <div class="set-row">
+            <span>采集间隔</span>
+            <div class="set-row-body">
+              <div class="cat-chips period-switch" id="collectIntervalChips" role="group" aria-label="采集间隔"></div>
+              <label class="set-inline" for="setInterval">自定义 <input id="setInterval" type="number" min="1" max="720" step="1" inputmode="numeric"> 分钟</label>
+              <small>每轮采集分析全部完成后，等待这么久再开始下一轮；自定义可填 1—720 分钟，回车即保存。</small>
+            </div>
+          </div>
+          <div class="set-row">
+            <span>随之运行</span>
+            <div class="set-row-body">
+              <small>日报 每天 08:00 · 周报 每周一 10:00 · 月报 每月 1 日 10:30 · 过期情报清理 每天 08:25</small>
+            </div>
+          </div>
+          <div class="set-row">
+            <span>RSSHub 地址</span>
+            <div class="set-row-body">
+              <label class="set-inline set-inline-wide" for="setRsshub"><span class="sr-only">RSSHub 实例地址</span><input id="setRsshub" type="text" inputmode="url" spellcheck="false" placeholder="选填，例如 https://rsshub.app"></label>
+              <small>高级 · 填入后，信源里 rsshub:// 开头的公众号与媒体订阅才能采集；留空则跳过它们。回车或离开输入框即保存。</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="glass card-pad set-card industry-card" id="settingsSelection" data-settings-section="settingsSelection" aria-labelledby="heading-settingsSelection">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">SELECTION RULES</span>
+            <h3 id="heading-settingsSelection" tabindex="-1">精选标准</h3>
+            <p>决定哪些情报能进入“精选”，以及模型调用用量。这里只做展示，一般无需改动。</p>
+          </div>
+          <span class="set-badge">只读</span>
+        </div>
+        <div id="industryInfo" class="set-panel industry-info" aria-live="polite"><p class="muted set-loading">正在读取…</p></div>
+      </div>
+      <div class="glass card-pad set-card push-card" id="settingsPush" data-settings-section="settingsPush" aria-labelledby="heading-settingsPush">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">MOBILE NEWS PUSH</span>
             <h3 id="heading-settingsPush" tabindex="-1">新闻推送 <span class="muted">飞书 · 钉钉 · QQ 机器人</span></h3>
             <p>把新入选的情报按热度排好，定时推送到手机上的机器人；同一事件只推一次。</p>
           </div>
-          <span class="daily-archive-cutoff" id="pushBoundBadge">尚未绑定</span>
+          <span class="set-badge" id="pushBoundBadge">尚未绑定</span>
         </div>
-        <section class="push-hero" id="pushHero" aria-label="推送状态">
+        <section class="set-hero push-hero" id="pushHero" aria-label="推送状态">
           <div class="desktop-switch">
             <span class="switch-copy">
               <small>定时推送</small>
@@ -481,349 +519,410 @@
           <p id="pushStatus" class="test-result desktop-settings-result" role="status" aria-live="polite"></p>
           <ol class="note-list" id="pushPreview" aria-label="下一次待推送情报" hidden></ol>
         </section>
-        <div class="push-step">
+        <div class="set-step">
           <h4 id="pushChannelsHeading"><b>1</b>推送到 <small>验证码确认后才会保存</small></h4>
-          <div class="push-panel" id="pushChannels" aria-labelledby="pushChannelsHeading" aria-live="polite"></div>
+          <div class="set-panel" id="pushChannels" aria-labelledby="pushChannelsHeading" aria-live="polite"></div>
           <section class="maintenance-action-card" id="pushBindPanel" style="margin-top:.625rem" aria-live="polite" hidden></section>
         </div>
-        <div class="push-step">
+        <div class="set-step">
           <h4 id="pushScheduleHeading"><b>2</b>推送时间 <small>点选即生效，自动保存</small></h4>
-          <div class="push-panel" id="pushSchedule" role="group" aria-labelledby="pushScheduleHeading"></div>
+          <div class="set-panel" id="pushSchedule" role="group" aria-labelledby="pushScheduleHeading"></div>
         </div>
-        <div class="push-step">
+        <div class="set-step">
           <h4 id="pushContentHeading"><b>3</b>推送内容</h4>
-          <div class="push-panel" id="pushContent" role="group" aria-labelledby="pushContentHeading"></div>
+          <div class="set-panel" id="pushContent" role="group" aria-labelledby="pushContentHeading"></div>
         </div>
-        <details class="push-step push-log">
+        <details class="set-step push-log">
           <summary>推送记录 <small id="pushLogSummary">尚无推送</small></summary>
           <ul class="note-list" id="pushHistory" aria-label="推送记录"></ul>
         </details>
         <p class="hint">推送由本机直接发给机器人，不经过第三方服务器；连接信息经 Windows 安全加密保存在本机。电脑需开机且摘星阁在运行（可在“桌面运行”中开启后台运行与登录启动），关机期间错过的时刻会在下次启动后补推一次。飞书 / 钉钉若使用“自定义关键词”，请把关键词设为“摘星阁”。</p>
       </div>
-      <div class="glass card-pad daily-archive-card" id="settingsArchive" data-settings-section="settingsArchive" aria-labelledby="heading-settingsArchive">
-        <div class="daily-archive-heading">
+      <div class="glass card-pad set-card" id="settingsArchive" data-settings-section="settingsArchive" aria-labelledby="heading-settingsArchive">
+        <div class="set-head">
           <div>
-            <span class="daily-archive-kicker">DAILY RESEARCH VAULT</span>
-            <h3 id="heading-settingsArchive" tabindex="-1">每日新闻资料库 <span class="muted">自动归档 · 可回溯分析</span></h3>
-            <p>每天 08:00 汇总此前 24 小时的全部采集内容，同时保存可读简报、完整 JSONL 数据和校验清单。</p>
+            <span class="set-kicker">DAILY ARCHIVE</span>
+            <h3 id="heading-settingsArchive" tabindex="-1">每日新闻资料库</h3>
+            <p>每天 08:00 把此前 24 小时采集到的全部新闻存成一期：可直接阅读的简报、完整数据与校验清单，按年 / 月 / 日放进你选的文件夹。</p>
           </div>
-          <span class="daily-archive-cutoff">08:00 截止</span>
+          <span class="set-badge">08:00 截止</span>
         </div>
-        <div class="daily-archive-master">
-          <label class="desktop-switch daily-archive-switch">
+        <section class="set-hero" id="dailyArchiveHero" aria-label="每日归档状态">
+          <label class="desktop-switch">
             <span class="switch-copy">
-              <strong>每天自动保存新闻简报</strong>
-              <small>首次开启会弹出系统文件夹选择窗口；关闭后保留已有归档。</small>
+              <small>每天自动保存 · 下一次</small>
+              <strong id="dailyArchiveNextRun">未启用</strong>
+              <small id="dailyArchiveStatus" class="daily-archive-live" role="status" aria-live="polite" aria-busy="false">自动归档已关闭。</small>
             </span>
-            <input id="dailyArchiveEnabled" type="checkbox" role="switch">
+            <input id="dailyArchiveEnabled" type="checkbox" role="switch" aria-describedby="dailyArchiveStatus">
             <span class="switch-track" aria-hidden="true"></span>
           </label>
-          <div class="daily-archive-next">
-            <span>下一次归档</span>
-            <strong id="dailyArchiveNextRun">未启用</strong>
-          </div>
-        </div>
-        <div class="daily-archive-path-row">
-          <div class="daily-archive-path-copy">
+        </section>
+        <div class="set-panel">
+          <div class="set-row">
             <span>保存位置</span>
-            <output id="dailyArchivePath" class="daily-archive-path" dir="auto">尚未选择保存位置</output>
-          </div>
-          <button class="btn-ghost" id="btnChooseDailyArchive" type="button">选择或更改位置</button>
-        </div>
-        <div class="daily-archive-status-grid" aria-label="每日归档状态">
-          <div>
-            <span>最近成功</span>
-            <strong id="dailyArchiveLastSuccess">尚无归档</strong>
-          </div>
-          <div>
-            <span>补存队列</span>
-            <strong id="dailyArchivePending">无待补存</strong>
-          </div>
-        </div>
-        <div class="daily-archive-actions">
-          <button class="btn-primary" id="btnSaveDailyArchive" type="button" disabled>立即保存最近一期</button>
-          <button class="btn-ghost" id="btnRetryDailyArchive" type="button" disabled>重试待补存日期</button>
-          <p id="dailyArchiveStatus"
-             class="test-result daily-archive-live"
-             role="status"
-             aria-live="polite"
-             aria-busy="false">自动归档已关闭。</p>
-        </div>
-        <p class="hint">归档目录按年、月、日整理。为确保 08:00 准时保存，请让摘星阁保持运行；可在“桌面运行”中开启后台运行和登录启动。</p>
-      </div>
-      <div class="glass card-pad storage-governance-card" id="settingsStorage" data-settings-section="settingsStorage" aria-labelledby="heading-settingsStorage">
-        <div class="storage-heading">
-          <div>
-            <span class="storage-kicker">STORAGE RADAR</span>
-            <h3 id="heading-settingsStorage" tabindex="-1">存储治理 <span class="muted">自动守护 · 手动可控</span></h3>
-          </div>
-          <span class="storage-policy-badge">本机专属</span>
-        </div>
-        <div class="maintenance-stats storage-overview" id="maintenanceStats" aria-live="polite">
-          <div class="storage-total">
-            <span class="storage-total-label">当前受管总计</span>
-            <span class="storage-total-number" id="msTotal">–</span>
-            <span class="storage-total-note">情报库、桌面缓存与可确认的旧版数据</span>
-          </div>
-          <div class="ms-item">
-            <span class="ms-num" id="msArticles">–</span>
-            <span class="ms-label">库内情报</span>
-          </div>
-          <div class="ms-item">
-            <span class="ms-num accent" id="msExpiring">–</span>
-            <span class="ms-label">已到清理期</span>
-          </div>
-        </div>
-        <div class="storage-breakdown" aria-label="存储占用明细">
-          <div class="storage-detail">
-            <span class="storage-detail-icon database" aria-hidden="true"></span>
-            <span class="storage-detail-copy"><span>情报数据库</span><strong id="msDatabase">–</strong></span>
-          </div>
-          <div class="storage-detail">
-            <span class="storage-detail-icon reclaimable" aria-hidden="true"></span>
-            <span class="storage-detail-copy"><span>可回收空页</span><strong id="msReclaimable">–</strong></span>
-          </div>
-          <div class="storage-detail">
-            <span class="storage-detail-icon cache" aria-hidden="true"></span>
-            <span class="storage-detail-copy"><span>桌面缓存</span><strong id="msCache">–</strong></span>
-          </div>
-          <div class="storage-detail">
-            <span class="storage-detail-icon residue" aria-hidden="true"></span>
-            <span class="storage-detail-copy"><span>迁移残留</span><strong id="msMigrationResidue">–</strong></span>
-          </div>
-          <div class="storage-detail">
-            <span class="storage-detail-icon legacy" aria-hidden="true"></span>
-            <span class="storage-detail-copy"><span>旧版数据</span><strong id="msLegacy">–</strong></span>
-          </div>
-        </div>
-        <div class="field-row">
-          <label class="field"><span>情报保留天数</span>
-            <input id="setRetentionDays" type="number" min="7" max="3650" step="1">
-          </label>
-          <label class="field"><span>无关内容保留天数</span>
-            <input id="setIrrelevantRetentionDays" type="number" min="1" max="3650" step="1">
-          </label>
-        </div>
-        <div class="btn-row">
-          <button class="btn-primary" id="btnSaveRetention">保存</button>
-          <button class="btn-ghost" id="btnPruneNow">立即清理</button>
-          <span id="pruneResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
-        </div>
-        <p class="hint storage-policy-hint" id="lastPruneHint">正在读取本机存储状态…</p>
-        <div class="maintenance-action-grid">
-          <section class="maintenance-action-card">
-            <span class="maintenance-action-index">01</span>
-            <div>
-              <h4>整理情报库</h4>
-              <p>回收数据库内部空页；压缩前后都会校验完整性。</p>
+            <div class="set-row-body">
+              <div class="set-line">
+                <output id="dailyArchivePath" class="daily-archive-path" dir="auto">尚未选择保存位置</output>
+                <button class="btn-ghost btn-compact" id="btnChooseDailyArchive" type="button">选择文件夹并开启</button>
+              </div>
             </div>
-            <button class="btn-ghost" id="btnCompactNow" type="button">安全压缩</button>
-            <span id="compactResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
-          </section>
-          <section class="maintenance-action-card">
-            <span class="maintenance-action-index">02</span>
-            <div>
-              <h4>清理桌面缓存</h4>
-              <p>仅处理可再生成的网页与图形缓存，不触碰情报、星标和设置。</p>
+          </div>
+          <div class="set-row">
+            <span>最近一期</span>
+            <div class="set-row-body">
+              <div class="set-line">
+                <strong id="dailyArchiveLastSuccess">尚无归档</strong>
+                <button class="btn-ghost btn-compact" id="btnSaveDailyArchive" type="button" disabled>立即保存最近一期</button>
+              </div>
+              <small>手动保存截至今天 08:00 的那一期；已经存过的只做校验，不会重复写入。</small>
             </div>
-            <button class="btn-ghost" id="btnClearCache" type="button">清理缓存</button>
-            <span id="cacheResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
-          </section>
-          <section class="maintenance-action-card">
-            <span class="maintenance-action-index">03</span>
-            <div>
-              <h4>旧版数据确认</h4>
-              <p>只在迁移满 30 天且新库健康时开放，并再次弹窗列出删除范围。</p>
+          </div>
+          <div class="set-row">
+            <span>补存</span>
+            <div class="set-row-body">
+              <div class="set-line">
+                <strong id="dailyArchivePending">无待补存</strong>
+                <button class="btn-ghost btn-compact" id="btnRetryDailyArchive" type="button" disabled>重试待补存日期</button>
+              </div>
+              <small>关机或文件夹暂不可用时错过的日期，会在下次运行时自动补存；也可以在这里手动重试。</small>
             </div>
-            <button class="btn-ghost" id="btnDeleteLegacy" type="button" disabled>审阅并清理</button>
-            <span id="legacyResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
-          </section>
+          </div>
         </div>
       </div>
-      <div class="glass card-pad" id="settingsDesktop" data-settings-section="settingsDesktop" aria-labelledby="heading-settingsDesktop">
-        <h3 id="heading-settingsDesktop" tabindex="-1">桌面运行 <span class="muted">Windows</span></h3>
-        <label class="desktop-switch">
-          <span class="switch-copy">
-            <strong>关闭主窗口后在后台运行</strong>
-            <small>关闭窗口时继续采集，可从系统托盘重新打开或彻底退出。</small>
-          </span>
-          <input id="setCloseToTray" type="checkbox" role="switch">
-          <span class="switch-track" aria-hidden="true"></span>
-        </label>
-        <label class="desktop-switch">
-          <span class="switch-copy">
-            <strong>登录 Windows 时自动启动</strong>
-            <small>若同时开启后台运行，登录后不会弹出主窗口。</small>
-          </span>
-          <input id="setLaunchAtLogin" type="checkbox" role="switch">
-          <span class="switch-track" aria-hidden="true"></span>
-        </label>
+      <div class="glass card-pad set-card" id="settingsDisplay" data-settings-section="settingsDisplay" aria-labelledby="heading-settingsDisplay">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">DISPLAY</span>
+            <h3 id="heading-settingsDisplay" tabindex="-1">显示</h3>
+            <p>界面大小与深浅色，点选即生效。</p>
+          </div>
+        </div>
+        <div class="set-panel">
+          <div class="set-row">
+            <span>界面缩放</span>
+            <div class="set-row-body">
+              <div class="scale-options" id="textScaleOptions" role="group" aria-label="界面缩放档位">
+                <button class="scale-option" type="button" data-text-scale="sm" aria-pressed="false">小</button>
+                <button class="scale-option" type="button" data-text-scale="md" aria-pressed="true">标准</button>
+                <button class="scale-option" type="button" data-text-scale="lg" aria-pressed="false">大</button>
+                <button class="scale-option" type="button" data-text-scale="xl" aria-pressed="false">特大</button>
+              </div>
+              <small>字号、行距与留白按同一比例缩放，版面不会散架；也可按 Ctrl + / Ctrl − 调整，Ctrl 0 复原。</small>
+            </div>
+          </div>
+          <div class="set-row">
+            <span>深浅主题</span>
+            <div class="set-row-body">
+              <div class="scale-options" id="themeOptions" role="group" aria-label="深浅主题">
+                <button class="scale-option" type="button" data-theme-choice="light" aria-pressed="true">浅色</button>
+                <button class="scale-option" type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
+              </div>
+              <small>也可以点顶部的月亮 / 太阳按钮，或按 Alt+T 切换。</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="glass card-pad set-card appearance-lab" id="settingsAppearance" data-settings-section="settingsAppearance" aria-labelledby="heading-settingsAppearance">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">VISUAL EFFECTS</span>
+            <h3 id="heading-settingsAppearance" tabindex="-1">氛围与动效</h3>
+            <p>玻璃质感、动态背景与鼠标跟随效果，只影响观感。系统开启“减少动态效果”时会自动静止。</p>
+          </div>
+          <button class="btn-ghost btn-compact" id="btnAquaReset" type="button" title="恢复玻璃与背景的默认参数，不改变开关与跟手动效">恢复默认外观</button>
+        </div>
+        <div class="set-step">
+          <h4>玻璃面板</h4>
+          <div class="set-panel">
+            <div class="set-row">
+              <span>质感</span>
+              <div class="set-row-body">
+                <div class="appearance-segments" role="group" aria-label="玻璃模式">
+                  <button type="button" data-aqua-mode="mica" aria-pressed="true">云母效果</button>
+                  <button type="button" data-aqua-mode="compat" aria-pressed="false">兼容模式</button>
+                </div>
+                <small>云母层次更丰富；兼容模式透明度更低、文字更清晰，适合低配电脑和长时间阅读。</small>
+              </div>
+            </div>
+            <label class="set-row" for="setAquaBlur">
+              <span>模糊度</span>
+              <span class="set-row-body set-range"><input id="setAquaBlur" type="range" min="0" max="40" step="1" value="2"><output id="outAquaBlur">2px</output></span>
+            </label>
+            <label class="set-row" for="setAquaFrost">
+              <span>磨砂度</span>
+              <span class="set-row-body set-range"><input id="setAquaFrost" type="range" min="0" max="100" step="1" value="20"><output id="outAquaFrost">20%</output></span>
+            </label>
+          </div>
+        </div>
+        <div class="set-step">
+          <h4>动态背景</h4>
+          <div class="set-panel">
+            <div class="desktop-switch">
+              <span class="switch-copy"><strong>显示动态背景</strong><small>流动的星云或你的壁纸，衬在玻璃面板后面。</small></span>
+              <button class="switch-button" id="setAquaEnabled" type="button" aria-pressed="true" aria-label="动态背景"><span class="switch-track" aria-hidden="true"></span></button>
+            </div>
+            <div class="set-row aqua-only">
+              <span>背景</span>
+              <div class="set-row-body">
+                <div class="appearance-segments" role="group" aria-label="背景来源">
+                  <button type="button" data-aqua-background="fluid" aria-pressed="true">流体星云</button>
+                  <button type="button" data-aqua-background="wallpaper" aria-pressed="false">自选壁纸</button>
+                </div>
+                <div class="btn-row" id="aquaWallpaperControls" hidden>
+                  <input class="wallpaper-file-input" id="setAquaWallpaper" type="file" accept="image/png,image/jpeg,image/webp">
+                  <label class="btn-primary btn-compact wallpaper-file-label" for="setAquaWallpaper">选择图片</label>
+                  <button class="btn-ghost btn-compact" id="btnAquaWallpaperClear" type="button">移除壁纸</button>
+                  <span class="test-result" id="aquaWallpaperStatus" role="status" aria-live="polite"></span>
+                </div>
+                <small class="wallpaper-only" hidden>图片压缩后只保存在本机；建议选与当前深浅主题相近的图片。</small>
+              </div>
+            </div>
+            <div class="set-row aqua-only">
+              <span>配色</span>
+              <div class="set-row-body">
+                <div class="fluid-palette-grid" id="aquaPalettePresets" role="group" aria-label="当前主题的流体配色预设"></div>
+                <small>预设随深浅主题切换；可用下面的滑杆继续微调。</small>
+              </div>
+            </div>
+            <label class="set-row aqua-only" for="setAquaHue">
+              <span>色相</span>
+              <span class="set-row-body set-range"><input id="setAquaHue" type="range" min="0" max="360" step="1" value="220"><output id="outAquaHue">220°</output></span>
+            </label>
+            <label class="set-row aqua-only" for="setAquaBrightness">
+              <span>明暗</span>
+              <span class="set-row-body set-range"><input id="setAquaBrightness" type="range" min="0" max="100" step="1" value="50"><output id="outAquaBrightness">50%</output></span>
+            </label>
+            <label class="set-row aqua-only wallpaper-only" for="setAquaWallpaperBlur" hidden>
+              <span>壁纸模糊</span>
+              <span class="set-row-body set-range"><input id="setAquaWallpaperBlur" type="range" min="0" max="40" step="1" value="0"><output id="outAquaWallpaperBlur">0px</output></span>
+            </label>
+            <label class="set-row aqua-only wallpaper-only" for="setAquaWallpaperFrost" hidden>
+              <span>壁纸磨砂</span>
+              <span class="set-row-body set-range"><input id="setAquaWallpaperFrost" type="range" min="0" max="100" step="1" value="0"><output id="outAquaWallpaperFrost">0%</output></span>
+            </label>
+            <label class="desktop-switch aqua-only">
+              <span class="switch-copy"><strong>星鲸粒子</strong><small>背景里一尾由星点组成、会轻微响应指针的星鲸。</small></span>
+              <input id="setAquaWhale" type="checkbox" role="switch" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+            <label class="desktop-switch aqua-only">
+              <span class="switch-copy"><strong>环境星尘</strong><small>缓慢漂移的星点、气泡与边缘柔化。</small></span>
+              <input id="setAquaCritters" type="checkbox" role="switch" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+          </div>
+        </div>
+        <div class="set-step pointer-lab" aria-labelledby="pointerHeading">
+          <h4 id="pointerHeading">跟手动效 <button class="btn-ghost btn-compact" id="btnPointerReset" type="button">恢复默认动效</button></h4>
+          <div class="set-panel">
+            <label class="desktop-switch">
+              <span class="switch-copy"><strong>开启跟手动效</strong><small>鼠标经过板块、导航、表单和弹层时显示所选效果。</small></span>
+              <input id="setPointerEnabled" type="checkbox" role="switch" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+            <div class="set-row pointer-only">
+              <span>效果</span>
+              <div class="set-row-body">
+                <select id="setPointerStyle" class="set-select" aria-label="跟手方式" aria-describedby="pointerStyleHint">
+                  <option value="glow">范围柔光</option><option value="comet">流星拖尾</option><option value="stars">星尘粒子</option><option value="ring">弹性光环</option>
+                </select>
+                <small id="pointerStyleHint" aria-live="polite">柔光照亮鼠标附近的表面，边缘反光轻轻跟随。</small>
+              </div>
+            </div>
+            <div class="set-row pointer-only">
+              <span id="pointerSizeLabel">光晕大小</span>
+              <span class="set-row-body set-range">
+                <input id="setPointerSize" type="range" min="80" max="800" step="1" value="320" aria-labelledby="pointerSizeLabel">
+                <output id="outPointerSize" hidden>320px</output>
+                <label class="set-inline" for="setPointerSizeNumber"><span class="sr-only">精确大小（px）</span><input id="setPointerSizeNumber" type="number" min="80" max="800" step="1" value="320"> px</label>
+              </span>
+            </div>
+            <label class="set-row pointer-only" for="setPointerOpacity">
+              <span>强度</span>
+              <span class="set-row-body set-range"><input id="setPointerOpacity" type="range" min="10" max="100" step="1" value="100"><output id="outPointerOpacity">100%</output></span>
+            </label>
+            <div class="set-row pointer-only">
+              <span>颜色</span>
+              <div class="set-row-body">
+                <div class="pointer-palette" id="pointerPalette" role="group" aria-label="跟手动效配色预设">
+                  <button type="button" data-pointer-color="#8b5cf6" aria-label="星云紫" aria-pressed="true" style="--swatch:#8b5cf6"></button>
+                  <button type="button" data-pointer-color="#5467ff" aria-label="摘星蓝" aria-pressed="false" style="--swatch:#5467ff"></button>
+                  <button type="button" data-pointer-color="#06b6d4" aria-label="冰川青" aria-pressed="false" style="--swatch:#06b6d4"></button>
+                  <button type="button" data-pointer-color="#10b981" aria-label="翡翠绿" aria-pressed="false" style="--swatch:#10b981"></button>
+                  <button type="button" data-pointer-color="#f59e0b" aria-label="琥珀金" aria-pressed="false" style="--swatch:#f59e0b"></button>
+                  <button type="button" data-pointer-color="#f97316" aria-label="日落橙" aria-pressed="false" style="--swatch:#f97316"></button>
+                  <button type="button" data-pointer-color="#f43f5e" aria-label="玫瑰红" aria-pressed="false" style="--swatch:#f43f5e"></button>
+                  <button type="button" data-pointer-color="#ec4899" aria-label="桃花粉" aria-pressed="false" style="--swatch:#ec4899"></button>
+                  <label class="set-inline" for="setPointerColor"><span class="sr-only">调色盘</span><input id="setPointerColor" type="color" value="#8b5cf6"></label>
+                  <label class="set-inline" for="setPointerColorHex"><span class="sr-only">颜色值</span><input id="setPointerColorHex" type="text" value="#8b5cf6" maxlength="7" pattern="#[0-9A-Fa-f]{6}" spellcheck="false" aria-label="跟手动效十六进制颜色"></label>
+                </div>
+                <small>每种效果分别记住自己的大小，颜色与强度共用。</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="glass card-pad set-card" id="settingsDesktop" data-settings-section="settingsDesktop" aria-labelledby="heading-settingsDesktop">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">DESKTOP</span>
+            <h3 id="heading-settingsDesktop" tabindex="-1">桌面运行</h3>
+            <p>自动采集、新闻推送与每日归档都需要摘星阁保持运行。两项默认关闭、互不影响；托盘菜单始终可以“退出摘星阁”。</p>
+          </div>
+          <span class="set-badge">Windows</span>
+        </div>
+        <div class="set-panel">
+          <label class="desktop-switch">
+            <span class="switch-copy">
+              <strong>关闭窗口后继续在后台运行</strong>
+              <small>点窗口右上角的关闭后，摘星阁留在系统托盘继续工作；从托盘图标可重新打开或彻底退出。</small>
+            </span>
+            <input id="setCloseToTray" type="checkbox" role="switch">
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <label class="desktop-switch">
+            <span class="switch-copy">
+              <strong>开机自动启动</strong>
+              <small>登录 Windows 后自动运行；同时开启后台运行时静默启动，不弹出窗口。</small>
+            </span>
+            <input id="setLaunchAtLogin" type="checkbox" role="switch">
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
         <p id="desktopSettingsResult"
            class="test-result desktop-settings-result"
            role="status"
            aria-live="polite"></p>
-        <p class="hint">两项默认关闭且相互独立。托盘菜单始终提供“退出摘星阁”。</p>
       </div>
-      <div class="glass card-pad" id="settingsDisplay" data-settings-section="settingsDisplay" aria-labelledby="heading-settingsDisplay">
-        <h3 id="heading-settingsDisplay" tabindex="-1">显示与排版 <span class="muted">立即生效</span></h3>
-        <div class="field">
-          <span>界面缩放</span>
-          <div class="scale-options" id="textScaleOptions" role="group" aria-label="界面缩放档位">
-            <button class="scale-option" type="button" data-text-scale="sm" aria-pressed="false">小</button>
-            <button class="scale-option" type="button" data-text-scale="md" aria-pressed="true">标准</button>
-            <button class="scale-option" type="button" data-text-scale="lg" aria-pressed="false">大</button>
-            <button class="scale-option" type="button" data-text-scale="xl" aria-pressed="false">特大</button>
-          </div>
-        </div>
-        <p class="hint">调的是整套版面的比例尺，不只是字号：字号、行距、留白、圆角、栏宽按同一比例一起变，所以放大之后版面不会散架。也可以随时用 <code>Ctrl</code> <code>+</code> / <code>Ctrl</code> <code>-</code> 增减，<code>Ctrl</code> <code>0</code> 回到标准档。</p>
-        <p class="hint">中文使用内置的<b>思源黑体</b>；西文、数字与符号优先使用 Windows 自带的 <b>Times New Roman</b>，表单与代码文字采用相同字体。</p>
-        <div class="pointer-lab" aria-labelledby="pointerHeading">
-          <h3 id="pointerHeading">跟手动效</h3>
-          <label class="desktop-switch">
-            <span class="switch-copy"><strong>开启跟手动效</strong><small>在所有板块、导航、表单和弹层使用所选风格。</small></span>
-            <input id="setPointerEnabled" type="checkbox" role="switch" checked>
-            <span class="switch-track" aria-hidden="true"></span>
-          </label>
-          <div class="appearance-grid">
-            <label class="field appearance-control-wide" for="setPointerStyle"><span>跟手方式</span><select id="setPointerStyle" aria-describedby="pointerStyleHint">
-              <option value="glow">范围柔光</option><option value="comet">流星拖尾</option><option value="stars">星尘粒子</option><option value="ring">弹性光环</option>
-            </select></label>
-            <p class="hint appearance-control-wide" id="pointerStyleHint" aria-live="polite">柔光照亮鼠标附近的表面，边缘反光轻轻跟随。</p>
-            <label class="appearance-control appearance-control-wide" for="setPointerSize">
-              <span class="appearance-label"><span id="pointerSizeLabel">光晕大小</span> <output id="outPointerSize">320px</output></span>
-              <input id="setPointerSize" type="range" min="80" max="800" step="1" value="320">
-            </label>
-            <label class="field" for="setPointerSizeNumber"><span>精确大小（px）</span><input id="setPointerSizeNumber" type="number" min="80" max="800" step="1" value="320"></label>
-            <label class="appearance-control" for="setPointerOpacity"><span class="appearance-label">动效强度 <output id="outPointerOpacity">100%</output></span><input id="setPointerOpacity" type="range" min="10" max="100" step="1" value="100"></label>
-            <div class="pointer-color-controls">
-              <label class="field" for="setPointerColor"><span>调色盘</span><input id="setPointerColor" type="color" value="#8b5cf6"></label>
-              <label class="field" for="setPointerColorHex"><span>颜色值</span><input id="setPointerColorHex" type="text" value="#8b5cf6" maxlength="7" pattern="#[0-9A-Fa-f]{6}" spellcheck="false" aria-label="跟手动效十六进制颜色"></label>
-            </div>
-            <div class="pointer-palette appearance-control-wide" id="pointerPalette" role="group" aria-label="跟手动效配色预设">
-              <button type="button" data-pointer-color="#8b5cf6" aria-label="星云紫" aria-pressed="true" style="--swatch:#8b5cf6"></button>
-              <button type="button" data-pointer-color="#5467ff" aria-label="摘星蓝" aria-pressed="false" style="--swatch:#5467ff"></button>
-              <button type="button" data-pointer-color="#06b6d4" aria-label="冰川青" aria-pressed="false" style="--swatch:#06b6d4"></button>
-              <button type="button" data-pointer-color="#10b981" aria-label="翡翠绿" aria-pressed="false" style="--swatch:#10b981"></button>
-              <button type="button" data-pointer-color="#f59e0b" aria-label="琥珀金" aria-pressed="false" style="--swatch:#f59e0b"></button>
-              <button type="button" data-pointer-color="#f97316" aria-label="日落橙" aria-pressed="false" style="--swatch:#f97316"></button>
-              <button type="button" data-pointer-color="#f43f5e" aria-label="玫瑰红" aria-pressed="false" style="--swatch:#f43f5e"></button>
-              <button type="button" data-pointer-color="#ec4899" aria-label="桃花粉" aria-pressed="false" style="--swatch:#ec4899"></button>
-            </div>
-          </div>
-          <div class="btn-row"><button class="btn-ghost btn-compact" id="btnPointerReset" type="button">恢复默认动效</button></div>
-          <p class="hint">每种风格独立记住尺寸，共用颜色与强度；修改立即生效并自动保存。停下后自然收敛，减少动态效果、失焦或窗口隐藏时停止。</p>
-        </div>
-      </div>
-      <div class="glass card-pad appearance-lab" id="settingsAppearance" data-settings-section="settingsAppearance" aria-labelledby="heading-settingsAppearance">
-        <div class="appearance-heading">
+      <div class="glass card-pad set-card storage-governance-card" id="settingsStorage" data-settings-section="settingsStorage" aria-labelledby="heading-settingsStorage">
+        <div class="set-head">
           <div>
-            <span class="appearance-kicker">AQUA GLASS LAB</span>
-            <h3 id="heading-settingsAppearance" tabindex="-1">界面氛围 <span class="muted">流体背景 · 云母玻璃</span></h3>
+            <span class="set-kicker">STORAGE</span>
+            <h3 id="heading-settingsStorage" tabindex="-1">存储与清理</h3>
+            <p>情报只存在本机。设好保留期限，过期内容会被自动清理；星标和备忘永远保留。</p>
           </div>
-          <div class="btn-row"><button class="btn-ghost btn-compact" id="setAquaEnabled" type="button" aria-pressed="true">氛围：开启</button><button class="btn-ghost btn-compact" id="btnAquaReset" type="button">恢复默认</button></div>
+          <span class="set-badge">本机专属</span>
         </div>
-        <div class="appearance-preview" aria-hidden="true">
-          <span class="appearance-preview-orbit"></span>
-          <div class="appearance-preview-card">
-            <small>摘星阁 · 实时情报</small>
-            <strong>探索未至之境</strong>
-            <span></span>
+        <div class="storage-summary" id="maintenanceStats" aria-live="polite">
+          <div class="storage-total">
+            <span>当前共占用</span>
+            <strong id="msTotal">–</strong>
+            <small><b id="msArticles">–</b> 条情报</small>
           </div>
+          <dl class="storage-breakdown" aria-label="存储占用明细">
+            <div><dt>情报数据库</dt><dd id="msDatabase">–</dd></div>
+            <div><dt>可回收空间</dt><dd id="msReclaimable">–</dd></div>
+            <div><dt>桌面缓存</dt><dd id="msCache">–</dd></div>
+            <div><dt>迁移残留</dt><dd id="msMigrationResidue">–</dd></div>
+            <div><dt>旧版数据</dt><dd id="msLegacy">–</dd></div>
+          </dl>
         </div>
-        <div class="appearance-controls">
-          <div class="appearance-control appearance-control-wide">
-            <span class="appearance-label">玻璃模式</span>
-            <div class="appearance-segments" role="group" aria-label="玻璃模式">
-              <button type="button" data-aqua-mode="mica" aria-pressed="true">云母效果</button>
-              <button type="button" data-aqua-mode="compat" aria-pressed="false">兼容模式</button>
+        <div class="set-step">
+          <h4>保留期限 <small>点选即生效，自动保存</small></h4>
+          <div class="set-panel">
+            <div class="set-row">
+              <span>相关情报</span>
+              <div class="set-row-body">
+                <div class="cat-chips period-switch" id="retentionChips" role="group" aria-label="情报保留天数"></div>
+                <label class="set-inline" for="setRetentionDays">自定义 <input id="setRetentionDays" type="number" min="7" max="3650" step="1" inputmode="numeric"> 天</label>
+                <small>低空经济与商业航天相关的情报保留多久（7—3650 天）。</small>
+              </div>
             </div>
-            <small>云母模式强化悬浮层次；兼容模式降低透明度，适合低配设备和高密度阅读。</small>
-          </div>
-          <label class="appearance-control" for="setAquaBlur">
-            <span class="appearance-label">玻璃模糊度 <output id="outAquaBlur">2px</output></span>
-            <input id="setAquaBlur" type="range" min="0" max="40" step="1" value="2">
-          </label>
-          <label class="appearance-control" for="setAquaFrost">
-            <span class="appearance-label">磨砂度 <output id="outAquaFrost">20%</output></span>
-            <input id="setAquaFrost" type="range" min="0" max="100" step="1" value="20">
-          </label>
-          <label class="appearance-control" for="setAquaHue">
-            <span class="appearance-label">流体颜色 <output id="outAquaHue">220°</output></span>
-            <input id="setAquaHue" type="range" min="0" max="360" step="1" value="220">
-          </label>
-          <label class="appearance-control" for="setAquaBrightness">
-            <span class="appearance-label">背景明暗 <output id="outAquaBrightness">50%</output></span>
-            <input id="setAquaBrightness" type="range" min="0" max="100" step="1" value="50">
-          </label>
-          <div class="appearance-control appearance-control-wide">
-            <span class="appearance-label">流体配色</span>
-            <div class="fluid-palette-grid" id="aquaPalettePresets" role="group" aria-label="当前主题的流体配色预设"></div>
-            <small>预设会随浅色 / 深色主题切换；仍可用上方滑杆继续精调色相与明暗。</small>
-          </div>
-          <div class="appearance-control appearance-control-wide">
-            <span class="appearance-label">背景来源</span>
-            <div class="appearance-segments" role="group" aria-label="背景来源">
-              <button type="button" data-aqua-background="fluid" aria-pressed="true">流体星云</button>
-              <button type="button" data-aqua-background="wallpaper" aria-pressed="false">自选壁纸</button>
+            <div class="set-row">
+              <span>无关内容</span>
+              <div class="set-row-body">
+                <div class="cat-chips period-switch" id="irrelevantRetentionChips" role="group" aria-label="无关内容保留天数"></div>
+                <label class="set-inline" for="setIrrelevantRetentionDays">自定义 <input id="setIrrelevantRetentionDays" type="number" min="1" max="3650" step="1" inputmode="numeric"> 天</label>
+                <small>被判定与关注领域无关的内容保留多久（1—3650 天），通常比相关情报短。</small>
+              </div>
+            </div>
+            <div class="set-row">
+              <span>自动清理</span>
+              <div class="set-row-body">
+                <small class="storage-policy-hint" id="lastPruneHint" aria-live="polite">正在读取本机存储状态…</small>
+              </div>
             </div>
           </div>
-          <div class="appearance-control appearance-control-wide wallpaper-picker" id="aquaWallpaperControls" hidden>
-            <span class="appearance-label">壁纸</span>
-            <div class="btn-row">
-              <input class="wallpaper-file-input" id="setAquaWallpaper" type="file" accept="image/png,image/jpeg,image/webp">
-              <label class="btn-primary btn-compact wallpaper-file-label" for="setAquaWallpaper">选择图片</label>
-              <button class="btn-ghost btn-compact" id="btnAquaWallpaperClear" type="button">移除壁纸</button>
-              <span class="test-result" id="aquaWallpaperStatus" role="status" aria-live="polite"></span>
-            </div>
-            <small>图片压缩后仅保存在本机，不会上传。建议选择与当前深浅主题相近的图片。</small>
-          </div>
-          <label class="appearance-control wallpaper-only" for="setAquaWallpaperBlur" hidden>
-            <span class="appearance-label">壁纸模糊 <output id="outAquaWallpaperBlur">0px</output></span>
-            <input id="setAquaWallpaperBlur" type="range" min="0" max="40" step="1" value="0">
-          </label>
-          <label class="appearance-control wallpaper-only" for="setAquaWallpaperFrost" hidden>
-            <span class="appearance-label">壁纸磨砂 <output id="outAquaWallpaperFrost">0%</output></span>
-            <input id="setAquaWallpaperFrost" type="range" min="0" max="100" step="1" value="0">
-          </label>
-          <label class="desktop-switch appearance-switch appearance-control-wide">
-            <span class="switch-copy">
-              <strong>星鲸粒子</strong>
-              <small>在工作区背景中显示一尾由星点组成、会轻微响应指针的星鲸。</small>
-            </span>
-            <input id="setAquaWhale" type="checkbox" role="switch" checked>
-            <span class="switch-track" aria-hidden="true"></span>
-          </label>
-          <label class="desktop-switch appearance-switch appearance-control-wide">
-            <span class="switch-copy">
-              <strong>环境星尘</strong>
-              <small>保留缓慢漂移的星点、气泡与边缘柔化；减少动态偏好会自动静止。</small>
-            </span>
-            <input id="setAquaCritters" type="checkbox" role="switch" checked>
-            <span class="switch-track" aria-hidden="true"></span>
-          </label>
         </div>
-        <p class="hint">氛围参数即时生效并仅保存在本机。系统会按设备能力自动降低帧率与模糊强度；“减少动态效果”偏好优先于这里的设置。</p>
+        <div class="set-step">
+          <h4>手动维护 <small>平时无需操作</small></h4>
+          <div class="set-panel">
+            <div class="set-row set-action">
+              <span>过期情报</span>
+              <div class="set-row-body">
+                <p>已到清理期 <b id="msExpiring">–</b> 条。按上面的保留期限立即删除，不影响星标。</p>
+                <span id="pruneResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+              </div>
+              <button class="btn-ghost btn-compact" id="btnPruneNow" type="button">立即清理</button>
+            </div>
+            <div class="set-row set-action">
+              <span>整理数据库</span>
+              <div class="set-row-body">
+                <p>回收删除后留下的空间；压缩前后都会校验完整性。</p>
+                <span id="compactResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+              </div>
+              <button class="btn-ghost btn-compact" id="btnCompactNow" type="button">安全压缩</button>
+            </div>
+            <div class="set-row set-action">
+              <span>桌面缓存</span>
+              <div class="set-row-body">
+                <p>可自动重建的网页与图形缓存，清理不影响情报、星标和设置。</p>
+                <span id="cacheResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+              </div>
+              <button class="btn-ghost btn-compact" id="btnClearCache" type="button">清理缓存</button>
+            </div>
+            <div class="set-row set-action">
+              <span>旧版数据</span>
+              <div class="set-row-body">
+                <p>旧版本迁移后留下的数据：迁移满 30 天且新库正常时才可清理，删除前会再次确认范围。</p>
+                <span id="legacyResult" class="test-result maintenance-action-status" role="status" aria-live="polite"></span>
+              </div>
+              <button class="btn-ghost btn-compact" id="btnDeleteLegacy" type="button" disabled>审阅并清理</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="glass card-pad" id="settingsShortcuts" data-settings-section="settingsShortcuts" aria-labelledby="heading-settingsShortcuts">
-        <h3 id="heading-settingsShortcuts" tabindex="-1">键盘快捷键 <span class="muted">全局生效</span></h3>
+      <div class="glass card-pad set-card" id="settingsShortcuts" data-settings-section="settingsShortcuts" aria-labelledby="heading-settingsShortcuts">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">SHORTCUTS</span>
+            <h3 id="heading-settingsShortcuts" tabindex="-1">快捷键</h3>
+            <p>全局生效；在输入框里打字时，除 Esc 与 Ctrl K 外不会被触发。</p>
+          </div>
+        </div>
         <ul class="shortcut-list">
-          <li><span>命令面板：跳转、操作与检索（输入框内也可唤起）</span><kbd>Ctrl</kbd><kbd>K</kbd></li>
+          <li><span>命令面板：跳转、操作与检索</span><kbd>Ctrl</kbd><kbd>K</kbd></li>
           <li><span>聚焦检索框</span><kbd>/</kbd></li>
           <li><span>清空检索并退出输入</span><kbd>Esc</kbd></li>
-          <li><span>跳转视图：先按 G，再按 F 精选 · H 热点 · C 一级市场 · A 全部 · S 星标 · D 情报日志 · U 更新日志 · L 网址 · R 信源 · 逗号 设置</span><kbd>G</kbd><kbd>F</kbd></li>
-          <li><span>按侧栏顺序切换视图（0 为设置）</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>9</kbd><kbd>0</kbd></li>
-          <li><span>在卡片 / 热点事件间逐条移动</span><kbd>J</kbd><kbd>K</kbd></li>
-          <li><span>焦点条目：打开原文 · 星标 · 复制 · 展开关联</span><kbd>O</kbd><kbd>S</kbd><kbd>C</kbd><kbd>E</kbd></li>
-          <li><span>焦点在导航上时切换相邻视图</span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></li>
-          <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>立即采集分析</span><kbd>Alt</kbd><kbd>R</kbd></li>
+          <li><span>切换浅色 / 深色主题</span><kbd>Alt</kbd><kbd>T</kbd></li>
           <li><span>复制当前列表为文本</span><kbd>Alt</kbd><kbd>C</kbd></li>
-          <li><span>放大界面</span><kbd>Ctrl</kbd><kbd>+</kbd></li>
-          <li><span>缩小界面</span><kbd>Ctrl</kbd><kbd>-</kbd></li>
+          <li><span>按侧栏顺序切换视图（0 为设置）</span><kbd>Alt</kbd><kbd>1</kbd>…<kbd>9</kbd><kbd>0</kbd></li>
+          <li><span>先按 G 再按字母跳转：F 精选 · H 热点 · C 一级市场 · A 全部 · S 星标 · D 情报日志 · U 更新日志 · L 网址 · R 信源 · 逗号 设置</span><kbd>G</kbd><kbd>F</kbd></li>
+          <li><span>在卡片 / 热点事件间逐条移动</span><kbd>J</kbd><kbd>K</kbd></li>
+          <li><span>当前条目：打开原文 · 星标 · 复制 · 展开关联</span><kbd>O</kbd><kbd>S</kbd><kbd>C</kbd><kbd>E</kbd></li>
+          <li><span>焦点在导航上时切换相邻视图</span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></li>
+          <li><span>放大 / 缩小界面</span><kbd>Ctrl</kbd><kbd>+</kbd><kbd>Ctrl</kbd><kbd>-</kbd></li>
           <li><span>界面缩放回到标准档</span><kbd>Ctrl</kbd><kbd>0</kbd></li>
           <li><span>回到顶部</span><kbd>Home</kbd></li>
         </ul>
-        <p class="hint">在输入框内录入文字时，除 <code>Esc</code> 外的快捷键不会被触发。</p>
+      </div>
+      <div class="glass card-pad set-card" id="settingsNotes" data-settings-section="settingsNotes" aria-labelledby="heading-settingsNotes">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">NOTES</span>
+            <h3 id="heading-settingsNotes" tabindex="-1">情报备忘</h3>
+            <p>随手记下线索、待核实的问题或想法。只保存在本机情报库，不会上传，也不会被自动清理。</p>
+          </div>
+        </div>
+        <div class="set-note-form">
+          <label class="field" for="feedbackText"><span class="sr-only">备忘内容</span>
+            <textarea id="feedbackText" rows="2" placeholder="写点什么…（Ctrl + Enter 记下）"></textarea>
+          </label>
+          <button class="btn-primary" id="btnFeedback" type="button">记下</button>
+        </div>
+        <ul class="note-list" id="feedbackList" aria-live="polite"></ul>
       </div>
     </div>
     </div>

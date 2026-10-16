@@ -24,14 +24,18 @@ test('capital search and native options adapt to both themes; atmosphere off per
  }
  await page.locator('[data-view="settings"]').click();
  const toggle=page.locator('#setAquaEnabled'),reset=page.locator('#btnAquaReset');
- const a=await toggle.boundingBox(),b=await reset.boundingBox();assert.ok(a.x<b.x);
+ // v0.2.37：开关移入“动态背景”行，恢复默认外观在章节头；两者都必须可见可点
+ await toggle.scrollIntoViewIfNeeded();assert.ok(await toggle.isVisible());assert.ok(await reset.isVisible());
  if(await toggle.getAttribute('aria-pressed')!=='true')await toggle.click();
  await toggle.click();await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='off');
  assert.equal(await page.locator('.atmosphere').isVisible(),false);
  await page.waitForTimeout(400);await page.reload();await page.waitForSelector('.nav');
  assert.equal(await page.locator('html').getAttribute('data-aqua-enabled'),'off');
- await page.locator('[data-view="settings"]').click();await reset.click();
+ await page.locator('[data-view="settings"]').click();
+ const pointerBefore=await page.locator('html').getAttribute('data-pointer-enabled');await reset.click();
  await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='off');
+ // v0.2.37：恢复默认外观只复位玻璃与背景参数，不改动开关与跟手动效
+ assert.equal(await page.locator('html').getAttribute('data-pointer-enabled'),pointerBefore);
  assert.equal(await page.locator('.atmosphere').isVisible(),false);
  await toggle.click();await page.waitForFunction(()=>document.documentElement.dataset.aquaEnabled==='on');
  assert.equal(await page.locator('.atmosphere').isVisible(),true);

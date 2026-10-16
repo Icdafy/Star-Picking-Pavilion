@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.36 · 新闻推送：时间规则修复与点选面板
+## v0.2.37 · 设置页重新设计：改动即生效
 
-- **改完就生效**：推送时间和内容全部改为点选，点一下自动保存；顶部状态区实时显示开关、下一次推送、倒计时和今天的时刻表，不用再找“保存”按钮。
-- **规则更直观**：每天固定时刻，选了就一定推；或在推送时段内按间隔推送（例如 08:00—22:00 每 2 小时）。旧版的起始时刻与免打扰自动换算为推送时段。
-- **修复跳到明天**：刚加入的、就在当前这一分钟的时刻照常推送，已推过的时刻再次保存也不会重推。
-- **推到手机**：在「设置 → 新闻推送」绑定飞书、钉钉群机器人，或经 OneBot v11（NapCat / Lagrange / LLOneBot）绑定 QQ 机器人；验证码确认后才保存，连接信息经 safeStorage 加密，同一事件只推一次。
+- **一眼看懂**：除新闻推送外的设置章节统一为“标题与一句话说明 → 状态区 → 标签 | 选项”的行面板，目录按情报处理、送达与归档、外观、系统分组；配置路径、提示词版本与权重表收进“高级”。
+- **改完就生效**：自动采集开关、采集间隔、RSSHub 地址、保留期限点一下或回车即保存，并弹出一句回执；保存被拒时说明原因并恢复原值。
+- **逻辑修正**：清空保留天数不再被悄悄换成默认值；“恢复默认外观”不再关掉动态背景或重置跟手动效；每日清理与日报随“自动采集”运行这一点直接写在页面上。
+- **少走弯路**：没有模型密钥时一键“填入密钥”；每日资料库按钮写明“选择文件夹并开启”；显示里可直接切换深浅主题。
 
-版本、界面与更新元数据统一为 0.2.36，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0236-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥、已绑定的机器人与推送设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.37，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0237-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与全部设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.36.exe`，双击并按向导安装。v0.2.36 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.37.exe`，双击并按向导安装。v0.2.37 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.36.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.37.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

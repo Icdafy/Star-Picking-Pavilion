@@ -415,10 +415,16 @@
         const budget = info.budget || {};
         const prompts = (info.prompts || []).filter(p => !p.name.startsWith('rules-') && p.name !== 'safety')
           .map(p => `<code title="提示词内容哈希，改提示词后自动变化">${esc(p.name)}@${esc(p.version || '—')}</code>`).join(' ');
-        return `<div class="industry-thresholds"><span class="muted">入选门槛（两次评分平均）</span>${thresholds}</div>
+        // v0.2.37：与设置页其它章节同一套「标签 | 内容」行；权重表与提示词版本是给维护者看的，收进“高级”
+        const row = (label, body, hint) => `<div class="set-row"><span>${label}</span><div class="set-row-body">${body}${hint ? `<small>${hint}</small>` : ''}</div></div>`;
+        return row('入选门槛', `<div class="cat-chips">${thresholds}</div>`,
+          '两次独立评分的平均分达到信源等级对应的门槛（满分 100）才进入精选。T1 官方一手 · T1.5 官方社媒 · T2 媒体聚合。')
+          + row('模型用量', `<p>本小时 <b>${esc(budget.hourCalls ?? 0)}</b> / ${esc(budget.maxCallsPerHour ?? '–')}，今日 <b>${esc(budget.dayCalls ?? 0)}</b> / ${esc(budget.maxCallsPerDay ?? '–')} 次</p>`,
+            `达到上限后自动暂停调用，下个时段恢复；已存回执 ${esc(budget.receipts ?? 0)} 份，重试与重跑直接复用，不重复付费。`)
+          + row('评分细则', `<details class="set-more industry-details"><summary>查看 ${esc((info.itemTypes || []).length)} 类内容在 ${esc(axisKeys.length)} 个维度上的权重</summary>
   <table class="weight-table"><thead><tr><th scope="col">内容类型</th>${axisKeys.map(axis => `<th scope="col">${esc(axes[axis])}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
-  <p class="industry-budget">模型调用：本小时 <b>${esc(budget.hourCalls ?? 0)}</b> / ${esc(budget.maxCallsPerHour ?? '–')}，今日 <b>${esc(budget.dayCalls ?? 0)}</b> / ${esc(budget.maxCallsPerDay ?? '–')}；已存回执 ${esc(budget.receipts ?? 0)} 份（重试与重跑直接复用，不重复付费）。</p>
-  <p class="industry-prompts">${prompts}</p>`;
+  <p class="hint">高级 · 门槛与权重在 <code>config/industry/selection.json</code>、<code>taxonomy.json</code>，评分标准在 <code>prompts/selection-score.md</code>；改完下一轮分析生效，已判过的资料按保存的两次评分立即重判。用自己标注的样本校准：<code>npm run eval:selection</code>。</p>
+  <p class="industry-prompts">${prompts}</p></details>`);
       }
 
       return Object.freeze({

@@ -31,7 +31,7 @@ test('核心网格可在自身最小宽度不足时自动降为单栏', () => {
   }
   assert.match(css, /\.settings-grid[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
   assert.match(css, /\.storage-breakdown[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
-  assert.match(css, /\.maintenance-action-grid[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
+  assert.match(css, /\.shortcut-list[^}]*grid-template-columns:\s*repeat\(auto-fit,/);
 });
 
 test('信息流栅格保持单列并保留容器查询降列规则', () => {
@@ -65,11 +65,9 @@ test('表单、长文本和浮层不会撑破可用空间', () => {
 
 test('daily archive status and long native paths adapt without horizontal overflow', () => {
   assert.match(css, /\.daily-archive-path[^}]*overflow-wrap:\s*anywhere;/s);
-  assert.match(
-    css,
-    /@container\s+app\s*\(max-width:\s*45rem\)[^{]*\{[\s\S]*?\.daily-archive-status-grid\s*\{[^}]*grid-template-columns:\s*1fr;/s
-  );
-  assert.match(css, /\.daily-archive-actions\s*\{[^}]*flex-wrap:\s*wrap;/s);
+  // v0.2.37：设置页的「标签 | 控件」行在窄容器下改为上下排列，行尾操作按钮随之换行
+  assert.match(css, /@container\s+app\s*\(max-width:\s*45rem\)\s*\{\.set-row,\.set-action\{grid-template-columns:1fr;/);
+  assert.match(css, /\.set-head\{display:flex;flex-wrap:wrap;/);
 });
 
 // 阶段 2 响应式补全：词库面板、弹窗层、日报头部、存储治理在窄容器下的适配，
@@ -84,7 +82,7 @@ test('阶段 2：词库面板、弹窗层、日报头部与存储治理在窄容
   // 存储治理统计在中间宽度先一步降栏，不等 45rem
   assert.match(
     css,
-    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.maintenance-stats\s*\{[^}]*grid-template-columns:\s*1fr 1fr;/s
+    /@container\s+app\s*\(max-width:\s*53\.75rem\)[^{]*\{[\s\S]*?\.storage-summary\s*\{[^}]*grid-template-columns:\s*1fr;/s
   );
   // 800×600 与 xl 档：弹窗层内边距与字号层次收敛（rem-only，不引入 px 字号）
   assert.match(

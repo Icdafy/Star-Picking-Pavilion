@@ -55,7 +55,8 @@ test('v0223 原生新闻流按报道时间排序、保留年月精度，设置�
   for (const minutes of [1, 37, 720]) {
     await page.locator('#setInterval').fill(String(minutes));
     const response = page.waitForResponse(response => response.url().endsWith('/api/settings') && response.request().method() === 'POST');
-    await page.locator('#btnSaveCollect').click();
+    // v0.2.37 起改动即保存：回车提交自定义间隔
+    await page.locator('#setInterval').press('Enter');
     assert.equal((await response).status(), 200);
     const saved = JSON.parse(fs.readFileSync(path.join(directory, 'settings.json'), 'utf8'));
     assert.equal(saved.collect.intervalMinutes, minutes);

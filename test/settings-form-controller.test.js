@@ -70,7 +70,44 @@ function settingsWithPrefix(prefix) {
 test('the settings form no longer owns AI fields: those moved to the models section', () => {
   assert.throws(() => SettingsFormController.createSettingsFormController({ elements: {}, request: async () => ({}) }), /automatic/);
   const controller = SettingsFormController.createSettingsFormController({ elements: createElements(), request: async () => ({}) });
-  assert.deepEqual(Object.keys(controller).sort(), ['load', 'saveCollect', 'saveRetention']);
+  assert.deepEqual(Object.keys(controller).sort(), ['discard', 'load', 'saveCollect', 'saveRetention']);
+});
+
+test('v0.2.37 改动即保存：每个字段只提交自己，空值与越界天数被拒绝，discard 读回服务器值', async () => {
+  const elements = createElements();
+  const bodies = [];
+  const controller = SettingsFormController.createSettingsFormController({
+    elements,
+    request: async (path, options) => {
+      if (options) { bodies.push(options.body); return { ok: true }; }
+      return settingsWithPrefix('loaded');
+    }
+  });
+  elements.automatic.checked = true;
+  elements.intervalMinutes.fill('bad');
+  await controller.saveCollect(['automatic']);
+  assert.deepEqual(bodies.at(-1), { collect: { automatic: true } }, '开关不能连带提交另一字段里未确认的输入');
+  elements.rsshubBase.fill(' https://hub.example ');
+  await controller.saveCollect('rsshubBase');
+  assert.deepEqual(bodies.at(-1), { collect: { rsshubBase: 'https://hub.example' } });
+  await assert.rejects(controller.saveCollect(['retentionDays']), TypeError);
+
+  for (const [value, pattern] of [['', /整数天/], ['6', /7 至 3650/], ['30.5', /整数天/], ['3651', /整数天/]]) {
+    elements.retentionDays.fill(value);
+    await assert.rejects(controller.saveRetention(['retentionDays']), pattern);
+  }
+  elements.retentionDays.fill('365');
+  await controller.saveRetention(['retentionDays']);
+  assert.deepEqual(bodies.at(-1), { collect: { retentionDays: 365 } });
+  elements.irrelevantRetentionDays.fill('0');
+  await assert.rejects(controller.saveRetention(['irrelevantRetentionDays']), /1 至 3650/);
+  assert.equal(bodies.length, 3);
+
+  // 被拒的输入仍是脏的：普通 load 不覆盖，discard 才读回服务器上的 7 天
+  await controller.load();
+  assert.equal(elements.irrelevantRetentionDays.value, '0');
+  await controller.discard(['irrelevantRetentionDays']);
+  assert.equal(elements.irrelevantRetentionDays.value, '7');
 });
 
 test('late settings load preserves every user edit', async () => {
@@ -133,7 +170,7 @@ test('successful saves mark unchanged submitted fields clean; failed saves keep 
   assert.deepEqual(calls[0].options.body, { collect: { automatic: false, intervalMinutes: 55, rsshubBase: 'https://saved-rsshub.example' } });
   elements.retentionDays.fill('120');
   failNext = true;
-  await assert.rejects(controller.saveRetention(), /injected save failure/);
+  await assert.rejects(controller.saveRetention(['retentionDays']), /injected save failure/);
   failNext = false;
   await controller.load();
 
