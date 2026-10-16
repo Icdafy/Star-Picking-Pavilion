@@ -8,10 +8,10 @@ const { DatabaseSync } = require('node:sqlite');
 const { CHANNELS, deliver, PushChannelError } = require('../server/push/channels');
 const { composeMessage, markdownSafe, safeLink, FEISHU_MAX_BYTES } = require('../server/push/compose');
 const {
-  normalizePushSettings, applyPushPatch, nextSlot, latestDueSlot, describeSchedule
+  normalizePushSettings, applyPushPatch, nextSlot, latestDueSlot, describeSchedule, todaySlots
 } = require('../server/push/schedule');
 const { createPushService } = require('../server/push/service');
-const { pushPatchFromForm, formatPushMoment, describeCountdown } = require('../renderer/settings-form-controller');
+const { pushDraftPatch, planTimeline, formatPushMoment, describeCountdown } = require('../renderer/settings-form-controller');
 
 const FEISHU_HOOK = 'https://open.feishu.cn/open-apis/bot/v2/hook/0a1b2c3d-4e5f-6789-abcd-ef0123456789';
 const DINGTALK_HOOK = 'https://oapi.dingtalk.com/robot/send?access_token=' + 'a'.repeat(64);
@@ -133,19 +133,48 @@ test('请求体超过平台上限时从末尾舍弃条目；QQ 长消息按条�
 });
 
 // ---------- 节奏 ----------
-test('每隔 N 小时从起始时刻对齐，免打扰跨午夜跳过，推送日生效', () => {
-  const hourly = normalizePushSettings({ mode: 'interval', intervalMinutes: 60, anchor: '08:00', quietEnabled: true, quietStart: '23:00', quietEnd: '07:30' });
+test('按间隔：从推送时段开始起每隔 N 推一次，时段外不推，结束时刻含在内', () => {
+  const hourly = normalizePushSettings({ mode: 'interval', intervalMinutes: 60, windowStart: '08:00', windowEnd: '22:00' });
   assert.deepEqual(nextSlot(hourly, local(2026, 10, 16, 14, 20)), local(2026, 10, 16, 15, 0));
   assert.deepEqual(nextSlot(hourly, local(2026, 10, 16, 15, 0)), local(2026, 10, 16, 16, 0), '严格晚于游标');
-  assert.deepEqual(nextSlot(hourly, local(2026, 10, 16, 22, 30)), local(2026, 10, 17, 8, 0), '23:00—07:30 免打扰');
-  const threeHours = normalizePushSettings({ mode: 'interval', intervalMinutes: 180, anchor: '08:00', quietEnabled: false });
-  assert.deepEqual(nextSlot(threeHours, local(2026, 10, 16, 9, 0)), local(2026, 10, 16, 11, 0));
-  assert.deepEqual(nextSlot(threeHours, local(2026, 10, 16, 23, 30)), local(2026, 10, 17, 2, 0));
+  assert.deepEqual(nextSlot(hourly, local(2026, 10, 16, 21, 30)), local(2026, 10, 16, 22, 0), '时段结束时刻本身也推');
+  assert.deepEqual(nextSlot(hourly, local(2026, 10, 16, 22, 0)), local(2026, 10, 17, 8, 0), '时段之外不打扰');
+  const threeHours = normalizePushSettings({ mode: 'interval', intervalMinutes: 180, windowStart: '00:00', windowEnd: '24:00' });
+  assert.deepEqual(todaySlots(threeHours, local(2026, 10, 16, 9, 0)), ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00']);
+  assert.deepEqual(nextSlot(threeHours, local(2026, 10, 16, 23, 30)), local(2026, 10, 17, 0, 0));
+  assert.equal(describeSchedule(threeHours), '每天 全天 每 3 小时');
+  assert.equal(describeSchedule(hourly), '每天 08:00—22:00 每 1 小时');
+});
+
+test('固定时刻：用户点名的时刻一定推送，深夜时刻不再被免打扰吞掉；推送日生效', () => {
+  const late = normalizePushSettings({ mode: 'times', times: ['23:30', '01:00'] });
+  assert.deepEqual(nextSlot(late, local(2026, 10, 16, 22, 0)), local(2026, 10, 16, 23, 30));
+  assert.deepEqual(nextSlot(late, local(2026, 10, 16, 23, 30)), local(2026, 10, 17, 1, 0));
   const weekdays = normalizePushSettings({ mode: 'times', times: ['09:00'], weekdays: [1, 2, 3, 4, 5] });
-  // 2026-10-16 是周五，下一次应跳过周末到周一
+  // 2026-10-16 是周五，10-17 / 10-18 是周末
   assert.deepEqual(nextSlot(weekdays, local(2026, 10, 16, 10, 0)), local(2026, 10, 19, 9, 0));
-  assert.equal(describeSchedule(weekdays), '工作日 09:00 定点推送，23:00—07:30 免打扰');
-  assert.equal(nextSlot(normalizePushSettings({ mode: 'times', times: ['01:00'], quietStart: '00:00', quietEnd: '06:00' }), local(2026, 10, 16, 0, 0)), null);
+  assert.deepEqual(todaySlots(weekdays, local(2026, 10, 17, 10, 0)), [], '非推送日没有时刻表');
+  assert.equal(describeSchedule(weekdays), '工作日 09:00');
+});
+
+test('v0.2.35 的起始时刻 / 免打扰 / 每天一次在读取时换算为新规则', () => {
+  const quiet = normalizePushSettings({ mode: 'interval', intervalMinutes: 60, anchor: '08:00', quietEnabled: true, quietStart: '23:00', quietEnd: '07:30' });
+  assert.equal(quiet.windowStart, '07:30');
+  assert.equal(quiet.windowEnd, '23:00');
+  assert.equal(quiet.quietStart, undefined);
+  assert.equal(quiet.anchor, undefined);
+  const noQuiet = normalizePushSettings({ mode: 'interval', intervalMinutes: 120, quietEnabled: false, quietStart: '23:00', quietEnd: '07:30' });
+  assert.deepEqual([noQuiet.windowStart, noQuiet.windowEnd], ['00:00', '24:00']);
+  const daily = normalizePushSettings({ mode: 'interval', intervalMinutes: 1440, anchor: '07:45' });
+  assert.equal(daily.mode, 'times');
+  assert.deepEqual(daily.times, ['07:45']);
+  const fresh = normalizePushSettings({});
+  assert.equal(fresh.mode, 'times', '默认每天固定时刻');
+  assert.deepEqual([fresh.windowStart, fresh.windowEnd], ['08:00', '22:00']);
+  // v0.2.35 实际保存过的设置：固定时刻原样保留
+  const saved = normalizePushSettings({ enabled: true, mode: 'times', times: ['08:30', '12:30', '20:20'], quietEnabled: true, quietStart: '23:00', quietEnd: '07:30' });
+  assert.deepEqual(saved.times, ['08:30', '12:30', '20:20']);
+  assert.equal(saved.enabled, true);
 });
 
 test('错过多个时刻只补推最近一次', () => {
@@ -164,6 +193,11 @@ test('推送设置补丁逐字段校验，拒绝未知字段与非法取值', ()
   assert.throws(() => applyPushPatch(base, { maxItems: 50 }), /1 到 20/);
   assert.throws(() => applyPushPatch(base, { webhook: 'x' }), /不支持/);
   assert.throws(() => applyPushPatch(base, { enabled: 'yes' }), /布尔/);
+  assert.throws(() => applyPushPatch(base, { quietEnabled: true }), /不支持/, '免打扰字段已并入推送时段');
+  assert.throws(() => applyPushPatch(base, { intervalMinutes: 1440 }), /列表/, '每天一次请用固定时刻');
+  assert.throws(() => applyPushPatch(base, { windowStart: '22:00', windowEnd: '08:00' }), /晚于/);
+  assert.throws(() => applyPushPatch(base, { times: Array.from({ length: 13 }, (_, hour) => String(hour).padStart(2, '0') + ':00') }), /最多 12/);
+  assert.equal(applyPushPatch(base, { windowStart: '06:30', windowEnd: '24:00' }).windowEnd, '24:00');
   const channels = normalizePushSettings({ channels: { feishu: { enabled: true, boundAt: 'bad' } } }).channels;
   assert.deepEqual(channels.feishu, { enabled: false, boundAt: null }, '没有绑定时间的渠道不能启用');
 });
@@ -308,7 +342,7 @@ test('限流自动退避重试；最终失败写入记录且不标记为已推�
 test('定时：开启后从下一个时刻起推；到点推送，关机错过的时刻只补一次', async () => {
   const harness = createHarness({ now: local(2026, 10, 16, 14, 20) });
   await bindFeishu(harness);
-  await harness.service.updateSettings({ enabled: true, mode: 'interval', intervalMinutes: 60, anchor: '08:00', quietEnabled: false });
+  await harness.service.updateSettings({ enabled: true, mode: 'interval', intervalMinutes: 60, windowStart: '00:00', windowEnd: '24:00' });
   harness.addArticle({ id: 1 });
   const start = harness.requests.length;
   // 计时器间隔设为 1 小时，由测试直接驱动 tick
@@ -328,6 +362,50 @@ test('定时：开启后从下一个时刻起推；到点推送，关机错过�
   assert.equal(service.view().history[0].trigger, 'catch-up');
   await service.tick();
   assert.equal(harness.requests.length, start + 2);
+  service.stop();
+});
+
+test('回归：20:20:25 保存“20:20”，本分钟内照样推送；推过之后再保存不会重推', async () => {
+  const harness = createHarness({ now: new Date(2026, 9, 16, 20, 17, 47) });
+  await bindFeishu(harness);
+  await harness.service.updateSettings({ enabled: true, mode: 'times', times: ['08:30', '12:30'] });
+  harness.addArticle({ id: 1 });
+  const service = createPushServiceClone(harness);
+  assert.equal(service.view().nextRunAt, local(2026, 10, 17, 8, 30).toISOString(), '只有 08:30、12:30 时下一次在明天');
+
+  harness.clock.value = new Date(2026, 9, 16, 20, 20, 25);
+  await harness.service.updateSettings({ times: ['08:30', '12:30', '20:20'] });
+  assert.equal(service.view().nextRunAt, local(2026, 10, 16, 20, 20).toISOString(), '刚加的本分钟时刻就是下一次');
+  assert.deepEqual(service.view().today, ['08:30', '12:30', '20:20']);
+  const before = harness.requests.length;
+  await service.tick();
+  assert.equal(harness.requests.length, before + 1, '本分钟内的时刻被推送');
+  assert.equal(service.view().history[0].trigger, 'schedule');
+
+  harness.clock.value = new Date(2026, 9, 16, 20, 20, 50);
+  await harness.service.updateSettings({ maxItems: 5 });
+  await service.tick();
+  assert.equal(harness.requests.length, before + 1, '同一分钟再次保存不重推');
+  assert.equal(service.view().nextRunAt, local(2026, 10, 17, 8, 30).toISOString());
+  service.stop();
+});
+
+test('开关关闭时不推送；打开时从此刻起算，不补推今天已过的时刻', async () => {
+  const harness = createHarness({ now: local(2026, 10, 16, 13, 0) });
+  await bindFeishu(harness);
+  await harness.service.updateSettings({ enabled: false, mode: 'times', times: ['12:30', '18:30'] });
+  harness.addArticle({ id: 1 });
+  const service = createPushServiceClone(harness);
+  assert.equal(service.view().nextRunAt, null, '未开启没有下一次');
+  const before = harness.requests.length;
+  harness.clock.value = local(2026, 10, 16, 18, 30);
+  await service.tick();
+  assert.equal(harness.requests.length, before, '关闭时到点不推');
+  harness.clock.value = local(2026, 10, 16, 18, 40);
+  await harness.service.updateSettings({ enabled: true });
+  await service.tick();
+  assert.equal(harness.requests.length, before, '18:40 开启不补推 18:30');
+  assert.equal(service.view().nextRunAt, local(2026, 10, 17, 12, 30).toISOString());
   service.stop();
 });
 
@@ -353,17 +431,36 @@ function createPushServiceClone(harness) {
 }
 
 // ---------- 设置页纯函数 ----------
-test('设置页表单在提交前拦下明显错误，定点模式才携带时刻', () => {
-  const base = { mode: 'interval', interval: '120', anchor: '08:00', times: '08:30', weekdays: [1, 2, 3], quiet: true,
-    quietStart: '23:00', quietEnd: '07:30', scope: 'featured', domain: 'all', maxItems: '8', minHeat: '0', skipEmpty: true };
-  const { patch } = pushPatchFromForm(base);
-  assert.equal(patch.intervalMinutes, 120);
-  assert.equal(patch.times, undefined);
-  assert.equal(pushPatchFromForm({ ...base, mode: 'times', times: '08:30, 18:30' }).patch.times, '08:30, 18:30');
-  assert.match(pushPatchFromForm({ ...base, weekdays: [] }).error, /推送日/);
-  assert.match(pushPatchFromForm({ ...base, maxItems: '0' }).error, /1 到 20/);
-  assert.match(pushPatchFromForm({ ...base, minHeat: '120' }).error, /0 到 100/);
-  assert.match(pushPatchFromForm({ ...base, mode: 'times', times: ' ' }).error, /推送时刻/);
+test('设置页草稿只拦结构性问题，选项值原样提交', () => {
+  const base = { mode: 'times', times: ['08:30'], intervalMinutes: 120, windowStart: '08:00', windowEnd: '22:00', weekdays: [1, 2, 3],
+    scope: 'featured', domain: 'all', maxItems: 8, minHeat: 0, skipEmpty: true };
+  const { patch } = pushDraftPatch(base);
+  assert.deepEqual(patch, base);
+  assert.notEqual(patch.times, base.times, '数组复制，不与草稿共享引用');
+  assert.match(pushDraftPatch({ ...base, weekdays: [] }).error, /推送日/);
+  assert.match(pushDraftPatch({ ...base, times: [] }).error, /推送时刻/);
+  assert.match(pushDraftPatch({ ...base, windowStart: '22:00', windowEnd: '08:00' }).error, /晚于/);
+  assert.equal(pushDraftPatch({ ...base, windowStart: '23:30', windowEnd: '24:00' }).error, undefined);
+});
+
+test('今天的时刻表：已过 / 下一次 / 稍后；时刻很多时折叠', () => {
+  const now = new Date(2026, 9, 16, 20, 20, 25);
+  const plan = planTimeline(['08:30', '12:30', '20:20', '22:00'], { now, nextRunAt: new Date(2026, 9, 16, 20, 20) });
+  assert.deepEqual(plan.entries.map(entry => entry.state), ['past', 'past', 'next', 'later']);
+  const off = planTimeline(['08:30', '12:30', '20:20', '22:00'], { now, nextRunAt: null });
+  assert.deepEqual(off.entries.map(entry => entry.state), ['past', 'past', 'past', 'later'], '未开启时不标下一次');
+  const tomorrow = planTimeline(['08:30', '12:30'], { now, nextRunAt: new Date(2026, 9, 17, 8, 30) });
+  assert.deepEqual(tomorrow.entries.map(entry => entry.state), ['past', 'past']);
+  const dense = Array.from({ length: 57 }, (_, index) => {
+    const minute = 8 * 60 + index * 15;
+    return String(Math.floor(minute / 60)).padStart(2, '0') + ':' + String(minute % 60).padStart(2, '0');
+  });
+  const folded = planTimeline(dense, { now: new Date(2026, 9, 16, 12, 5), nextRunAt: new Date(2026, 9, 16, 12, 15) });
+  assert.equal(folded.entries[0].time, '12:15');
+  assert.equal(folded.entries[0].state, 'next');
+  assert.equal(folded.entries.length, 10);
+  assert.equal(folded.pastHidden, 17);
+  assert.equal(folded.laterHidden, 57 - 17 - 10);
 });
 
 test('下一次推送显示为今天 / 明天与倒计时', () => {

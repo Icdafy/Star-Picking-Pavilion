@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-[v0.2.35](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.35) 已于北京时间 2026-10-16 19:04:18 发布：设置页新增「新闻推送」，支持飞书、钉钉与 QQ（OneBot v11）机器人验证码绑定与自定节奏推送。tag Release 与 main CI 全部门禁通过，六项公开附件下载与摘要已复核，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0235-validation.md)。
+v0.2.36 修复新闻推送的时间规则（当前分钟时刻被跳过、免打扰吞掉固定时刻、未保存时状态不同步），并把推送设置改为点选与自动保存；发布由 tag 工作流完成，证据见 [本版验证](docs/v0236-validation.md)。
 
 ## 发布前授权门槛
 
@@ -21,7 +21,7 @@
 npm ci
 node node_modules/electron/install.js
 npm run releases:sync
-npm run verify:version -- --tag v0.2.35
+npm run verify:version -- --tag v0.2.36
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -31,11 +31,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.35 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.35.exe
+npm run verify:version -- --tag v0.2.36 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.36.exe
 ```
 
-v0.2.35 的签名状态预期为 `NotSigned`。
+v0.2.36 的签名状态预期为 `NotSigned`。
 
 ### 更新日志同步（每次发版必做）
 
@@ -84,19 +84,19 @@ v0.2.35 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.35
-git tag -a v0.2.35 -m "摘星阁 v0.2.35"
-git push origin v0.2.35
+npm run verify:version -- --tag v0.2.36
+git tag -a v0.2.36 -m "摘星阁 v0.2.36"
+git push origin v0.2.36
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会显式安装锁定的 Electron 二进制，再依次执行版本检查、单元测试、真实 Electron 测试、生产及完整工具链依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。SBOM 先生成生产 JS 图，再补入与锁文件一致的实际 Electron 运行时并重新校验 CycloneDX 1.6。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.35 Release 应包含：
+v0.2.36 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.35.exe`
-- `Star-Picking-Pavilion-Setup-0.2.35.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.36.exe`
+- `Star-Picking-Pavilion-Setup-0.2.36.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`

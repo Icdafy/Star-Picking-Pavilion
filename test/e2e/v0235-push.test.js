@@ -46,6 +46,9 @@ test('v0235 news push binds a QQ robot by verification code and schedules pushes
     ['feishu', 'dingtalk', 'qq']);
   assert.equal(await page.locator('#pushEnabled').isDisabled(), true, '未绑定前不能开启定时推送');
   assert.equal(await page.locator('#pushBoundBadge').textContent(), '尚未绑定');
+  assert.equal(await page.locator('#pushNextRun').textContent(), '先绑定一个机器人');
+  assert.equal(await page.locator('#settingsPush input[type="number"], #settingsPush input[type="time"], #pushSchedule input, #pushContent input').count(), 0,
+    '推送时间与内容全部是选项，没有需要手填的输入框');
 
   // 飞书：错误的地址在本机就被拦下，不会发出任何请求
   await page.locator('[data-push-channel="feishu"] [data-push-act="bind"]').click();
@@ -74,26 +77,64 @@ test('v0235 news push binds a QQ robot by verification code and schedules pushes
   await page.keyboard.press('Enter');
   await page.waitForSelector('[data-push-channel="qq"] [data-push-act="test"]');
   assert.equal(await page.locator('#pushBindPanel').isHidden(), true);
-  assert.match(await page.locator('[data-push-channel="qq"]').textContent(), /已绑定 · 推送中[\s\S]*私聊 20•+16/);
+  assert.match(await page.locator('[data-push-channel="qq"]').textContent(), /推送中[\s\S]*私聊 20•+16/);
   assert.equal(await page.locator('#pushBoundBadge').textContent(), '已绑定 QQ');
   assert.equal(await page.locator('#pushEnabled').isDisabled(), false, '绑定后可以开启定时推送');
   for (let waited = 0; messages.length < 2 && waited < 50; waited++) await new Promise(resolve => setTimeout(resolve, 100));
   assert.match(messages[1].body.message[0].data.text, /绑定成功/, '手机端收到绑定成功回执');
 
-  // 节奏：每天固定时刻 + 工作日；保存后开启定时推送
-  await page.locator('[data-push-mode="times"]').click();
-  assert.equal(await page.locator('#pushTimesField').isVisible(), true);
-  assert.equal(await page.locator('#pushIntervalField').isHidden(), true);
-  await page.locator('#pushTimes').fill('8:30, 12:30, 21:15');
-  for (const day of ['6', '7']) await page.locator(`#pushWeekdays [data-weekday="${day}"]`).click();
-  assert.equal(await page.locator('#pushWeekdays [data-weekday="6"]').getAttribute('aria-pressed'), 'false');
-  await page.locator('#pushMaxItems').fill('6');
-  await page.locator('#btnSavePush').click();
-  await page.waitForFunction(() => /已保存：工作日 08:30、12:30、21:15 定点推送/.test(document.getElementById('pushStatus').textContent));
-  assert.equal(await page.locator('#pushTimes').inputValue(), '08:30, 12:30, 21:15');
-  await page.locator('#pushEnabled').check({ force: true });
+  // 推送时间：开关先于时间设置也能开启；之后改时间，状态区立即跟着变，不需要另点保存
+  assert.equal(await page.locator('#pushNextRun').textContent(), '定时推送已关闭');
+  await page.locator('#pushHero .push-toggle').click();
   await page.waitForFunction(() => /定时推送已开启/.test(document.getElementById('pushStatus').textContent));
-  assert.match(await page.locator('#pushNextRun').textContent(), /(今天|明天|\d+月\d+日) (08:30|12:30|21:15)（/);
+  assert.match(await page.locator('#pushNextRun').textContent(), /^下一次 (今天|明天) \d\d:\d\d$/);
+
+  // 每天固定时刻：套用常用组合 → 用下拉添加“现在这一分钟” → 状态区立刻显示“今天 HH:MM · 即将推送”
+  await page.locator('[data-push-set="mode"][data-value="times"]').click();
+  await page.locator('[data-push-preset="08:30,18:30"]').click();
+  await page.waitForFunction(() => /已自动保存/.test(document.getElementById('pushStatus').textContent));
+  const nowClock = await page.evaluate(() => {
+    const at = new Date(Date.now() + 5000);
+    return { hour: at.getHours(), minute: at.getMinutes() };
+  });
+  const pickMinute = Math.floor(nowClock.minute / 5) * 5;
+  await page.locator('[data-push-pick="hour"]').selectOption(String(nowClock.hour));
+  await page.locator('[data-push-pick="minute"]').selectOption(String(pickMinute));
+  await page.locator('[data-push-add]').click();
+  const added = String(nowClock.hour).padStart(2, '0') + ':' + String(pickMinute).padStart(2, '0');
+  await page.waitForFunction(() => /已自动保存/.test(document.getElementById('pushStatus').textContent));
+  assert.ok(await page.locator(`[data-push-remove="${added}"]`).count(), '新加的时刻出现在已选列表里');
+  if (pickMinute === nowClock.minute) {
+    assert.equal(await page.locator('#pushNextRun').textContent(), `下一次 今天 ${added}`, '刚选中的本分钟时刻就是下一次推送');
+    assert.equal(await page.locator('#pushTimeline .is-next').textContent(), added);
+  }
+
+  // 工作日 + 每次 5 条：全部点选
+  await page.locator('[data-push-days="1,2,3,4,5"]').click();
+  await page.locator('[data-push-set="maxItems"][data-value="5"]').click();
+  await page.waitForFunction(() => /已自动保存 · 工作日 /.test(document.getElementById('pushStatus').textContent));
+  assert.equal(await page.locator('[data-push-day="6"]').getAttribute('aria-pressed'), 'false');
+
+  // 按间隔：推送时段 + 间隔芯片；状态区与时刻表同步
+  await page.locator('[data-push-set="mode"][data-value="interval"]').click();
+  await page.locator('[data-push-set="intervalMinutes"][data-value="180"]').click();
+  await page.locator('[data-push-allday]').click();
+  await page.waitForFunction(() => /已自动保存 · 工作日 全天 每 3 小时/.test(document.getElementById('pushStatus').textContent));
+  assert.match(await page.locator('#pushHeroDetail').textContent(), /工作日 全天 每 3 小时 · 推送到QQ/);
+  await page.locator('[data-push-window="windowStart"]').selectOption('09:00');
+  await page.waitForFunction(() => /已自动保存 · 工作日 09:00—24:00 每 3 小时/.test(document.getElementById('pushStatus').textContent));
+  const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).push;
+  assert.equal(saved.mode, 'interval');
+  assert.equal(saved.intervalMinutes, 180);
+  assert.deepEqual([saved.windowStart, saved.windowEnd], ['09:00', '24:00']);
+  assert.equal(saved.maxItems, 5);
+  assert.deepEqual(saved.weekdays, [1, 2, 3, 4, 5]);
+  assert.equal(saved.quietEnabled, undefined, '不再保存免打扰字段');
+
+  // 键盘：单选组方向键切换并自动保存
+  await page.locator('[data-push-set="scope"][data-value="featured"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.activeElement?.dataset.value === 'relevant' && /已自动保存/.test(document.getElementById('pushStatus').textContent));
 
   // 测试推送与立即推送（空库：不打扰）
   await page.locator('[data-push-channel="qq"] [data-push-act="test"]').click();
@@ -101,6 +142,7 @@ test('v0235 news push binds a QQ robot by verification code and schedules pushes
   assert.match(messages.at(-1).body.message[0].data.text, /测试推送/);
   await page.locator('#btnPushNow').click();
   await page.waitForFunction(() => /QQ没有新情报/.test(document.getElementById('pushStatus').textContent));
+  await page.locator('#settingsPush .push-log summary').click();
   assert.match(await page.locator('#pushHistory').textContent(), /QQ · 手动 · 没有新情报，未打扰/);
 
   // 重新进入设置页时表单从后端恢复，凭据从未回到页面
@@ -112,6 +154,7 @@ test('v0235 news push binds a QQ robot by verification code and schedules pushes
   const settingsFile = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
   assert.doesNotMatch(settingsFile, /e2e-token|20261016/);
   assert.equal(JSON.parse(settingsFile).push.enabled, true);
+  assert.equal(await page.locator('[data-push-set="intervalMinutes"][data-value="180"]').getAttribute('aria-checked'), 'true', '重新进入后选项从后端恢复');
 
   const shots = path.join(root, 'work/v0235/screenshots');
   fs.mkdirSync(shots, { recursive: true });

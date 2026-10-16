@@ -1,8 +1,16 @@
-# v0.2.35 发布状态
+# v0.2.36 发布状态
+
+新闻推送时间规则修复（当前分钟时刻、免打扰与固定时刻冲突、开关与时间不同步）与点选式推送设置面板。
+
+v0.2.36 正在经 tag 工作流发布，结果与证据见[验证记录](docs/v0236-validation.md)。
+---
+
+# v0.2.35 发布状态（历史）
 
 新增设置页“新闻推送”：飞书、钉钉与 QQ（OneBot v11）机器人验证码绑定，自定节奏推送按热度排序的新情报。
 
 [v0.2.35](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.35) 于2026-10-16 19:04:18（北京时间）发布为最新正式版，无发布阻塞。精确提交 `38c0d46` 的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38889928480)与[Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38889932200)完整通过：1125/1125单元与集成、40/40真实Electron、零生产及完整依赖漏洞、47项声明、1299项包边界及一次性Windows安装/启动/单实例/退出/卸载。六项公开附件已匿名下载并按 SHA256SUMS 复核，latest.yml 指向 0.2.35 安装器；用户数据保留。证据见[验证记录](docs/v0235-validation.md)。
+
 ---
 
 # v0.2.34 发布状态（历史）

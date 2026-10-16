@@ -25,11 +25,12 @@ test('样式表体积不超过预算，膨胀必须先被护栏拦下', () => {
   // 而让新增文件绕过预算。v0.1 基线约 235.5 KiB；v0.2.0 新增“当前热点”“一级市场”
   // 两个一等视图（intel.css，约 18 KiB，发布前已确认 styles.css 无死规则可清），
   // 基线约 259 KiB，上限上调到 275 KiB；v0.2.3 设置页「模型」一节照搬 DeepSeek Harness Models 页
-  // （约 15 KiB）与可读性、动效升级（约 3 KiB），上限上调到 292 KiB；再超时应先清理重复覆盖和死规则。
+  // （约 15 KiB）与可读性、动效升级（约 3 KiB），上限上调到 292 KiB；v0.2.36 新闻推送改为点选面板
+  // （约 4 KiB，字体分片索引无损压缩回收约 2 KiB），上限上调到 296 KiB；再超时应先清理重复覆盖和死规则。
   const bytes = stylesheetFiles.reduce((total, file) => total + fs.statSync(file).size, 0);
   assert.ok(
-    bytes <= 292 * 1024,
-    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 292 KB 总预算`
+    bytes <= 296 * 1024,
+    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 296 KB 总预算`
   );
 });
 

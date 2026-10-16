@@ -8,8 +8,8 @@
      上下文窗口 / 最大输出 / 输入类型，「获取可用模型」询问表单当前显示的端点与密钥，勾选后采纳）→
      整行宽的「添加模型提供商」入口（分段切换：第三方目录 / 自定义模型 API，两个草稿互不丢失）。
      摘星阁自己的补充只有一处：顶部「分析模型」选择，决定整条精选链用哪个模型。
-   createPushSettings —— v0.2.35「新闻推送」一节：飞书 / 钉钉 / QQ（OneBot v11）机器人验证码绑定、
-     推送节奏（每隔 N 分钟或每天定点、推送日、免打扰）、推送内容口径、立即推送与推送记录。 */
+   createPushSettings —— 「新闻推送」一节：飞书 / 钉钉 / QQ（OneBot v11）机器人验证码绑定（v0.2.35）；
+     v0.2.36 起推送时间与内容全部改为点选、改动即自动保存，顶部状态区实时显示下一次推送与今天的时刻表。 */
 
 (function exposeSettingsFormController(root, factory) {
   const api = factory();
@@ -1132,9 +1132,9 @@
 
 
   // ======================================================================
-  // 新闻推送（v0.2.35）—— 绑定飞书 / 钉钉 / QQ 机器人，按自定节奏把新情报推到手机。
+  // 新闻推送 —— 绑定飞书 / 钉钉 / QQ 机器人，按自定时间把新情报推到手机。
   // 绑定是两步：填写连接信息 → 手机上收到 6 位验证码 → 回填验证码后才保存。
-  // 节奏与内容表单与采集表单同口径：用户正在改的字段不被迟到的加载覆盖。
+  // 推送时间与内容只用点选：改动先进本地草稿并立即重绘，短暂停顿后自动保存；保存在途时迟到的视图不覆盖草稿。
   // ======================================================================
   const PUSH_GUIDES = Object.freeze({
     feishu: Object.freeze({
@@ -1174,14 +1174,46 @@
     })
   });
   const PUSH_TRIGGERS = Object.freeze({ schedule: '定时', 'catch-up': '补推', manual: '手动', test: '测试' });
-  const PUSH_FORM_FIELDS = Object.freeze(['interval', 'anchor', 'times', 'quiet', 'quietStart', 'quietEnd',
+  const PUSH_CHANNEL_MARKS = Object.freeze({ feishu: '飞', dingtalk: '钉', qq: 'Q' });
+  const PUSH_CHANNEL_HINTS = Object.freeze({
+    feishu: '飞书群机器人 · Webhook，支持签名校验',
+    dingtalk: '钉钉群机器人 · Webhook，支持加签',
+    qq: 'QQ 私聊或群 · 经 NapCat 等 OneBot v11 服务'
+  });
+  const PUSH_MAX_TIMES = 12;
+  const PUSH_INTERVALS = Object.freeze([[15, '15 分钟'], [30, '30 分钟'], [60, '1 小时'], [120, '2 小时'], [180, '3 小时'],
+    [240, '4 小时'], [360, '6 小时'], [480, '8 小时'], [720, '12 小时']]);
+  const PUSH_TIME_PRESETS = Object.freeze([
+    Object.freeze(['早间一次', Object.freeze(['08:30'])]),
+    Object.freeze(['早晚两次', Object.freeze(['08:30', '18:30'])]),
+    Object.freeze(['早中晚三次', Object.freeze(['08:30', '12:30', '18:30'])])
+  ]);
+  const PUSH_DAY_PRESETS = Object.freeze([['每天', '1,2,3,4,5,6,7'], ['工作日', '1,2,3,4,5'], ['周末', '6,7']]);
+  const PUSH_DAY_NAMES = Object.freeze(['一', '二', '三', '四', '五', '六', '日']);
+  const PUSH_CHOICES = Object.freeze({
+    scope: Object.freeze([['featured', '精选情报', '双评分入选的高价值情报'], ['relevant', '全部相关动态', '与低空 / 航天相关的全部动态']]),
+    domain: Object.freeze([['all', '两个领域'], ['lowaltitude', '只看低空经济'], ['aerospace', '只看商业航天']]),
+    maxItems: Object.freeze([[3, '3 条'], [5, '5 条'], [8, '8 条'], [10, '10 条'], [15, '15 条'], [20, '20 条']]),
+    minHeat: Object.freeze([[0, '不限'], [40, '40 分以上'], [60, '60 分以上'], [80, '80 分以上']]),
+    skipEmpty: Object.freeze([[true, '不发送', '没有新情报就不打扰'], [false, '发一条提示', '到点也发“本时段暂无新情报”']])
+  });
+  const PUSH_DRAFT_KEYS = Object.freeze(['mode', 'times', 'intervalMinutes', 'windowStart', 'windowEnd', 'weekdays',
     'scope', 'domain', 'maxItems', 'minHeat', 'skipEmpty']);
+
+  function pad2(number) {
+    return String(number).padStart(2, '0');
+  }
+
+  function clockMinutes(text) {
+    if (text === '24:00') return 1440;
+    const match = /^(\d{2}):(\d{2})$/.exec(String(text || ''));
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+  }
 
   function formatPushMoment(value, now = new Date()) {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) return '';
-    const pad = number => String(number).padStart(2, '0');
-    const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const clock = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
     const dayDiff = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate())
       - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
     const day = dayDiff === 0 ? '今天' : dayDiff === 1 ? '明天' : dayDiff === -1 ? '昨天' : `${date.getMonth() + 1}月${date.getDate()}日`;
@@ -1197,33 +1229,35 @@
     return hours < 24 ? `约 ${hours} 小时${minutes % 60 ? ` ${minutes % 60} 分` : ''}后` : `约 ${Math.round(hours / 24)} 天后`;
   }
 
-  function pushPatchFromForm(form) {
-    const patch = {
-      mode: form.mode,
-      intervalMinutes: Number(form.interval),
-      anchor: form.anchor || '08:00',
-      weekdays: form.weekdays,
-      quietEnabled: form.quiet === true,
-      quietStart: form.quietStart || '23:00',
-      quietEnd: form.quietEnd || '07:30',
-      scope: form.scope,
-      domain: form.domain,
-      maxItems: Number(form.maxItems),
-      minHeat: Number(form.minHeat || 0),
-      skipEmpty: form.skipEmpty === true
-    };
-    if (form.mode === 'times') patch.times = String(form.times || '');
-    if (!patch.weekdays.length) return { error: '请至少选择一个推送日。' };
-    if (!Number.isInteger(patch.maxItems) || patch.maxItems < 1 || patch.maxItems > 20) return { error: '每次最多条数请输入 1 到 20 的整数。' };
-    if (!Number.isInteger(patch.minHeat) || patch.minHeat < 0 || patch.minHeat > 100) return { error: '最低热度请输入 0 到 100 的整数。' };
-    if (form.mode === 'times' && !patch.times.trim()) return { error: '请填写至少一个每天推送时刻，例如 08:30, 18:30。' };
+  // 设置页草稿 → 提交给后端的补丁。所有字段都来自选项，这里只拦“删光了”这类结构性问题。
+  function pushDraftPatch(draft) {
+    const patch = {};
+    for (const key of PUSH_DRAFT_KEYS) patch[key] = Array.isArray(draft[key]) ? [...draft[key]] : draft[key];
+    if (!patch.weekdays?.length) return { error: '请至少保留一个推送日。' };
+    if (!patch.times?.length) return { error: '请至少保留一个推送时刻。' };
+    if (clockMinutes(patch.windowEnd) <= clockMinutes(patch.windowStart)) return { error: '推送时段的结束时间必须晚于开始时间。' };
     return { patch };
   }
 
-  function createPushSettings({ elements, request, toast = () => {}, confirm = async () => true, escapeHTML, now = () => new Date() } = {}) {
-    const required = ['enabled', 'nextRun', 'badge', 'channels', 'bindPanel', 'mode', 'interval', 'anchor', 'times',
-      'intervalField', 'anchorField', 'timesField', 'weekdays', 'quiet', 'quietStart', 'quietEnd', 'scope', 'domain',
-      'maxItems', 'minHeat', 'skipEmpty', 'save', 'preview', 'pushNow', 'status', 'previewList', 'lastRun', 'totals', 'history'];
+  // 今天的时刻表：已过 / 下一次 / 稍后。时刻很多（例如每 15 分钟）时只列出接下来的几个，其余折叠成计数。
+  function planTimeline(slots, { now = new Date(), nextRunAt = null, limit = 10 } = {}) {
+    const current = now.getHours() * 60 + now.getMinutes();
+    const next = nextRunAt ? new Date(nextRunAt) : null;
+    const nextToday = next && next.toDateString() === now.toDateString() ? `${pad2(next.getHours())}:${pad2(next.getMinutes())}` : null;
+    const entries = (slots || []).map(time => ({
+      time,
+      state: time === nextToday ? 'next' : clockMinutes(time) <= current ? 'past' : 'later'
+    }));
+    if (entries.length <= limit + 2) return { entries, pastHidden: 0, laterHidden: 0 };
+    const upcoming = entries.filter(entry => entry.state !== 'past');
+    const shown = upcoming.slice(0, limit);
+    return { entries: shown, pastHidden: entries.length - upcoming.length, laterHidden: upcoming.length - shown.length };
+  }
+
+  function createPushSettings({ elements, request, toast = () => {}, confirm = async () => true, escapeHTML, now = () => new Date(),
+    saveDelayMs = 320 } = {}) {
+    const required = ['enabled', 'hero', 'nextRun', 'heroDetail', 'timeline', 'badge', 'channels', 'bindPanel', 'schedule', 'content',
+      'preview', 'pushNow', 'status', 'previewList', 'logSummary', 'history'];
     if (!elements || typeof request !== 'function' || typeof escapeHTML !== 'function') {
       throw new TypeError('push settings elements, request and escapeHTML are required');
     }
@@ -1231,77 +1265,152 @@
       if (!elements[name]) throw new TypeError(`push settings element is required: ${name}`);
     }
     const esc = escapeHTML;
-    const state = { view: null, mode: 'interval', weekdays: [1, 2, 3, 4, 5, 6, 7], dirty: new Set(), revision: 0,
-      bind: null, busy: new Set(), channelStatus: {} };
+    const state = { view: null, draft: null, revision: 0, saved: 0, saveTimer: null, saving: null,
+      pick: null, bind: null, busy: new Set(), channelStatus: {} };
 
     function setStatus(text, tone = '') {
       elements.status.textContent = text || '';
       elements.status.className = `test-result desktop-settings-result${tone ? ` ${tone}` : ''}`;
     }
 
-    function markDirty(name) {
-      state.dirty.add(name);
-      state.revision += 1;
+    function draftFrom(settings) {
+      const draft = {};
+      for (const key of PUSH_DRAFT_KEYS) draft[key] = Array.isArray(settings[key]) ? [...settings[key]] : settings[key];
+      return draft;
     }
 
-    // ---------- 渲染 ----------
-    function renderMode() {
-      for (const button of elements.mode.querySelectorAll('[data-push-mode]')) {
-        const on = button.dataset.pushMode === state.mode;
-        button.classList.toggle('active', on);
-        button.setAttribute('aria-checked', String(on));
-        button.tabIndex = on ? 0 : -1;
+    // ---------- 选项渲染（全部是点选，没有需要手填的数字） ----------
+    function choice(group, value, label, { on, title = '', extra = '' } = {}) {
+      return `<button class="chip${on ? ' active' : ''}" type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}"
+        data-push-set="${group}" data-value="${esc(String(value))}"${title ? ` title="${esc(title)}"` : ''}${extra}>${esc(label)}</button>`;
+    }
+
+    function radioGroup(group, label, options, current) {
+      const known = options.some(([value]) => value === current);
+      const list = known ? options : [...options, [current, group === 'minHeat' ? `${current} 分以上` : `${current} 条`]];
+      return `<div class="cat-chips period-switch" role="radiogroup" aria-label="${esc(label)}">${list
+        .map(([value, text, title]) => choice(group, value, text, { on: value === current, title })).join('')}</div>`;
+    }
+
+    function option(label, body, hint = '') {
+      return `<div class="push-opt"><span>${esc(label)}</span><div class="push-opt-body">${body}${hint ? `<small>${esc(hint)}</small>` : ''}</div></div>`;
+    }
+
+    function timeOptions(from, to, step, selected) {
+      const list = [];
+      for (let minute = from; minute <= to; minute += step) {
+        const text = minute === 1440 ? '24:00' : `${pad2(Math.floor(minute / 60))}:${pad2(minute % 60)}`;
+        list.push(text);
       }
-      elements.intervalField.hidden = state.mode !== 'interval';
-      elements.anchorField.hidden = state.mode !== 'interval';
-      elements.timesField.hidden = state.mode !== 'times';
+      if (selected && !list.includes(selected)) list.push(selected);
+      return list.sort((a, b) => clockMinutes(a) - clockMinutes(b))
+        .map(text => `<option value="${text}"${text === selected ? ' selected' : ''}>${text}</option>`).join('');
     }
 
-    function renderWeekdays() {
-      for (const button of elements.weekdays.querySelectorAll('[data-weekday]')) {
-        const on = state.weekdays.includes(Number(button.dataset.weekday));
-        button.classList.toggle('active', on);
-        button.setAttribute('aria-pressed', String(on));
+    function defaultPick() {
+      const current = now();
+      return { hour: (current.getHours() + 1) % 24, minute: 0 };
+    }
+
+    function renderSchedule() {
+      const draft = state.draft;
+      const pick = state.pick || (state.pick = defaultPick());
+      const mode = `<div class="cat-chips period-switch" role="radiogroup" aria-label="推送方式">
+        ${choice('mode', 'times', '每天固定时刻', { on: draft.mode === 'times' })}${choice('mode', 'interval', '按间隔推送', { on: draft.mode === 'interval' })}</div>`;
+      let rows = option('推送方式', mode, draft.mode === 'times' ? '到了你选的时刻就推送，适合每天看几次简报。' : '在推送时段内按固定间隔推送，适合盯紧动态。');
+      if (draft.mode === 'times') {
+        const chips = draft.times.map(time => `<button class="chip active push-time" type="button" data-push-remove="${time}"
+          aria-label="移除 ${time}" title="点击移除">${time}<span aria-hidden="true">×</span></button>`).join('');
+        const hours = Array.from({ length: 24 }, (_, hour) => `<option value="${hour}"${hour === pick.hour ? ' selected' : ''}>${pad2(hour)} 时</option>`).join('');
+        const minutes = Array.from({ length: 12 }, (_, index) => index * 5)
+          .map(minute => `<option value="${minute}"${minute === pick.minute ? ' selected' : ''}>${pad2(minute)} 分</option>`).join('');
+        const full = draft.times.length >= PUSH_MAX_TIMES;
+        const presets = PUSH_TIME_PRESETS.map(([label, times]) => {
+          const on = times.join(',') === draft.times.join(',');
+          return `<button class="chip${on ? ' active' : ''}" type="button" aria-pressed="${on}" data-push-preset="${times.join(',')}">${esc(label)}</button>`;
+        }).join('');
+        rows += option('推送时刻', `<div class="cat-chips" role="list" aria-label="已选推送时刻">${chips}</div>
+          <div class="push-pick"><select data-push-pick="hour" aria-label="添加时刻：小时">${hours}</select>
+            <select data-push-pick="minute" aria-label="添加时刻：分钟">${minutes}</select>
+            <button class="btn-ghost btn-compact" type="button" data-push-add ${full ? 'disabled' : ''}>＋ 添加</button></div>
+          <div class="cat-chips" aria-label="常用组合">${presets}</div>`, full ? `已达上限 ${PUSH_MAX_TIMES} 个时刻。` : '点已选时刻可移除；也可以直接套用常用组合。');
+      } else {
+        const allDay = draft.windowStart === '00:00' && draft.windowEnd === '24:00';
+        const start = clockMinutes(draft.windowStart);
+        const end = clockMinutes(draft.windowEnd);
+        rows += option('间隔', radioGroup('intervalMinutes', '推送间隔', PUSH_INTERVALS, draft.intervalMinutes));
+        rows += option('推送时段', `<div class="push-pick">
+            <select data-push-window="windowStart" aria-label="推送时段开始">${timeOptions(0, Math.min(end - 30, 1410), 30, draft.windowStart)}</select>
+            <span class="muted">至</span>
+            <select data-push-window="windowEnd" aria-label="推送时段结束">${timeOptions(Math.max(start + 30, 30), 1440, 30, draft.windowEnd)}</select>
+            <button class="chip${allDay ? ' active' : ''}" type="button" aria-pressed="${allDay}" data-push-allday>全天</button></div>`,
+        `从 ${draft.windowStart} 起每 ${PUSH_INTERVALS.find(([value]) => value === draft.intervalMinutes)?.[1] || `${draft.intervalMinutes} 分钟`}推送一次，时段之外不打扰。`);
       }
+      const days = draft.weekdays.join(',');
+      const presets = PUSH_DAY_PRESETS.map(([label, value]) => `<button class="chip${days === value ? ' active' : ''}" type="button"
+        aria-pressed="${days === value}" data-push-days="${value}">${label}</button>`).join('');
+      const single = PUSH_DAY_NAMES.map((name, index) => {
+        const on = draft.weekdays.includes(index + 1);
+        return `<button class="chip${on ? ' active' : ''}" type="button" aria-pressed="${on}" data-push-day="${index + 1}" aria-label="周${name}">${name}</button>`;
+      }).join('');
+      rows += option('推送日', `<div class="cat-chips">${presets}<span class="push-divider" aria-hidden="true"></span>${single}</div>`);
+      return rows;
     }
 
-    function fillForm(settings) {
-      const assign = (name, apply) => { if (!state.dirty.has(name)) apply(); };
-      assign('mode', () => { state.mode = settings.mode; });
-      assign('weekdays', () => { state.weekdays = [...settings.weekdays]; });
-      assign('interval', () => { elements.interval.value = String(settings.intervalMinutes); });
-      assign('anchor', () => { elements.anchor.value = settings.anchor; });
-      assign('times', () => { elements.times.value = settings.times.join(', '); });
-      assign('quiet', () => { elements.quiet.checked = settings.quietEnabled === true; });
-      assign('quietStart', () => { elements.quietStart.value = settings.quietStart; });
-      assign('quietEnd', () => { elements.quietEnd.value = settings.quietEnd; });
-      assign('scope', () => { elements.scope.value = settings.scope; });
-      assign('domain', () => { elements.domain.value = settings.domain; });
-      assign('maxItems', () => { elements.maxItems.value = String(settings.maxItems); });
-      assign('minHeat', () => { elements.minHeat.value = String(settings.minHeat); });
-      assign('skipEmpty', () => { elements.skipEmpty.checked = settings.skipEmpty === true; });
-      elements.quietStart.disabled = !elements.quiet.checked;
-      elements.quietEnd.disabled = !elements.quiet.checked;
-      renderMode();
-      renderWeekdays();
+    function renderContent() {
+      const draft = state.draft;
+      return option('推送范围', radioGroup('scope', '推送范围', PUSH_CHOICES.scope, draft.scope),
+        PUSH_CHOICES.scope.find(([value]) => value === draft.scope)?.[2])
+        + option('关注领域', radioGroup('domain', '关注领域', PUSH_CHOICES.domain, draft.domain))
+        + option('每次最多', radioGroup('maxItems', '每次最多条数', PUSH_CHOICES.maxItems, draft.maxItems), '按热度从高到低截取。')
+        + option('热度门槛', radioGroup('minHeat', '最低热度', PUSH_CHOICES.minHeat, draft.minHeat))
+        + option('没有新情报时', radioGroup('skipEmpty', '没有新情报时', PUSH_CHOICES.skipEmpty, draft.skipEmpty),
+          PUSH_CHOICES.skipEmpty.find(([value]) => value === draft.skipEmpty)?.[2]);
     }
 
+    // 重绘选项时保住键盘焦点：按同一个 data-* 选择器找回对应按钮
+    function focusKey(node) {
+      if (!node?.dataset) return null;
+      for (const name of ['pushSet', 'pushRemove', 'pushPreset', 'pushDays', 'pushDay', 'pushPick', 'pushWindow']) {
+        if (node.dataset[name] !== undefined) {
+          const attr = `data-${name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`;
+          return name === 'pushSet' ? `[${attr}="${node.dataset.pushSet}"][data-value="${node.dataset.value}"]` : `[${attr}="${node.dataset[name]}"]`;
+        }
+      }
+      if (node.matches?.('[data-push-add]')) return '[data-push-add]';
+      if (node.matches?.('[data-push-allday]')) return '[data-push-allday]';
+      return null;
+    }
+
+    function renderOptions() {
+      if (!state.draft) return;
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      const host = [elements.schedule, elements.content].find(node => node.contains?.(active));
+      const key = host ? focusKey(active) : null;
+      elements.schedule.innerHTML = renderSchedule();
+      elements.content.innerHTML = renderContent();
+      if (host && key) (host.querySelector(key) || host.querySelector('[data-push-set][aria-checked="true"]'))?.focus();
+    }
+
+    // ---------- 状态区 ----------
     function channelCard(channel) {
       const busy = state.busy.has(channel.id);
       const status = state.channelStatus[channel.id];
-      const detail = channel.bound
-        ? `${channel.enabled ? '已绑定 · 推送中' : '已绑定 · 已暂停'}<br>${esc(channel.target || '')}<br>${esc(channel.security || '')}`
-        : channel.pending ? '验证码已发送，请在下方输入手机上收到的 6 位数字。'
-          : { feishu: '群机器人 Webhook，支持签名校验与消息卡片。', dingtalk: '群机器人 Webhook，支持加签与 Markdown。', qq: '经 NapCat / Lagrange 等 OneBot v11 服务推送到 QQ 私聊或群。' }[channel.id];
+      const binding = state.bind?.channel === channel.id;
+      const badge = channel.bound
+        ? `<span class="push-badge ${channel.enabled ? 'on' : 'off'}">${channel.enabled ? '推送中' : '已暂停'}</span>`
+        : channel.pending ? '<span class="push-badge">待验证</span>' : '';
+      const detail = channel.bound ? [channel.target, channel.security].filter(Boolean).join(' · ') : PUSH_CHANNEL_HINTS[channel.id];
+      const disabled = busy ? ' disabled' : '';
       const actions = channel.bound
-        ? `<button class="btn-ghost" type="button" data-push-act="test" ${busy ? 'disabled' : ''}>发送测试</button>
-           <button class="btn-ghost" type="button" data-push-act="toggle" aria-pressed="${channel.enabled}" ${busy ? 'disabled' : ''}>${channel.enabled ? '暂停推送' : '恢复推送'}</button>
-           <button class="btn-ghost" type="button" data-push-act="rebind" ${busy ? 'disabled' : ''}>重新绑定</button>
-           <button class="btn-ghost" type="button" data-push-act="unbind" ${busy ? 'disabled' : ''}>解绑</button>`
-        : `<button class="${state.bind?.channel === channel.id ? 'btn-ghost' : 'btn-primary'}" type="button" data-push-act="bind" ${busy ? 'disabled' : ''}>${state.bind?.channel === channel.id ? '绑定中…' : '绑定'}</button>`;
-      return `<section class="maintenance-action-card" data-push-channel="${esc(channel.id)}" aria-label="${esc(channel.name)}">
-        <span class="maintenance-action-index">${channel.bound ? '● ' : ''}${esc(channel.shortName)}</span>
-        <div><h4>${esc(channel.name)}</h4><p>${detail}</p></div>
+        ? `<button class="btn-ghost btn-compact" type="button" data-push-act="test"${disabled}>发送测试</button>
+           <button class="btn-ghost btn-compact" type="button" data-push-act="toggle"${disabled}>${channel.enabled ? '暂停' : '恢复'}</button>
+           <button class="btn-ghost btn-compact" type="button" data-push-act="rebind"${disabled}>重新绑定</button>
+           <button class="btn-ghost btn-compact" type="button" data-push-act="unbind"${disabled}>解绑</button>`
+        : `<button class="${binding ? 'btn-ghost' : 'btn-primary'} btn-compact" type="button" data-push-act="bind"${disabled}>${binding ? '绑定中…' : '绑定'}</button>`;
+      return `<section class="push-channel${channel.bound && channel.enabled ? ' is-on' : ''}" data-push-channel="${esc(channel.id)}" aria-label="${esc(channel.name)}">
+        <i aria-hidden="true">${PUSH_CHANNEL_MARKS[channel.id] || ''}</i>
+        <div><h4>${esc(channel.name)}${badge}</h4><p>${esc(detail || '')}</p></div>
         <div class="btn-row">${actions}</div>
         <span class="test-result maintenance-action-status${status?.tone ? ` ${status.tone}` : ''}" role="status" aria-live="polite">${esc(status?.text || '')}</span>
       </section>`;
@@ -1353,34 +1462,70 @@
       panel.hidden = false;
     }
 
+    function renderTimeline(view, current) {
+      const slots = view.today || [];
+      if (!slots.length) {
+        elements.timeline.innerHTML = '<li class="push-slots-label">今天不是推送日</li>';
+        return;
+      }
+      const plan = planTimeline(slots, { now: current, nextRunAt: view.settings.enabled ? view.nextRunAt : null });
+      const pills = plan.entries.map(entry => `<li class="${entry.state === 'next' ? 'is-next' : entry.state === 'past' ? 'is-past' : ''}"
+        ${entry.state === 'next' ? 'aria-current="time"' : ''}>${entry.time}</li>`).join('');
+      elements.timeline.innerHTML = `<li class="push-slots-label">今天</li>${plan.pastHidden ? `<li class="is-past">已过 ${plan.pastHidden} 次</li>` : ''}${pills}${plan.laterHidden ? `<li class="push-slots-label">另有 ${plan.laterHidden} 次</li>` : ''}`;
+    }
+
     function renderSummary() {
       const view = state.view;
       if (!view) return;
       const current = now();
       const anyBound = view.channels.some(channel => channel.bound);
-      elements.enabled.checked = view.settings.enabled === true;
-      elements.enabled.disabled = !anyBound && !view.settings.enabled;
-      elements.nextRun.textContent = !view.settings.enabled ? '未开启'
-        : !anyBound || !view.channels.some(channel => channel.enabled) ? '没有启用的机器人'
-          : view.nextRunAt ? `${formatPushMoment(view.nextRunAt, current)}（${describeCountdown(view.nextRunAt, current)}）` : '没有可用的推送时刻';
-      elements.nextRun.title = view.schedule || '';
+      const active = view.channels.filter(channel => channel.enabled).map(channel => channel.shortName);
+      const on = view.settings.enabled === true;
+      elements.enabled.checked = on;
+      elements.enabled.disabled = !anyBound && !on;
+      let title;
+      let detail;
+      if (!anyBound) {
+        title = '先绑定一个机器人';
+        detail = '在下方“推送到”里绑定飞书、钉钉或 QQ，验证成功后即可开启定时推送。';
+      } else if (!on) {
+        title = '定时推送已关闭';
+        detail = `打开右侧开关后，按“${view.schedule}”推送到${active.join('、') || '已绑定的机器人'}。`;
+      } else if (!active.length) {
+        title = '机器人都已暂停';
+        detail = '在下方“推送到”里恢复至少一个机器人。';
+      } else if (view.nextRunAt) {
+        title = `下一次 ${formatPushMoment(view.nextRunAt, current)}`;
+        detail = `${describeCountdown(view.nextRunAt, current)} · ${view.schedule} · 推送到${active.join('、')}`;
+      } else {
+        title = '没有可用的推送时刻';
+        detail = '请检查下方的推送时间。';
+      }
+      elements.nextRun.textContent = title;
+      elements.heroDetail.textContent = detail;
+      elements.hero.classList.toggle('is-on', on && active.length > 0);
+      elements.pushNow.hidden = !active.length;
+      renderTimeline(view, current);
       const last = view.history.find(entry => entry.trigger !== 'test' && entry.ok && !entry.skipped);
-      elements.lastRun.textContent = last ? `${formatPushMoment(last.at, current)} · ${last.channelName} ${last.count} 条` : '尚无推送';
-      elements.totals.textContent = `${view.totals.pushes} 次 · ${view.totals.items} 条`;
-      elements.history.innerHTML = view.history.slice(0, 8).map(entry => {
+      elements.logSummary.textContent = `${last ? `最近 ${formatPushMoment(last.at, current)} · ${last.channelName} ${last.count} 条` : '尚无推送'} · 累计 ${view.totals.pushes} 次 ${view.totals.items} 条`;
+      elements.history.innerHTML = view.history.length ? view.history.slice(0, 8).map(entry => {
         const outcome = !entry.ok ? `失败：${entry.error || '未知原因'}`
           : entry.skipped ? '没有新情报，未打扰' : `已送达 ${entry.count} 条`;
         return `<li class="note-item"><div class="note-body"><p>${esc(entry.channelName)} · ${esc(PUSH_TRIGGERS[entry.trigger] || entry.trigger)} · ${esc(outcome)}</p>
           <span class="note-time">${esc(formatPushMoment(entry.at, current))}</span></div></li>`;
-      }).join('');
-      if (!elements.status.textContent && view.settings.enabled && !view.collectAutomatic) {
-        setStatus('提示：“采集调度”中的自动采集分析尚未开启，推送只会包含手动“立即采集分析”得到的新情报。', 'warning');
+      }).join('') : '<li class="note-item"><div class="note-body"><p class="muted">还没有推送记录。</p></div></li>';
+      if (!elements.status.textContent && on && !view.collectAutomatic) {
+        setStatus('提示：“采集调度”里的自动采集分析尚未开启，推送只会包含手动“立即采集分析”得到的新情报。', 'warning');
       }
     }
 
     function render() {
       if (!state.view) return;
-      fillForm(state.view.settings);
+      // 保存回来的设置与草稿一致时不重绘选项，避免关掉用户刚展开的下拉框
+      const next = state.revision === state.saved ? draftFrom(state.view.settings) : state.draft;
+      const changed = !elements.schedule.firstChild || JSON.stringify(next) !== JSON.stringify(state.draft);
+      state.draft = next;
+      if (changed) renderOptions();
       renderChannels();
       renderBindPanel();
       renderSummary();
@@ -1391,7 +1536,7 @@
       try {
         const view = await request('/api/push');
         state.view = view;
-        if (revision === state.revision) state.dirty.clear();
+        if (revision === state.revision) state.saved = state.revision;
         render();
         return view;
       } catch (error) {
@@ -1407,31 +1552,120 @@
       }
     }
 
-    // ---------- 设置 ----------
-    function readForm() {
-      return {
-        mode: state.mode, weekdays: [...state.weekdays], interval: elements.interval.value, anchor: elements.anchor.value,
-        times: elements.times.value, quiet: elements.quiet.checked, quietStart: elements.quietStart.value, quietEnd: elements.quietEnd.value,
-        scope: elements.scope.value, domain: elements.domain.value, maxItems: elements.maxItems.value, minHeat: elements.minHeat.value,
-        skipEmpty: elements.skipEmpty.checked
-      };
-    }
-
-    async function save({ silent = false } = {}) {
-      const { patch, error } = pushPatchFromForm(readForm());
+    // ---------- 自动保存 ----------
+    async function save() {
+      clearTimeout(state.saveTimer);
+      state.saveTimer = null;
+      const { patch, error } = pushDraftPatch(state.draft);
       if (error) {
         setStatus(error, 'fail');
         throw new Error(error);
       }
       const revision = state.revision;
-      const view = await request('/api/push/settings', { body: patch });
-      if (revision === state.revision) state.dirty.clear();
-      adopt(view);
-      if (!silent) {
-        setStatus(`已保存：${view.schedule}。`, 'ok');
-        toast('新闻推送设置已保存');
+      const run = (async () => {
+        await state.saving?.catch(() => {});
+        const view = await request('/api/push/settings', { body: patch });
+        if (revision === state.revision) state.saved = revision;
+        adopt(view);
+        return view;
+      })();
+      state.saving = run;
+      try {
+        const view = await run;
+        if (revision === state.revision) setStatus(`已自动保存 · ${view.schedule}`, 'ok');
+        return view;
+      } catch (failure) {
+        setStatus(`保存失败：${failure.message}`, 'fail');
+        throw failure;
+      } finally {
+        if (state.saving === run) state.saving = null;
       }
-      return view;
+    }
+
+    function change(mutate) {
+      if (!state.draft) return;
+      const message = mutate(state.draft);
+      if (typeof message === 'string') {
+        setStatus(message, 'warning');
+        return;
+      }
+      state.revision += 1;
+      renderOptions();
+      setStatus('正在保存…');
+      clearTimeout(state.saveTimer);
+      state.saveTimer = setTimeout(() => { save().catch(() => {}); }, saveDelayMs);
+    }
+
+    function parseChoice(group, raw) {
+      if (group === 'skipEmpty') return raw === 'true';
+      if (['intervalMinutes', 'maxItems', 'minHeat'].includes(group)) return Number(raw);
+      return raw;
+    }
+
+    function addTime(draft) {
+      const pick = state.pick || defaultPick();
+      const time = `${pad2(pick.hour)}:${pad2(pick.minute)}`;
+      if (draft.times.includes(time)) return `${time} 已在推送时刻里。`;
+      if (draft.times.length >= PUSH_MAX_TIMES) return `每天最多 ${PUSH_MAX_TIMES} 个推送时刻。`;
+      draft.times = [...draft.times, time].sort((a, b) => clockMinutes(a) - clockMinutes(b));
+      state.pick = { hour: (pick.hour + 1) % 24, minute: pick.minute };
+      return null;
+    }
+
+    function onOptionClick(event) {
+      const target = event.target.closest('button');
+      if (!target || target.disabled) return;
+      const data = target.dataset;
+      if (data.pushSet) {
+        change(draft => { draft[data.pushSet] = parseChoice(data.pushSet, data.value); });
+      } else if (data.pushRemove) {
+        change(draft => {
+          if (draft.times.length <= 1) return '至少保留一个推送时刻；想停止推送请关闭上方开关。';
+          draft.times = draft.times.filter(time => time !== data.pushRemove);
+          return null;
+        });
+      } else if (data.pushPreset) {
+        change(draft => { draft.times = data.pushPreset.split(','); });
+      } else if (target.matches('[data-push-add]')) {
+        change(addTime);
+      } else if (target.matches('[data-push-allday]')) {
+        change(draft => {
+          const allDay = draft.windowStart === '00:00' && draft.windowEnd === '24:00';
+          [draft.windowStart, draft.windowEnd] = allDay ? ['08:00', '22:00'] : ['00:00', '24:00'];
+        });
+      } else if (data.pushDays) {
+        change(draft => { draft.weekdays = data.pushDays.split(',').map(Number); });
+      } else if (data.pushDay) {
+        const day = Number(data.pushDay);
+        change(draft => {
+          if (draft.weekdays.includes(day) && draft.weekdays.length === 1) return '至少保留一个推送日。';
+          draft.weekdays = draft.weekdays.includes(day) ? draft.weekdays.filter(value => value !== day) : [...draft.weekdays, day].sort((a, b) => a - b);
+          return null;
+        });
+      }
+    }
+
+    function onOptionChange(event) {
+      const select = event.target;
+      if (select.dataset.pushPick) {
+        state.pick = { ...(state.pick || defaultPick()), [select.dataset.pushPick]: Number(select.value) };
+      } else if (select.dataset.pushWindow) {
+        change(draft => { draft[select.dataset.pushWindow] = select.value; });
+      }
+    }
+
+    // 单选组：方向键在组内移动并立即选中（与系统单选按钮一致）
+    function onOptionKeydown(event) {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      const button = event.target.closest('[data-push-set]');
+      const group = button?.closest('[role="radiogroup"]');
+      if (!group) return;
+      const buttons = [...group.querySelectorAll('[data-push-set]')];
+      const step = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+      const next = buttons[(buttons.indexOf(button) + step + buttons.length) % buttons.length];
+      event.preventDefault();
+      next.focus();
+      next.click();
     }
 
     async function toggleEnabled(enabled) {
@@ -1443,9 +1677,8 @@
       }
       elements.enabled.disabled = true;
       try {
-        const { patch, error } = pushPatchFromForm(readForm());
-        const view = await request('/api/push/settings', { body: error ? { enabled } : { ...patch, enabled } });
-        state.dirty.clear();
+        if (state.saveTimer || state.saving) await save();
+        const view = await request('/api/push/settings', { body: { enabled } });
         adopt(view);
         setStatus(enabled ? `定时推送已开启：${view.schedule}。` : '定时推送已关闭，已绑定的机器人保留。', enabled ? 'ok' : '');
       } catch (failure) {
@@ -1459,6 +1692,7 @@
     async function showPreview() {
       elements.preview.disabled = true;
       try {
+        if (state.saveTimer || state.saving) await save();
         const preview = await request('/api/push/preview');
         const list = elements.previewList;
         if (!preview.items.length) {
@@ -1470,7 +1704,7 @@
         list.innerHTML = preview.items.map((item, index) => `<li class="note-item"><div class="note-body"><p>${index + 1}. ${esc(item.title)}</p>
           <span class="note-time">${esc([item.source, Number.isFinite(item.heat) ? `热度 ${Math.round(item.heat)}` : ''].filter(Boolean).join(' · '))}</span></div></li>`).join('');
         list.hidden = false;
-        setStatus(`下一次推送预计包含 ${preview.items.length} 条（按当前已保存的推送内容设置）。`);
+        setStatus(`下一次推送预计包含 ${preview.items.length} 条。`);
         return preview;
       } catch (error) {
         setStatus(`预览失败：${error.message}`, 'fail');
@@ -1488,6 +1722,7 @@
       elements.pushNow.disabled = true;
       setStatus('正在推送…');
       try {
+        if (state.saveTimer || state.saving) await save();
         const result = await request('/api/push/run', { body: {} });
         adopt(result.view);
         const parts = (result.results || []).map(entry => {
@@ -1571,7 +1806,7 @@
         state.channelStatus[bind.channel] = { text: '绑定成功，手机上会收到一条确认消息。', tone: 'ok' };
         adopt(result.view);
         toast(`${state.view.channels.find(channel => channel.id === bind.channel)?.name || '机器人'}绑定成功`);
-        if (!state.view.settings.enabled) setStatus('绑定完成。设置好推送节奏后，打开上方“开启定时推送”即可。', 'ok');
+        if (!state.view.settings.enabled) setStatus('绑定完成。选好下方的推送时间，再打开上方开关即可开始定时推送。', 'ok');
         return result;
       } catch (error) {
         bind.busy = false;
@@ -1632,40 +1867,12 @@
       event.preventDefault();
       (state.bind.step === 'code' ? verifyCode() : sendCode()).catch(() => {});
     });
-    elements.mode.addEventListener('click', event => {
-      const button = event.target.closest('[data-push-mode]');
-      if (!button) return;
-      state.mode = button.dataset.pushMode;
-      markDirty('mode');
-      renderMode();
-    });
-    elements.mode.addEventListener('keydown', event => {
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-      event.preventDefault();
-      state.mode = state.mode === 'interval' ? 'times' : 'interval';
-      markDirty('mode');
-      renderMode();
-      elements.mode.querySelector(`[data-push-mode="${state.mode}"]`)?.focus();
-    });
-    elements.weekdays.addEventListener('click', event => {
-      const button = event.target.closest('[data-weekday]');
-      if (!button) return;
-      const day = Number(button.dataset.weekday);
-      state.weekdays = state.weekdays.includes(day) ? state.weekdays.filter(value => value !== day) : [...state.weekdays, day].sort();
-      markDirty('weekdays');
-      renderWeekdays();
-    });
-    for (const name of PUSH_FORM_FIELDS) {
-      elements[name].addEventListener(['quiet', 'skipEmpty', 'scope', 'domain', 'interval'].includes(name) ? 'change' : 'input', () => {
-        markDirty(name);
-        if (name === 'quiet') {
-          elements.quietStart.disabled = !elements.quiet.checked;
-          elements.quietEnd.disabled = !elements.quiet.checked;
-        }
-      });
+    for (const host of [elements.schedule, elements.content]) {
+      host.addEventListener('click', onOptionClick);
+      host.addEventListener('change', onOptionChange);
+      host.addEventListener('keydown', onOptionKeydown);
     }
     elements.enabled.addEventListener('change', event => { toggleEnabled(event.currentTarget.checked).catch(() => {}); });
-    elements.save.addEventListener('click', () => { save().catch(error => setStatus(`保存失败：${error.message}`, 'fail')); });
     elements.preview.addEventListener('click', () => { showPreview().catch(() => {}); });
     elements.pushNow.addEventListener('click', () => { pushNow().catch(() => {}); });
 
@@ -1676,7 +1883,8 @@
     createSettingsFormController,
     createModelsSettings,
     createPushSettings,
-    pushPatchFromForm,
+    pushDraftPatch,
+    planTimeline,
     formatPushMoment,
     describeCountdown,
     parseCapacity,

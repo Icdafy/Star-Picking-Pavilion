@@ -8,7 +8,7 @@
 const crypto = require('node:crypto');
 const { CHANNELS, CHANNEL_IDS, PushChannelError, channelById, deliver } = require('./channels');
 const { composeMessage, digestHeadline, formatStamp } = require('./compose');
-const { applyPushPatch, describeSchedule, latestDueSlot, nextSlot, normalizePushSettings } = require('./schedule');
+const { applyPushPatch, describeSchedule, latestDueSlot, nextSlot, normalizePushSettings, todaySlots } = require('./schedule');
 
 const CREDENTIAL_PREFIX = 'push-';
 const STATE_KEY = 'push.state';
@@ -225,6 +225,19 @@ function createPushService({
     return Number.isFinite(value) ? new Date(value) : null;
   }
 
+  // 当前这一分钟的推送时刻仍算“将来”：20:20:25 保存“20:20”，本分钟内照样推送。
+  function minuteFloor(now = clock()) {
+    return new Date(Math.floor(now.getTime() / 60_000) * 60_000 - 1);
+  }
+
+  // 开启推送、改时间、绑定或恢复渠道后从此刻重新起算：只推此后（含当前这一分钟）的时刻，
+  // 不会把过去的时刻补推一遍；本分钟已经推过的时刻也不会因为再次保存而重推。
+  function resetCursor() {
+    const floor = minuteFloor();
+    const last = cursor();
+    writeState({ cursor: (last && last > floor ? last : floor).toISOString() });
+  }
+
   async function tick() {
     if (!started || stopping || running) return;
     let push;
@@ -235,7 +248,7 @@ function createPushService({
     // 开启推送、绑定或重新启用渠道时游标都会重置为当下：之后只推新时刻，不会把过去的时刻补推一遍
     if (!push.enabled || !activeChannels(push).length) return;
     if (!last) {
-      writeState({ cursor: now.toISOString() });
+      resetCursor();
       return;
     }
     const due = latestDueSlot(push, last, now);
@@ -337,13 +350,13 @@ function createPushService({
       next.push = push;
       return { settings: next, credentials: { [credentialKey(id)]: JSON.stringify(entry.config) }, result: true };
     });
-    writeState({ cursor: boundAt });
+    resetCursor();
     const push = pushSettings();
     // 绑定成功回执：让手机端立刻看到推送节奏，失败不影响绑定结果
     deliverWithRetry(id, entry.config, composeMessage({
       kind: 'test',
       title: '摘星阁 · 绑定成功',
-      lead: `${channel.name}已绑定。${push.enabled ? `推送节奏：${describeSchedule(push)}。` : '在设置页打开“定时推送”后即按你设定的节奏推送新情报。'}`
+      lead: `${channel.name}已绑定。${push.enabled ? `推送时间：${describeSchedule(push)}。` : '在设置页打开“定时推送”后，即按你设定的时间推送新情报。'}`
     }, [], { now: clock() })).catch(() => {});
     return { ok: true, boundAt };
   }
@@ -377,7 +390,7 @@ function createPushService({
       next.push = push;
       return { settings: next, result: true };
     });
-    if (enabled) writeState({ cursor: clock().toISOString() });
+    if (enabled) resetCursor();
     return { ok: true };
   }
 
@@ -392,7 +405,7 @@ function createPushService({
     const message = composeMessage({
       kind: 'test',
       title: '摘星阁 · 测试推送',
-      lead: `${formatStamp(now)} · 这是一条测试消息${items.length ? `，附最近 ${items.length} 条情报预览（不计入推送记录）` : ''}。推送节奏：${describeSchedule(push)}${push.enabled ? '' : '（定时推送尚未开启）'}。`
+      lead: `${formatStamp(now)} · 这是一条测试消息${items.length ? `，附最近 ${items.length} 条情报预览（不计入推送记录）` : ''}。推送时间：${describeSchedule(push)}${push.enabled ? '' : '（定时推送尚未开启）'}。`
     }, items, { now });
     try {
       await deliverWithRetry(id, config, message);
@@ -412,8 +425,8 @@ function createPushService({
       updated.push = { ...applyPushPatch(current, patch), channels: current.channels };
       return { settings: updated, result: updated.push };
     });
-    // 节奏改了从现在重新起算，避免刚保存就把新节奏下“已经过去”的时刻补推出去
-    writeState({ cursor: clock().toISOString() });
+    // 时间规则改了从现在重新起算，避免刚保存就把新规则下“已经过去”的时刻补推出去
+    resetCursor();
     return next;
   }
 
@@ -432,12 +445,14 @@ function createPushService({
     const now = clock();
     const state = readState();
     const last = cursor(state);
-    const next = push.enabled && active.length ? nextSlot(push, last && last > now ? last : now) : null;
+    const floor = minuteFloor(now);
+    const next = push.enabled && active.length ? nextSlot(push, last && last > floor ? last : floor) : null;
     const summary = totals.get();
     return {
       settings: { ...push, channels: undefined },
       schedule: describeSchedule(push),
       nextRunAt: next ? next.toISOString() : null,
+      today: todaySlots(push, now),
       running: Boolean(running),
       collectAutomatic: settings.collect?.automatic === true,
       lastRunAt: state.lastRunAt || null,

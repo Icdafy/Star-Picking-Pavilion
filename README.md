@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.35 · 新闻推送：飞书 / 钉钉 / QQ 机器人
+## v0.2.36 · 新闻推送：时间规则修复与点选面板
 
-- **推到手机**：在「设置 → 新闻推送」绑定飞书、钉钉群机器人，或经 OneBot v11（NapCat / Lagrange / LLOneBot）绑定 QQ 机器人，新入选的情报按热度排序后推送到手机，同一事件只推一次。
-- **验证码绑定**：填写 Webhook / 加签密钥或 OneBot 地址后，摘星阁先向机器人发送 6 位验证码，在设置页回填后才保存；连接信息经 safeStorage 加密，界面只显示掩码。
-- **时间自己定**：每 15 分钟至每天一次（按起始时刻对齐），或每天最多 12 个固定时刻；可选推送日、免打扰时段，关机错过的时刻只补推一次。
-- **内容可控**：精选或全部相关动态、低空 / 航天领域、条数与最低热度；可预览、立即推送、发测试消息并查看推送记录。
+- **改完就生效**：推送时间和内容全部改为点选，点一下自动保存；顶部状态区实时显示开关、下一次推送、倒计时和今天的时刻表，不用再找“保存”按钮。
+- **规则更直观**：每天固定时刻，选了就一定推；或在推送时段内按间隔推送（例如 08:00—22:00 每 2 小时）。旧版的起始时刻与免打扰自动换算为推送时段。
+- **修复跳到明天**：刚加入的、就在当前这一分钟的时刻照常推送，已推过的时刻再次保存也不会重推。
+- **推到手机**：在「设置 → 新闻推送」绑定飞书、钉钉群机器人，或经 OneBot v11（NapCat / Lagrange / LLOneBot）绑定 QQ 机器人；验证码确认后才保存，连接信息经 safeStorage 加密，同一事件只推一次。
 
-版本、界面与更新元数据统一为 0.2.35，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0235-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，推送默认关闭，无新增依赖。
+版本、界面与更新元数据统一为 0.2.36，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0236-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥、已绑定的机器人与推送设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.35.exe`，双击并按向导安装。v0.2.35 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.36.exe`，双击并按向导安装。v0.2.36 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.35.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.36.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

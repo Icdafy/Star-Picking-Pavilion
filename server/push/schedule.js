@@ -1,24 +1,24 @@
 'use strict';
-// 新闻推送 · 推送节奏（纯函数，不读时钟、不碰磁盘，便于逐分钟断言）
-//   interval：从「起始时刻」开始每隔 N 分钟一次（N 只取能整除 24 小时的档位，每天的时刻表稳定可预期）
-//   times：每天固定的若干个时刻（最多 12 个）
-// 两种模式都受「推送日」与「免打扰时段」约束；落在免打扰里的时刻直接跳过，新闻顺延到下一次一起推。
+// 新闻推送 · 推送时间规则（纯函数，不读时钟、不碰磁盘，便于逐分钟断言）
+//   times：每天固定的若干个时刻（最多 12 个）。用户点名的时刻一定会推，不受任何时段限制。
+//   interval：在「推送时段」内从时段开始起每隔 N 分钟一次，例如 08:00—22:00 每 2 小时 = 08:00、10:00 … 22:00。
+// 两种方式都只在选中的「推送日」生效。v0.2.36 起不再有独立的起始时刻与免打扰：
+// 旧版的“起始时刻 + 免打扰”会悄悄吞掉用户亲手设定的时刻，改为一个看得见的推送时段。
 const { CHANNEL_IDS } = require('./channels');
 
-const INTERVAL_CHOICES = Object.freeze([15, 30, 60, 120, 180, 240, 360, 480, 720, 1440]);
+const INTERVAL_CHOICES = Object.freeze([15, 30, 60, 120, 180, 240, 360, 480, 720]);
 const MAX_TIMES = 12;
+const DAY_MINUTES = 1440;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const DEFAULT_PUSH = Object.freeze({
   enabled: false,
-  mode: 'interval',
-  intervalMinutes: 60,
-  anchor: '08:00',
+  mode: 'times',
   times: Object.freeze(['08:30', '12:30', '18:30']),
+  intervalMinutes: 120,
+  windowStart: '08:00',
+  windowEnd: '22:00',
   weekdays: Object.freeze([1, 2, 3, 4, 5, 6, 7]),
-  quietEnabled: true,
-  quietStart: '23:00',
-  quietEnd: '07:30',
   scope: 'featured',
   domain: 'all',
   maxItems: 8,
@@ -30,6 +30,11 @@ const DEFAULT_PUSH = Object.freeze({
 function minutesOf(text) {
   const match = TIME_PATTERN.exec(String(text || ''));
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+// 时段结束允许 24:00（= 当天结束）
+function endMinutesOf(text) {
+  return String(text) === '24:00' ? DAY_MINUTES : minutesOf(text);
 }
 
 function timeText(minutes) {
@@ -56,26 +61,45 @@ function normalizeBoundAt(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
 }
 
-// settings.json 里的 push 段：只存节奏、内容口径与每个渠道的启用 / 绑定时间，连接信息另存加密凭据。
+// 推送时段：优先读新字段；v0.2.35 的设置把“免打扰的结束—开始”换算成推送时段，关闭免打扰即全天。
+function normalizeWindow(source) {
+  let start = minutesOf(source.windowStart);
+  let end = endMinutesOf(source.windowEnd);
+  if (start === null && end === null && (source.quietStart !== undefined || source.quietEnabled !== undefined)) {
+    const quietStart = minutesOf(source.quietStart);
+    const quietEnd = minutesOf(source.quietEnd);
+    const quietOn = source.quietEnabled !== false && quietStart !== null && quietEnd !== null;
+    [start, end] = quietOn && quietEnd < quietStart ? [quietEnd, quietStart] : [0, DAY_MINUTES];
+  }
+  if (start === null) start = minutesOf(DEFAULT_PUSH.windowStart);
+  if (end === null) end = endMinutesOf(DEFAULT_PUSH.windowEnd);
+  if (end <= start) [start, end] = [0, DAY_MINUTES];
+  return { windowStart: timeText(start), windowEnd: end === DAY_MINUTES ? '24:00' : timeText(end) };
+}
+
+// settings.json 里的 push 段：只存时间规则、内容口径与每个渠道的启用 / 绑定时间，连接信息另存加密凭据。
 function normalizePushSettings(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  const times = normalizeTimes(source.times);
   const channels = {};
   for (const id of CHANNEL_IDS) {
     const entry = source.channels?.[id];
     const boundAt = normalizeBoundAt(entry?.boundAt);
     channels[id] = { enabled: Boolean(boundAt) && entry?.enabled !== false, boundAt };
   }
+  let mode = source.mode === 'interval' ? 'interval' : source.mode === 'times' ? 'times' : DEFAULT_PUSH.mode;
+  let times = normalizeTimes(source.times);
+  // v0.2.35 的「每天一次」间隔等同于一个固定时刻
+  if (mode === 'interval' && Number(source.intervalMinutes) === DAY_MINUTES) {
+    mode = 'times';
+    times = normalizeTimes([source.anchor || DEFAULT_PUSH.windowStart]);
+  }
   return {
     enabled: source.enabled === true,
-    mode: source.mode === 'times' ? 'times' : 'interval',
-    intervalMinutes: INTERVAL_CHOICES.includes(Number(source.intervalMinutes)) ? Number(source.intervalMinutes) : DEFAULT_PUSH.intervalMinutes,
-    anchor: minutesOf(source.anchor) === null ? DEFAULT_PUSH.anchor : source.anchor,
+    mode,
     times: times.length ? times : [...DEFAULT_PUSH.times],
+    intervalMinutes: INTERVAL_CHOICES.includes(Number(source.intervalMinutes)) ? Number(source.intervalMinutes) : DEFAULT_PUSH.intervalMinutes,
+    ...normalizeWindow(source),
     weekdays: normalizeWeekdays(source.weekdays),
-    quietEnabled: source.quietEnabled === undefined ? DEFAULT_PUSH.quietEnabled : source.quietEnabled === true,
-    quietStart: minutesOf(source.quietStart) === null ? DEFAULT_PUSH.quietStart : source.quietStart,
-    quietEnd: minutesOf(source.quietEnd) === null ? DEFAULT_PUSH.quietEnd : source.quietEnd,
     scope: source.scope === 'relevant' ? 'relevant' : 'featured',
     domain: ['lowaltitude', 'aerospace'].includes(source.domain) ? source.domain : 'all',
     maxItems: boundedInteger(source.maxItems, 1, 20, DEFAULT_PUSH.maxItems),
@@ -91,41 +115,43 @@ function invalid(message) {
   return error;
 }
 
-// 设置页提交的节奏 / 内容补丁：逐字段严格校验，错误点名字段，不静默改写用户的输入。
+// 设置页提交的时间 / 内容补丁：逐字段严格校验，错误点名字段，不静默改写用户的输入。
 function applyPushPatch(current, patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw invalid('推送设置必须是对象');
-  const allowed = ['enabled', 'mode', 'intervalMinutes', 'anchor', 'times', 'weekdays', 'quietEnabled', 'quietStart', 'quietEnd',
+  const allowed = ['enabled', 'mode', 'times', 'intervalMinutes', 'windowStart', 'windowEnd', 'weekdays',
     'scope', 'domain', 'maxItems', 'minHeat', 'skipEmpty'];
   const unknown = Object.keys(patch).filter(key => !allowed.includes(key));
   if (unknown.length) throw invalid(`包含不支持的推送设置字段：${unknown.join('、')}`);
   const next = { ...normalizePushSettings(current) };
-  for (const key of ['enabled', 'quietEnabled', 'skipEmpty']) {
+  for (const key of ['enabled', 'skipEmpty']) {
     if (patch[key] === undefined) continue;
     if (typeof patch[key] !== 'boolean') throw invalid('开关字段必须是布尔值');
     next[key] = patch[key];
   }
   if (patch.mode !== undefined) {
-    if (!['interval', 'times'].includes(patch.mode)) throw invalid('推送方式只能是“每隔一段时间”或“每天定点”');
+    if (!['interval', 'times'].includes(patch.mode)) throw invalid('推送方式只能是“每天固定时刻”或“按间隔推送”');
     next.mode = patch.mode;
   }
   if (patch.intervalMinutes !== undefined) {
     if (!INTERVAL_CHOICES.includes(Number(patch.intervalMinutes))) throw invalid('推送间隔只能从列表中选择');
     next.intervalMinutes = Number(patch.intervalMinutes);
   }
-  for (const key of ['anchor', 'quietStart', 'quietEnd']) {
-    if (patch[key] === undefined) continue;
-    if (minutesOf(patch[key]) === null) throw invalid('时刻请使用 24 小时制 HH:MM，例如 08:30');
-    next[key] = patch[key];
+  if (patch.windowStart !== undefined || patch.windowEnd !== undefined) {
+    const start = minutesOf(patch.windowStart ?? next.windowStart);
+    const end = endMinutesOf(patch.windowEnd ?? next.windowEnd);
+    if (start === null || end === null) throw invalid('推送时段请使用 24 小时制 HH:MM，例如 08:00');
+    if (end <= start) throw invalid('推送时段的结束时间必须晚于开始时间');
+    next.windowStart = timeText(start);
+    next.windowEnd = end === DAY_MINUTES ? '24:00' : timeText(end);
   }
   if (patch.times !== undefined) {
     const raw = (Array.isArray(patch.times) ? patch.times : String(patch.times).split(/[\s,，、;；]+/))
       .map(entry => String(entry).trim()).filter(Boolean);
-    if (!raw.length) throw invalid('请至少填写一个推送时刻，例如 08:30、12:30、18:30');
+    if (!raw.length) throw invalid('请至少保留一个推送时刻');
     const wrong = raw.find(entry => minutesOf(entry.replace(/^(\d):/, '0$1:')) === null);
-    if (wrong) throw invalid(`推送时刻“${wrong.slice(0, 12)}”格式错误：请使用 24 小时制 HH:MM，多个时刻用逗号分隔`);
-    const times = normalizeTimes(raw);
-    if (times.length > MAX_TIMES || new Set(raw).size > MAX_TIMES) throw invalid(`每天最多 ${MAX_TIMES} 个推送时刻`);
-    next.times = times;
+    if (wrong) throw invalid(`推送时刻“${wrong.slice(0, 12)}”格式错误：请使用 24 小时制 HH:MM`);
+    if (new Set(normalizeTimesUnbounded(raw)).size > MAX_TIMES) throw invalid(`每天最多 ${MAX_TIMES} 个推送时刻`);
+    next.times = normalizeTimes(raw);
   }
   if (patch.weekdays !== undefined) {
     const weekdays = normalizeWeekdays(patch.weekdays);
@@ -153,25 +179,23 @@ function applyPushPatch(current, patch) {
   return next;
 }
 
-function slotMinutes(push) {
-  if (push.mode === 'times') return push.times.map(minutesOf).filter(value => value !== null);
-  const step = push.intervalMinutes;
-  const start = minutesOf(push.anchor) % step;
+function normalizeTimesUnbounded(list) {
+  return list.map(entry => minutesOf(entry.replace(/^(\d):/, '0$1:'))).filter(entry => entry !== null);
+}
+
+// 一天之内的全部推送时刻（分钟数，升序）
+function slotMinutes(pushSettings) {
+  const push = normalizePushSettings(pushSettings);
+  if (push.mode === 'times') return push.times.map(minutesOf);
+  const start = minutesOf(push.windowStart);
+  const end = endMinutesOf(push.windowEnd);
   const list = [];
-  for (let minute = start; minute < 1440; minute += step) list.push(minute);
+  for (let minute = start; minute <= end && minute < DAY_MINUTES; minute += push.intervalMinutes) list.push(minute);
   return list;
 }
 
 function isoWeekday(date) {
   return date.getDay() === 0 ? 7 : date.getDay();
-}
-
-function inQuietHours(push, minute) {
-  if (!push.quietEnabled) return false;
-  const start = minutesOf(push.quietStart);
-  const end = minutesOf(push.quietEnd);
-  if (start === null || end === null || start === end) return false;
-  return start < end ? minute >= start && minute < end : minute >= start || minute < end;
 }
 
 // 返回严格晚于 after 的下一个推送时刻（本地时区）；没有可用时刻时返回 null。
@@ -185,7 +209,6 @@ function nextSlot(pushSettings, after) {
     const date = new Date(base.getFullYear(), base.getMonth(), base.getDate() + day);
     if (!push.weekdays.includes(isoWeekday(date))) continue;
     for (const minute of minutes) {
-      if (inQuietHours(push, minute)) continue;
       const slot = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(minute / 60), minute % 60);
       if (slot.getTime() > base.getTime()) return slot;
     }
@@ -206,24 +229,36 @@ function latestDueSlot(pushSettings, after, now) {
   return due;
 }
 
+// 当天的推送时刻表：不是推送日时为空
+function todaySlots(pushSettings, now) {
+  const push = normalizePushSettings(pushSettings);
+  const date = new Date(now);
+  if (!push.weekdays.includes(isoWeekday(date))) return [];
+  return slotMinutes(push).map(timeText);
+}
+
+function describeDays(weekdays) {
+  const weekdayNames = ['一', '二', '三', '四', '五', '六', '日'];
+  return weekdays.length === 7 ? '每天'
+    : weekdays.join(',') === '1,2,3,4,5' ? '工作日'
+      : weekdays.join(',') === '6,7' ? '周末'
+        : `每周${weekdays.map(day => weekdayNames[day - 1]).join('、')}`;
+}
+
+function describeInterval(minutes) {
+  return minutes < 60 ? `${minutes} 分钟` : `${minutes / 60} 小时`;
+}
+
 function describeSchedule(pushSettings) {
   const push = normalizePushSettings(pushSettings);
-  const weekdayNames = ['一', '二', '三', '四', '五', '六', '日'];
-  const days = push.weekdays.length === 7 ? '每天'
-    : push.weekdays.join(',') === '1,2,3,4,5' ? '工作日'
-      : push.weekdays.join(',') === '6,7' ? '周末'
-        : `每周${push.weekdays.map(day => weekdayNames[day - 1]).join('、')}`;
-  const rhythm = push.mode === 'times'
-    ? `${push.times.join('、')} 定点推送`
-    : push.intervalMinutes < 60 ? `${push.anchor} 起每 ${push.intervalMinutes} 分钟推送一次`
-      : push.intervalMinutes === 1440 ? `${push.anchor} 推送一次`
-        : `${push.anchor} 起每 ${push.intervalMinutes / 60} 小时推送一次`;
-  const quiet = push.quietEnabled ? `，${push.quietStart}—${push.quietEnd} 免打扰` : '';
-  return `${days} ${rhythm}${quiet}`;
+  const days = describeDays(push.weekdays);
+  if (push.mode === 'times') return `${days} ${push.times.join('、')}`;
+  const window = push.windowStart === '00:00' && push.windowEnd === '24:00' ? '全天' : `${push.windowStart}—${push.windowEnd}`;
+  return `${days} ${window} 每 ${describeInterval(push.intervalMinutes)}`;
 }
 
 module.exports = {
   DEFAULT_PUSH, INTERVAL_CHOICES, MAX_TIMES,
-  normalizePushSettings, applyPushPatch, nextSlot, latestDueSlot, describeSchedule,
-  inQuietHours, slotMinutes, minutesOf
+  normalizePushSettings, applyPushPatch, nextSlot, latestDueSlot, todaySlots, describeSchedule,
+  slotMinutes, minutesOf
 };
