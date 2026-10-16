@@ -40,7 +40,7 @@
 | 单元与集成 | `npm test`：1134/1134 通过（新增：字段级保存与校验、discard 读回；视图层开关 / 胶囊 / 回车各自提交、失败读回、保留期限胶囊、备忘空态与 Ctrl+Enter）。 |
 | 新用户走查 | `work/v0237/flows.cjs`（全新配置目录、真实 Electron）：缺少密钥 → 填入密钥聚焦；开关即保存；胶囊 30 分钟、自定义 45 回车、非法 0 被拒读回；RSSHub 非法被拒、合法失焦保存；保留期限胶囊与清空被拒读回；主题胶囊与顶栏同步；关闭动态背景 / 跟手动效收起从属项；恢复默认外观不动开关与跟手动效；备忘 Ctrl+Enter；800 / 640 宽度与小 / 特大字号无横向溢出。12 步全部通过，控制台仅有走查故意触发的 400。 |
 | 视觉审阅 | `work/v0237/before.cjs`：用户数据副本，1440 宽、深浅两色逐节截图对比（`work/v0237/before/`、`work/v0237/after/`）。 |
-| 真实 Electron | `npm run test:e2e`：结果见下方发布记录。章节数断言 10 → 11；自定义间隔改为回车保存；跟手动效断言改指“氛围与动效”；“恢复默认外观”新增不改动跟手动效的断言。 |
+| 真实 Electron | `npm run test:e2e`：40/40 通过（本地约 412 秒）。章节数断言 10 → 11；自定义间隔改为回车保存；跟手动效断言改指“氛围与动效”；“恢复默认外观”新增不改动跟手动效的断言。 |
 
 ## 限制
 
@@ -49,4 +49,6 @@
 
 ## 发布记录
 
-v0.2.37 经 tag 工作流发布；结果在发布完成后补记。
+- 本地：`npm test` 1134/1134、`npm run test:e2e` 40/40、`npm run audit:runtime` 0 漏洞、`npm run dist` + `npm run verify:package`（1299 项 ASAR 条目）与 `npm run verify:version -- --tag v0.2.37 --artifacts` 全部通过。
+- 提交 `a8de824` 推送 main 与 tag `v0.2.37`：[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38935033262) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38935038800) 首轮成功。
+- [v0.2.37](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.37) 于 2026-10-17 01:04:34（北京时间）发布，为最新正式版（非草稿、非预发布）。附件：安装器 101,341,722 B、blockmap、latest.yml（version 0.2.37，size 与安装器一致）、SHA256SUMS.txt（`43ddb9049319a2253621f8c592d7bccf6da1f544285ea4bffc459b44211377fb`）、sbom.cdx.json、THIRD_PARTY_NOTICES.txt。

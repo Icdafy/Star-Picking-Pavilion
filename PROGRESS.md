@@ -2,7 +2,7 @@
 
 设置页（新闻推送以外）重新设计：统一行面板与分组目录、改动即保存、保留天数与“恢复默认外观”逻辑修复。
 
-v0.2.37 正在经 tag 工作流发布，结果与证据见[验证记录](docs/v0237-validation.md)。
+[v0.2.37](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.37) 于2026-10-17 01:04:34（北京时间）发布为最新正式版，无发布阻塞。精确提交 `a8de824` 的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38935033262)与[Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38935038800)首轮完整通过；本地 1134/1134 单元与集成、40/40 真实 Electron、零生产依赖漏洞、1299 项包边界。六项公开附件齐全：安装器 101,341,722 B，SHA-256 `43ddb9049319a2253621f8c592d7bccf6da1f544285ea4bffc459b44211377fb`，latest.yml 指向 0.2.37；用户数据保留。证据见[验证记录](docs/v0237-validation.md)。
 ---
 
 # v0.2.36 发布状态（历史）

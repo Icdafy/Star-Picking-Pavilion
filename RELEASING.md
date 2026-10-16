@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.37 重新设计设置页（新闻推送以外）的版式与使用逻辑：统一行面板、改动即保存、修复保留天数静默回落与“恢复默认”误改开关；发布由 tag 工作流完成，证据见 [本版验证](docs/v0237-validation.md)。
+[v0.2.37](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.37) 已于北京时间 2026-10-17 01:04:34 发布：重新设计设置页（新闻推送以外）的版式与使用逻辑，统一行面板、改动即保存，修复保留天数静默回落与“恢复默认”误改开关。tag Release 与 main CI 全部门禁通过，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0237-validation.md)。
 
 ## 发布前授权门槛
 
