@@ -10,6 +10,29 @@ const { launchNativeElectron } = require('./native-electron.cjs');
 const root = path.resolve(__dirname, '../..');
 const output = path.join(root, 'work/v0228/screenshots');
 
+async function waitForStableGeometry(locator) {
+  await locator.evaluate(async node => {
+    const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+    let previous = null;
+    for (;;) {
+      await frame();
+      // A finished spring restores inline styles on another frame, which can
+      // expose a CSS transition. Re-read animations after each completion.
+      const animations = node.getAnimations({ subtree: true }).filter(animation =>
+        Number.isFinite(animation.effect?.getComputedTiming().endTime)
+        && animation.playState !== 'finished' && animation.playState !== 'idle');
+      if (animations.length) {
+        await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+        previous = null;
+        continue;
+      }
+      const bounds = JSON.stringify(node.getBoundingClientRect().toJSON());
+      if (bounds === previous) return;
+      previous = bounds;
+    }
+  });
+}
+
 test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art and global configurable tracking', { timeout: 150000 }, async t => {
   fs.mkdirSync(output, { recursive: true });
   let releaseFeed, enteredFeed, feedRequests = 0;
@@ -135,9 +158,46 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
     const towerAfter = await page.locator('.tower').evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
     assert.deepEqual(towerAfter, towerBefore, `tracking preserves ${width}px toolbar positioning and geometry`);
   }
-  await page.keyboard.press('Control+k');
-  await page.waitForSelector('#commandPalette[open]'); await page.waitForTimeout(300);
+  // A test-owned finite animation holds the compositor near its final frame.
+  // This models a delayed visual clock without changing any production timing.
+  // The former 300ms wait measures the intermediate rectangle; the new guard
+  // must remain pending even though that paused rectangle spans stable frames.
+  await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.id = 'modalGeometryScheduleProbe';
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:fixed;left:0;top:0;width:682.5px;height:585px;opacity:0;pointer-events:none';
+    document.body.append(probe);
+    probe.__geometryAnimation = probe.animate([{ transform: 'scale(.97)' }, { transform: 'none' }], { duration: 400 });
+    probe.__geometryAnimation.pause();
+    probe.__geometryAnimation.currentTime = 399.95;
+  });
+  const probe = page.locator('#modalGeometryScheduleProbe');
+  await page.waitForTimeout(300);
+  const prematureBounds = await probe.evaluate(node => node.getBoundingClientRect().toJSON());
+  let geometrySettled = false;
+  const stableGeometry = waitForStableGeometry(probe).then(() => { geometrySettled = true; });
+  await probe.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+  assert.equal(geometrySettled, false, 'stable frames alone cannot finish while the native animation clock is paused');
+  await probe.evaluate(node => node.__geometryAnimation.finish());
+  await stableGeometry;
+  const settledBounds = await probe.evaluate(node => node.getBoundingClientRect().toJSON());
+  assert.notDeepEqual(prematureBounds, settledBounds, 'the former fixed 300ms precondition can observe an unfinished animation');
+  await probe.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.deepEqual(await probe.evaluate(node => node.getBoundingClientRect().toJSON()), settledBounds,
+    'the animation-aware precondition preserves exact geometry under a delayed visual clock');
+  console.log('modal geometry clock regression:', JSON.stringify({ premature: prematureBounds, settled: settledBounds }));
+  await probe.evaluate(node => { node.__geometryAnimation.cancel(); node.remove(); });
   const dialog = page.locator('#commandPalette');
+  await dialog.evaluate(node => {
+    node.__geometryOpen = new Promise(resolve => node.addEventListener('toggle', event => {
+      if (event.newState === 'open') resolve();
+    }, { once: true }));
+  });
+  await page.keyboard.press('Control+k');
+  await page.waitForSelector('#commandPalette[open]');
+  await dialog.evaluate(node => node.__geometryOpen);
+  await waitForStableGeometry(dialog);
   const dialogBefore = await dialog.evaluate(node => ({ position: getComputedStyle(node).position, bounds: node.getBoundingClientRect().toJSON() }));
   await dialog.locator('.palette-foot').hover();
   await page.waitForFunction(() => document.querySelector('#commandPalette .surface-light'));
