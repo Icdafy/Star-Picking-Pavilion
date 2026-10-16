@@ -134,3 +134,82 @@ test('nested atomic batches roll back only their own writes and never commit the
   });
   assert.equal(child.status, 0, child.stderr);
 });
+
+for (const failure of ['SQLITE_BUSY: database is locked', 'SQLITE_IOERR: disk I/O error']) {
+  test(`an operational integrity-check failure preserves the database (${failure})`, async t => {
+    const sandbox = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-integrity-operation-'));
+    t.after(async () => fs.promises.rm(sandbox, { recursive: true, force: true }));
+    const program = `
+      const assert = require('node:assert/strict');
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const { DatabaseSync } = require('node:sqlite');
+      const file = path.join(process.env.STAR_PICKING_PAVILION_DATA_DIR, 'star-picking-pavilion.db');
+      const fixture = new DatabaseSync(file);
+      fixture.exec("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT); INSERT INTO meta VALUES('keeper','user data')");
+      fixture.close();
+      const entry = ${JSON.stringify(path.join(root, 'server/db.js'))};
+      const original = DatabaseSync.prototype.prepare;
+      let failedDatabase;
+      const failure = new Error(${JSON.stringify(failure)});
+      DatabaseSync.prototype.prepare = function (sql) {
+        if (sql === 'PRAGMA quick_check') { failedDatabase = this; throw failure; }
+        return original.call(this, sql);
+      };
+      assert.throws(() => require(entry), error => error === failure);
+      DatabaseSync.prototype.prepare = original;
+      assert.throws(() => failedDatabase.prepare('SELECT 1'), /not open/i);
+      assert.equal(fs.readdirSync(process.env.STAR_PICKING_PAVILION_DATA_DIR).some(name => name.includes('.corrupt-')), false);
+      const { db, closeDatabase } = require(entry);
+      assert.equal(db.prepare("SELECT value FROM meta WHERE key='keeper'").get().value, 'user data');
+      assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
+      closeDatabase();
+    `;
+    const child = spawnSync(process.execPath, ['-e', program], {
+      cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: sandbox }, encoding: 'utf8'
+    });
+    assert.equal(child.status, 0, child.stderr);
+  });
+}
+
+for (const reportedAs of ['row', 'error']) {
+  test(`a confirmed integrity failure still quarantines the original before recovery (${reportedAs})`, async t => {
+    const sandbox = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-integrity-confirmed-'));
+    t.after(async () => fs.promises.rm(sandbox, { recursive: true, force: true }));
+    const program = `
+      const assert = require('node:assert/strict');
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const { DatabaseSync } = require('node:sqlite');
+      const directory = process.env.STAR_PICKING_PAVILION_DATA_DIR;
+      const file = path.join(directory, 'star-picking-pavilion.db');
+      const fixture = new DatabaseSync(file);
+      fixture.exec("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT); INSERT INTO meta VALUES('keeper','original data')");
+      fixture.close();
+      const original = DatabaseSync.prototype.prepare;
+      let injected = false;
+      DatabaseSync.prototype.prepare = function (sql) {
+        if (sql === 'PRAGMA quick_check' && !injected) {
+          injected = true;
+          if (${JSON.stringify(reportedAs)} === 'error') throw new Error('SQLITE_CORRUPT: database disk image is malformed');
+          return { get: () => ({ quick_check: 'database disk image is malformed' }) };
+        }
+        return original.call(this, sql);
+      };
+      const { db, closeDatabase } = require(${JSON.stringify(path.join(root, 'server/db.js'))});
+      DatabaseSync.prototype.prepare = original;
+      assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
+      assert.equal(db.prepare("SELECT value FROM meta WHERE key='keeper'").get(), undefined);
+      const saved = fs.readdirSync(directory).find(name => /^star-picking-pavilion\\.db\\.corrupt-/.test(name));
+      assert.ok(saved, 'original database must remain available for recovery');
+      const preserved = new DatabaseSync(path.join(directory, saved));
+      assert.equal(preserved.prepare("SELECT value FROM meta WHERE key='keeper'").get().value, 'original data');
+      preserved.close();
+      closeDatabase();
+    `;
+    const child = spawnSync(process.execPath, ['-e', program], {
+      cwd: root, env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: sandbox }, encoding: 'utf8'
+    });
+    assert.equal(child.status, 0, child.stderr);
+  });
+}

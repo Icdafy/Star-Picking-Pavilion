@@ -440,12 +440,17 @@ const statsController = StatsController.createStatsController({
   frame: callback => requestAnimationFrame(callback)
 });
 const { refreshStats } = statsController;
+let realtimePoller = null;
 // 后端状态推送与统计回退共用同一渲染入口；迟到的统计响应不能覆盖新状态。
 const activityStream = typeof window.EventSource === 'function' ? new window.EventSource('/api/activity') : null;
 activityStream?.addEventListener('message', event => {
-  try { statsController.renderActivity(JSON.parse(event.data)); } catch { /* 重连后会重放当前状态 */ }
+  try {
+    const status = JSON.parse(event.data);
+    statsController.renderActivity(status);
+    realtimePoller?.observeActivity(status);
+  } catch { /* 重连后会重放当前状态 */ }
 });
-window.addEventListener('pagehide', () => activityStream?.close(), { once: true });
+window.addEventListener('pagehide', () => { activityStream?.close(); realtimePoller?.dispose(); }, { once: true });
 
 // ---------- 卡片渲染 ----------
 // 阶段 4：整卡模板迁为 index.html 的 <template id="cardTemplate">，
@@ -740,25 +745,22 @@ Object.assign(registryDeps, {
 });
 
 // 手动采集
+let collectRequestPending = false;
 $('#btnRefresh').addEventListener('click', async function () {
+  if (collectRequestPending) return;
+  collectRequestPending = true;
+  this.disabled = true;
   try {
     const result = await api('/api/collect', { body: {} });
-    await refreshStats();
-    if (result.started === false) return;
-    toast('采集管线已启动，稍候自动刷新');
-    const poll = setInterval(async () => {
-      const s = await refreshStats();
-      if (s && s.pipeline?.activity === 'online') {
-        clearInterval(poll);
-        if (FEED_VIEWS.includes(state.view)) { loadFeed(); }
-        if (s.pipeline.lastPipeline?.ok === false) toast('采集分析失败，请检查信源或模型设置', true);
-        else toast('采集分析完成');
-      }
-    }, 1000);
-    window.addEventListener('pagehide', () => clearInterval(poll), { once: true });
+    if (result.started !== false) toast('采集分析已启动，新结果会陆续显示');
+    if (result.started !== false || result.running) await realtimePoller.watchPipeline();
+    else await refreshStats();
   } catch (e) {
     await refreshStats();
     toast('启动失败：' + e.message, true);
+  } finally {
+    collectRequestPending = false;
+    this.disabled = statsController.isBusy();
   }
 });
 
@@ -878,13 +880,18 @@ window.addEventListener('resize', () => { syncNavHeight(); syncTabIndicator(); }
 $('#toTop').addEventListener('click', scrollToTop);
 
 // ---------- 实时更新（批 2 拆入 renderer/realtime-poller.js） ----------
-const realtimePoller = RealtimePoller.createRealtimePoller({
+realtimePoller = RealtimePoller.createRealtimePoller({
   api, state, FEED_VIEWS, toast, preferenceActions,
   refreshStats, loadFeed, scrollToTop,
   document,
   getScrollY: () => document.getElementById('appViewport').scrollTop,
   elements: { btnRealtime: $('#btnRealtime'), newFlash: $('#newFlash') },
-  diff: feedDiffList
+  diff: feedDiffList,
+  onPipelineComplete: async () => {
+    if (state.view === 'hot') await hotViewController.loadHot();
+    else if (state.view === 'capital') await capitalViewController.load();
+    else if (state.view === 'sources') await loadSources();
+  }
 });
 const { setRealtime } = realtimePoller;
 

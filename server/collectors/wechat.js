@@ -47,7 +47,8 @@ async function fetch(source, settings, { page = pacedPage } = {}) {
     if (!profile.relevant || (source.domain !== 'both' && profile.domain !== source.domain)) continue;
     items.push({ title, url: candidate.link, summary, contentText: article.text,
       publisherId: article.publisherId, images: article.images, image: article.images[0]?.url || null,
-      publishedAt: article.publishedAt || null });
+      publishedAt: article.publishedAt || null, publicationPrecision: article.publicationPrecision || null,
+      publicationDateText: article.publicationDateText || null });
   }
   return items;
 }

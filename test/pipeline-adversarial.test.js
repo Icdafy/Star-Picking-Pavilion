@@ -28,6 +28,18 @@ test('timing repair obeys the same paid-call budget as scoring', () => {
   assert.equal(result.attempts, 0);
   assert.equal(result.repair.budgetPaused, true);
 });
+
+test('prefilter overlaps bounded independent scoring and reruns reuse completed work', () => {
+  const out = runScenario('prefilter-scoring-overlap', { withKey: true });
+  assert.equal(out.firstWhilePrefilterRunning, true, '第一条已落库时第二预筛仍在等待');
+  assert.equal(out.result.analyzed, 24);
+  assert.equal(out.secondResult.analyzed, 0);
+  assert.ok(out.peakActive >= 2 && out.peakActive <= 10, '三个评分 worker × 三个请求，加一个预筛');
+  assert.equal(out.requests, 74, '24条各两次评分+一次理解，另两批预筛');
+  assert.equal(out.requestsAfterRetry, out.requests, '重跑不产生额外付费请求');
+  assert.deepEqual(out.independentScores, [{ task: 'score-1', c: 24 }, { task: 'score-2', c: 24 }]);
+  assert.equal(out.usage.hourCalls, out.requests);
+});
 function runScenario(scenario, options = {}) {
   const cacheKey = scenario;
   if (scenarioCache.has(cacheKey)) return scenarioCache.get(cacheKey);

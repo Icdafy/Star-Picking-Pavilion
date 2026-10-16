@@ -1105,9 +1105,10 @@ test('实时轮询先比对 stats 信号再探测，无变化轮次直接跳过'
   assert.match(realtimePollerSource, /if \(signals !== null && signals === lastPollSignals\) return schedule\(\);/);
   // 探测失败时回滚信号：本轮信号不得被静默消费，下轮重探不漏更新
   assert.match(realtimePollerSource, /catch \{[\s\S]*?lastPollSignals = null;/);
-  assert.match(realtimePollerSource, /\[s\.today, s\.pending, s\.featuredToday, s\.articles, s\.starred\]\.join\('\|'\)/);
-  // 18 秒周期不变
-  assert.match(realtimePollerSource, /pollTimer = setTimeout\(pollRealtime, 18000\);/);
+  assert.match(realtimePollerSource, /\[s\.today, s\.pending, s\.featuredToday, s\.articles, s\.starred,/);
+  assert.match(realtimePollerSource, /pipelineProgress\?\.analyzed/);
+  // 空闲18秒；任务期间1.5秒，后台跟踪5秒，仍用自调度避免请求重叠。
+  assert.match(realtimePollerSource, /pipelineBusy \? \(document\.hidden \? 5000 : 1500\) : 18000/);
   // freshIds 新条目高亮路径保持：card-new 类由阶段 1 样式承接
   assert.match(feedControllerSource, /if \(el\) el\.classList\.add\('card-new'\);/);
 });
@@ -1157,5 +1158,5 @@ test('液态玻璃阶段 3：WAAPI 动效引擎、fx-tier 档位与视图切换�
   assert.match(app, /document\.body\.classList\.remove\('theme-transition'\), 320\);/);
   assert.match(css, /body\.theme-transition[\s\S]*?transition: color 260ms/);
   // 轮询主循环 setTimeout 自调度不动
-  assert.match(realtimePollerSource, /pollTimer = setTimeout\(pollRealtime, 18000\);/);
+  assert.match(realtimePollerSource, /pollTimer = setTimeout\(pollRealtime, pipelineBusy \? 1500 : 18000\);/);
 });

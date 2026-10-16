@@ -370,14 +370,17 @@ function countStats() {
   };
 }
 
-// 界面每 18 秒轮询一次 /api/stats，这些计数都是全表聚合；短 TTL 缓存足以让面板保持“实时”，
-// 又不至于在库变大后每轮都重扫。管线状态与 AI 配置本身很便宜，始终取最新值。
+// 空闲18秒、任务期间1.5秒轮询；同连接写入与其它连接提交均立即失效，
+// 没有变化时复用聚合结果，5秒TTL同时兜住跨日。管线与AI配置始终取最新值。
 const STATS_CACHE_TTL_MS = 5_000;
 let statsCache = null;
+const statsRevision = db.prepare('SELECT total_changes() AS revision');
+const statsDataVersion = db.prepare('PRAGMA data_version');
 
 function getStats(nowMs = Date.now()) {
-  if (!statsCache || nowMs - statsCache.at >= STATS_CACHE_TTL_MS) {
-    statsCache = { at: nowMs, counts: countStats() };
+  const revision = `${statsRevision.get().revision}:${statsDataVersion.get().data_version}`;
+  if (!statsCache || statsCache.revision !== revision || nowMs - statsCache.at >= STATS_CACHE_TTL_MS) {
+    statsCache = { at: nowMs, revision, counts: countStats() };
   }
   return {
     ...statsCache.counts,

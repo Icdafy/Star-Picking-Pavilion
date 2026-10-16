@@ -8,7 +8,7 @@ const { loadSettings } = require('../config');
 const { collectionIntervalMs } = require('../schedule-policy');
 const { isDue, nextFetchAtIso } = require('../source-health');
 const { removeDisabledSources } = require('../source-lifecycle');
-const { structureItem } = require('../ai/normalize');
+const { structureItem, canonicalizeUrl } = require('../ai/normalize');
 const { settleAll } = require('../async-work');
 const { networkAccess } = require('../network-access');
 const { needsChinese } = require('../ai/translation');
@@ -28,6 +28,24 @@ const ADAPTERS = {
   html: htmlAdapter,
   api: apiAdapter   // 公开 JSON API（东方财富关键词搜索等）
 };
+
+// 同一轮的转载入口、带跟踪参数链接只补抓一次。缓存有界且不跨轮持久化；
+// 失败只合并正在进行的请求，不能把网络失败当作已成功抓过。
+function createEnrichmentCache(enrich, maxEntries = 512) {
+  const entries = new Map();
+  return (article, options) => {
+    // 历史新闻的月日推定以首次收录时间为准，不能复用另一时刻的推定结果。
+    const key = `${Boolean(article.intl)}:${article.fetched_at || ''}:${canonicalizeUrl(article.url) || article.url}`;
+    if (entries.has(key)) return entries.get(key);
+    const pending = Promise.resolve().then(() => enrich(article, options)).then(content => {
+      if (content?.status !== 'ok' && !content?.publishedAt && entries.get(key) === pending) entries.delete(key);
+      return content;
+    }, error => { if (entries.get(key) === pending) entries.delete(key); throw error; });
+    if (entries.size >= maxEntries) entries.delete(entries.keys().next().value);
+    entries.set(key, pending);
+    return pending;
+  };
+}
 
 // 信源迁移 —— 改地址、修选择器、清退死源。
 // 必须在 INSERT OR IGNORE 补新源之前跑：种子库里写的已经是新地址，
@@ -143,6 +161,7 @@ async function collectSource(source, settings, { enrich = enrichArticle, network
     ...entry.structured, tier: source.tier, intl: source.intl
   }, settings));
   const filtered = items.length - prepared.length;
+  const enrichOnce = createEnrichmentCache(enrich);
   // 在入库前补查缺失发布时间；不依赖 API Key，网络等待与没有日期仍可收录。
   // HTTP 请求在事务外完成，避免长时间锁住 SQLite。
   let position = 0;
@@ -151,9 +170,16 @@ async function collectSource(source, settings, { enrich = enrichArticle, network
       const entry = prepared[position++];
       entry.existing = db.prepare('SELECT * FROM articles WHERE url=? OR canonical_url=? LIMIT 1')
         .get(entry.structured.url, entry.structured.canonicalUrl);
+      // 公众号适配器已经按节流和 robots 取过完整正文并核验日期，
+      // 即使页面没有发布时间，也不应在此处及后续 AI 阶段重复下载。
+      if (source.type === 'wechat' && entry.structured.contentText) {
+        entry.structured.contentStatus = 'ok';
+        entry.structured.publicationCheckedAt = now();
+        continue;
+      }
       if (entry.structured.publishedAt || entry.existing?.published_at
         || (entry.existing && !needsPublicationCheck(entry.existing))) continue;
-      const content = await enrich({ ...entry.existing, url: entry.structured.url, intl: source.intl }, { network });
+      const content = await enrichOnce({ ...entry.existing, url: entry.structured.url, intl: source.intl }, { network });
       if (content.status === 'network-wait') continue;
       entry.structured.publicationCheckedAt = now();
       entry.structured.publishedAt = content.publishedAt || null;
@@ -201,25 +227,54 @@ async function collectAll(onProgress, { force = false, network = networkAccess, 
   // 外部源由导入接口接收；不能把每轮的“未请求”伪记为采集成功。
   const enabled = db.prepare("SELECT * FROM sources WHERE enabled = 1 AND removed_at IS NULL AND type <> 'external'").all();
   const startedAt = Date.now();
-  const networkStatus = enabled.some(source => source.intl) ? await network.detect({ force }) : network.snapshot();
-  const waiting = enabled.filter(source => source.intl && !networkStatus.available);
-  const reachable = enabled.filter(source => !source.intl || networkStatus.available);
-  const sources = force ? reachable : reachable.filter(source => isDue(source, startedAt));
-  const skippedBackoff = reachable.length - sources.length;
-  const skippedNetwork = waiting.length;
-  const skipped = skippedBackoff + skippedNetwork;
-  const results = waiting.map(source => ({ source: source.name, url: source.url, type: source.type,
-    intl: true, skipped: true, reason: 'network-unavailable' }));
+  const domestic = enabled.filter(source => !source.intl);
+  const international = enabled.filter(source => source.intl);
+  const sources = force ? domestic : domestic.filter(source => isDue(source, startedAt));
+  let networkStatus = international.length ? null : network.snapshot();
+  let skippedBackoff = domestic.length - sources.length;
+  let skippedNetwork = 0;
+  let completed = skippedBackoff;
+  const total = enabled.length;
+  const results = [];
+  const enrichOnce = createEnrichmentCache(enrich);
+  const report = progress => {
+    // 观察者故障不能把已提交成功的信源误记为采集失败。
+    try { onProgress?.({ ...progress, completed, total }); }
+    catch (error) { console.warn('[collect] 进度通知失败:', String(error.message || error).slice(0, 180)); }
+  };
+  const reportSkipped = () => report({ source: null, added: 0,
+    skipped: skippedBackoff + skippedNetwork, skippedBackoff, skippedNetwork });
+  if (skippedBackoff) reportSkipped();
+  // 国内信源立即开工；海外探测并行进行，仍严格等探测通过后才发出海外请求。
+  const internationalReady = international.length ? Promise.resolve().then(() => network.detect({ force })).then(status => {
+    networkStatus = status;
+    const waiting = status.available ? [] : international;
+    const reachable = status.available ? international : [];
+    const due = force ? reachable : reachable.filter(source => isDue(source, startedAt));
+    const backoff = reachable.length - due.length;
+    skippedNetwork = waiting.length;
+    skippedBackoff += backoff;
+    completed += waiting.length + backoff;
+    results.push(...waiting.map(source => ({ source: source.name, url: source.url, type: source.type,
+      intl: true, skipped: true, reason: 'network-unavailable' })));
+    sources.push(...due);
+    if (waiting.length || backoff) reportSkipped();
+  }) : Promise.resolve();
   const CONCURRENCY = 4;
   let idx = 0;
   async function worker() {
-    while (idx < sources.length) {
+    while (true) {
+      if (idx >= sources.length) {
+        await internationalReady;
+        if (idx >= sources.length) return;
+      }
       const source = sources[idx++];
       const started = Date.now();
       try {
-        const r = await collectSource(source, settings, { enrich, network });
+        const r = await collectSource(source, settings, { enrich: enrichOnce, network });
         results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), ...r, ms: Date.now() - started });
-        onProgress && onProgress({ source: source.name, ...r });
+        completed++;
+        report({ source: source.name, ...r });
       } catch (e) {
         const msg = String(e.message || e).slice(0, 200);
         const consecutive = (Number(source.consecutive_errors) || 0) + 1;
@@ -231,17 +286,20 @@ async function collectAll(onProgress, { force = false, network = networkAccess, 
             nextFetchAtIso(consecutive, intervalMs, Date.now()), source.id, source.url, source.type, source.selector_json, source.intl);
         if (!recorded.changes) {
           results.push({ source: source.name, url: source.url, added: 0, skipped: true, reason: 'source-changed' });
+          completed++;
+          report({ source: source.name, added: 0, skipped: true, reason: 'source-changed' });
           continue;
         }
         results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), error: msg, consecutiveErrors: consecutive });
-        onProgress && onProgress({ source: source.name, error: msg, consecutiveErrors: consecutive });
+        completed++;
+        report({ source: source.name, error: msg, consecutiveErrors: consecutive });
       }
     }
   }
   await settleAll(Array.from({ length: CONCURRENCY }, worker));
-  const publicationRepair = await repairPublicationTimes(db, { enrich, network });
+  const publicationRepair = await repairPublicationTimes(db, { enrich: enrichOnce, network });
   publicationRepair.repaired += results.reduce((sum, row) => sum + (row.publicationRepaired || 0), 0);
-  return { results, skipped, skippedBackoff, skippedNetwork, network: networkStatus, publicationRepair };
+  return { results, skipped: skippedBackoff + skippedNetwork, skippedBackoff, skippedNetwork, network: networkStatus, publicationRepair };
 }
 
-module.exports = { collectAll, collectSource, seedSources, applySourceMigrations };
+module.exports = { collectAll, collectSource, seedSources, applySourceMigrations, createEnrichmentCache };

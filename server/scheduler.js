@@ -1,12 +1,12 @@
 'use strict';
-// 调度：默认在线待命。手动或明确开启的自动任务统一运行采集→分析，任务外不调用模型。
+// 调度：默认在线待命。手动或明确开启的自动任务统一运行采集与分析流水，任务外不调用模型。
 //   · 自动循环：每轮完整结束后等待 intervalMinutes 分钟，默认关闭
 //   · 定时：每小时热度快照；每天 08:00 日报；每周一 10:00 周报；每月 1 日 10:30 月报（学 AIHOT 的刊期）
-//   · runPipeline：手动「立即采集分析」一次性全量（采集→抽干分析→归组），供 /api/collect 与脚本用
+//   · runPipeline：手动「立即采集分析」一次性全量（边采集边分析→归组收尾），供 /api/collect 与脚本用
 // 模型只在这里的任务里被调用；读者打开页面只读库里已有的结果。
 const cron = require('node-cron');
 const { collectAll } = require('./collectors');
-const { analyzePending, rescoreAfterClustering } = require('./ai/pipeline');
+const { analyzePending, rescoreAfterClustering, pendingAnalysisCount } = require('./ai/pipeline');
 const { groupPending, digestStories, consolidateStories } = require('./ai/stories');
 const { computeHotRanking, snapshotHeat } = require('./ai/hot');
 const { generateDaily } = require('./ai/daily');
@@ -41,13 +41,14 @@ let nextCollectAt = null;
 const cronTasks = new Set();
 const statusListeners = new Set();
 let statusRevision = 0;
+let pipelineProgress = null;
 
 function getStatus() {
   return {
     revision: statusRevision,
     activity: collectRunning || analyzeRunning || pipelineRunning ? 'collecting' : 'online',
     running: collectRunning || analyzeRunning || pruneRunning || compactRunning || pipelineRunning,
-    schedulerStarted, schedulerStopping, pipelineRunning, activeSchedule, nextCollectAt, lastPipeline,
+    schedulerStarted, schedulerStopping, pipelineRunning, pipelineProgress, activeSchedule, nextCollectAt, lastPipeline,
     collectRunning, analyzeRunning, pruneRunning, compactRunning,
     lastRun, lastAnalyzeAt, lastPrune, lastCompact, lastGroup
   };
@@ -59,6 +60,12 @@ function notifyStatus() {
   for (const listener of statusListeners) {
     try { listener(status); } catch { /* 已关闭的状态连接不能中断任务 */ }
   }
+}
+
+function updatePipelineProgress(patch) {
+  if (!pipelineProgress) return;
+  pipelineProgress = { ...pipelineProgress, ...patch, updatedAt: new Date().toISOString() };
+  notifyStatus();
 }
 
 function subscribeStatus(listener) {
@@ -163,7 +170,7 @@ function compactOnce(trigger = 'manual', { mode = trigger === 'manual' ? 'manual
 
 // ---------- 采集一次 ----------
 // force：手动触发时忽略失败退避，把暂停中的信源也重试一遍
-async function collectOnce(trigger = 'cron', { force = false, pipeline = false } = {}) {
+async function collectOnce(trigger = 'cron', { force = false, pipeline = false, onProgress = null } = {}) {
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
@@ -175,9 +182,11 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
   const started = Date.now();
   try {
     console.log(`[collect] 开始（${trigger}）`);
-    const { results, skippedBackoff, skippedNetwork, network, publicationRepair } = await collectAll(p =>
-      p.error ? console.log(`  ✗ ${p.source}: ${p.error}`)
-              : (p.added ? console.log(`  ✓ ${p.source}: 新增 ${p.added}`) : null), { force });
+    const { results, skippedBackoff, skippedNetwork, network, publicationRepair } = await collectAll(p => {
+      if (p.error) console.log(`  ✗ ${p.source}: ${p.error}`);
+      else if (p.added) console.log(`  ✓ ${p.source}: 新增 ${p.added}`);
+      onProgress?.(p);
+    }, { force });
     const added = results.reduce((s, r) => s + (r.added || 0), 0);
     lastRun = {
       at: new Date().toISOString(), trigger, ms: Date.now() - started,
@@ -198,7 +207,9 @@ async function collectOnce(trigger = 'cron', { force = false, pipeline = false }
 }
 
 // ---------- 分析一批（实时循环调用）----------
-async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = {}) {
+async function analyzeOnce(trigger = 'loop', limit = 60, {
+  pipeline = false, deferEditorial = false, deferConsolidation = false, deferMaintenance = false, onProgress = null
+} = {}) {
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   if (pipelineRunning && !pipeline) return { skipped: true, reason: 'pipeline' };
   if (compactRunning) return { skipped: true, reason: 'maintenance' };
@@ -207,7 +218,7 @@ async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = 
   analyzeRunning = true;
   notifyStatus();
   try {
-    const r = await analyzePending(null, limit);
+    const r = await analyzePending(onProgress, limit, { deferMaintenance });
     lastAnalyzeAt = new Date().toISOString();
     if (schedulerStopping) return r;
     const settings = loadSettings();
@@ -215,9 +226,10 @@ async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = 
     const group = await groupPending({ settings });
     if (schedulerStopping) return { ...r, group };
     // 事件级合并：同一批次各自开出的同一事件在这里并成一条（有新归组时才跑）
-    if (group.processed > 0) {
+    if (group.processed > 0 && !deferConsolidation) {
       const consolidated = await consolidateStories({ settings }).catch(e => { console.warn('[stories]', e.message); return { merged: 0 }; });
       group.consolidated = consolidated.merged;
+      if (consolidated.budgetPaused) group.budgetPaused = true;
     }
     lastGroup = { at: lastAnalyzeAt, ...group };
     if (r.analyzed > 0 || group.processed > 0) {
@@ -231,19 +243,20 @@ async function analyzeOnce(trigger = 'loop', limit = 60, { pipeline = false } = 
       lastHotAt = Date.now();
     }
     // 花钱的编辑工作（事件综述、导语改写）节流到每 15 分钟一次
-    if (!schedulerStopping && settings.ai.apiKey && !r.budgetPaused && Date.now() - lastEditorialAt > 15 * 60e3) {
+    const budgetPaused = Boolean(r.budgetPaused || group.budgetPaused);
+    if (!deferEditorial && !schedulerStopping && settings.ai.apiKey && !budgetPaused && Date.now() - lastEditorialAt > 15 * 60e3) {
       lastEditorialAt = Date.now();
       await digestStories({ settings }).catch(e => console.warn('[stories]', e.message));
       if (!schedulerStopping) await enhanceLeads({ settings }).catch(e => console.warn('[reports]', e.message));
     }
-    return { ...r, group };
+    return { ...r, budgetPaused, group };
   } finally {
     analyzeRunning = false;
     notifyStatus();
   }
 }
 
-// ---------- 手动全量：采集 → 抽干分析 → 聚类（立即采集分析按钮）----------
+// ---------- 手动全量：采集与分析重叠 → 聚类收尾（立即采集分析按钮）----------
 function runPipeline(trigger = 'manual') {
   if (schedulerStopping) return Promise.resolve({ skipped: true, reason: 'stopping' });
   if (pipelinePromise) return pipelinePromise;
@@ -251,6 +264,8 @@ function runPipeline(trigger = 'manual') {
   // 一轮任务接管自动计时，避免刚完成又被旧计时器触发。
   cancelCollectionTimer();
   pipelineRunning = true;
+  pipelineProgress = { phase: 'waiting', startedAt: new Date().toISOString(), sourcesCompleted: 0, sourcesTotal: 0,
+    collected: 0, analyzed: 0, featured: 0, batches: 0, message: '等待当前任务完成' };
   notifyStatus();
   const started = Date.now();
   pipelinePromise = (async () => {
@@ -261,9 +276,13 @@ function runPipeline(trigger = 'manual') {
       }
       const result = await executePipeline(trigger);
       lastPipeline = { at: new Date().toISOString(), trigger, ms: Date.now() - started, ok: !result.skipped, ...result };
+      updatePipelineProgress({ phase: result.skipped ? 'stopped' : result.budgetPaused || result.hasMore ? 'paused' : 'completed',
+        message: result.skipped ? '任务已停止' : result.budgetPaused ? '模型预算已用尽，待分析资料已保留'
+          : result.hasMore ? '本轮已完成，部分资料等待下轮分析' : '采集分析完成' });
       return result;
     } catch (error) {
       lastPipeline = { at: new Date().toISOString(), trigger, ms: Date.now() - started, ok: false };
+      updatePipelineProgress({ phase: 'failed', message: '任务未完成，请查看运行日志后重试' });
       throw error;
     } finally {
       pipelineRunning = false;
@@ -277,26 +296,107 @@ function runPipeline(trigger = 'manual') {
 
 async function executePipeline(trigger) {
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
-  await collectOnce(trigger, { force: trigger === 'manual', pipeline: true });
-  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   let total = 0;
-  // 抽干：反复分析直到没有 analyzed=0（每批 200）
-  for (let pass = 0; pass < 12; pass++) {
-    const r = await analyzeOnce(trigger, 200, { pipeline: true });
-    if (schedulerStopping) return { skipped: true, reason: 'stopping' };
-    if (r.skipped) break;
-    total += r.analyzed || 0;
-    if (!r.analyzed) break;
-  }
-  await groupPending({ settings: loadSettings(), limit: 1000 });
+  let featured = 0;
+  let budgetPaused = false;
+  let collectionDone = false;
+  let collectionFailed = false;
+  let generation = 0;
+  let wakeAnalysis = null;
+  let hasMore = false;
+  let lastAnalysis = null;
+  const signalAnalysis = () => {
+    generation++;
+    wakeAnalysis?.();
+    wakeAnalysis = null;
+  };
+  updatePipelineProgress({ phase: 'collecting', message: '正在采集信源' });
+  // 单一消费者先处理已有积压；每个信源提交入库后唤醒，慢源不会挡住已到资料。
+  const collection = collectOnce(trigger, { force: trigger === 'manual', pipeline: true, onProgress: p => {
+    updatePipelineProgress({ sourcesCompleted: p.completed ?? pipelineProgress.sourcesCompleted,
+      sourcesTotal: p.total ?? pipelineProgress.sourcesTotal,
+      collected: pipelineProgress.collected + (p.added || 0) });
+    if (p.added) signalAnalysis();
+  } }).catch(error => { collectionFailed = true; throw error; }).finally(() => {
+    collectionDone = true;
+    signalAnalysis();
+  });
+  const analysis = (async () => {
+    let observedGeneration = generation;
+    let shouldAnalyze = true;
+    // 保留每轮最多 2400 条的上限，较小批次让入选和事件更早可读。
+    for (let pass = 0; total < 2400 && pass < 240 && !schedulerStopping && !collectionFailed;) {
+      if (!shouldAnalyze && !collectionDone && observedGeneration === generation) {
+        await new Promise(resolve => { wakeAnalysis = resolve; });
+      }
+      if (schedulerStopping || collectionFailed) break;
+      observedGeneration = generation;
+      updatePipelineProgress({ phase: collectionDone ? 'analyzing' : 'collecting-analyzing', message: '正在分析并归组已采集资料' });
+      const r = await analyzeOnce(trigger, Math.min(40, 2400 - total), { pipeline: true, deferEditorial: true,
+        deferConsolidation: true, deferMaintenance: true,
+        onProgress: p => updatePipelineProgress({ analysisStage: p.stage || 'scoring', batchDone: p.done, batchTotal: p.total }) });
+      if (r.skipped) break;
+      pass++;
+      lastAnalysis = r;
+      total += r.analyzed || 0;
+      featured += r.featured || 0;
+      budgetPaused ||= Boolean(r.budgetPaused || r.translation?.budgetPaused);
+      updatePipelineProgress({ analyzed: total, featured, batches: pass });
+      if (budgetPaused) {
+        hasMore = Boolean(r.remaining ?? true);
+        break;
+      }
+      // UNKNOWN 补正文后要再判；仅有翻译完成时也要继续，不能误判为队列已空。
+      shouldAnalyze = Boolean(r.analyzed || r.retryPending || r.translation?.translated);
+      if (!shouldAnalyze && collectionDone && observedGeneration === generation) {
+        hasMore = Boolean(r.remaining || r.translation?.deferred);
+        break;
+      }
+      if (!shouldAnalyze) updatePipelineProgress({ phase: 'collecting', message: '等待其余信源完成，已到资料已分析' });
+      if (total >= 2400 || pass === 240) hasMore = Boolean(r.remaining ?? shouldAnalyze);
+    }
+  })();
+  // 与模型的独立评分一样，失败也要等待另一分支完成才释放整轮任务锁。
+  const outcomes = await Promise.allSettled([collection, analysis]);
+  const failure = outcomes.find(result => result.status === 'rejected');
+  if (failure) throw failure.reason;
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
-  await consolidateStories({ settings: loadSettings() }).catch(e => console.warn('[stories]', e.message));
+  // 采集结果的精确统计覆盖渐进计数（包括无请求、退避等特殊情形）。
+  updatePipelineProgress({ phase: 'grouping', collected: lastRun?.collected || 0, message: '正在完成事件归组与合并' });
+  const tailGroup = await groupPending({ settings: loadSettings(), limit: 1000 });
+  budgetPaused ||= Boolean(tailGroup.budgetPaused);
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
+  const consolidated = await consolidateStories({ settings: loadSettings() }).catch(e => { console.warn('[stories]', e.message); return {}; });
+  budgetPaused ||= Boolean(consolidated.budgetPaused);
   if (schedulerStopping) return { skipped: true, reason: 'stopping' };
   const rescore = rescoreAfterClustering();
   computeHotRanking();
   lastHotAt = Date.now();
+  // 全事件合并、综述和旧资料时间修补每轮只做一次，优先保证新资料出结果。
+  if (!budgetPaused) {
+    updatePipelineProgress({ phase: 'editorial', message: '正在完善事件综述与历史资料时间' });
+    const settings = loadSettings();
+    if (settings.ai.apiKey && Date.now() - lastEditorialAt > 15 * 60e3) {
+      lastEditorialAt = Date.now();
+      const digest = await digestStories({ settings }).catch(e => { console.warn('[stories]', e.message); return {}; });
+      budgetPaused ||= Boolean(digest?.budgetPaused);
+      if (!schedulerStopping && !budgetPaused) await enhanceLeads({ settings }).catch(e => console.warn('[reports]', e.message));
+    }
+    if (!schedulerStopping && !budgetPaused) {
+      const maintenance = await analyzePending(null, 0, { translate: false });
+      budgetPaused ||= Boolean(maintenance.budgetPaused || maintenance.timingRepair?.budgetPaused);
+      if (maintenance.timingRepair?.repaired) {
+        rescoreAfterClustering();
+        computeHotRanking();
+      }
+    }
+  }
+  if (schedulerStopping) return { skipped: true, reason: 'stopping' };
+  // 消费者达到上限后，慢源仍可能继续入库；以两条分支都结束后的真实队列为准。
+  hasMore = pendingAnalysisCount() > 0;
   console.log(`[pipeline] 手动全量完成：分析 ${total} 条，门槛重判 ${rescore.changed} 条`);
-  return { ...lastRun, analyzed: total, rescored: rescore.changed };
+  return { ...lastRun, analyzed: total, featured, rescored: rescore.changed, budgetPaused, hasMore,
+    translationDeferred: lastAnalysis?.translation?.deferred || 0 };
 }
 
 function cancelCollectionTimer() {

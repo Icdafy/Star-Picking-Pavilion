@@ -2,6 +2,7 @@
 const { clampPublishedAt } = require('./date-time');
 const { loadSelection } = require('./industry');
 const { publicationUpperBound } = require('./collectors/publication-date');
+const { settleAll } = require('./async-work');
 
 const RETRY_MS = 24 * 60 * 60 * 1000;
 function needsPublicationCheck(row, at = Date.now()) {
@@ -47,12 +48,16 @@ async function repairPublicationTimes(database, { enrich, network, limit = 10 } 
       AND (a.publication_checked_at IS NULL OR a.publication_checked_at<=?)
     ORDER BY a.starred DESC, (s.tier='T1') DESC, a.featured DESC, a.id DESC LIMIT ?`).all(cutoff, limit);
   let attempted = 0, repaired = 0;
-  for (const row of rows) {
-    const content = await enrich(row, { network });
-    if (content.status === 'network-wait') continue;
-    attempted++;
-    repaired += savePublicationTime(database, row, content) ? 1 : 0;
-  }
+  let position = 0;
+  await settleAll(Array.from({ length: Math.min(2, rows.length) }, async () => {
+    while (position < rows.length) {
+      const row = rows[position++];
+      const content = await enrich(row, { network });
+      if (content.status === 'network-wait') continue;
+      attempted++;
+      repaired += savePublicationTime(database, row, content) ? 1 : 0;
+    }
+  }));
   return { attempted, repaired };
 }
 

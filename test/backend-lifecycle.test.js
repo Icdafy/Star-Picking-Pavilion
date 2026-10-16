@@ -25,13 +25,14 @@ function schedulerFixture(t, overrides = {}) {
   const settings = { collect: { automatic: overrides.automatic ?? true, intervalMinutes: 10, analyzeIntervalSeconds: 75 }, ai: {}, dailyReportHour: 8 };
   const dependencies = {
     'node-cron': { schedule: () => ({ stop() {}, destroy() {} }) },
-    './collectors': { collectAll: async () => { events.push('collect'); await overrides.collect?.(); return { results: [], skipped: 0 }; } },
+    './collectors': { collectAll: async onProgress => { events.push('collect'); await overrides.collect?.(onProgress); return { results: [], skipped: 0 }; } },
     './ai/pipeline': {
-      analyzePending: async () => { events.push('analyze'); await overrides.analyze?.(); return { analyzed: 0 }; },
+      pendingAnalysisCount: () => overrides.remaining?.() || 0,
+      analyzePending: async (onProgress, limit, options) => { events.push('analyze'); return await overrides.analyze?.(onProgress, limit, options) || { analyzed: 0 }; },
       rescoreAfterClustering: () => { events.push('rescore'); return { changed: 0 }; }
     },
     './ai/stories': {
-      groupPending: async options => { events.push(options.limit === 1000 ? 'tail' : 'group'); await overrides.group?.(options); return { processed: 0 }; },
+      groupPending: async options => { events.push(options.limit === 1000 ? 'tail' : 'group'); return await overrides.group?.(options) || { processed: 0 }; },
       digestStories: async () => {}, consolidateStories: async () => ({ merged: 0 })
     },
     './ai/hot': { computeHotRanking: () => events.push('hot'), snapshotHeat() {} },
@@ -148,6 +149,128 @@ test('failed pipelines release their lock and can be retried', async t => {
   failing = false;
   await scheduler.runPipeline();
   assert.equal(scheduler.getStatus().lastPipeline.ok, true);
+});
+
+test('ready articles are analyzed and grouped before the slowest source finishes', async t => {
+  const source = deferred(); t.after(() => source.resolve());
+  let analysisCalls = 0;
+  const fixture = schedulerFixture(t, {
+    collect: async progress => { progress({ source: 'fast', added: 2, completed: 1, total: 2 }); await source.promise; },
+    analyze: (_progress, limit) => limit === 0 ? { analyzed: 0 } : { analyzed: analysisCalls++ === 0 ? 2 : 0, featured: 1 }
+  });
+  const run = fixture.scheduler.runPipeline();
+  await tick();
+  const status = fixture.scheduler.getStatus();
+  assert.equal(status.collectRunning, true);
+  assert.equal(status.pipelineProgress.sourcesCompleted, 1);
+  assert.equal(status.pipelineProgress.sourcesTotal, 2);
+  assert.equal(status.pipelineProgress.analyzed, 2);
+  assert.ok(fixture.events.includes('group'), '已到资料归组后即可供首屏读取');
+  assert.equal(fixture.events.includes('tail'), false);
+  source.resolve(); await run;
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'completed');
+});
+
+test('budget exhaustion waits for collection without hot-looping analysis', async t => {
+  const source = deferred(); t.after(() => source.resolve());
+  let calls = 0;
+  const fixture = schedulerFixture(t, {
+    collect: async progress => { progress({ source: 'first', added: 1, completed: 1, total: 2 }); await source.promise;
+      progress({ source: 'second', added: 1, completed: 2, total: 2 }); },
+    analyze: () => { calls++; return { analyzed: 0, budgetPaused: true, remaining: 2 }; },
+    remaining: () => 2
+  });
+  const run = fixture.scheduler.runPipeline();
+  await tick(); await tick();
+  assert.equal(calls, 1);
+  assert.equal(fixture.scheduler.getStatus().running, true);
+  source.resolve();
+  const result = await run;
+  assert.equal(result.budgetPaused, true);
+  assert.equal(result.hasMore, true);
+  assert.equal(calls, 1, '预算阻断不重入抽干与付费修补');
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'paused');
+});
+
+test('a failed collection drains in-flight analysis before another pipeline may run', async t => {
+  const article = deferred(), failSource = deferred();
+  t.after(() => { article.resolve(); failSource.resolve(); });
+  let analyzed = false;
+  const fixture = schedulerFixture(t, {
+    collect: async () => { await failSource.promise; throw new Error('source failed'); },
+    analyze: async () => { await article.promise; analyzed = true; return { analyzed: 0 }; }
+  });
+  const run = fixture.scheduler.runPipeline();
+  const rejected = assert.rejects(run, /source failed/);
+  failSource.resolve(); await tick();
+  assert.equal(fixture.scheduler.getStatus().pipelineRunning, true);
+  assert.equal(analyzed, false);
+  article.resolve(); await rejected;
+  assert.equal(analyzed, true);
+  assert.equal(fixture.scheduler.getStatus().pipelineRunning, false);
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'failed');
+});
+
+test('UNKNOWN enrichment and translation-only progress receive a follow-up analysis batch', async t => {
+  let calls = 0;
+  const fixture = schedulerFixture(t, { analyze: (_progress, limit) => {
+    if (limit === 0) return { analyzed: 0 };
+    calls++;
+    return calls === 1 ? { analyzed: 0, retryPending: 1 } : calls === 2
+      ? { analyzed: 0, translation: { translated: 1 } } : { analyzed: calls === 3 ? 1 : 0 };
+  } });
+  const result = await fixture.scheduler.runPipeline();
+  assert.equal(result.analyzed, 1);
+  assert.equal(calls, 4);
+});
+
+test('many individually completed sources do not exhaust the article processing cap', async t => {
+  let pending = 0;
+  const fixture = schedulerFixture(t, {
+    collect: async progress => {
+      for (let index = 0; index < 75; index++) {
+        pending++;
+        progress({ source: String(index), added: 1, completed: index + 1, total: 75 });
+        await tick(); await tick();
+      }
+    },
+    analyze: (_progress, limit) => { if (limit === 0) return { analyzed: 0 };
+      const count = pending; pending = 0; return { analyzed: count, remaining: pending }; }
+  });
+  const result = await fixture.scheduler.runPipeline();
+  assert.equal(result.analyzed, 75);
+  assert.equal(pending, 0);
+  assert.equal(result.hasMore, false);
+});
+
+test('articles arriving after the 2400 article cap remain visible in final pending status', async t => {
+  const slow = deferred(); t.after(() => slow.resolve());
+  let analyzed = 0, pending = 0;
+  const fixture = schedulerFixture(t, {
+    collect: async progress => {
+      await slow.promise; pending++;
+      progress({ source: 'slow', added: 1, completed: 1, total: 1 });
+    },
+    analyze: (_progress, limit) => {
+      if (!limit) return { analyzed: 0, remaining: pending };
+      analyzed += limit;
+      if (analyzed === 2400) slow.resolve();
+      return { analyzed: limit, remaining: 0 };
+    },
+    remaining: () => pending
+  });
+  const result = await fixture.scheduler.runPipeline();
+  assert.equal(result.analyzed, 2400);
+  assert.equal(result.hasMore, true);
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'paused');
+});
+
+test('a grouping budget pause remains visible after all articles are already scored', async t => {
+  const fixture = schedulerFixture(t, { group: () => ({ processed: 0, budgetPaused: true }) });
+  const result = await fixture.scheduler.runPipeline();
+  assert.equal(result.analyzed, 0);
+  assert.equal(result.budgetPaused, true);
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'paused');
 });
 
 test('a prune request reserves its lock before acknowledgment and completes exactly once', async t => {

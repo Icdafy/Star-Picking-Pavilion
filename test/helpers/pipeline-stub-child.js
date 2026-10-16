@@ -632,7 +632,74 @@ async function scenarioTimingRepairBudget() {
   return out;
 }
 
+async function scenarioPrefilterScoringOverlap() {
+  let releaseSecond;
+  const firstPersisted = new Promise(resolve => { releaseSecond = resolve; });
+  let prefilterCalls = 0, firstWhilePrefilterRunning = false;
+  let secondPrefilterRunning = false, active = 0, peakActive = 0;
+  let firstResultMs = null;
+  let started;
+  const stub = await startStub(async ({ kind, payload }) => {
+    active++; peakActive = Math.max(peakActive, active);
+    try {
+      if (kind === 'prefilter') {
+        const count = (String(payload.messages[1].content).match(/<item id="/g) || []).length;
+        prefilterCalls++;
+        if (prefilterCalls === 2) {
+          secondPrefilterRunning = true;
+          // 旧实现要等所有预筛结束，250ms 后放行；新实现会在第一条评分落库时放行。
+          let fallback;
+          await Promise.race([firstPersisted, new Promise(resolve => { fallback = setTimeout(resolve, 250); })]);
+          clearTimeout(fallback);
+          secondPrefilterRunning = false;
+        }
+        return ok({ results: Array.from({ length: count }, (_, i) => ({ i, label: 'PASS', d: 'B' })) });
+      }
+      await new Promise(resolve => setTimeout(resolve, 15));
+      return ok(VALID_SCORING);
+    } finally { active--; }
+  });
+  writeSettings(stub.baseUrl);
+  const { db, closeDatabase } = require(serverModule('db'));
+  let { analyzePending } = require(serverModule('ai', 'pipeline'));
+  if (process.argv[3]) {
+    // 可重复性能对照只在此隔离测试进程编译已发布版本，不写工作区或用户数据。
+    const Module = require('node:module');
+    const { execFileSync } = require('node:child_process');
+    const filename = serverModule('ai', 'pipeline.js');
+    const baseline = new Module(filename, module);
+    baseline.filename = filename;
+    baseline.paths = Module._nodeModulePaths(path.dirname(filename));
+    baseline._compile(execFileSync('git', ['show', `${process.argv[3]}:server/ai/pipeline.js`], { cwd: root, encoding: 'utf8' }), filename);
+    ({ analyzePending } = baseline.exports);
+  }
+  const { usageSnapshot } = require(serverModule('ai', 'receipts'));
+  const source = insertSource(db, '流水性能桩', 'T1');
+  for (let index = 0; index < 24; index++) {
+    const id = insertArticle(db, source, `${RELEVANT_TITLES[0]}（流水第${index}条）`, '火箭完成回收试验。');
+    db.prepare("UPDATE articles SET content_status='ok',content_text='火箭完成回收试验。' WHERE id=?").run(id);
+  }
+  started = performance.now();
+  const result = await analyzePending(p => {
+    if (p.stage !== 'scoring' || firstResultMs != null) return;
+    firstResultMs = Math.round(performance.now() - started);
+    firstWhilePrefilterRunning = secondPrefilterRunning;
+    releaseSecond();
+  }, 200, { deferMaintenance: true });
+  const beforeRetry = stub.requests.length;
+  const secondResult = await analyzePending(null, 200, { deferMaintenance: true });
+  const out = { result, secondResult, firstResultMs, elapsedMs: Math.round(performance.now() - started),
+    firstWhilePrefilterRunning, peakActive, requests: beforeRetry, requestsAfterRetry: stub.requests.length,
+    independentScores: db.prepare("SELECT task,COUNT(*) c FROM model_receipts WHERE task LIKE 'score-%' GROUP BY task ORDER BY task").all(),
+    outcomeDigest: require('node:crypto').createHash('sha256').update(JSON.stringify(db.prepare(`
+      SELECT id,analyzed,relevant,domain,category,score_a,score_b,featured,attention_score,ai_summary,ai_reason,
+        item_type,author_role,tags_json,subjects_json,events_json,entities_json,deal_json FROM articles ORDER BY id`).all())).digest('hex'),
+    usage: usageSnapshot() };
+  closeDatabase(); await stopStub(stub); return out;
+}
+
 const SCENARIOS = {
+  'prefilter-scoring-overlap': scenarioPrefilterScoringOverlap,
   'early-failure-drain': scenarioEarlyFailureDrain,
   'timing-repair-budget': scenarioTimingRepairBudget,
   'historical-timing': scenarioHistoricalTiming,

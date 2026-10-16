@@ -5,6 +5,11 @@ const { parsePublicationDate } = require('./publication-date');
 const { networkAccess } = require('../network-access');
 const { removeHiddenContent } = require('./visible-content');
 const { isVideoPageUrl } = require('./video-url');
+const { canonicalizeUrl } = require('../ai/normalize');
+
+// 采集日期修复与 AI 补正文可以重叠；只共享同一网络/抓取实现的在途请求，
+// 完成后立即释放，不跨任务保留正文或缓存网络失败。
+const pendingContent = new WeakMap();
 
 function extractContent(html, url, options = {}) {
   const $ = cheerio.load(html, { scriptingEnabled: false });
@@ -90,6 +95,18 @@ async function enrichArticle(article, { network = networkAccess, fetchPageImpl =
   const intl = article.intl != null ? Boolean(article.intl) : article.source_id
     ? Boolean(require('../db').db.prepare('SELECT intl FROM sources WHERE id=?').get(article.source_id)?.intl) : false;
   if (intl && !(await network.detect()).available) return { text: '', images: [], status: 'network-wait' };
+  let byFetch = pendingContent.get(network);
+  if (!byFetch) { byFetch = new WeakMap(); pendingContent.set(network, byFetch); }
+  let pending = byFetch.get(fetchPageImpl);
+  if (!pending) { pending = new Map(); byFetch.set(fetchPageImpl, pending); }
+  const key = `${intl}:${article.fetched_at || ''}:${canonicalizeUrl(article.url) || article.url}`;
+  if (pending.has(key)) return pending.get(key);
+  const request = loadArticleContent(article, fetchPageImpl).finally(() => { pending.delete(key); });
+  pending.set(key, request);
+  return request;
+}
+
+async function loadArticleContent(article, fetchPageImpl) {
   try {
     const page = new URL(article.url).hostname === 'mp.weixin.qq.com'
       ? { html: await require('./wechat').pacedPage(article.url), url: article.url }

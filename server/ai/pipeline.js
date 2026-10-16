@@ -237,12 +237,16 @@ function participantKeyOf(article) {
 }
 
 // ---------- 主流程 ----------
-async function analyzePending(onProgress, limit = 200) {
+function pendingAnalysisCount() {
+  return db.prepare('SELECT COUNT(*) c FROM articles WHERE analyzed=0').get().c;
+}
+
+async function analyzePending(onProgress, limit = 200, { deferMaintenance = false, translate = true } = {}) {
   const settings = loadSettings();
   const selection = industry.loadSelection();
   const breakthroughs = loadBreakthroughs();
   const hasKey = !!settings.ai.apiKey;
-  const translation = await translatePending(settings);
+  const translation = translate ? await translatePending(settings) : { translated: 0 };
   const repair = () => repairTiming(db, { hasKey, enrich: enrichArticle, extract: async article => {
     reserveCall();
     const response = await chat([
@@ -254,7 +258,7 @@ async function analyzePending(onProgress, limit = 200) {
   } });
   refreshEventTiming();
   // 升级前的相关资料：纯代码补一遍主体公司关联（不重判、不重写既有研判）
-  const backfilled = companies.backfillSubjects(300) + deals.backfillHistory(300).scanned;
+  const backfilled = deferMaintenance ? 0 : companies.backfillSubjects(300) + deals.backfillHistory(300).scanned;
 
   const pending = db.prepare(`
     SELECT a.id, a.source_id, a.title, a.url, a.summary_raw, a.published_at, a.publication_precision, a.publication_date_text, a.fetched_at, a.domain,
@@ -264,11 +268,14 @@ async function analyzePending(onProgress, limit = 200) {
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.analyzed = 0 AND COALESCE(a.translation_status, '') <> 'pending'
     ORDER BY a.id DESC LIMIT ?`).all(limit);
-  if (!pending.length) return { analyzed: 0, featured: 0, backfilled, translation, timingRepair: await repair() };
+  if (!pending.length) return { analyzed: 0, featured: 0, backfilled, translation,
+    budgetPaused: Boolean(translation.budgetPaused), remaining: pendingAnalysisCount(),
+    timingRepair: deferMaintenance || translation.budgetPaused ? null : await repair() };
 
   const cleaned = refreshCleaning(pending);
   let analyzed = 0;
-  let budgetPaused = false;
+  let budgetPaused = Boolean(translation.budgetPaused);
+  let retryPending = 0;
   const selectedIds = [];
 
   const persist = (a, domain, outcome, flag) => {
@@ -302,7 +309,7 @@ async function analyzePending(onProgress, limit = 200) {
       analyzed++;
       onProgress && onProgress({ done: analyzed, total: pending.length });
     }
-    return { analyzed, featured: selectedIds.length, cleaned, backfilled, mode: 'heuristic' };
+    return { analyzed, featured: selectedIds.length, cleaned, backfilled, mode: 'heuristic', translation, remaining: pendingAnalysisCount() };
   }
 
   // 预筛批次的启发式降级：相关条目带入评分阶段，无关条目写终态
@@ -315,68 +322,106 @@ async function analyzePending(onProgress, limit = 200) {
     return true;
   }
 
-  // 阶段 ③：批量预筛
-  const B = settings.ai.maxBatchPrefilter || 20;
-  for (let i = 0; i < candidates.length && !budgetPaused; i += B) {
-    const batch = candidates.slice(i, i + B);
+  // 预筛与评分组成有界流水：第一批通过即可产出结果，不等全部资料预筛完。
+  // 三个评分 worker 仍各发两次独立评分与一次理解；预筛最多另占一个请求。
+  const configuredBatch = Number(settings.ai.maxBatchPrefilter);
+  const B = Number.isInteger(configuredBatch) && configuredBatch > 0 ? Math.min(100, configuredBatch) : 20;
+  const CONC = 3;
+  let idx = 0;
+  let producerDone = false;
+  const waiters = new Set();
+  function signalQueue() {
+    for (const resolve of waiters) resolve();
+    waiters.clear();
+  }
+  const waitForQueue = () => new Promise(resolve => waiters.add(resolve));
+
+  async function prefilter() {
     try {
-      const results = await editorial.prefilterBatch(batch, settings);
-      for (let k = 0; k < batch.length; k++) {
-        const a = batch[k];
-        const r = results[k];
-        prefilterFailures.delete(a.id);
-        if (r.label === 'PASS') {
-          a._domain = r.domain;
-          a._prefilter = 'PASS';
-          relevantArts.push(a);
-        } else if (r.label === 'BLOCK') {
-          markIrrelevant(a.id, 'BLOCK');
-          analyzed++;
-        } else if (!a.content_status && Number(a.prefilter_attempts || 0) < 1) {
-          // UNKNOWN：材料不足，补抓正文，下一轮带着正文再判一次
-          try { await ensureContent(a); } catch {}
-          db.prepare("UPDATE articles SET prefilter_label='UNKNOWN', prefilter_attempts=prefilter_attempts+1 WHERE id=?").run(a.id);
-        } else if (a._profile.relevant) {
-          // 补过正文仍拿不准：交给词库画像做最后判断
-          a._domain = r.domain || a._profile.domain || a.domain;
-          a._prefilter = 'UNKNOWN';
-          relevantArts.push(a);
-        } else {
-          markIrrelevant(a.id, 'UNKNOWN');
-          analyzed++;
-        }
-      }
-    } catch (e) {
-      if (e?.budgetExceeded) {
-        budgetPaused = true;
-        console.warn(`[ai] ${e.message}`);
-        break;
-      }
-      if (e?.parseFailure) {
-        console.error('[ai] 预筛响应异常，本批降级启发式:', e.message);
-        for (const a of batch) {
-          if (degradeWithHeuristic(a)) relevantArts.push(a);
-          else analyzed++;
-        }
-      } else {
-        console.error('[ai] 预筛调用失败，条目保持待判:', e.message);
-        for (const a of batch) {
-          if (bumpFailure(prefilterFailures, a.id)) {
-            if (degradeWithHeuristic(a)) relevantArts.push(a);
-            else analyzed++;
+      for (let i = 0; i < candidates.length && !budgetPaused; i += B) {
+        // 积压至多两批；尊重评分端背压，避免大库一次排满内存或提前占光预算。
+        while (relevantArts.length - idx >= B * 2 && !budgetPaused) await waitForQueue();
+        if (budgetPaused) break;
+        const batch = candidates.slice(i, i + B);
+        try {
+          const results = await editorial.prefilterBatch(batch, settings);
+          const unknown = [];
+          for (let k = 0; k < batch.length; k++) {
+            const a = batch[k];
+            const r = results[k];
+            prefilterFailures.delete(a.id);
+            if (r.label === 'PASS') {
+              a._domain = r.domain;
+              a._prefilter = 'PASS';
+              relevantArts.push(a);
+              signalQueue();
+            } else if (r.label === 'BLOCK') {
+              markIrrelevant(a.id, 'BLOCK');
+              analyzed++;
+            } else if (!a.content_status && Number(a.prefilter_attempts || 0) < 1) {
+              unknown.push(a);
+            } else if (a._profile.relevant) {
+              // 补过正文仍拿不准：交给词库画像做最后判断。
+              a._domain = r.domain || a._profile.domain || a.domain;
+              a._prefilter = 'UNKNOWN';
+              relevantArts.push(a);
+              signalQueue();
+            } else {
+              markIrrelevant(a.id, 'UNKNOWN');
+              analyzed++;
+            }
+          }
+          // UNKNOWN 补正文至多两路；已通过的条目不用等这些慢网页即可评分。
+          let contentIndex = 0;
+          await settleAll(Array.from({ length: Math.min(2, unknown.length) }, async () => {
+            while (contentIndex < unknown.length) {
+              const a = unknown[contentIndex++];
+              try { await ensureContent(a); } catch {}
+              db.prepare("UPDATE articles SET prefilter_label='UNKNOWN', prefilter_attempts=prefilter_attempts+1 WHERE id=?").run(a.id);
+              retryPending++;
+            }
+          }));
+        } catch (e) {
+          if (e?.budgetExceeded) {
+            budgetPaused = true;
+            console.warn(`[ai] ${e.message}`);
+            break;
+          }
+          if (e?.parseFailure) {
+            console.error('[ai] 预筛响应异常，本批降级启发式:', e.message);
+            for (const a of batch) {
+              if (degradeWithHeuristic(a)) relevantArts.push(a);
+              else analyzed++;
+            }
+          } else {
+            console.error('[ai] 预筛调用失败，条目保持待判:', e.message);
+            for (const a of batch) {
+              if (bumpFailure(prefilterFailures, a.id)) {
+                if (degradeWithHeuristic(a)) relevantArts.push(a);
+                else analyzed++;
+              }
+            }
           }
         }
+        onProgress && onProgress({ stage: 'prefilter', done: Math.min(i + B, candidates.length), total: candidates.length });
+        signalQueue();
       }
+    } finally {
+      producerDone = true;
+      signalQueue();
     }
-    onProgress && onProgress({ stage: 'prefilter', done: Math.min(i + B, candidates.length), total: candidates.length });
   }
 
   // 阶段 ④⑤：两次独立评分 + 内容理解（同一条资料的三个调用并发，条目之间小并发）
-  const CONC = 3;
-  let idx = 0;
   async function worker() {
-    while (idx < relevantArts.length && !budgetPaused) {
+    while (!budgetPaused) {
+      if (idx >= relevantArts.length) {
+        if (producerDone) break;
+        await waitForQueue();
+        continue;
+      }
       const a = relevantArts[idx++];
+      signalQueue();
       try {
         if (a._heuristic) {
           persist(a, a._domain, a._heuristic, 3);
@@ -394,6 +439,7 @@ async function analyzePending(onProgress, limit = 200) {
       } catch (e) {
         if (e?.budgetExceeded) {
           budgetPaused = true;
+          signalQueue();
           console.warn(`[ai] ${e.message}`);
           break;
         }
@@ -414,7 +460,8 @@ async function analyzePending(onProgress, limit = 200) {
       onProgress && onProgress({ stage: 'scoring', done: analyzed, total: pending.length });
     }
   }
-  await settleAll(Array.from({ length: CONC }, worker));
+  // 任何分支失败仍抽干已启动的调用，调度锁释放后不会再有后台写库。
+  await settleAll([prefilter(), ...Array.from({ length: CONC }, worker)]);
 
   return {
     analyzed,
@@ -424,7 +471,9 @@ async function analyzePending(onProgress, limit = 200) {
     mode: 'full',
     translation,
     budgetPaused,
-    timingRepair: budgetPaused ? null : await repair()
+    retryPending,
+    remaining: pendingAnalysisCount(),
+    timingRepair: budgetPaused || deferMaintenance ? null : await repair()
   };
 }
 
@@ -611,6 +660,7 @@ function rescoreAfterClustering() {
 module.exports = {
   ANALYSIS_VERSION,
   analyzePending,
+  pendingAnalysisCount,
   rescoreAfterClustering,
   scoringContext,
   breakthroughFor,

@@ -61,7 +61,10 @@ function checkIntegrity(database) {
     const row = database.prepare('PRAGMA quick_check').get();
     return row?.quick_check === 'ok' ? null : (row?.quick_check || 'unknown');
   } catch (error) {
-    return String(error?.message || error);
+    const message = String(error?.message || error);
+    // 锁等待、I/O 或权限错误不能证明文件损坏；误隔离健康库会让用户看到一个空库。
+    if (!SQLITE_CORRUPT_PATTERN.test(message)) throw error;
+    return message;
   }
 }
 
@@ -80,7 +83,14 @@ function initializeDatabase() {
     db = null;
   }
   if (db) {
-    const problem = checkIntegrity(db);
+    let problem;
+    try { problem = checkIntegrity(db); }
+    catch (error) {
+      // 启动失败也必须释放句柄，允许用户排除环境故障后直接重试。
+      db.close();
+      db = null;
+      throw error;
+    }
     if (!problem) return;
     console.error(`[db] 完整性检查未通过: ${problem}；隔离损坏文件并以空库重建`);
     db.close(); // 重命名前必须先断开连接，否则 Windows 上文件句柄会让 rename 失败
@@ -137,7 +147,7 @@ CREATE INDEX IF NOT EXISTS idx_articles_cluster ON articles(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_articles_analyzed ON articles(analyzed, relevant);
 -- 统计面板每 18 秒按 fetched_at 计数；无此索引会全表扫描
 CREATE INDEX IF NOT EXISTS idx_articles_fetched ON articles(fetched_at);
--- 信息流时间线按 COALESCE(published_at, fetched_at) 倒序；表达式索引让排序走索引而非全表排序
+-- 公司动态、事件聚类按原始时间文本检索；信息流的真实时刻排序索引在补列后创建
 CREATE INDEX IF NOT EXISTS idx_articles_timeline
   ON articles(COALESCE(published_at, fetched_at) DESC);
 -- 保留清理与聚类窗口都按「相关性 + 时间」取子集
@@ -237,6 +247,18 @@ function migrateV020(addCol) {
   addCol('translation_json', 'TEXT');
   addCol('translation_retry_at', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_articles_translation ON articles(translation_status, translation_retry_at, id)');
+  // 信源面板逐源统计待翻译量，且来源迁移按 source_id 找历史文章；覆盖索引避免逐源重扫全文表。
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_source_translation ON articles(source_id, translation_status)');
+  // 采集后按最新 id 取待分析批次；旧 (analyzed, relevant) 索引不能同时满足此排序。
+  db.exec('CREATE INDEX IF NOT EXISTS idx_articles_pending_order ON articles(analyzed, id DESC)');
+  // 信息流保留 julianday 的时区/不同日期格式语义，索引表达式与接口 ORDER BY 完全一致。
+  // 全部动态与精选分别按相关性/精选标记定位后直接取最新页，不再排序全部历史记录。
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_articles_relevant_time
+    ON articles(relevant, julianday(COALESCE(published_at, fetched_at)) DESC, id DESC)
+    WHERE analyzed IN (1, 3)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_articles_featured_time
+    ON articles(featured, julianday(COALESCE(published_at, fetched_at)) DESC, id DESC)
+    WHERE relevant = 1 AND analyzed IN (1, 3)`);
   addCol('prefilter_label', 'TEXT');                       // PASS | BLOCK | UNKNOWN（模型预筛结论）
   addCol('prefilter_attempts', 'INTEGER NOT NULL DEFAULT 0');
   addCol('score_a', 'REAL');                               // 第一次独立评分（0–100）

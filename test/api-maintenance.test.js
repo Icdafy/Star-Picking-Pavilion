@@ -7,6 +7,25 @@ const { DatabaseSync } = require('node:sqlite');
 const { API_TOKEN_HEADER } = require('../server/http-security');
 const { startServer } = require('./helpers/server-child');
 
+test('statistics invalidate immediately after a committed database change without waiting for the TTL', async t => {
+  const server = await startServer(t);
+  const headers = { [API_TOKEN_HEADER]: server.token };
+  const stats = async () => JSON.parse((await server.request({ pathname: '/api/stats', headers })).body);
+  const before = await stats();
+  const database = new DatabaseSync(path.join(server.dataDir, 'star-picking-pavilion.db'));
+  try {
+    const sourceId = database.prepare('SELECT id FROM sources LIMIT 1').get().id;
+    database.prepare(`INSERT INTO articles(source_id,title,url,fetched_at,relevant,analyzed,featured,domain)
+      VALUES (?,'火箭完成首飞','https://example.com/fresh-stats',?,1,3,1,'aerospace')`)
+      .run(sourceId, new Date().toISOString());
+    const after = await stats();
+    assert.equal(after.articles, before.articles + 1);
+    assert.equal(after.today, before.today + 1);
+    assert.equal(after.featuredToday, before.featuredToday + 1);
+    assert.deepEqual(await stats(), after);
+  } finally { database.close(); }
+});
+
 test('source URL conflicts return actionable 409 responses without changing either source', async t => {
   const server = await startServer(t);
   const headers = { [API_TOKEN_HEADER]: server.token, 'content-type': 'application/json' };

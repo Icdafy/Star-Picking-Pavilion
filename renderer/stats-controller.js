@@ -21,6 +21,7 @@
     // 统计数字变化时做一次短促补间，避免刷新瞬间的跳字
     let activityRevision = -1;
     let statsRequest = 0;
+    let activityBusy = false;
     const statAnimations = new WeakMap();
     function renderActivity(schedule = {}) {
       if (Number.isFinite(schedule.revision)) {
@@ -29,7 +30,16 @@
       }
       const busy = schedule.activity ? schedule.activity === 'collecting'
         : Boolean(schedule.collectRunning || schedule.analyzeRunning || schedule.pipelineRunning);
-      const label = busy ? '采集中' : '在线';
+      activityBusy = busy;
+      const progress = schedule.pipelineProgress;
+      const phases = { waiting: '等待中', collecting: '采集中', 'collecting-analyzing': '采集分析中',
+        analyzing: '分析中', grouping: '归组中', editorial: '综述中' };
+      const label = busy ? (phases[progress?.phase] || '采集中') : '在线';
+      const count = value => Number.isFinite(value) && value >= 0 ? Math.floor(value).toLocaleString('zh-CN') : '0';
+      const detail = busy && progress ? [phases[progress.phase] || '采集分析中',
+        `信源 ${count(progress.sourcesCompleted)}/${count(progress.sourcesTotal)}`,
+        `新增 ${count(progress.collected)} 条`, `已分析 ${count(progress.analyzed)} 条`,
+        `精选 ${count(progress.featured)} 条`, progress.message].filter(Boolean).join('；') : '';
       if (elements.statStatusLabel.textContent !== label) {
         elements.statStatus.innerHTML = `<span class="pulse-dot${busy ? ' busy' : ''}"></span>`;
         elements.statStatusLabel.textContent = label;
@@ -38,10 +48,13 @@
         elements.btnRefresh.classList.toggle('spinning', busy);
         elements.btnRefresh.disabled = busy;
         elements.btnRefresh.setAttribute('aria-busy', String(busy));
+        elements.btnRefresh.setAttribute('title', detail || '立即采集分析（Alt+R）');
+        elements.btnRefresh.setAttribute('aria-label', detail || '立即采集分析');
       }
+      elements.statStatusLabel.title = detail;
       if (elements.collectScheduleStatus) {
         const date = value => new Date(value).toLocaleString('zh-CN', { hour12: false });
-        elements.collectScheduleStatus.textContent = busy ? '采集分析任务正在运行；全部完成后恢复在线。'
+        elements.collectScheduleStatus.textContent = busy ? (detail || '采集分析任务正在运行；全部完成后恢复在线。')
           : schedule.nextCollectAt ? `下次自动采集：${date(schedule.nextCollectAt)}${schedule.lastRun?.at ? '；最近采集完成：' + date(schedule.lastRun.at) : ''}`
           : schedule.activeSchedule?.enabled ? '在线待命，等待下一次自动任务。'
           : '在线待命；自动采集关闭，点击“立即采集分析”才会开始工作。';
@@ -92,7 +105,7 @@
       } catch { /* 后端未就绪 */ }
     }
 
-    return Object.freeze({ setStat, refreshStats, renderActivity });
+    return Object.freeze({ setStat, refreshStats, renderActivity, isBusy: () => activityBusy });
   }
 
   return Object.freeze({ createStatsController });

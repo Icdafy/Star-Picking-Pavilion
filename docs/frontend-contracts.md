@@ -945,3 +945,7 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 ## v0.2.33 刷新率自适应运动内核
 
 `DomUtils.springEasing({ bounce, velocity })` 把单位阻尼弹簧（ζ = 1 − bounce）在静止阈值 .0005 内归一到完整时长，采样 200 点后以 Ramer–Douglas–Peucker（容差 .0015）简化为 CSS `linear()`，按参数缓存。`createMotion` 在 `CSS.supports` 通过时用于双帧动画与 `fadeSlideIn`，并在非静态档把 bounce .2 的曲线写入根节点 `--spring-light`。`DomUtils.createFrameRateProbe` 仅在前台聚焦时测量 24 个 rAF 间隔的较快四分位，启动 4 秒后复测、resize 后重测，写入 `data-refresh-rate`；`retargetIndicator` 关键帧数为每帧一个（10—48）。时长、终态写入、`fill: 'backwards'`、取消与降级规则不变，CSS、脚本与关键帧预算不变。
+
+## v0.2.34 采集进度与渐进结果
+
+统计控制器按单调 revision 接收采集/分析/归组/综述阶段，并将真实计数用于 title 和可访问名称。实时轮询统一手动跟踪与后台调度：空闲18秒、任务中1.5秒、后台手动跟踪5秒，自调度且只有一个在途请求；SSE在途完成排队补跑，POST前旧在线响应不能完成新任务。计数与分析批次共同作为更新信号，阅读中保留卡片、提供更新横幅，后台完成回前台再调和。CSS、脚本和动画预算不变。

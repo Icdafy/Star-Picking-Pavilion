@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.33 · 刷新率自适应动效与交互细节
+## v0.2.34 · 渐进采集分析与全层可靠性优化
 
-- **逐帧真实的弹簧**：视图入场、页头、弹层、展开、信息流错峰和按压回弹由同一弹簧内核生成 CSS linear() 曲线，60—240Hz 显示器的每一帧都落在真实曲线上。
-- **刷新率自适应**：前台测量显示器实际帧间隔，跨屏时重测；导航与分段滑块按每帧一个关键帧采样，连续改向保持速度。
-- **中文输入法友好**：各检索框在拼音选词期间不再按半截拼音检索或切换视图，选词按键不触发快捷键。
-- **细节修补**：选中态只保留一层滑块，按钮连点不选中文字，链接与图片不拖出残影，提示在后台不提前消失。
+- **渐进出结果**：采集与分析交叠，预筛与评分有界流水，慢信源仍在采集时首批新闻即可完成分析；保留两次独立评分、预算和回执。
+- **减少重复等待**：国内采集与海外检测并行，相同正文、日期与 robots 请求合并，已核验公众号全文复用，历史日期修复最多两项并发。
+- **真实进度**：显示采集、分析、归组与综述阶段和数量，任务中每约 1.5 秒探测新结果；慢响应不叠加请求，阅读中的卡片保持。
+- **数据与退出可靠性**：四个精确 SQLite 索引加速队列、统计和排序；临时数据库访问错误保留原库，后端退出失败明确报错并可重试。
 
-版本、界面与更新元数据统一为 0.2.33，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0233-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.34，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0234-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与设置，无新增依赖。合成基准的首条入库中位数为 388→87ms，真实耗时仍随信源网络、积压数量和模型响应而变。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.33.exe`，双击并按向导安装。v0.2.33 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.34.exe`，双击并按向导安装。v0.2.34 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.33.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.34.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

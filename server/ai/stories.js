@@ -299,7 +299,7 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
             }
           }
         } catch (error) {
-          if (error?.budgetExceeded) { judgeBudget = 0; break; }
+          if (error?.budgetExceeded) { stats.budgetPaused = true; judgeBudget = 0; break; }
           // 判不了就留到下一轮：不写 grouped_at
           console.warn(`[stories] 归组判断失败 #${doc.id}:`, error.message);
           continue;
@@ -393,7 +393,7 @@ async function consolidateStories({ settings = null, nowMs = Date.now() } = {}) 
           merge = confirmation.relation === first.relation && confirmation.confidence >= config.sameMinConfidence;
         }
       } catch (error) {
-        if (error?.budgetExceeded) budget = 0;
+        if (error?.budgetExceeded) { stats.budgetPaused = true; budget = 0; }
         else console.warn(`[stories] 事件合并判断失败 #${a}/#${b}:`, error.message);
       }
     }
@@ -452,7 +452,7 @@ async function digestStories({ settings = null, call = chat, receipt = withRecei
   const stories = db.prepare(`SELECT id, digest_hash, digest FROM clusters
     WHERE merged_into IS NULL AND latest_at >= ? ORDER BY size DESC, latest_at DESC`).all(since);
   const prompt = industry.renderPrompt('story-digest');
-  let digested = 0, attempted = 0;
+  let digested = 0, attempted = 0, budgetPaused = false;
   for (const story of stories) {
     const input = digestInput(story.id, prompt, settings);
     if (!input || input.hash === story.digest_hash) continue;
@@ -479,11 +479,11 @@ async function digestStories({ settings = null, call = chat, receipt = withRecei
         .run(digest, title, input.size, now(), input.hash, story.id);
       digested++;
     } catch (error) {
-      if (error?.budgetExceeded) break;
+      if (error?.budgetExceeded) { budgetPaused = true; break; }
       console.warn(`[stories] 事件综述失败 #${story.id}:`, error.message);
     }
   }
-  return { digested };
+  return { digested, ...(budgetPaused ? { budgetPaused: true } : {}) };
 }
 
 module.exports = {

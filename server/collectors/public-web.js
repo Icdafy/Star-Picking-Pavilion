@@ -2,7 +2,7 @@
 const dns = require('node:dns');
 const net = require('node:net');
 const { Agent, fetch } = require('undici');
-const { readBoundedBody } = require('./fetch-util');
+const { readBoundedBody, cancelBody } = require('./fetch-util');
 // 公开网页正文抓取如实标明身份与版本，便于站点按 robots.txt 识别
 const CRAWLER_UA = `StarPickingPavilion/${require('../../package.json').version} (+https://github.com/Icdafy/Star-Picking-Pavilion)`;
 
@@ -47,20 +47,49 @@ async function publicFetch(value, { maxBytes = 2 * 1024 * 1024, fetchImpl = fetc
     const response = await fetchImpl(url.href, { dispatcher, signal, redirect: 'manual',
       headers: { 'User-Agent': CRAWLER_UA, Accept: '*/*' } });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      await response.body?.cancel();
+      await cancelBody(response);
       const next = publicUrl(new URL(response.headers.get('location'), url).href);
       if (!response.headers.get('location')) throw new Error('公开网页跳转缺少目标地址');
       if (allowRedirect && !await allowRedirect(next)) throw new Error('正文跳转违反站点抓取规则');
       url = next;
       continue;
     }
-    if (!response.ok) { await response.body?.cancel(); throw new Error(`公开采集 HTTP ${response.status}`); }
+    if (!response.ok) { await cancelBody(response); throw new Error(`公开采集 HTTP ${response.status}`); }
     return { body: await readBoundedBody(response, maxBytes), type: response.headers.get('content-type') || '', url: url.href };
   }
   throw new Error('公开网页跳转过多');
 }
 
 const robotsCache = new Map();
+// 按调用方缓存隔离正在读取的 robots；多篇正文共享同一站点规则请求。
+const robotsPending = new WeakMap();
+const ROBOTS_RETRY_MS = 30000;
+
+async function loadRobots(origin, cache, fetchImpl) {
+  const cached = cache.get(origin);
+  if (cached && Date.now() - cached.at < (cached.error ? ROBOTS_RETRY_MS : 3600000)) {
+    if (cached.error) throw cached.error;
+    return cached;
+  }
+  let pending = robotsPending.get(cache);
+  if (!pending) { pending = new Map(); robotsPending.set(cache, pending); }
+  if (pending.has(origin)) return pending.get(origin);
+  const request = (async () => {
+    let entry;
+    try {
+      entry = { at: Date.now(), text: (await publicFetch(`${origin}/robots.txt`, { maxBytes: 128000, fetchImpl })).body.toString('utf8') };
+    } catch (error) {
+      // 不可达时保持拒绝；短暂共享失败，避免同轮每篇正文都重试到超时。
+      entry = /HTTP 404\b/.test(error.message) ? { at: Date.now(), text: '' } : { at: Date.now(), error };
+    }
+    if (cache.size >= 200) cache.delete(cache.keys().next().value);
+    cache.set(origin, entry);
+    if (entry.error) throw entry.error;
+    return entry;
+  })().finally(() => { pending.delete(origin); });
+  pending.set(origin, request);
+  return request;
+}
 function robotsAllowed(text, pathname) {
   // Conservative: honor every wildcard/our-agent Disallow, including Allow exceptions by longest match.
   let applies = false, hasRules = false, allowed = true, longest = -1;
@@ -84,13 +113,7 @@ function robotsAllowed(text, pathname) {
 }
 async function fetchPage(value, { fetchImpl = fetch, cache = robotsCache, withUrl = false } = {}) {
   async function allowed(url) {
-    let cached = cache.get(url.origin);
-    if (!cached || Date.now() - cached.at > 3600000) {
-      try { cached = { at: Date.now(), text: (await publicFetch(`${url.origin}/robots.txt`, { maxBytes: 128000, fetchImpl })).body.toString('utf8') }; }
-      catch (error) { if (!/HTTP 404\b/.test(error.message)) throw error; cached = { at: Date.now(), text: '' }; }
-      if (cache.size > 200) cache.clear();
-      cache.set(url.origin, cached);
-    }
+    const cached = await loadRobots(url.origin, cache, fetchImpl);
     return robotsAllowed(cached.text, url.pathname + url.search);
   }
   const url = publicUrl(value);

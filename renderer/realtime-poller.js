@@ -18,7 +18,7 @@
     refreshStats, loadFeed, scrollToTop,
     document, getScrollY, elements,
     // 阶段 4（可选）：keyed diff 渲染器，注入后顶部新条目走前置插入
-    diff
+    diff, onPipelineComplete
   } = {}) {
     if (typeof api !== 'function' || !state || !Array.isArray(FEED_VIEWS)
       || typeof toast !== 'function' || !preferenceActions
@@ -54,22 +54,76 @@
     });
 
     let pollTimer;
+    let activePoll = null;
+    let activityPollPending = false;
+    let pipelineBusy = false;
+    let watchingPipeline = false;
+    let watchAfterRequest = 0;
+    let activityRevision = -1;
+    let pipelineRefreshPending = false;
+    let disposed = false;
     let pollRequest = 0;
     let lastPollContext = null;
     // 轮询信号快照：先拉 /api/stats，仅当计数信号相对上轮变化时才探测 feed
     let lastPollSignals = null;
     function pollSignalsOf(s) {
-      return [s.today, s.pending, s.featuredToday, s.articles, s.starred].join('|');
+      return [s.today, s.pending, s.featuredToday, s.articles, s.starred,
+        s.pipeline?.pipelineProgress?.analyzed, s.pipeline?.pipelineProgress?.batches,
+        s.pipeline?.lastPipeline?.at].join('|');
     }
-    async function pollRealtime() {
+    function pollRealtime() {
+      if (disposed) return Promise.resolve();
+      // 按钮、前台恢复和状态推送共用一轮请求，慢响应不会叠出请求队列。
+      if (activePoll) return activePoll;
+      activePoll = runPollRealtime().finally(() => {
+        activePoll = null;
+        if (activityPollPending && !disposed) {
+          activityPollPending = false;
+          pollRealtime();
+        }
+      });
+      return activePoll;
+    }
+    async function runPollRealtime() {
       clearTimeout(pollTimer);
       const request = ++pollRequest;
       const context = () => [state.view, state.domain, state.category, state.q].join('\u0000');
       const startedContext = context();
-      const current = () => request === pollRequest && !document.hidden && context() === startedContext;
-      const schedule = () => { if (request === pollRequest) pollTimer = setTimeout(pollRealtime, 18000); };
-      if (document.hidden) return schedule();          // 后台标签页暂停
+      const current = () => !disposed && request === pollRequest && !document.hidden && context() === startedContext;
+      const schedule = () => { if (!disposed && request === pollRequest) pollTimer = setTimeout(pollRealtime,
+        pipelineBusy ? (document.hidden ? 5000 : 1500) : 18000); };
+      if (document.hidden && !watchingPipeline) return schedule();
       const stats = await refreshStats();
+      if (disposed) return;
+      if (stats?.pipeline && (!Number.isFinite(stats.pipeline.revision) || stats.pipeline.revision >= activityRevision)) {
+        if (Number.isFinite(stats.pipeline.revision)) activityRevision = stats.pipeline.revision;
+        pipelineBusy = stats.pipeline.activity === 'collecting'
+          || Boolean(stats.pipeline.pipelineRunning || stats.pipeline.collectRunning || stats.pipeline.analyzeRunning);
+        if (watchingPipeline && request >= watchAfterRequest && !pipelineBusy) {
+          watchingPipeline = false;
+          const result = stats.pipeline.lastPipeline;
+          if (result?.ok === false) toast('采集分析失败，请检查信源或模型设置', true);
+          else if (stats.pipeline.pipelineProgress?.phase === 'paused') toast('采集已完成，部分分析等待预算或重试');
+          else toast('采集分析完成');
+          lastPollSignals = null;
+          pipelineRefreshPending = true;
+        }
+      }
+      if (!current()) { lastPollSignals = null; return schedule(); }
+      if (pipelineRefreshPending && !state.loading) {
+        pipelineRefreshPending = false;
+        if (FEED_VIEWS.includes(state.view)) {
+          const reading = getScrollY() >= 220 || document.querySelector('.card.expanded, .cluster-items:not([hidden])')
+            || document.activeElement?.closest?.('.card');
+          if (reading) {
+            elements.newFlash.textContent = '🛰 情报分析已更新 · 点击查看';
+            elements.newFlash.hidden = false;
+          } else { await loadFeed(); }
+        }
+        if (typeof onPipelineComplete === 'function') {
+          try { await onPipelineComplete(); } catch { /* 视图恢复失败不阻断后续轮询 */ }
+        }
+      }
       if (!current()) { lastPollSignals = null; return schedule(); }
       // 无变化轮次直接跳过 feed 探测；stats 拉取失败时宁可多探一次不漏更新
       const signals = stats ? pollSignalsOf(stats) : null;
@@ -119,10 +173,38 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) pollRealtime(); });
 
     function start() {
-      pollTimer = setTimeout(pollRealtime, 18000);   // 自调度实时增量循环
+      clearTimeout(pollTimer);
+      if (!disposed) pollTimer = setTimeout(pollRealtime, pipelineBusy ? 1500 : 18000);
     }
 
-    return Object.freeze({ setRealtime, showNewFlash, pollRealtime, start });
+    function watchPipeline() {
+      watchingPipeline = true;
+      watchAfterRequest = pollRequest + 1;
+      pipelineBusy = true;
+      lastPollSignals = null;
+      // 采集 POST 之前发出的旧“在线”响应不能被当作本轮任务已完成。
+      return activePoll ? activePoll.then(pollRealtime, pollRealtime) : pollRealtime();
+    }
+    function observeActivity(status) {
+      if (Number.isFinite(status.revision)) {
+        if (status.revision < activityRevision) return;
+        activityRevision = status.revision;
+      }
+      const busy = status.activity === 'collecting'
+        || Boolean(status.pipelineRunning || status.collectRunning || status.analyzeRunning);
+      const changed = pipelineBusy !== busy;
+      pipelineBusy = busy;
+      if (changed) {
+        if (activePoll) activityPollPending = true;
+        else pollRealtime();
+      }
+    }
+    function dispose() {
+      disposed = true;
+      clearTimeout(pollTimer);
+    }
+
+    return Object.freeze({ setRealtime, showNewFlash, pollRealtime, watchPipeline, observeActivity, start, dispose });
   }
 
   return Object.freeze({ createRealtimePoller });

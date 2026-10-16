@@ -590,7 +590,11 @@ function shutdownDesktop() {
     if (autoUpdateTimer) clearInterval(autoUpdateTimer);
     autoUpdateTimer = null;
     if (serverController) await serverController.shutdown();
-  })();
+  })().catch(error => {
+    // 安全关闭失败会阻止安装；排除故障后的下一次退出/安装必须可以重新尝试。
+    desktopShutdownPromise = null;
+    throw error;
+  });
   return desktopShutdownPromise;
 }
 

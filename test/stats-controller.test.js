@@ -178,3 +178,26 @@ test('an old number animation cannot overwrite a newer value', () => {
   oldFrame(650);
   assert.equal(elements.statToday.textContent, '200');
 });
+
+test('pipeline stages and actual counts appear in accessible status without interpreting markup', () => {
+  const { ctrl, elements } = createController();
+  const attributes = {};
+  elements.btnRefresh = { classList: { toggle() {} }, setAttribute: (name, value) => { attributes[name] = value; } };
+  ctrl.renderActivity({ revision: 10, activity: 'collecting', pipelineProgress: {
+    phase: 'collecting-analyzing', sourcesCompleted: 18, sourcesTotal: 201,
+    collected: 40, analyzed: 12, featured: 3, message: '<img src=x onerror=alert(1)>'
+  } });
+  assert.equal(elements.statStatusLabel.textContent, '采集分析中');
+  assert.match(elements.collectScheduleStatus.textContent, /信源 18\/201；新增 40 条；已分析 12 条；精选 3 条/);
+  assert.match(attributes['aria-label'], /<img/);
+  assert.equal(attributes.title, attributes['aria-label']);
+  assert.equal(elements.btnRefresh.disabled, true);
+  ctrl.renderActivity({ revision: 9, activity: 'online' });
+  assert.equal(elements.btnRefresh.disabled, true);
+  ctrl.renderActivity({ revision: 11, activity: 'collecting', pipelineProgress: { phase: 'grouping' } });
+  assert.equal(elements.statStatusLabel.textContent, '归组中');
+  ctrl.renderActivity({ revision: 12, activity: 'online' });
+  assert.equal(elements.btnRefresh.disabled, false);
+  assert.equal(attributes['aria-label'], '立即采集分析');
+  assert.equal(ctrl.isBusy(), false);
+});

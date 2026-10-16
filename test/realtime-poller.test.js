@@ -258,3 +258,122 @@ test('a loading feed does not consume the signal needed by the next realtime pro
   assert.equal(env.calls.feedProbe, 1);
   assert.equal(env.calls.loadFeed, 1);
 });
+
+test('slow stats and feed requests remain single flight across timer, button and visibility triggers', async t => {
+  const env = makeEnv({ feedItems: [{ id: 'new' }] });
+  let release, statsCalls = 0;
+  env.refreshStats = () => { statsCalls++; return new Promise(resolve => { release = resolve; }); };
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  const first = poller.pollRealtime();
+  assert.equal(poller.pollRealtime(), first);
+  env.dispatchVisibility();
+  assert.equal(statsCalls, 1);
+  release({ today: 1 });
+  await first;
+  assert.equal(env.calls.feedProbe, 1);
+});
+
+test('a pre-start idle response cannot finish a newly accepted pipeline', async t => {
+  const env = makeEnv();
+  let release, calls = 0;
+  let nextStats = { pipeline: { revision: 2, activity: 'collecting' } };
+  env.refreshStats = () => ++calls === 1 ? new Promise(resolve => { release = resolve; })
+    : Promise.resolve(nextStats);
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  poller.pollRealtime();
+  const watching = poller.watchPipeline();
+  release({ pipeline: { revision: 1, activity: 'online' } });
+  await watching;
+  assert.equal(calls, 2);
+  assert.equal(env.calls.toast.length, 0);
+  nextStats = { pipeline: { revision: 3, activity: 'online', lastPipeline: { ok: true } } };
+  await poller.pollRealtime();
+  assert.deepEqual(env.calls.toast, [['采集分析完成', false]]);
+  await poller.pollRealtime();
+  assert.equal(env.calls.toast.length, 1);
+});
+
+test('task progress probes analyzed results before completion even when article counts stay equal', async t => {
+  const env = makeEnv({ statsSequence: [
+    { today: 8, pipeline: { activity: 'collecting', pipelineProgress: { analyzed: 1, batches: 1 } } },
+    { today: 8, pipeline: { activity: 'collecting', pipelineProgress: { analyzed: 2, batches: 2 } } }
+  ] });
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  await poller.watchPipeline();
+  await poller.pollRealtime();
+  assert.equal(env.calls.feedProbe, 2);
+  assert.equal(env.calls.toast.length, 0);
+});
+
+test('hidden completion waits for foreground to reconcile and paused budget is disclosed', async t => {
+  const env = makeEnv({ hidden: true, statsSequence: [
+    { pipeline: { activity: 'collecting' } },
+    { pipeline: { activity: 'online', lastPipeline: { ok: true }, pipelineProgress: { phase: 'paused' } } },
+    { pipeline: { activity: 'online' } }
+  ] });
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  await poller.watchPipeline();
+  await poller.pollRealtime();
+  assert.equal(env.calls.loadFeed, 0);
+  assert.deepEqual(env.calls.toast, [['采集已完成，部分分析等待预算或重试', false]]);
+  env.document.hidden = false;
+  await poller.pollRealtime();
+  assert.equal(env.calls.loadFeed, 1);
+});
+
+test('a late older idle response cannot finish a pipeline after a newer activity push', async t => {
+  const env = makeEnv({ statsSequence: [
+    { pipeline: { revision: 1, activity: 'collecting' } },
+    { pipeline: { revision: 1, activity: 'online' } },
+    { pipeline: { revision: 3, activity: 'online', lastPipeline: { ok: false } } }
+  ] });
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  await poller.watchPipeline();
+  poller.observeActivity({ revision: 2, activity: 'collecting' });
+  await poller.pollRealtime();
+  assert.equal(env.calls.toast.length, 0);
+  await poller.pollRealtime();
+  assert.deepEqual(env.calls.toast, [['采集分析失败，请检查信源或模型设置', true]]);
+  poller.dispose();
+  await poller.pollRealtime();
+  assert.equal(env.calls.toast.length, 1);
+});
+
+test('pipeline finalization preserves an expanded card and offers a refresh banner', async t => {
+  const env = makeEnv({ reading: true, statsSequence: [
+    { pipeline: { activity: 'collecting' } }, { pipeline: { activity: 'online', lastPipeline: { ok: true } } }
+  ] });
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  await poller.watchPipeline();
+  await poller.pollRealtime();
+  assert.equal(env.calls.loadFeed, 0);
+  assert.equal(env.elements.newFlash.hidden, false);
+  assert.match(env.elements.newFlash.textContent, /情报分析已更新/);
+});
+
+test('an SSE completion during an older stats request queues one immediate refresh', async t => {
+  const env = makeEnv();
+  let calls = 0, release;
+  env.refreshStats = () => {
+    calls++;
+    if (calls === 2) return new Promise(resolve => { release = resolve; });
+    return Promise.resolve({ pipeline: calls === 1 ? { revision: 1, activity: 'collecting' }
+      : { revision: 2, activity: 'online', lastPipeline: { ok: true } } });
+  };
+  const poller = createRealtimePoller(env);
+  t.after(() => poller.dispose());
+  await poller.watchPipeline();
+  const older = poller.pollRealtime();
+  poller.observeActivity({ revision: 2, activity: 'online' });
+  release({ pipeline: { revision: 1, activity: 'collecting' } });
+  await older;
+  await poller.pollRealtime();
+  assert.equal(calls, 3);
+  assert.deepEqual(env.calls.toast, [['采集分析完成', false]]);
+});
