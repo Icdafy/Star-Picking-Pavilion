@@ -1,8 +1,8 @@
-# v0.2.41 发布状态（待验证、待发布）
+# v0.2.41 发布状态
 
-本版候选变更按用户上传的原始 PNG 统一桌面、任务栏、窗口、托盘、通知、安装与卸载、网页页签和系统更新页的静态 Logo，保留白色圆角底、金色星星与紫色弧线。仅主页面左上角的原有 SVG 动效及首帧回退图保持原样。
+已按用户上传的原始 PNG 统一桌面、任务栏、窗口、托盘、通知、安装与卸载、网页页签和系统更新页的静态 Logo，保留白色圆角底、金色星星与紫色弧线。主页面左上角原有 SVG 动效及首帧回退图保持原样。
 
-版本、安装器及更新元数据目标为 0.2.41；无依赖或用户数据业务变更，沿用已接受的未签名策略。单元与集成、真实 Electron、图标/包边界/版本、依赖审计、main CI、一次性 Windows 安装卸载烟测、tag Release 和六项公开附件复核均待验证，尚未形成正式发布结论。证据回填至 [验证记录](docs/v0241-validation.md)。
+[v0.2.41](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.41) 于 2026-10-17 21:00:11（北京时间）发布为最新正式版，无发布阻塞。精确提交 `f1380c9` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39033079909) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39034000227) 全部通过：1165/1165 单元与集成、42/42 真实 Electron、两项依赖审计、1303 项包边界、七尺寸 PE 图标及一次性 Windows 安装/启动/单实例/退出/卸载烟测。六项公开附件已重新下载核验；安装器 101,881,789 B，产品及文件版本 0.2.41，NotSigned，SHA-256 `c7fc411e01a196f5f96c898f15540d8155eefe021fa16bb5775b72ef2a479bbe` 与 SHA256SUMS.txt 及 GitHub 摘要一致，latest.yml 两处 SHA-512 和尺寸一致。本地首轮四项桌面失败均在不改代码和测试的单独复验中通过；实网巡检两个空结果的限制单独披露。无依赖或用户数据业务变更；完整证据见 [验证记录](docs/v0241-validation.md)。
 
 ---
 

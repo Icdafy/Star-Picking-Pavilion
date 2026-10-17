@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.41 当前为待验证、待发布候选版本：使用本次上传的 PNG 统一全部静态 Logo，保留主页面左上角 SVG 动效与首帧回退图。沿用已接受的 NotSigned 策略；main CI、tag Release 及公开附件复核的结果将记录于 [本版验证](docs/v0241-validation.md)。完成全部门禁前不得将本段改为已发布。
+[v0.2.41](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.41) 已于北京时间 2026-10-17 21:00:11 发布：使用本次上传的 PNG 统一全部静态 Logo，保留主页面左上角 SVG 动效与首帧回退图。精确提交 `f1380c9` 的 main CI 与 tag Release 全部门禁通过，沿用已接受的 NotSigned 策略；六项公开附件已重新下载复核，完整证据见 [本版验证](docs/v0241-validation.md)。
 
 上一正式版 [v0.2.40](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.40) 已于北京时间 2026-10-17 18:57:32 发布：修复更新弹窗旧 Logo，并新增自动清理开关。精确提交 42b4504 的 main CI 与 tag Release 全部门禁通过，公开附件已重新下载校验，历史证据见 [v0.2.40 验证](docs/v0240-validation.md)。
 

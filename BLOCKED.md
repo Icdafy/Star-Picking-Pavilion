@@ -1,8 +1,8 @@
-# v0.2.41 发布状态（待验证、待发布）
+# v0.2.41 发布状态
 
-本版候选变更按用户上传的原始 PNG 统一全部静态 Logo，仅主页面左上角原有 SVG 动效及首帧回退图保持原样。版本目标为 0.2.41，沿用已接受的未签名策略，无依赖或用户数据业务变更。
+已按用户上传的原始 PNG 统一全部静态 Logo，主页面左上角原有 SVG 动效及首帧回退图保持原样。版本为 0.2.41，沿用已接受的未签名策略，无依赖或用户数据业务变更。
 
-当前尚待完成本地验证、main 精确提交的完整 CI 与一次性 Windows 安装卸载烟测、tag Release 及六项公开附件重新下载复核。尚无已确认的技术阻塞；待验证项目不视作通过，正式发布结论回填至 [验证记录](docs/v0241-validation.md)。
+[v0.2.41](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.41) 于 2026-10-17 21:00:11（北京时间）发布为最新正式版，无发布阻塞。精确提交 `f1380c9` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39033079909) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39034000227) 全部通过：1165/1165 单元与集成、42/42 真实 Electron、两项依赖审计、1303 项包边界、七尺寸 PE 图标及一次性 Windows 安装/启动/单实例/退出/卸载烟测。六项公开附件已下载复核；安装器 101,881,789 B、0.2.41、NotSigned，SHA-256 `c7fc411e01a196f5f96c898f15540d8155eefe021fa16bb5775b72ef2a479bbe` 与 SHA256SUMS.txt 及 GitHub 摘要一致。首次本地桌面回归的四项失败单独复验均通过；信源巡检两项空检索结果单独披露。完整证据见 [验证记录](docs/v0241-validation.md)。
 
 ---
 
