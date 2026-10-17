@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.40 修复更新弹窗图标并新增自动清理开关。当前候选版本正在验证，正式状态与证据见 [本版验证](docs/v0240-validation.md)。
+[v0.2.40](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.40) 已于北京时间 2026-10-17 18:57:32 发布：修复更新弹窗旧 Logo，并新增自动清理开关。精确提交 42b4504 的 main CI 与 tag Release 全部门禁通过，沿用 NotSigned 策略；公开附件已重新下载校验，完整证据见 [本版验证](docs/v0240-validation.md)。
 
 ## 发布前授权门槛
 

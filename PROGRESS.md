@@ -1,8 +1,8 @@
 # v0.2.40 发布状态
 
-已修复 Windows 旧图标生成链，新增可持久化的自动清理开关。本地 1165/1165 单元与集成、41/41 真实 Electron、生产与工具链零漏洞、1303 项包边界、7 种尺寸的实际 PE 图标比对和打包后启动验证通过。信源巡检 197 有内容、4 空结果、0 请求失败，严格模式因空结果未通过，未变更采集逻辑。
+已修复更新弹窗旧 Logo，并新增可持久化的自动清理开关。
 
-当前等待 main CI 与 tag 发布工作流；尚未公开发布 v0.2.40。测试与范围见[验证记录](docs/v0240-validation.md)。
+[v0.2.40](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.40) 于 2026-10-17 18:57:32（北京时间）发布为最新正式版，无发布阻塞。精确提交 `42b4504` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39025129192) 与 [Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39025877995) 全部通过：1165/1165 单元与集成、41/41 真实 Electron、生产与完整工具链零漏洞、1303 项包边界、7 种尺寸的实际 PE 图标比对、一次性 Windows 安装/启动/单实例/退出/卸载烟测。六项公开附件已重新下载核验：安装器 100,334,537 B，产品及文件版本 0.2.40，NotSigned；SHA-256 `20568b408a6ea6c299bb41a16c9aaee53192a88fe8fb77e98e7808758cd0fec1` 与 SHA256SUMS.txt 及 GitHub 摘要一致，latest.yml 两处 SHA-512 与尺寸一致。原有用户数据保留；信源巡检 197 有内容、4 空结果、0 请求失败的限制如实保留。证据见[验证记录](docs/v0240-validation.md)。
 
 ---
 

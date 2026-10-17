@@ -26,10 +26,25 @@
 
 第二轮 main CI（提交 462c13e，[运行 39002494039](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39002494039)）1164 项单元与 41 项桌面回归、两项依赖审计及第三方声明全部通过，但构建前的图标渲染校验失败。已在本地用超出显示器的画布复现：Windows 在构造隐藏窗口时会将内容尺寸裁至屏幕工作区；仅启用离屏选项仍会受影响。窗口绘制方案还会在负载较高时返回首个不透明占位帧，因此最终生成器直接将解码完成的 SVG 绘制到独立的 1024 × 1024 canvas，取回 PNG 并生成 ICO；不再截图窗口，画布大小与绘制结果均不依赖显示器或合成器首帧。继续固定软件渲染、1× 与 sRGB，并在构建时校验生成结果。新增真实 Electron 回归将画布设为大于当前屏幕工作区，验证完整尺寸、Logo 非空及透明背景。CI 与 Release 同时将图标检查提前到长时间测试之前，以便及早发现渲染环境问题；构建时仍再次校验。
 
-精确提交的 main CI 成功后才推送 tag；发布工作流另外执行一次性 Windows 安装/启动/单实例/退出/卸载烟测。发布后在此回填工作流与公开附件校验。
+最终提交 `42b4504284299cd7233f74316130b55a45f01614` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39025129192) 已全部通过，包括新增 Canvas 大尺寸回归、1165 项单元、41 项桌面测试、两项依赖审计、图标一致性、包边界及一次性 Windows 安装/启动/单实例/退出/卸载烟测。已将 `v0.2.40` 标签推送到同一提交，[Release 工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39025877995) 全部通过，公开附件复核通过。
 
 ## 限制
 
 - 自动清理开关控制每日的过期情报、过期回执清理及清理后的自动压缩；手动清理、手动压缩和桌面缓存维护保持各自现有入口与策略。
 - 当前安装包继续采用未签名策略；Windows SmartScreen 可能提示未知发布者，README 与发布说明保留校验指引。
 - 正在运行的旧版本使用的是旧包资源，本次安装完成后才会切换到新版资源。
+
+## 正式发布与附件复核
+
+于 2026-10-17 18:57:32（北京时间）发布为 Latest，非 draft、非 prerelease。Release 工作流再次通过 1165 项单元与集成、41 项真实 Electron、图标生成一致性、两项依赖审计、第三方声明、1303 项包边界、7 种尺寸 PE 图标、产物版本及一次性 Windows 安装/启动/单实例/退出/卸载烟测，然后生成 SHA-256、CycloneDX 1.6 SBOM 并上传六项资产。
+
+| 附件 | 字节数 |
+| --- | ---: |
+| latest.yml | 374 |
+| sbom.cdx.json | 82,051 |
+| SHA256SUMS.txt | 106 |
+| Star-Picking-Pavilion-Setup-0.2.40.exe | 100,334,537 |
+| Star-Picking-Pavilion-Setup-0.2.40.exe.blockmap | 106,109 |
+| THIRD_PARTY_NOTICES.txt | 6,347 |
+
+六项资产已重新下载并逐项核对 GitHub SHA-256 摘要。安装器 SHA-256 为 `20568b408a6ea6c299bb41a16c9aaee53192a88fe8fb77e98e7808758cd0fec1`，与 SHA256SUMS.txt 一致；PE 产品版本及文件版本均为 0.2.40，签名状态 NotSigned。latest.yml 的 version、两处文件名、size 与两处 SHA-512 均匹配实际安装器；公开安装器的七种图标尺寸与当前 ICO 的帧数据完全一致。SBOM 为 CycloneDX 1.6，根版本 0.2.40，包含实际交付的 Electron 42.11.11；第三方声明与本版一致，发布正文与 RELEASE_NOTES.md 一致。复核脚本和结果保存在被忽略的 work/v0240/。
