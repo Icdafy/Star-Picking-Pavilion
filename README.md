@@ -2,25 +2,25 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.40 · 更新弹窗图标修复与自动清理开关
+## v0.2.41 · 静态 Logo 统一更新
 
-- **最新 Logo**：Windows 安装器、卸载器、窗口、托盘与更新通知统一使用当前图标，从最新静态 SVG 生成，并在构建前校验。
-- **可选自动清理**：“设置 → 存储与清理 → 自动清理”增加即时保存的开关，关闭后停止每天的过期情报清理；需要时仍可点“立即清理”。开启时每天 08:25 随自动采集运行，开关在重启后保留。
-- **更新通知**：显式使用新版 Logo，点击打开应用，选择“重启安装”后才安装。
+- **统一静态 Logo**：采用本次上传的原始 PNG，保留白色圆角底、金色星星与紫色弧线。桌面快捷方式、任务栏、应用窗口、托盘、更新通知、安装器、卸载器、网页页签与系统更新页共用该图案。
+- **保留主页面动效**：仅主页面左上角继续使用原有 SVG Logo、悬停动效与第一帧回退图，行为和外观保持不变。
+- **图标一致性检查**：Windows 多尺寸 ICO 从上传 PNG 生成，在构建与包校验中验证资源一致性。
 
-版本、界面与更新元数据统一为 0.2.40，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0240-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、归档、密钥与全部设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.41，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0241-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.40.exe`，双击并按向导安装。v0.2.40 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.41.exe`，双击并按向导安装。v0.2.41 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.40.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.41.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

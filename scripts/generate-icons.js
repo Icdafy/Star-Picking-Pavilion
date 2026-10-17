@@ -28,43 +28,24 @@ function createIcon(frames) {
   return Buffer.concat([header, ...frames.map(frame => frame.png)]);
 }
 
-async function renderLogoSvg(source, size = 1024) {
-  const { BrowserWindow, nativeImage } = require('electron');
-  const win = new BrowserWindow({
-    width: 64,
-    height: 64,
-    useContentSize: true,
-    show: false,
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    webPreferences: { sandbox: true, contextIsolation: true, backgroundThrottling: false, offscreen: true }
-  });
-  try {
-    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
-      '<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:">'
-    ));
-    // A detached canvas has its own pixel dimensions. Neither the desktop's
-    // work area nor an initial compositor frame can crop or replace this image.
-    const png = await win.webContents.executeJavaScript(`(async () => {
-      const image = new Image();
-      image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(${JSON.stringify(source)});
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = ${size};
-      const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
-      context.drawImage(image, 0, 0, ${size}, ${size});
-      return canvas.toDataURL('image/png');
-    })()`);
-    const raster = nativeImage.createFromDataURL(png);
-    const actual = raster.getSize();
-    if (raster.isEmpty() || actual.width !== size || actual.height !== size) {
-      throw new Error(`Canonical SVG canvas failed: expected ${size} × ${size}, actual ${actual.width} × ${actual.height}`);
-    }
-    return raster;
-  } finally {
-    win.destroy();
+function createIconOutputs(source) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (!Buffer.isBuffer(source) || !source.subarray(0, signature.length).equals(signature)) {
+    throw new Error('renderer/logo.png must contain a PNG image');
   }
+  const { nativeImage } = require('electron');
+  const raster = nativeImage.createFromBuffer(source);
+  const { width, height } = raster.getSize();
+  if (raster.isEmpty() || width < 1 || width !== height) {
+    throw new Error('renderer/logo.png must be a decodable square PNG image');
+  }
+  // Resize the uploaded static image directly; keep its colors and alpha, and
+  // leave the source PNG and the independent in-app SVG animation untouched.
+  const resize = size => raster.resize({ width: size, height: size, quality: 'best' }).toPNG();
+  return new Map([
+    ['build/icon.png', resize(512)],
+    ['build/icon.ico', createIcon(ICON_SIZES.map(size => ({ size, png: resize(size) })))]
+  ]);
 }
 
 async function generateIcons({ check = false } = {}) {
@@ -75,25 +56,19 @@ async function generateIcons({ check = false } = {}) {
   app.on('window-all-closed', () => {});
   await app.whenReady();
   try {
-    const source = fs.readFileSync(path.join(projectRoot, 'renderer', 'logo-still.svg'), 'utf8');
-    const raster = await renderLogoSvg(source);
-    const resize = size => raster.resize({ width: size, height: size, quality: 'best' }).toPNG();
-    const outputs = new Map([
-      ['renderer/logo.png', raster.toPNG()],
-      ['build/icon.png', resize(512)],
-      ['build/icon.ico', createIcon(ICON_SIZES.map(size => ({ size, png: resize(size) })))]
-    ]);
+    const source = fs.readFileSync(path.join(projectRoot, 'renderer', 'logo.png'));
+    const outputs = createIconOutputs(source);
     for (const [relativeFile, content] of outputs) {
       const file = path.join(projectRoot, relativeFile);
       if (check) {
         if (!fs.existsSync(file) || !fs.readFileSync(file).equals(content)) {
-          throw new Error(`${relativeFile} is stale; run npm run icon to regenerate from renderer/logo-still.svg`);
+          throw new Error(`${relativeFile} is stale; run npm run icon to regenerate from renderer/logo.png`);
         }
       } else {
         fs.writeFileSync(file, content);
       }
     }
-    console.log(`${check ? 'Verified' : 'Generated'} application, tray and installer icons from renderer/logo-still.svg`);
+    console.log(`${check ? 'Verified' : 'Generated'} application, tray and installer icons from renderer/logo.png`);
   } finally {
     app.quit();
   }
@@ -124,4 +99,4 @@ if (require.main === module || (process.versions.electron && path.resolve(proces
   }
 }
 
-module.exports = { ICON_SIZES, createIcon, renderLogoSvg };
+module.exports = { ICON_SIZES, createIcon, createIconOutputs };

@@ -1,21 +1,21 @@
-# 摘星阁 v0.2.40
+# 摘星阁 v0.2.41
 
-修复 Windows 更新弹窗仍显示旧 Logo 的问题，并为自动清理增加可随时开启或关闭的开关。
+按本次上传的原始 PNG 统一摘星阁静态 Logo，保留白色圆角底、金色星星与紫色弧线；主页面左上角原有 Logo 动效保持不变。
 
-- 统一最新图标：安装器、卸载器、应用窗口、托盘与系统更新通知使用当前的摘星阁 Logo。旧图标的原因是 Windows 图标生成链仍读取 v0.2.26 的 PNG；现改为从应用内最新静态 SVG 生成，构建时检查图标一致性。
-- 更新通知：明确显示“已下载，选择重启安装完成更新”，点击通知打开摘星阁，由使用者决定何时安装。
-- 自动清理开关：“设置 → 存储与清理 → 自动清理”新增开关，修改立即保存，重启后仍保留。关闭后不再定时清理过期情报；“立即清理”仍可使用。开启时沿用每天 08:25 随自动采集运行的安排，未开启自动采集时会明确提示。
-- 升级保留原有清理设置与运行习惯，旧版本默认保持自动清理开启；星标、备忘、归档、密钥与已有设置均保留，没有新增运行依赖。
-- 版本、安装器、更新元数据与内置日志统一为 0.2.40。
+- 统一静态图标：桌面快捷方式、任务栏、应用窗口、托盘、系统更新通知、安装器、卸载器、网页页签与系统更新页均使用本次上传的图案。
+- 保留主页面动效：左上角继续使用原有 SVG 文件、悬停播放与首帧回退图，主题适配和播放行为保持不变。
+- 图标来源明确：多尺寸 Windows ICO 从上传 PNG 生成，构建与包校验继续检查图标一致性。
+- 星标、备忘、归档、密钥、已有情报与全部设置均保留，没有依赖变更。
+- 版本、安装器、更新元数据与内置日志统一为 0.2.41。
 
-实现、测试与限制见 [v0.2.40 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0240-validation.md)。
+实现、测试与限制见 [v0.2.41 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0241-validation.md)。
 
 ## 安装与校验
 
-下载 `Star-Picking-Pavilion-Setup-0.2.40.exe`。安装包仍未签名，Windows SmartScreen 可能提示未知发布者；可以用附件 `SHA256SUMS.txt` 核对安装包。
+下载 `Star-Picking-Pavilion-Setup-0.2.41.exe`。安装包仍未签名，Windows SmartScreen 可能提示未知发布者；可以用附件 `SHA256SUMS.txt` 核对安装包。
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.40.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.41.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

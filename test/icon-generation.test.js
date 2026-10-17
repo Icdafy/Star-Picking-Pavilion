@@ -47,7 +47,7 @@ test('package verifier compares the embedded PE frames, including a stale small 
   assert.throws(() => assertWindowsIconResources(Buffer.from(resedit.NtExecutable.createEmpty(false).generate()), icon), /no Windows icon resources/);
 });
 
-test('release build verifies rendered canonical SVG against committed desktop and installer icons', () => {
+test('release build verifies static PNG derivatives before packaging desktop and installer icons', () => {
   const pkg = require('../package.json');
   assert.equal(pkg.scripts.icon, 'node scripts/generate-icons.js');
   assert.match(pkg.scripts.dist, /npm run icon -- --check && electron-builder/);
@@ -56,49 +56,86 @@ test('release build verifies rendered canonical SVG against committed desktop an
   assert.equal(pkg.build.nsis.uninstallerIcon, 'build/icon.ico');
 });
 
-test('Windows icon rendering preserves a canvas larger than the desktop work area',
-  { skip: process.platform !== 'win32', timeout: 45000 }, t => {
-    const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-icon-size-'));
+test('static PNG icon generation preserves the source independently of animated SVGs and rejects stale derivatives',
+  { timeout: 45000 }, t => {
+    const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-icon-png-'));
     t.after(() => {
       const target = path.resolve(profile);
       assert.ok(target.startsWith(path.resolve(os.tmpdir()) + path.sep)
-        && path.basename(target).startsWith('spp-icon-size-'));
+        && path.basename(target).startsWith('spp-icon-png-'));
       fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     });
-    const resultFile = path.join(profile, 'result.json');
-    const wrapper = path.join(profile, 'render.cjs');
+    for (const directory of ['renderer', 'build', 'scripts']) fs.mkdirSync(path.join(profile, directory));
+    const source = fs.readFileSync(path.join(root, 'renderer/logo.png'));
+    const generator = path.join(profile, 'scripts/generate-icons.js');
+    fs.writeFileSync(path.join(profile, 'renderer/logo.png'), source);
+    fs.copyFileSync(path.join(root, 'scripts/generate-icons.js'), generator);
+    // These deliberately invalid animation assets must never be read by the
+    // static icon pipeline, even when present alongside the uploaded PNG.
+    for (const name of ['logo.svg', 'logo-still.svg']) {
+      fs.writeFileSync(path.join(profile, 'renderer', name), 'independent animation asset');
+    }
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    function run(script, ...args) {
+      return spawnSync(require('electron'), [script, `--user-data-dir=${path.join(profile, 'electron-profile')}`, ...args], {
+        env, cwd: root, windowsHide: true, encoding: 'utf8', timeout: 10000
+      });
+    }
+    function succeeds(result) {
+      assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    }
+    succeeds(run(generator));
+    assert.deepEqual(fs.readFileSync(path.join(profile, 'renderer/logo.png')), source,
+      'Generation must preserve the uploaded PNG bytes');
+    for (const name of ['logo.svg', 'logo-still.svg']) {
+      assert.equal(fs.readFileSync(path.join(profile, 'renderer', name), 'utf8'), 'independent animation asset');
+    }
+    assert.deepEqual(fs.readdirSync(path.join(profile, 'build')).sort(), ['icon.ico', 'icon.png']);
+
+    const wrapper = path.join(profile, 'inspect.cjs');
     fs.writeFileSync(wrapper, `
+      const assert = require('node:assert/strict');
       const fs = require('node:fs');
-      const { app, screen } = require('electron');
+      const { app, nativeImage } = require('electron');
       process.on('uncaughtException', error => { console.error(error); app.exit(1); });
-      const { renderLogoSvg } = require(${JSON.stringify(path.join(root, 'scripts/generate-icons'))});
-      app.disableHardwareAcceleration();
-      app.commandLine.appendSwitch('force-device-scale-factor', '1');
-      app.commandLine.appendSwitch('force-color-profile', 'srgb');
+      const { ICON_SIZES, createIconOutputs } = require(${JSON.stringify(generator)});
+      const resedit = require(${JSON.stringify(require.resolve('resedit'))});
       app.on('window-all-closed', () => {});
-      app.whenReady().then(async () => {
-        const area = screen.getPrimaryDisplay().workAreaSize;
-        const size = Math.max(area.width, area.height) + 64;
-        const source = fs.readFileSync(${JSON.stringify(path.join(root, 'renderer/logo-still.svg'))}, 'utf8');
-        const image = await renderLogoSvg(source, size);
-        const pixels = image.toBitmap();
-        let visible = 0;
-        for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
-        fs.writeFileSync(${JSON.stringify(resultFile)}, JSON.stringify({
-          area, requested: size, actual: image.getSize(), visible, cornerAlpha: pixels[3]
-        }));
+      app.whenReady().then(() => {
+        const source = fs.readFileSync(${JSON.stringify(path.join(profile, 'renderer/logo.png'))});
+        assert.throws(() => createIconOutputs(Buffer.from('<svg/>')), /must contain a PNG/);
+        assert.throws(() => createIconOutputs(source.subarray(0, 8)), /decodable square PNG/);
+        const rectangle = nativeImage.createFromBitmap(Buffer.alloc(2 * 4, 255), { width: 2, height: 1 });
+        assert.throws(() => createIconOutputs(rectangle.toPNG()), /decodable square PNG/);
+        const original = nativeImage.createFromBuffer(source);
+        assert.equal(original.isEmpty(), false);
+        const png = fs.readFileSync(${JSON.stringify(path.join(profile, 'build/icon.png'))});
+        const image = nativeImage.createFromBuffer(png);
+        assert.deepEqual(image.getSize(), { width: 512, height: 512 });
+        assert.deepEqual(image.toBitmap(), original.resize({ width: 512, height: 512, quality: 'best' }).toBitmap(),
+          'Static icon pixels must retain the uploaded PNG colors and alpha');
+        const frames = resedit.Data.IconFile.from(fs.readFileSync(${JSON.stringify(path.join(profile, 'build/icon.ico'))})).icons;
+        assert.deepEqual(frames.map(frame => frame.data.width), ICON_SIZES);
+        for (const frame of frames) {
+          const size = frame.data.width;
+          const image = nativeImage.createFromBuffer(Buffer.from(frame.data.bin));
+          assert.deepEqual(image.getSize(), { width: size, height: size });
+          assert.deepEqual(image.toBitmap(), original.resize({ width: size, height: size, quality: 'best' }).toBitmap(),
+            'Each ICO size must retain the uploaded PNG colors and alpha');
+        }
         app.quit();
       }).catch(error => { console.error(error); app.exit(1); });
     `);
-    const env = { ...process.env };
-    delete env.ELECTRON_RUN_AS_NODE;
-    const result = spawnSync(require('electron'), [wrapper, `--user-data-dir=${profile}`], {
-      env, cwd: root, windowsHide: true, encoding: 'utf8', timeout: 30000
-    });
-    assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
-    const rendered = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
-    assert.ok(rendered.requested > rendered.area.width && rendered.requested > rendered.area.height);
-    assert.deepEqual(rendered.actual, { width: rendered.requested, height: rendered.requested });
-    assert.ok(rendered.visible > 0, 'the full-size frame must contain the logo');
-    assert.equal(rendered.cornerAlpha, 0, 'the background must remain transparent');
+    succeeds(run(wrapper));
+    succeeds(run(generator, '--check'));
+    const iconPath = path.join(profile, 'build/icon.ico');
+    const before = fs.readFileSync(iconPath);
+    fs.appendFileSync(iconPath, Buffer.from([0]));
+    const stale = run(generator, '--check');
+    assert.notEqual(stale.status, 0);
+    assert.match(stale.stderr, /build\/icon\.ico is stale/);
+    assert.deepEqual(fs.readFileSync(iconPath), Buffer.concat([before, Buffer.from([0])]),
+      'Check mode must report stale files without rewriting them');
+    assert.deepEqual(fs.readFileSync(path.join(profile, 'renderer/logo.png')), source);
   });
