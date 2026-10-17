@@ -1,10 +1,14 @@
 # v0.2.42 发布状态
 
-2026-10-18（北京时间），当前为候选版本，仍需完成本版完整发布门禁。Windows 图标修复包括开发/正式身份分离、窗口 Shell 身份与图标声明、版本化 ICO 及仅指向本应用的已有快捷方式迁移；全部静态 Logo 使用上传 PNG，仅保留主页面左上角原 SVG 动效与首帧回退图。
+[v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 已于 2026-10-18 00:56:27（北京时间）发布为最新正式版，非 draft、非 prerelease；六项公开附件重新下载复核全部通过，无发布阻塞。Windows 图标修复包括开发/正式身份分离、窗口 Shell 身份与图标声明、版本化 ICO 及仅指向本应用的已有快捷方式迁移；全部静态 Logo 使用上传 PNG，仅保留主页面左上角原 SVG 动效与首帧回退图。
 
 当前本地门禁全部通过：1170 / 1170 单元与集成、43 / 43 完整真实 Electron 回归（0 失败，484714.6595 ms，含默认图标、缺失 Shell 身份与错误图标负控）、图标一致性检查、生产与完整工具链零漏洞审计、快捷方式 mock 5 / 5 与临时真实四位置 `.lnk` 迁移夹具。最终本地候选重新构建与 1304 项包边界检查通过，应用和安装器七尺寸 PE 图标、resources 中 PNG / ICO 和带产物的版本校验全部通过；ASAR 15,871,760 B，本地安装器 102,144,731 B，版本 0.2.42，NotSigned。
 
-仍待完成的是独立 main CI、tag Release 及六项公开附件复核，尚不能标为正式发布成功。安装烟测以 `testDataDir` 隔离并跳过用户快捷方式迁移，迁移结果来自临时真实 `.lnk` 夹具。精确范围、原生图标与 Shell 属性证据见 [验证记录](docs/v0242-validation.md)。
+本地打包程序的隔离实跑也已通过：原生窗口与 Shell 身份、托盘和通知资源正确，23 项既有快捷方式哈希保持不变，证据为 `work/v0242/packaged-native/packaged-runtime.json`。精确提交 `69167db3a51fd73aff81acc9eca435cd096edee6` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39048402604) 已全部成功，含 1170 / 1170 单元、43 / 43 真实 Electron、零漏洞审计、1304 项包边界及安装后的原生图标、Shell 属性、单实例、卸载与用户数据保留。CI ASAR 15,884,592 B、安装器 102,142,131 B 为 CI 候选产物，不是最终 Release 附件。
+
+`v0.2.42` tag 指向同一精确提交，[Release 第 2 次作业](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39049461836/attempts/2) 全部门禁通过，含 1170 / 1170 单元、43 / 43 真实 Electron、零漏洞审计、1304 项包边界、安装后图标与 Shell 属性、单实例、退出、卸载及用户数据保留。最终 Release ASAR 15,884,592 B、安装器 102,142,132 B，六项附件尺寸/GitHub 摘要、SHA256SUMS、更新元数据、blockmap、七尺寸图标、SBOM、声明与发布正文复核均通过。正式安装器 PE 产品/文件版本 0.2.42、NotSigned，SHA-256 `991033ed7dc12272521cd8f63edba608e6a9089992e66f7570cee1dc42adb421`。安装烟测以 `testDataDir` 隔离并跳过用户快捷方式迁移，迁移结果来自临时真实 `.lnk` 夹具。精确范围与全部复核证据见 [验证记录](docs/v0242-validation.md)。
+
+Release 首轮 42 / 43，既有连续导航测试在固定 450 ms 后的选中指示器几何断言失败，新增图标测试通过；原因尚未定位，原始日志 `work/v0242/release-failed.log` 保留。第 2 次作业以同提交、同代码、同断言及同 tag 完整重跑成功后发布，成功日志为 `work/v0242/release-success.log`。
 
 ---
 

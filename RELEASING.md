@@ -2,7 +2,11 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-当前候选版本为 **v0.2.42（2026-10-18，北京时间）**：修复打开应用后 Windows 任务栏仍显示 Electron 默认图标的问题；开发版与正式版分离身份，每个窗口明确设置 Shell 图标与重新启动信息，使用带版本号的 ICO 并升级指向本应用的已有快捷方式。全部静态图标继续采用本次上传的 PNG，仅保留主页面左上角原有 SVG 动效与首帧回退图。候选验证与公开发布结果记录在 [本版验证](docs/v0242-validation.md)，完成门禁与附件复核前不视为已经发布。
+[v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 已于北京时间 **2026-10-18 00:56:27** 发布为最新正式版，非 draft、非 prerelease：修复打开应用后 Windows 任务栏仍显示 Electron 默认图标的问题；开发版与正式版分离身份，每个窗口明确设置 Shell 图标与重新启动信息，使用带版本号的 ICO 并升级指向本应用的已有快捷方式。全部静态图标继续采用本次上传的 PNG，仅保留主页面左上角原有 SVG 动效与首帧回退图。六项公开附件已重新下载且全部复核通过，发布验证完成，详见 [本版验证](docs/v0242-validation.md)。
+
+精确提交 `69167db3a51fd73aff81acc9eca435cd096edee6` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39048402604) 与同提交的 [Release 第 2 次作业](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39049461836/attempts/2) 均已全部通过，含 1170 / 1170 单元与集成、43 / 43 真实 Electron、零漏洞依赖审计、1304 项包边界与一次性 Windows 安装/原生图标和 Shell 身份/单实例/退出/卸载/保留用户数据烟测。本地打包程序隔离实跑也已通过。最终 Release ASAR 15,884,592 B、安装器 102,142,132 B，PE 产品/文件版本 0.2.42，NotSigned；SHA-256 `991033ed7dc12272521cd8f63edba608e6a9089992e66f7570cee1dc42adb421` 与 SHA256SUMS 及 GitHub 摘要一致，六项公开附件的更新元数据、blockmap、七尺寸图标、SBOM、声明与发布正文均复核通过。main CI 的 102,142,131 B 安装器属于单独候选产物。
+
+Release 首轮桌面回归为 42 / 43：既有 `v0210-motion.test.js` 连续导航测试在固定 450 ms 后的选中指示器几何断言失败，新增图标测试通过。首轮失败日志保存在 `work/v0242/release-failed.log`，原因尚未定位；第 2 次作业保持同提交、同代码、同断言和同 tag，完整重跑成功后发布，成功日志为 `work/v0242/release-success.log`。
 
 [v0.2.41](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.41) 已于北京时间 2026-10-17 21:00:11 发布：使用本次上传的 PNG 统一全部静态 Logo，保留主页面左上角 SVG 动效与首帧回退图。精确提交 `f1380c9` 的 main CI 与 tag Release 全部门禁通过，沿用已接受的 NotSigned 策略；六项公开附件已重新下载复核，完整证据见 [本版验证](docs/v0241-validation.md)。
 

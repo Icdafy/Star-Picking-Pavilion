@@ -1,10 +1,14 @@
 # v0.2.42 发布状态
 
-2026-10-18（北京时间），当前为候选版本。已实现开发版独立应用身份、每个窗口明确设置 Windows Shell 图标与重新启动信息、带版本号的 ICO、窗口和通知 PNG，以及仅匹配本应用 EXE 的已有快捷方式图标迁移。全部静态图标使用上传的新 PNG，主页面左上角 SVG 动效及首帧回退图保持原样。
+[v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 已于 2026-10-18 00:56:27（北京时间）发布为最新正式版，非 draft、非 prerelease；六项公开附件重新下载复核全部通过，发布验证完成。已实现开发版独立应用身份、每个窗口明确设置 Windows Shell 图标与重新启动信息、带版本号的 ICO、窗口和通知 PNG，以及仅匹配本应用 EXE 的已有快捷方式图标迁移。全部静态图标使用上传的新 PNG，主页面左上角 SVG 动效及首帧回退图保持原样。
 
 完整单元与集成 1170 / 1170、完整真实 Electron 回归 43 / 43（0 失败，484714.6595 ms）、图标一致性检查、生产与完整工具链零漏洞审计均通过。实际 Windows 三类 HICON 平均通道误差 1.637 / 255，四项 Shell 属性通过；E2E 包含 Electron 默认图标、缺失 Shell 身份与错误图标负控。快捷方式 mock 测试 5 / 5 与临时真实四位置 `.lnk` 的迁移、幂等、元数据保持及无关目标保护均通过，未操作真实用户快捷方式；安装烟测的隔离 `testDataDir` 会跳过该迁移，二者证据分别记录。
 
-最终本地候选重新构建、1304 项包边界、七尺寸 PE 图标、resources 中 PNG / ICO 与带产物的版本校验全部通过；ASAR 15,871,760 B，本地安装器 102,144,731 B，0.2.42，NotSigned。左上角 SVG、首帧回退图、动效工具与品牌样式源文件对上版无差异。本地门禁全部通过；独立 main CI、tag Release 及六项公开附件复核尚未完成，不视为已经发布。详见 [验证记录](docs/v0242-validation.md)。
+最终本地候选重新构建、1304 项包边界、七尺寸 PE 图标、resources 中 PNG / ICO 与带产物的版本校验全部通过；ASAR 15,871,760 B，本地安装器 102,144,731 B，0.2.42，NotSigned。本地打包程序以隔离 `testDataDir` 实际启动，打包状态、原生图标、Shell 属性、托盘和通知资源均通过，23 项既有快捷方式哈希保持不变；原始记录为 `work/v0242/packaged-native/packaged-runtime.json`。左上角 SVG、首帧回退图、动效工具与品牌样式源文件对上版无差异。
+
+精确提交 `69167db3a51fd73aff81acc9eca435cd096edee6` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39048402604) 全部成功：1170 / 1170 单元与集成、43 / 43 真实 Electron、零漏洞依赖审计、1304 项包边界，安装后三类 HICON 与 Shell 属性、单实例、卸载和保留用户数据均通过。CI ASAR 15,884,592 B、安装器 102,142,131 B 属于 main CI 候选产物。`v0.2.42` tag 指向同一提交，[Release 第 2 次作业](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39049461836/attempts/2) 的完整门禁全部通过并发布，含安装后原生图标与 Shell 身份、单实例、退出、卸载和保留用户数据；最终 Release ASAR 15,884,592 B、安装器 102,142,132 B，公开附件复核全部通过。正式安装器 PE 产品/文件版本 0.2.42、NotSigned，SHA-256 `991033ed7dc12272521cd8f63edba608e6a9089992e66f7570cee1dc42adb421` 与 SHA256SUMS 及 GitHub 摘要相同，更新元数据、4856 块 blockmap、七尺寸图标、SBOM 和换行归一化后的声明均一致。详见 [验证记录](docs/v0242-validation.md)。
+
+Release 首轮桌面回归为 42 / 43，唯一失败是既有 `v0210-motion.test.js` 连续导航测试在固定 450 ms 后的 `.nav-tabs` 几何差小于 1 px 断言；新增图标测试通过。相同断言曾在基线 `719faea` 的 main CI 失败，但此次原因尚未定位。第 2 次作业保持同提交、同代码、同断言及同 tag，完整重跑后全部通过并发布；首轮日志 `work/v0242/release-failed.log` 与成功日志 `work/v0242/release-success.log` 均保留。
 
 ---
 
