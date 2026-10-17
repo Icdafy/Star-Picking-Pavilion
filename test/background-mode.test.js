@@ -166,6 +166,7 @@ test('defaults stay visible and do not create a tray', async () => {
 
 test('enabled background mode hides close, creates one tray and notifies once', async () => {
   const fixture = createFixture({ closeToTray: true });
+  fixture.dependencies.notificationIconPath = 'C:\\resources\\application-icon.png';
   const controller = createBackgroundModeController(fixture.dependencies);
   await controller.initialize();
   const firstEvent = { prevented: 0, preventDefault() { this.prevented += 1; } };
@@ -179,6 +180,8 @@ test('enabled background mode hides close, creates one tray and notifies once', 
   assert.equal(fixture.notifications.length, 1);
   assert.equal(fixture.notifications[0].showCount, 1);
   assert.equal(fixture.trays.length, 1);
+  assert.equal(fixture.trays[0].iconPath, fixture.dependencies.iconPath);
+  assert.equal(fixture.notifications[0].options.icon, fixture.dependencies.notificationIconPath);
   assert.equal(controller.shouldStartHidden(['electron', '.', '--hidden']), true);
 });
 

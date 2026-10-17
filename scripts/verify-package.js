@@ -40,7 +40,8 @@ const ALLOWED_RESOURCE_ENTRIES = new Set([
   'elevate.exe',
   'LICENSE.txt',
   'THIRD_PARTY_NOTICES.txt',
-  'tray-icon.ico'
+  'application-icon.png',
+  `application-icon-${require('../package.json').version}.ico`
 ]);
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
@@ -184,8 +185,15 @@ function verifyPackage(options = {}) {
     return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
   });
   const canonicalIcon = fs.readFileSync(path.join(projectRoot, 'build', 'icon.ico'));
-  const trayIcon = fs.readFileSync(path.join(resourcesDir, 'tray-icon.ico'));
+  const trayIcon = fs.readFileSync(path.join(resourcesDir, `application-icon-${packageJson.version}.ico`));
   if (!trayIcon.equals(canonicalIcon)) throw new Error('Packaged tray/notification icon is stale');
+  const applicationImage = fs.readFileSync(path.join(resourcesDir, 'application-icon.png'));
+  if (!applicationImage.equals(fs.readFileSync(path.join(projectRoot, 'build', 'icon.png')))) {
+    throw new Error('Packaged window/notification PNG is stale');
+  }
+  if (!asar.extractFile(archive, 'renderer/logo.png').equals(fs.readFileSync(path.join(projectRoot, 'renderer', 'logo.png')))) {
+    throw new Error('Packaged static logo is stale');
+  }
   const executable = path.join(distDir, 'win-unpacked', `${packageJson.build.executableName}.exe`);
   const iconFrames = assertWindowsIconResources(fs.readFileSync(executable), canonicalIcon, 'Application executable');
   assertWindowsIconResources(fs.readFileSync(installer), canonicalIcon, 'Update installer');

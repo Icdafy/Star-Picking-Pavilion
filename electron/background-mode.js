@@ -29,6 +29,7 @@ function createBackgroundModeController({
   getWindow,
   preferenceStore,
   iconPath,
+  notificationIconPath = iconPath,
   platform = process.platform,
   isPackaged = app?.isPackaged === true,
   execPath = process.execPath,
@@ -147,7 +148,7 @@ function createBackgroundModeController({
       const notification = new Notification({
         title: '摘星阁仍在后台运行',
         body: '可从系统托盘重新打开，或选择“退出摘星阁”彻底退出。',
-        icon: iconPath
+        icon: notificationIconPath
       });
       notification.show();
     } catch {}

@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const { _electron: electron } = require('playwright');
+const { assertWindowsWindowIcons } = require('../test/e2e/windows-window-icons.cjs');
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const quote = value => "'" + String(value).replace(/'/g, "''") + "'";
@@ -35,6 +36,14 @@ async function main() {
     await page.waitForSelector('.nav');
     const version=await app.evaluate(({app})=>app.getVersion());
     if (version !== pkg.version) throw new Error(`Installed app version ${version} differs from ${pkg.version}`);
+    const brand = require('../config/brand.json');
+    const icons = await assertWindowsWindowIcons(app, fs.readFileSync(path.join(workspace,'renderer','logo.png')), {
+      directory: path.join(workspace,'work','installer-smoke','native-window'),
+      shell: { appId:brand.appId, displayName:brand.displayName,
+        iconPath:path.join(install,'resources',`application-icon-${version}.ico`),
+        relaunchCommand:`"${executablePath}"` }
+    });
+    console.log('Installed native window icons and Shell taskbar identity:', JSON.stringify(icons));
     const second=spawn(executablePath,['--hidden'],{env,windowsHide:true,stdio:'ignore'});
     const exit=await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{second.kill();reject(new Error('Second instance did not exit'));},10000);
@@ -48,7 +57,7 @@ async function main() {
     while(fs.existsSync(executablePath) && Date.now()<deadline) await wait(250);
     if(fs.existsSync(executablePath)) throw new Error('Uninstall did not remove installed executable');
     if(fs.readFileSync(marker,'utf8')!=='retain after uninstall') throw new Error('Uninstall removed user data');
-    console.log(`Installed, launched, checked single-instance, closed and uninstalled v${version}; user data retained.`);
+    console.log(`Installed, launched, verified native/Shell icons, checked single-instance, closed and uninstalled v${version}; user data retained.`);
   } finally {
     if(app) await app.close().catch(()=>{});
     const resolved=path.resolve(root), temporary=path.resolve(os.tmpdir())+path.sep;

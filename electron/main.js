@@ -13,7 +13,8 @@ const {
   session,
   safeStorage,
   powerMonitor,
-  nativeTheme
+  nativeTheme,
+  nativeImage
 } = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -38,6 +39,7 @@ const { createDailyArchiveService } = require('./daily-archive');
 const { createDailyArchiveBundleRequester } = require('./daily-archive-request');
 const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
 const { getWindowTheme } = require('./window-theme');
+const { refreshApplicationShortcuts } = require('./desktop-branding');
 const {
   createAppearanceWallpaperStore,
   registerAppearanceWallpaperIpc
@@ -51,10 +53,19 @@ const {
   publicVersionFromUpdateInfo
 } = require('./update-coordinator');
 const packageMetadata = require('../package.json');
-if (process.platform === 'win32') app.setAppUserModelId(require('../config/brand.json').appId);
+const brand = require('../config/brand.json');
+// Development's electron.exe must never compete with the installed program's
+// shortcuts for the same Windows taskbar identity.
+const applicationUserModelId = app.isPackaged ? brand.appId : `${brand.appId}.development`;
+if (process.platform === 'win32') app.setAppUserModelId(applicationUserModelId);
+// Give each release a distinct Shell icon resource, so taskbar pins and
+// shortcuts no longer reuse an icon cached against the previous EXE path.
 const applicationIconPath = app.isPackaged
-  ? path.join(process.resourcesPath, 'tray-icon.ico')
+  ? path.join(process.resourcesPath, `application-icon-${packageMetadata.version}.ico`)
   : path.join(__dirname, '..', 'build', 'icon.ico');
+const applicationImagePath = app.isPackaged
+  ? path.join(process.resourcesPath, 'application-icon.png')
+  : path.join(__dirname, '..', 'build', 'icon.png');
 let autoUpdater = null;
 try { ({ autoUpdater } = require('electron-updater')); } catch { /* 开发期未装也不影响 */ }
 
@@ -334,6 +345,8 @@ async function createWindow(serverPort, initialTheme = 'dark') {
   rendererOrigin = expectedOrigin;
   const startHidden = backgroundMode?.shouldStartHidden(process.argv) === true;
   const windowTheme = getWindowTheme(initialTheme);
+  const windowIcon = nativeImage.createFromPath(applicationImagePath);
+  if (windowIcon.isEmpty()) throw new Error('无法加载摘星阁应用图标');
   win = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -341,13 +354,13 @@ async function createWindow(serverPort, initialTheme = 'dark') {
     minHeight: 600,
     backgroundColor: windowTheme.backgroundColor,
     title: '摘星阁 · 低空经济与商业航天情报站',
-    icon: applicationIconPath,
+    icon: windowIcon,
     titleBarStyle: 'hidden',
     ...(process.platform !== 'darwin'
       ? { titleBarOverlay: windowTheme.titleBarOverlay }
       : {}),
     autoHideMenuBar: true,
-    show: !startHidden,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -358,7 +371,26 @@ async function createWindow(serverPort, initialTheme = 'dark') {
       preload: path.join(__dirname, 'preload.js')
     }
   });
+  if (process.platform === 'win32') {
+    win.setAppDetails({
+      appId: applicationUserModelId,
+      appIconPath: applicationIconPath,
+      appIconIndex: 0,
+      relaunchCommand: app.isPackaged
+        ? `"${process.execPath}"`
+        : `"${process.execPath}" "${app.getAppPath()}"`,
+      relaunchDisplayName: brand.displayName
+    });
+    if (app.isPackaged && !testDataDir) {
+      const result = refreshApplicationShortcuts({
+        shell, app, executablePath: process.execPath,
+        iconPath: applicationIconPath, appId: brand.appId
+      });
+      if (result.failed.length) console.warn('[图标] 部分快捷方式图标更新失败:', result.failed);
+    }
+  }
   applyWindowTheme(initialTheme);
+  if (!startHidden) win.show();
   win.on('page-title-updated', event => {
     event.preventDefault();
     win?.setTitle('摘星阁 · 低空经济与商业航天情报站');
@@ -451,7 +483,7 @@ function setupAutoUpdate() {
   // Windows shell's cached logo. Always supply our packaged, current brand icon.
   const updateNotifier = createUpdateDownloadedNotifier({
     Notification,
-    iconPath: applicationIconPath,
+    iconPath: applicationImagePath,
     onClick: () => focusExistingWindow(win),
     onError: error => console.warn('[更新] 无法显示系统通知:', error.message)
   });
@@ -554,6 +586,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     getWindow: () => win,
     preferenceStore: uiPreferencesStore,
     iconPath: applicationIconPath,
+    notificationIconPath: applicationImagePath,
     isQuitting: () => quitAfterShutdown,
     requestQuit: () => app.quit()
   });

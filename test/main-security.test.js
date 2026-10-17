@@ -187,8 +187,8 @@ test('auto update starts independently and reports failures to the renderer', ()
   assert.match(source, /reportStatus:\s*sendUpdateStatus/);
   assert.match(source, /updateCheckCoordinator\.check\(\)/);
   assert.doesNotMatch(source, /checkForUpdatesAndNotify\(/);
-  assert.match(source, /app\.setAppUserModelId\(require\('\.\.\/config\/brand\.json'\)\.appId\)/);
-  assert.match(source, /createUpdateDownloadedNotifier\(\{\s*Notification,\s*iconPath:\s*applicationIconPath/s);
+  assert.match(source, /app\.setAppUserModelId\(applicationUserModelId\)/);
+  assert.match(source, /createUpdateDownloadedNotifier\(\{\s*Notification,\s*iconPath:\s*applicationImagePath/s);
   assert.match(source, /autoUpdater\.on\('update-downloaded',[\s\S]*?updateNotifier\.notify\(i\)/);
 });
 

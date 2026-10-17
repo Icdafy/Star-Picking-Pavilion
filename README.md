@@ -2,25 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.41 · 静态 Logo 统一更新
+## v0.2.42 · Windows 任务栏图标修复
 
+- **修复任务栏身份**：修复打开应用后 Windows 任务栏仍显示 Electron 默认图标的问题。开发版与正式版使用独立身份，每个窗口明确设置任务栏图标和启动信息，正式版启动时更新指向本应用的已有快捷方式图标。
 - **统一静态 Logo**：采用本次上传的原始 PNG，保留白色圆角底、金色星星与紫色弧线。桌面快捷方式、任务栏、应用窗口、托盘、更新通知、安装器、卸载器、网页页签与系统更新页共用该图案。
 - **保留主页面动效**：仅主页面左上角继续使用原有 SVG Logo、悬停动效与第一帧回退图，行为和外观保持不变。
-- **图标一致性检查**：Windows 多尺寸 ICO 从上传 PNG 生成，在构建与包校验中验证资源一致性。
+- **图标一致性检查**：Windows 多尺寸 ICO 从上传 PNG 生成并使用带版本号的资源路径，窗口和通知显式读取 PNG；构建与包校验验证资源一致性。
 
-版本、界面与更新元数据统一为 0.2.41，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0241-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.42，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0242-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.41.exe`，双击并按向导安装。v0.2.41 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.42.exe`，双击并按向导安装。v0.2.42 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.41.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.42.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

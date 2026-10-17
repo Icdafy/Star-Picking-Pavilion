@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
 // Use the real Electron entry point, backend, preload and renderer. Main-process
 // IPC provides the same native evaluate interface as the other desktop tests.
 // No startup retry or application/API interception hides a failed launch.
-async function launchNativeElectron(root, profile, { startScheduler = false } = {}) {
+async function launchNativeElectron(root, profile, { startScheduler = false, presentWindow = true } = {}) {
   const port = await new Promise(resolve => {
     const server = net.createServer();
     server.listen(0, '127.0.0.1', () => {
@@ -78,7 +78,7 @@ async function launchNativeElectron(root, profile, { startScheduler = false } = 
     // Interactions require a presented, unoccluded native window. A hidden or
     // covered renderer can stop animation frames and stall click stability
     // checks; keep the test window visible without changing its motion policy.
-    await evaluate(({ BrowserWindow }) => {
+    if (presentWindow) await evaluate(({ BrowserWindow }) => {
       const win = BrowserWindow.getAllWindows()[0];
       win.setAlwaysOnTop(true); win.show(); win.focus(); win.webContents.focus();
     });

@@ -34,7 +34,8 @@ test('packaging config is a production allowlist with no broad glob or asar unpa
   assert.deepEqual(packageJson.build.extraResources, [
     { from: 'LICENSE', to: 'LICENSE.txt' },
     { from: 'THIRD_PARTY_NOTICES.txt', to: 'THIRD_PARTY_NOTICES.txt' },
-    { from: 'build/icon.ico', to: 'tray-icon.ico' }
+    { from: 'build/icon.ico', to: 'application-icon-${version}.ico' },
+    { from: 'build/icon.png', to: 'application-icon.png' }
   ]);
   assert.equal(packageJson.build.nsis.license, 'LICENSE');
   assert.equal(packageJson.scripts['verify:package'], 'node scripts/verify-package.js');
@@ -98,7 +99,8 @@ test('package verifier requires the application license and third-party notices 
     'elevate.exe',
     'LICENSE.txt',
     'THIRD_PARTY_NOTICES.txt',
-    'tray-icon.ico'
+    `application-icon-${packageJson.version}.ico`,
+    'application-icon.png'
   ]));
   assert.throws(() => assertAllowedResourceEntries(['app.asar', 'copied-user-data.db']), /copied-user-data/);
 });
@@ -186,6 +188,6 @@ test('package verifier rejects database, WAL, secret and temporary artifacts at 
 });
 
 test('expected installer name is derived from the canonical public release version', () => {
-  assert.equal(expectedInstallerName(packageJson.build.buildVersion), 'Star-Picking-Pavilion-Setup-0.2.41.exe');
+  assert.equal(expectedInstallerName(packageJson.build.buildVersion), 'Star-Picking-Pavilion-Setup-0.2.42.exe');
   assert.equal(path.extname(expectedInstallerName(packageJson.build.buildVersion)), '.exe');
 });
