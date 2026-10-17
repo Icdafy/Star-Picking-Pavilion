@@ -208,10 +208,29 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   for (const [index, view] of ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'sources', 'settings'].entries()) {
     await page.locator(`.tab[data-view="${view}"]`).click();
     const panel = page.locator('.view:not([hidden])').first();
-    // 每个视图的页头位置相同：交替落点保证每次都是真实的指针移动，不依赖入场动画结束后
-    // 浏览器补发的合成悬停事件（v0.2.39 入场更慢，慢速 CI 上补发晚于等待时限）。
-    await panel.locator('.page-banner').first().hover({ position: { x: 75 + (index % 2) * 12, y: 55 } });
-    await page.waitForFunction(() => document.querySelector('.view:not([hidden]) .surface-glow'));
+    const banner = panel.locator('.page-banner').first();
+    // 切换视图和 locator.hover 的自动滚动都会触发 clearPointer。先完成滚动及整个面板
+    // 的有限入场动画，再发真实鼠标移动；不依赖静止指针上的浏览器补发悬停事件。
+    await banner.scrollIntoViewIfNeeded();
+    await waitForStableGeometry(panel);
+    const bannerBounds = await banner.boundingBox();
+    const trackingPoint = { x: bannerBounds.x + 75 + (index % 2) * 12, y: bannerBounds.y + 55 };
+    await page.mouse.move(4, 10);
+    await page.mouse.move(trackingPoint.x, trackingPoint.y);
+    try {
+      await page.waitForFunction(() => document.querySelector('.view:not([hidden]) .surface-glow'));
+    } catch (error) {
+      console.error('view tracking failure:', JSON.stringify(await page.evaluate(({ view, point }) => ({
+        view, point, focus: document.hasFocus(), hidden: document.hidden,
+        tier: document.documentElement.dataset.fxTier, pointer: document.documentElement.dataset.pointerEnabled,
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        activeView: document.querySelector('.view:not([hidden])')?.id,
+        hit: document.elementFromPoint(point.x, point.y)?.outerHTML.slice(0, 600),
+        scroll: document.getElementById('appViewport').scrollTop,
+        lights: [...document.querySelectorAll('.surface-light')].map(node => node.parentElement.id || node.parentElement.className)
+      }), { view, point: trackingPoint })));
+      throw error;
+    }
     assert.ok(await panel.locator('.surface-glow').count() > 0, `${view} tracking surface`);
     if (view === 'daily') {
       await page.waitForFunction(() => !state.loading);
