@@ -194,5 +194,6 @@ test('极光引擎接受节奏系数；缺少环境时仍退化为惰性对象',
   assert.match(source, /const soft = 1 \/ \(tempo \* tempo\);/);
   assert.match(source, /body\.ks = 1300 \* soft;/);
   assert.match(source, /function stepGaze\(dt\)/);
+  assert.match(source, /const gazeAllowed = \(\) => full\(\) && tempo > 1 && !pointerGlow\(\);/, '开启追光时凝光轮廓让位');
   assert.match(source, /受力挤压/);
 });

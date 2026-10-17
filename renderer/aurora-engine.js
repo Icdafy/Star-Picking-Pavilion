@@ -760,7 +760,10 @@
     const GAZE_SELECTOR = '.glass, .card, .set-panel, .release-entry, .common-links-card';
     const gazes = new Map();
     let gazeTarget = null, gazeX = 0, gazeY = 0;
-    const gazeAllowed = () => full() && tempo > 1;
+    // 开启“跟手动效 · 追光”时由原有追光负责表面的光，凝光轮廓不再叠加，也不在同一帧改写表面的样式变量。
+    const pointerGlow = () => root.dataset.pointerEnabled === 'on' && root.dataset.fxTier === 'full'
+      && (!root.dataset.pointerStyle || root.dataset.pointerStyle === 'glow');
+    const gazeAllowed = () => full() && tempo > 1 && !pointerGlow();
     function clearGaze(element) {
       gazes.delete(element);
       for (const name of ['--gaze-x', '--gaze-y', '--gaze-o']) element.style.removeProperty(name);

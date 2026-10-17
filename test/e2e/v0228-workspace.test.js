@@ -249,7 +249,8 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   }
   await page.locator('[data-settings-target="settingsAppearance"]').click();
   await page.locator('#setPointerSizeNumber').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(300);
+  // v0.2.39 节奏 × 1.382：章节跳转的滚动与入场更慢，等滚动落定后再悬停。
+  await page.waitForTimeout(700);
   await page.locator('#setPointerSizeNumber').hover();
   await page.waitForFunction(() => document.querySelector('#settingsAppearance .surface-glow'));
   await page.waitForTimeout(500);
