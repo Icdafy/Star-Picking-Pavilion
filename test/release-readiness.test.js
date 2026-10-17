@@ -189,6 +189,8 @@ test('CI and tag release workflows enforce every gate before publishing', () => 
   for (const workflow of [ci, release]) {
     assert.match(workflow, /npm run audit:toolchain/);
     assert.ok(workflow.indexOf('node node_modules/electron/install.js') < workflow.indexOf('npm test'));
+    assert.ok(workflow.indexOf('node node_modules/electron/install.js') < workflow.indexOf('npm run icon -- --check'));
+    assert.ok(workflow.indexOf('npm run icon -- --check') < workflow.indexOf('npm test'));
     assert.match(workflow, /node node_modules\/electron\/install\.js/);
     assert.ok(workflow.indexOf('npm run notices') < workflow.indexOf('npm run dist'));
     assert.match(workflow, /git diff --exit-code -- THIRD_PARTY_NOTICES\.txt/);

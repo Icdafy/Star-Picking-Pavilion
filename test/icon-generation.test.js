@@ -4,6 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const resedit = require('resedit');
 const { ICON_SIZES, createIcon } = require('../scripts/generate-icons');
 const { assertWindowsIconResources } = require('../scripts/verify-package');
@@ -53,3 +55,50 @@ test('release build verifies rendered canonical SVG against committed desktop an
   assert.equal(pkg.build.nsis.installerIcon, 'build/icon.ico');
   assert.equal(pkg.build.nsis.uninstallerIcon, 'build/icon.ico');
 });
+
+test('Windows icon rendering preserves a canvas larger than the desktop work area',
+  { skip: process.platform !== 'win32', timeout: 45000 }, t => {
+    const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-icon-size-'));
+    t.after(() => {
+      const target = path.resolve(profile);
+      assert.ok(target.startsWith(path.resolve(os.tmpdir()) + path.sep)
+        && path.basename(target).startsWith('spp-icon-size-'));
+      fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    });
+    const resultFile = path.join(profile, 'result.json');
+    const wrapper = path.join(profile, 'render.cjs');
+    fs.writeFileSync(wrapper, `
+      const fs = require('node:fs');
+      const { app, screen } = require('electron');
+      process.on('uncaughtException', error => { console.error(error); app.exit(1); });
+      const { renderLogoSvg } = require(${JSON.stringify(path.join(root, 'scripts/generate-icons'))});
+      app.disableHardwareAcceleration();
+      app.commandLine.appendSwitch('force-device-scale-factor', '1');
+      app.commandLine.appendSwitch('force-color-profile', 'srgb');
+      app.on('window-all-closed', () => {});
+      app.whenReady().then(async () => {
+        const area = screen.getPrimaryDisplay().workAreaSize;
+        const size = Math.max(area.width, area.height) + 64;
+        const source = fs.readFileSync(${JSON.stringify(path.join(root, 'renderer/logo-still.svg'))}, 'utf8');
+        const image = await renderLogoSvg(source, size);
+        const pixels = image.toBitmap();
+        let visible = 0;
+        for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
+        fs.writeFileSync(${JSON.stringify(resultFile)}, JSON.stringify({
+          area, requested: size, actual: image.getSize(), visible, cornerAlpha: pixels[3]
+        }));
+        app.quit();
+      }).catch(error => { console.error(error); app.exit(1); });
+    `);
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const result = spawnSync(require('electron'), [wrapper, `--user-data-dir=${profile}`], {
+      env, cwd: root, windowsHide: true, encoding: 'utf8', timeout: 30000
+    });
+    assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    const rendered = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
+    assert.ok(rendered.requested > rendered.area.width && rendered.requested > rendered.area.height);
+    assert.deepEqual(rendered.actual, { width: rendered.requested, height: rendered.requested });
+    assert.ok(rendered.visible > 0, 'the full-size frame must contain the logo');
+    assert.equal(rendered.cornerAlpha, 0, 'the background must remain transparent');
+  });

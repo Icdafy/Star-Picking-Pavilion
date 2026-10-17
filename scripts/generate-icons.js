@@ -28,34 +28,55 @@ function createIcon(frames) {
   return Buffer.concat([header, ...frames.map(frame => frame.png)]);
 }
 
-async function generateIcons({ check = false } = {}) {
-  const { app, BrowserWindow } = require('electron');
-  app.disableHardwareAcceleration();
-  app.commandLine.appendSwitch('force-device-scale-factor', '1');
-  app.commandLine.appendSwitch('force-color-profile', 'srgb');
-  await app.whenReady();
-  const source = fs.readFileSync(path.join(projectRoot, 'renderer', 'logo-still.svg'), 'utf8');
+async function renderLogoSvg(source, size = 1024) {
+  const { BrowserWindow, nativeImage } = require('electron');
   const win = new BrowserWindow({
-    width: 1024,
-    height: 1024,
+    width: 64,
+    height: 64,
     useContentSize: true,
     show: false,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    webPreferences: { sandbox: true, contextIsolation: true, backgroundThrottling: false }
+    webPreferences: { sandbox: true, contextIsolation: true, backgroundThrottling: false, offscreen: true }
   });
   try {
-    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(
-      `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;width:1024px;height:1024px;background:transparent}svg{display:block;width:1024px;height:1024px}</style></head><body>${source}</body></html>`
-    )}`);
-    const raster = await win.webContents.capturePage({ x: 0, y: 0, width: 1024, height: 1024 }, {
-      stayHidden: true,
-      stayAwake: true
-    });
-    if (raster.isEmpty() || raster.getSize().width !== 1024 || raster.getSize().height !== 1024) {
-      throw new Error('Canonical SVG did not render at 1024 × 1024');
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
+      '<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:">'
+    ));
+    // A detached canvas has its own pixel dimensions. Neither the desktop's
+    // work area nor an initial compositor frame can crop or replace this image.
+    const png = await win.webContents.executeJavaScript(`(async () => {
+      const image = new Image();
+      image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(${JSON.stringify(source)});
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = ${size};
+      const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
+      context.drawImage(image, 0, 0, ${size}, ${size});
+      return canvas.toDataURL('image/png');
+    })()`);
+    const raster = nativeImage.createFromDataURL(png);
+    const actual = raster.getSize();
+    if (raster.isEmpty() || actual.width !== size || actual.height !== size) {
+      throw new Error(`Canonical SVG canvas failed: expected ${size} × ${size}, actual ${actual.width} × ${actual.height}`);
     }
+    return raster;
+  } finally {
+    win.destroy();
+  }
+}
+
+async function generateIcons({ check = false } = {}) {
+  const { app } = require('electron');
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('force-device-scale-factor', '1');
+  app.commandLine.appendSwitch('force-color-profile', 'srgb');
+  app.on('window-all-closed', () => {});
+  await app.whenReady();
+  try {
+    const source = fs.readFileSync(path.join(projectRoot, 'renderer', 'logo-still.svg'), 'utf8');
+    const raster = await renderLogoSvg(source);
     const resize = size => raster.resize({ width: size, height: size, quality: 'best' }).toPNG();
     const outputs = new Map([
       ['renderer/logo.png', raster.toPNG()],
@@ -74,12 +95,11 @@ async function generateIcons({ check = false } = {}) {
     }
     console.log(`${check ? 'Verified' : 'Generated'} application, tray and installer icons from renderer/logo-still.svg`);
   } finally {
-    win.destroy();
     app.quit();
   }
 }
 
-if (process.versions.electron || require.main === module) {
+if (require.main === module || (process.versions.electron && path.resolve(process.argv[1] || '') === __filename)) {
   if (process.versions.electron) {
     generateIcons({ check: process.argv.includes('--check') }).catch(error => {
       console.error(error.message);
@@ -104,4 +124,4 @@ if (process.versions.electron || require.main === module) {
   }
 }
 
-module.exports = { ICON_SIZES, createIcon };
+module.exports = { ICON_SIZES, createIcon, renderLogoSvg };

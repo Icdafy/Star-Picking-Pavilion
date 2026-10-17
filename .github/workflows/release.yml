@@ -28,6 +28,9 @@ jobs:
       - name: Verify tag and package version
         run: npm run verify:version -- --tag $env:GITHUB_REF_NAME
 
+      - name: Verify canonical Windows icons
+        run: npm run icon -- --check
+
       - name: Unit and integration tests
         run: npm test
 
