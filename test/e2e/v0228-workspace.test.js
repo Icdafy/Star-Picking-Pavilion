@@ -205,10 +205,12 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   assert.deepEqual(await dialog.evaluate(node => node.getBoundingClientRect().toJSON()), dialogBefore.bounds, 'tracking preserves native modal geometry');
   await page.keyboard.press('Escape');
 
-  for (const view of ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'sources', 'settings']) {
+  for (const [index, view] of ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'sources', 'settings'].entries()) {
     await page.locator(`.tab[data-view="${view}"]`).click();
     const panel = page.locator('.view:not([hidden])').first();
-    await panel.locator('.page-banner').first().hover({ position: { x: 75, y: 55 } });
+    // 每个视图的页头位置相同：交替落点保证每次都是真实的指针移动，不依赖入场动画结束后
+    // 浏览器补发的合成悬停事件（v0.2.39 入场更慢，慢速 CI 上补发晚于等待时限）。
+    await panel.locator('.page-banner').first().hover({ position: { x: 75 + (index % 2) * 12, y: 55 } });
     await page.waitForFunction(() => document.querySelector('.view:not([hidden]) .surface-glow'));
     assert.ok(await panel.locator('.surface-glow').count() > 0, `${view} tracking surface`);
     if (view === 'daily') {
@@ -252,6 +254,9 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   // v0.2.39 节奏 × 1.382：章节跳转的滚动与入场更慢，等滚动落定后再悬停。
   await page.waitForTimeout(700);
   await page.locator('#setPointerSizeNumber').hover();
+  // 再移动 2px，确保滚动落定后的悬停是一次真实的指针移动。
+  const sizeBox = await page.locator('#setPointerSizeNumber').boundingBox();
+  await page.mouse.move(sizeBox.x + sizeBox.width / 2 + 2, sizeBox.y + sizeBox.height / 2);
   await page.waitForFunction(() => document.querySelector('#settingsAppearance .surface-glow'));
   await page.waitForTimeout(500);
   const restingCenter = await page.locator('#settingsAppearance .surface-glow').evaluate(node => {
