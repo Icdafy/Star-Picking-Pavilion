@@ -178,7 +178,8 @@ test('v0210 Electron: current version, continuous navigation redirection, filter
   await domain.click();
   // Pausing the visual clock must not extend the lifetime or hide the selected state.
   await page.evaluate(() => document.querySelector('.domain-pills .selection-indicator').getAnimations().forEach(animation => animation.pause()));
-  await page.waitForTimeout(450);
+  // v0.2.39 节奏 × 1.382：提交时限为 300ms × 1.382 + 50ms，等待同比放宽。
+  await page.waitForTimeout(650);
   const geometry = await page.evaluate(selectedGeometry, '.domain-pills');
   assert.ok(geometry.every(delta => delta < 1), `domain geometry mismatch: ${JSON.stringify(geometry)}`);
   assert.ok(await page.evaluate(() => [...document.querySelectorAll('.selection-indicator')].every(el =>
@@ -232,12 +233,13 @@ test('v0210 Electron: pointer spotlight, bounded press waves and keyboard action
       { bubbles: true, button: 0, pointerType: 'mouse', clientX: 600, clientY: 100 }));
   });
   assert.ok(await page.locator('.press-wave').count() <= 4);
-  await page.waitForTimeout(600); assert.equal(await page.locator('.press-wave').count(), 0);
+  await page.waitForTimeout(850); assert.equal(await page.locator('.press-wave').count(), 0);
   const button = page.locator('#btnRealtime'); await button.focus();
   const active = await button.getAttribute('aria-pressed'); await page.keyboard.press('Enter');
   assert.notEqual(await button.getAttribute('aria-pressed'), active);
   assert.equal(await page.locator('#btnRealtime .press-wave').count(), 1);
-  await page.waitForTimeout(600);
+  // v0.2.39：光波寿命上限为 500ms × 1.382。
+  await page.waitForTimeout(850);
   assert.equal(await page.locator('.press-wave, .motion-wave-host').count(), 0);
   // Fault injection: the browser renders the native animation, but its completion
   // promise remains pending. Cleanup must remain bounded without that callback.
@@ -256,7 +258,8 @@ test('v0210 Electron: pointer spotlight, bounded press waves and keyboard action
     finally { Element.prototype.animate = original; }
   });
   assert.equal(await page.locator('#btnRealtime .press-wave').count(), 1);
-  await page.waitForTimeout(600);
+  // v0.2.39：光波寿命上限为 500ms × 1.382。
+  await page.waitForTimeout(850);
   assert.equal(await page.locator('.press-wave, .motion-wave-host').count(), 0);
   assert.deepEqual(errors, []);
 });

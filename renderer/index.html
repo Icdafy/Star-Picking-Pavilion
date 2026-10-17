@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="aqua-shell.css">
 <link rel="stylesheet" href="intel.css">
 <link rel="stylesheet" href="fluid.css">
+<link rel="stylesheet" href="golden.css">
 </head>
 <body>
 <!-- 静态回退图的深色主题配色；矢量 Logo 直接通过 CSS 提亮弧线。 -->
@@ -415,6 +416,7 @@
           <a href="#settingsDisplay" data-settings-target="settingsDisplay">显示</a>
           <a href="#settingsAppearance" data-settings-target="settingsAppearance">氛围与动效</a>
           <p class="settings-nav-group">系统</p>
+          <a href="#settingsUpdate" data-settings-target="settingsUpdate">系统更新</a>
           <a href="#settingsDesktop" data-settings-target="settingsDesktop">桌面运行</a>
           <a href="#settingsStorage" data-settings-target="settingsStorage">存储与清理</a>
           <a href="#settingsShortcuts" data-settings-target="settingsShortcuts">快捷键</a>
@@ -721,11 +723,6 @@
               <span class="set-row-body set-range"><input id="setAquaWallpaperFrost" type="range" min="0" max="100" step="1" value="0"><output id="outAquaWallpaperFrost">0%</output></span>
             </label>
             <label class="desktop-switch aqua-only">
-              <span class="switch-copy"><strong>星鲸粒子</strong><small>背景里一尾由星点组成、会轻微响应指针的星鲸。</small></span>
-              <input id="setAquaWhale" type="checkbox" role="switch" checked>
-              <span class="switch-track" aria-hidden="true"></span>
-            </label>
-            <label class="desktop-switch aqua-only">
               <span class="switch-copy"><strong>环境星尘</strong><small>缓慢漂移的星点、气泡与边缘柔化。</small></span>
               <input id="setAquaCritters" type="checkbox" role="switch" checked>
               <span class="switch-track" aria-hidden="true"></span>
@@ -780,6 +777,32 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      <div class="glass card-pad set-card update-card" id="settingsUpdate" data-settings-section="settingsUpdate" aria-labelledby="heading-settingsUpdate">
+        <div class="set-head">
+          <div>
+            <span class="set-kicker">SYSTEM UPDATE</span>
+            <h3 id="heading-settingsUpdate" tabindex="-1">系统更新</h3>
+            <p>新版本在后台下载，下载完成后由你决定何时重启安装；情报、星标、归档、密钥与全部设置都会保留。</p>
+          </div>
+          <span class="set-badge" id="updateCenterBadge">检查中</span>
+        </div>
+        <div class="set-hero update-hero" id="updateCenterHero" data-state="idle">
+          <div class="update-orbit" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><circle class="orbit-track" cx="32" cy="32" r="28"/><circle class="orbit-arc" cx="32" cy="32" r="28" pathLength="100"/></svg>
+            <span class="orbit-core" id="updateCenterCore"><img src="/logo-still.svg" width="40" height="40" alt=""></span>
+          </div>
+          <div class="update-hero-copy">
+            <strong id="updateCenterTitle">摘星阁</strong>
+            <p id="updateCenterStatus" role="status" aria-live="polite">正在读取更新状态…</p>
+          </div>
+          <button class="btn-primary" id="btnUpdateCenter" type="button">检查更新</button>
+        </div>
+        <div class="set-panel">
+          <div class="set-row"><span>当前版本</span><span class="set-row-body"><strong id="updateCenterVersion">–</strong></span></div>
+          <div class="set-row"><span>更新方式</span><span class="set-row-body"><small>启动后与每隔一段时间自动检查 GitHub Releases；发现新版本即在后台下载，进度显示在顶部流体云中。</small></span></div>
+          <div class="set-row set-action"><span>更新日志</span><span class="set-row-body"><small>每一版做了什么、改了哪里。</small></span><button class="btn-ghost btn-compact" id="btnUpdateCenterLog" type="button">查看更新日志</button></div>
         </div>
       </div>
       <div class="glass card-pad set-card" id="settingsDesktop" data-settings-section="settingsDesktop" aria-labelledby="heading-settingsDesktop">
@@ -1052,7 +1075,25 @@
   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 </button>
 
-<div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<!-- 流体云：窗口顶部正中的实时状态胶囊；采集、更新与操作提示汇入同一朵云 -->
+<div class="fluid-cloud" id="fluidCloud" data-state="hidden" data-tone="info" aria-hidden="true">
+  <div class="fluid-cloud-shell">
+    <button class="fluid-cloud-capsule" id="fluidCloudCapsule" type="button" aria-expanded="false" aria-controls="fluidCloudPanel" tabindex="-1">
+      <span class="fluid-cloud-orb" aria-hidden="true"></span>
+      <span class="fluid-cloud-title"></span>
+      <span class="fluid-cloud-value" hidden></span>
+      <span class="fluid-cloud-meter" aria-hidden="true" hidden><span class="fluid-cloud-fill"></span><span class="fluid-cloud-glint"></span></span>
+    </button>
+    <div class="fluid-cloud-panel" id="fluidCloudPanel" role="group" aria-labelledby="fluidCloudPanelTitle" aria-hidden="true" inert>
+      <h2><span class="fluid-cloud-orb" aria-hidden="true"></span><span class="fluid-cloud-panel-title" id="fluidCloudPanelTitle"></span></h2>
+      <p class="fluid-cloud-detail" hidden></p>
+      <span class="fluid-cloud-meter" aria-hidden="true" hidden><span class="fluid-cloud-fill"></span></span>
+      <dl class="fluid-cloud-facts" hidden></dl>
+      <div class="fluid-cloud-actions"></div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  </div>
+</div>
 
 <!-- 阶段 4：信息流卡片整卡模板。此前 cardInner 是 app.js 里的字符串模板，
      现迁为 cloneNode(true) + 字段级填充；结构节点与旧输出逐字等价，
@@ -1125,6 +1166,7 @@
 <script src="store.js"></script>
 <script src="view-registry.js"></script>
 <script src="aurora-engine.js"></script>
+<script src="fluid-cloud.js"></script>
 <script src="dsh-aqua-engine.js"></script>
 <script src="aqua-shell.js"></script>
 <script src="app.js"></script>

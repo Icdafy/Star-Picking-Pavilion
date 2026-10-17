@@ -72,7 +72,6 @@ const state = {
   aquaBackground: restoredPreferences.aquaBackground,
   aquaWallpaperBlur: restoredPreferences.aquaWallpaperBlur,
   aquaWallpaperFrost: restoredPreferences.aquaWallpaperFrost,
-  aquaWhale: restoredPreferences.aquaWhale,
   aquaEnabled: restoredPreferences.aquaEnabled,
   aquaCritters: restoredPreferences.aquaCritters,
   pointerEnabled: restoredPreferences.pointerEnabled,
@@ -131,17 +130,24 @@ reducedMotionQuery?.addEventListener?.('change', syncFxTier);
 
 // 微型运动引擎（dom-utils 阶段 3 新增 createMotion）：matchMedia/document/rAF
 // 经 deps 注入；视图切换入场与信息流错峰入场共用这一套 WAAPI 弹簧
+// v0.2.39 节奏：全部动效时长 × (1 + φ⁻²)，弹簧按同一时间尺度放慢，更接近真实的手与材料。
+const MOTION_TEMPO = 1.382;
 const motion = DomUtils.createMotion({
   document,
+  tempo: MOTION_TEMPO,
+  liquidIndicator: true,
   matchMedia: window.matchMedia ? query => window.matchMedia(query) : null,
   raf: callback => requestAnimationFrame(callback)
 });
 const interactionMotion = DomUtils.createInteractionMotion({ document, window, motion });
 // v0.2.38 极光引擎：流体设计的融合渲染层（涟漪、柔性反馈、果冻滑动、彗星追光、下拉压暗）。
 const auroraEngine = window.AuroraEngine
-  ? window.AuroraEngine.createAuroraEngine({ document, window, motion, springEasing: DomUtils.springEasing })
+  ? window.AuroraEngine.createAuroraEngine({ document, window, motion, springEasing: DomUtils.springEasing, tempo: MOTION_TEMPO })
   : null;
 window.addEventListener('pagehide', () => auroraEngine?.dispose(), { once: true });
+// v0.2.39 流体云：采集分析、更新下载与操作提示汇入窗口顶部正中的同一枚胶囊。
+const fluidCloud = window.FluidCloud ? window.FluidCloud.createFluidCloud({ document, window, tempo: MOTION_TEMPO }) : null;
+window.addEventListener('pagehide', () => fluidCloud?.dispose(), { once: true });
 const brandLogo = DomUtils.createBrandLogo({ document, window });
 window.addEventListener('pagehide', () => brandLogo?.dispose(), { once: true });
 window.addEventListener('pagehide', () => interactionMotion.dispose(), { once: true });
@@ -310,13 +316,8 @@ function toast(msg, isError) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.toggle('error', !!isError);
+  // 提示并入流体云：外壳的尺寸与文字的浮现都由样式里的弹簧过渡完成。
   el.classList.add('show');
-  motion.spring(el, {
-    from: { transform: 'translate(-50%, 6px)', opacity: '.75' },
-    to: { transform: 'translate(-50%, 0)', opacity: '1' },
-    duration: 140,
-    restoreStyles: true
-  });
   // 驻留时长随字数走：短消息不晾着碍事，长消息让人读得完；错误多留 1.5 秒
   holdToast(Math.min(isError ? 7500 : 6000, 2400 + String(msg).length * 45 + (isError ? 1500 : 0)));
 }
@@ -443,7 +444,23 @@ const statsController = StatsController.createStatsController({
   },
   prefersReducedMotion,
   now: () => performance.now(),
-  frame: callback => requestAnimationFrame(callback)
+  frame: callback => requestAnimationFrame(callback),
+  onActivity: ({ busy, label, detail, progress }) => {
+    if (!busy) { fluidCloud?.clearActivity('pipeline'); return; }
+    const count = value => Number.isFinite(value) && value >= 0 ? Math.floor(value).toLocaleString('zh-CN') : '0';
+    const total = Number(progress?.sourcesTotal) || 0;
+    const done = Number(progress?.sourcesCompleted) || 0;
+    fluidCloud?.setActivity('pipeline', {
+      tone: 'busy',
+      title: label,
+      value: total ? `${count(done)}/${count(total)}` : '',
+      progress: total ? done / total : null,
+      detail: progress?.message || '采集与分析在后台进行，完成后信息流自动更新。',
+      facts: progress ? [['信源', `${count(done)}/${count(total)}`], ['新增', count(progress.collected)],
+        ['已分析', count(progress.analyzed)], ['精选', count(progress.featured)]] : [],
+      actions: [{ label: '查看全部动态', run: () => switchView('all') }]
+    });
+  }
 });
 const { refreshStats } = statsController;
 let realtimePoller = null;
@@ -903,7 +920,57 @@ realtimePoller = RealtimePoller.createRealtimePoller({
 const { setRealtime } = realtimePoller;
 
 // ---------- 工作区更新按钮 ----------
-UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill'), progress: $('#updateProgress'), live: $('#updateStatus'), motion });
+// v0.2.39：同一份更新状态驱动侧栏按钮、顶部流体云与“设置 → 系统更新”。
+const updateCenter = {
+  badge: $('#updateCenterBadge'), hero: $('#updateCenterHero'), core: $('#updateCenterCore'), title: $('#updateCenterTitle'),
+  status: $('#updateCenterStatus'), version: $('#updateCenterVersion'), button: $('#btnUpdateCenter')
+};
+function renderUpdateCenter({ status = 'idle', version = '', percent = null, message = '', pending = false } = {}) {
+  if (!updateCenter.hero) return;
+  const current = Desktop?.version || '';
+  const copy = {
+    idle: ['可检查更新', `摘星阁 ${current}`, '自动检查已开启；也可以现在手动检查一次。', '检查更新'],
+    checking: ['检查中', '正在检查更新…', '正在连接 GitHub Releases 查询最新版本。', '检查中…'],
+    current: ['已是最新', `摘星阁 ${current}`, '你正在使用最新版本。', '再次检查'],
+    available: ['发现新版本', `发现新版本 ${version}`, '准备在后台下载，下载期间可以照常使用。', '下载中…'],
+    downloading: ['下载中', `正在下载 ${version}`, `已下载 ${percent ?? 0}%，完成后由你决定何时重启安装。`, '下载中…'],
+    downloaded: ['可安装', `${version} 已就绪`, '下载完成。重启摘星阁即可安装，全部数据与设置都会保留。', '重启安装'],
+    installing: ['安装中', `正在安装 ${version}`, '摘星阁将自动退出并完成安装。', '安装中…'],
+    error: ['需要重试', pending ? '更新失败' : '暂时无法检查更新', message || '网络或更新服务暂时不可用，稍后再试。', pending ? '重试' : '重新检查']
+  }[status] || [];
+  const [badge, title, detail, action] = copy;
+  updateCenter.hero.dataset.state = status;
+  updateCenter.badge.textContent = badge;
+  updateCenter.badge.className = `set-badge${status === 'current' || status === 'downloaded' ? ' ok' : status === 'error' ? ' warn' : ''}`;
+  updateCenter.title.textContent = title;
+  updateCenter.status.textContent = detail;
+  updateCenter.version.textContent = current ? `${current}` : '–';
+  const arc = status === 'downloading' ? (percent ?? 0) : ['current', 'downloaded'].includes(status) ? 100 : ['checking', 'available', 'installing'].includes(status) ? 28 : 0;
+  updateCenter.hero.style.setProperty('--update-off', String(100 - arc));
+  const coreValue = status === 'downloading' ? `${percent ?? 0}%` : status === 'downloaded' ? '↻' : status === 'error' ? '!' : '';
+  if (coreValue) updateCenter.core.dataset.value = coreValue; else delete updateCenter.core.dataset.value;
+  updateCenter.button.textContent = action;
+  updateCenter.button.disabled = ['checking', 'available', 'downloading', 'installing'].includes(status);
+  // 流体云：只在有待处理的更新时出现。
+  if (status === 'downloading' || status === 'available') fluidCloud?.setActivity('update', { tone: 'info', title: '下载更新', value: status === 'downloading' ? `${percent ?? 0}%` : version, progress: status === 'downloading' ? (percent ?? 0) / 100 : null, detail: `摘星阁 ${version} 正在后台下载。`, actions: [{ label: '查看详情', run: () => openSettingsSection('settingsUpdate') }] });
+  else if (status === 'downloaded') fluidCloud?.setActivity('update', { tone: 'ready', title: '更新已就绪', value: version, detail: '重启摘星阁即可安装新版本，全部数据与设置都会保留。', actions: [{ label: '稍后', run: () => {} }, { label: '重启安装', primary: true, run: () => updatePill?.trigger() }] });
+  else if (status === 'error' && pending) fluidCloud?.setActivity('update', { tone: 'error', title: '更新失败', detail: message || '稍后可再次尝试。', actions: [{ label: '重试', primary: true, run: () => updatePill?.trigger() }] });
+  else fluidCloud?.clearActivity('update');
+}
+function openSettingsSection(id) {
+  switchView('settings');
+  requestAnimationFrame(() => document.querySelector(`#settingsNav [data-settings-target="${id}"]`)?.click());
+}
+const updatePill = UpdatePill.createUpdatePill({ desktop: Desktop, pill: $('#updatePill'), progress: $('#updateProgress'), live: $('#updateStatus'), motion, onChange: renderUpdateCenter });
+if (!updatePill && updateCenter.hero) {
+  updateCenter.hero.dataset.state = 'idle';
+  updateCenter.badge.textContent = '浏览器预览';
+  updateCenter.title.textContent = '在线更新仅在桌面版可用';
+  updateCenter.status.textContent = '浏览器预览不安装更新；请在摘星阁桌面版中检查。';
+  updateCenter.button.disabled = true;
+}
+updateCenter.button?.addEventListener('click', () => updatePill?.trigger());
+$('#btnUpdateCenterLog')?.addEventListener('click', () => switchView('releases'));
 
 // ---------- 启动 ----------
 async function start() {

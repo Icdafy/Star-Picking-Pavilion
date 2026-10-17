@@ -262,7 +262,7 @@
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, white, color-mix(in srgb, var(--accent) 18%, white) 70%);
   box-shadow: 0 .125rem .5rem rgb(46 58 89 / 28%), 0 0 0 .1875rem color-mix(in srgb, var(--accent) 22%, transparent);
-  transition: scale 380ms var(--fluid-spring), box-shadow 240ms var(--ease);
+  transition: scale 525ms var(--fluid-spring), box-shadow 332ms var(--ease);
 }
 :root:not([data-fluid="off"]) input[type="range"]:hover::-webkit-slider-thumb { scale: 1.08; }
 :root:not([data-fluid="off"]) input[type="range"]:is(:active, .fluid-range-active)::-webkit-slider-thumb {
@@ -279,12 +279,12 @@
 .fluid-scrim {
   position: absolute; top: 0; left: 0; right: 0; height: 100%; z-index: 90;
   pointer-events: none; opacity: 0; background: var(--fluid-scrim);
-  transition: opacity 180ms var(--ease);
+  transition: opacity 249ms var(--ease);
 }
 :root:not([data-fluid="off"])[data-fluid-scrim] .fluid-scrim,
 :root:not([data-fluid="off"]):has(select:open) .fluid-scrim { opacity: 1; }
 :root[data-fluid-scrim="lexicon"] .tower { z-index: 95; }
-:root:not([data-fluid="off"]) .lexicon-panel { transition-delay: 60ms; }
+:root:not([data-fluid="off"]) .lexicon-panel { transition-delay: 83ms; }
 /* 浮出的面板承载正文，比常驻面板更实一些：透光但不透字。 */
 :root:not([data-fluid="off"]) :is(.lexicon-panel, .report-export-menu) {
   --glass-blur: blur(22px) saturate(160%);
@@ -304,7 +304,7 @@
   }
   :root:not([data-fluid="off"]) select:not([multiple], [size])::picker-icon {
     color: var(--c-fg-faint);
-    transition: rotate 320ms var(--fluid-spring);
+    transition: rotate 442ms var(--fluid-spring);
   }
   :root:not([data-fluid="off"]) select:open::picker-icon { rotate: 180deg; color: var(--accent-ink); }
   :root:not([data-fluid="off"]) select:open { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-ring); }
@@ -324,8 +324,8 @@
     opacity: 0;
     transform: translateY(-.375rem) scale(.96);
     transform-origin: top center;
-    transition: opacity 200ms var(--ease) 90ms, transform 460ms var(--fluid-spring) 90ms,
-      overlay 260ms allow-discrete, display 260ms allow-discrete;
+    transition: opacity 276ms var(--ease) 124ms, transform 636ms var(--fluid-spring) 124ms,
+      overlay 359ms allow-discrete, display 359ms allow-discrete;
   }
   :root:not([data-fluid="off"]) select:open::picker(select) { opacity: 1; transform: none; }
   @starting-style {
@@ -336,7 +336,7 @@
     min-height: 2.25rem; padding: .375rem .75rem;
     border-radius: .75rem;
     font-size: var(--t-sm);
-    transition: background-color 160ms var(--ease), color 160ms var(--ease);
+    transition: background-color 221ms var(--ease), color 221ms var(--ease);
   }
   :root:not([data-fluid="off"]) select option:hover,
   :root:not([data-fluid="off"]) select option:focus-visible { background: var(--hover-bg); outline: none; }
@@ -346,11 +346,11 @@
 
 /* 弹窗：遮罩先到，面板再浮起。 */
 :root:not([data-fluid="off"]) .glass-dialog {
-  transition: opacity 220ms var(--ease) 70ms, transform 520ms var(--fluid-spring) 70ms,
-    overlay 300ms allow-discrete, display 300ms allow-discrete;
+  transition: opacity 304ms var(--ease) 97ms, transform 719ms var(--fluid-spring) 97ms,
+    overlay 415ms allow-discrete, display 415ms allow-discrete;
 }
 :root:not([data-fluid="off"]) .glass-dialog::backdrop {
-  transition: opacity 200ms var(--ease), overlay 300ms allow-discrete, display 300ms allow-discrete;
+  transition: opacity 276ms var(--ease), overlay 415ms allow-discrete, display 415ms allow-discrete;
 }
 :root:not([data-fluid="off"]) .report-export-menu:popover-open {
   border-radius: 1.125rem;

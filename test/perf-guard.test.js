@@ -27,12 +27,14 @@ test('样式表体积不超过预算，膨胀必须先被护栏拦下', () => {
   // 基线约 259 KiB，上限上调到 275 KiB；v0.2.3 设置页「模型」一节照搬 DeepSeek Harness Models 页
   // （约 15 KiB）与可读性、动效升级（约 3 KiB），上限上调到 292 KiB；v0.2.36 新闻推送改为点选面板
   // （约 4 KiB，字体分片索引无损压缩回收约 2 KiB），上限上调到 296 KiB；v0.2.38 流体设计新增独立的
-  // fluid.css（约 14 KiB：凝光材质、悬浮控件、涟漪、彗星追光、下拉压暗），上限上调到 320 KiB，
+  // fluid.css（约 14 KiB：凝光材质、悬浮控件、涟漪、彗星追光、下拉压暗），上限上调到 320 KiB；
+  // v0.2.39 黄金分割排版与流体设计 2.0 新增 golden.css（约 16 KiB：φ 令牌、黄金版式、凝光轮廓、
+  // 全局浮岛、流体云与系统更新），同时删除星鲸粒子样式，上限上调到 336 KiB，
   // 关键帧与滤镜仍各自受下面的护栏约束；再超时应先清理重复覆盖和死规则。
   const bytes = stylesheetFiles.reduce((total, file) => total + fs.statSync(file).size, 0);
   assert.ok(
-    bytes <= 320 * 1024,
-    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 320 KB 总预算`
+    bytes <= 336 * 1024,
+    `页面样式已达 ${(bytes / 1024).toFixed(1)} KB，超过 336 KB 总预算`
   );
 });
 
@@ -50,8 +52,9 @@ test('index.html 脚本标签总数受控，Aqua 官方引擎保持单一独立�
   // v0.2.0 新增两个一等视图：表示层与两个视图控制器合并为单一的 intel-views.js，
   // 净增一个边界到 27。
   // v0.2.38 新增极光引擎 aurora-engine.js（流体设计的融合渲染层），净增一个边界到 28。
+  // v0.2.39 新增流体云 fluid-cloud.js（窗口顶部的实时状态胶囊，可独立单测），净增一个边界到 29。
   const scriptCount = [...html.matchAll(/<script\b/gi)].length;
-  assert.ok(scriptCount <= 28, `脚本标签已有 ${scriptCount} 个，上限 28 个`);
+  assert.ok(scriptCount <= 29, `脚本标签已有 ${scriptCount} 个，上限 29 个`);
 });
 
 test('样式表动画关键帧数量受控，动效不无限堆叠', () => {
@@ -125,7 +128,9 @@ test('transition 只过渡合成层友好属性，布局类属性与 all 不参�
       // 豁免：.tab-indicator 的 width/height 跟随目标 tab 的实测尺寸（脚本写
       // --ti-w/--ti-h，换行与界面缩放都要重测），尺寸跟随没有 transform 等价物，
       // 属布局机制必需；styles.css 该块内已有同口径豁免注释。
-      const exempt = p => selector.includes('.tab-indicator') && /^(width|height)$/.test(p);
+      // v0.2.39 豁免：流体云外壳是脱离文档流的 fixed 小盒子（contain: layout style），宽高随内容
+      // 流动变化只重排它自己，不影响页面任何其他元素；缩放实现会把胶囊圆角压成椭圆。
+      const exempt = p => (selector.includes('.tab-indicator') || selector === '.fluid-cloud-shell') && /^(width|height)$/.test(p);
       for (const p of props) {
         if (exempt(p)) continue;
         if (p === 'all' || layoutProp.test(p)) offenders.push(`${selector} → ${p}`);

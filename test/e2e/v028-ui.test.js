@@ -47,12 +47,10 @@ test('v028 fresh installation uses the captured baseline and reopening retains s
     preferences: starPickingPavilion.preferences,
     theme: document.documentElement.dataset.theme,
     effects: document.documentElement.dataset.aquaEnabled,
-    whale: document.documentElement.dataset.aquaWhale,
     stars: document.documentElement.dataset.aquaCritters
   }));
   assert.equal(initial.theme, 'light');
   assert.equal(initial.effects, 'off');
-  assert.equal(initial.whale, 'off');
   assert.equal(initial.stars, 'off');
   assert.deepEqual(initial.preferences, { version: 2, ...Schema.INITIAL_UI_PREFERENCES });
   assert.equal((await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBackgroundColor())).toLowerCase(), '#ffffff');
@@ -60,7 +58,7 @@ test('v028 fresh installation uses the captured baseline and reopening retains s
   assert.equal(interval, 60);
   const choices = { version: 2, ...Schema.getLegacyUiPreferences(CommonLinks),
     theme: 'dark', textScale: 'xl', aquaMode: 'compat', aquaHue: 260, aquaBrightness: 38,
-    aquaBlur: 12, aquaFrost: 55, aquaWhale: false, aquaCritters: true,
+    aquaBlur: 12, aquaFrost: 55, aquaCritters: true,
     view: 'settings', linksCategory: 'AI', commonLinksFavorites: [], realtime: false };
   await page.evaluate(values => starPickingPavilion.updatePreferences(values), choices);
   const file = path.join(directory, 'ui-preferences.json');

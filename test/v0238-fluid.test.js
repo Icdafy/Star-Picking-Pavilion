@@ -112,7 +112,7 @@ test('页面接线：极光引擎在组合根之前加载，流体样式最后�
   for (const mode of ['auto', 'full', 'lite', 'off']) assert.match(html, new RegExp(`data-fluid-mode="${mode}"`));
   assert.match(html, /id="fluidModeHint" aria-live="polite"/);
   const app = read('renderer/app.js');
-  assert.match(app, /AuroraEngine\.createAuroraEngine\(\{ document, window, motion, springEasing: DomUtils\.springEasing \}\)/);
+  assert.match(app, /AuroraEngine\.createAuroraEngine\(\{ document, window, motion, springEasing: DomUtils\.springEasing, tempo: MOTION_TEMPO \}\)/);
   assert.match(app, /fluid: auroraEngine/);
   assert.match(read('renderer/aqua-shell.js'), /root\.dataset\.fluidMode = state\.fluidMode;/);
 });

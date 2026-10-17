@@ -6,7 +6,7 @@
 > 逐条核对后再动手；任何一条被破坏，`npm test` 会立即报出来。
 >
 > 当前统计口径：Aqua 外壳升级后，页面实际加载的三份 CSS 合计约 235.5 KiB，
-> 早期模块化记录中的文件体积为历史值；当前页面脚本为 28 条（v0.2.38 新增极光引擎），预算 28/28 已用尽。
+> 早期模块化记录中的文件体积为历史值；当前页面脚本为 29 条（v0.2.38 新增极光引擎，v0.2.39 新增流体云），预算 29/29 已用尽。
 
 ---
 
@@ -814,11 +814,11 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 | 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| 页面实际加载的全部本地 CSS | ≈ 314,700 B（CRLF 口径，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置、v0.2.4 命令面板、v0.2.36 推送面板、v0.2.37 设置页统一行面板；v0.2.38 新增 fluid.css 约 20 KiB） | ≤ 320 KiB |
-| index.html `<script>` 标签总数 | 28（v0.2.0 新增合并后的 intel-views.js；v0.2.38 新增极光引擎 aurora-engine.js） | ≤ 28 |
+| 页面实际加载的全部本地 CSS | ≈ 314,700 B（CRLF 口径，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置、v0.2.4 命令面板、v0.2.36 推送面板、v0.2.37 设置页统一行面板；v0.2.38 新增 fluid.css 约 20 KiB；v0.2.39 新增 golden.css 约 16 KiB，并删除星鲸样式） | ≤ 336 KiB |
+| index.html `<script>` 标签总数 | 29（v0.2.0 新增合并后的 intel-views.js；v0.2.38 新增极光引擎 aurora-engine.js；v0.2.39 新增流体云 fluid-cloud.js） | ≤ 29 |
 | 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
-| 全部已加载 CSS 的 `backdrop-filter` 声明 | 10（v0.2.38 下拉选项面板 `::picker(select)`） | ≤ 10 |
+| 全部已加载 CSS 的 `backdrop-filter` 声明 | 10（v0.2.38 下拉选项面板 `::picker(select)`；v0.2.39 提示的独立模糊并入流体云外壳，总数不变） | ≤ 10 |
 
 除数字预算外还有定性护栏。其一（阶段 2 新增，液态玻璃阶段 4 登记）：
 transition 过渡属性白名单断言「transition 只过渡合成层
@@ -981,3 +981,13 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 - **悬浮控件**：顶栏、筛选栏、指挥栏、设置目录与各页工具条统一 `--fluid-bar-radius`（1.5rem）与浮起阴影，栏内控件统一 `--fluid-ctl-h`（2.375rem）与胶囊圆角。
 
 视图切换经 view-registry 的可选依赖 `fluid.enterView(panel, direction)`：按侧栏顺序向下切换时内容自下而上到达，反之自上而下；引擎不可用或静止时回到原 `fadeSlideIn`。预算：CSS ≤ 320 KiB、脚本 28、关键帧 20、backdrop-filter 10（新增的一处为 `::picker(select)`）。
+
+## v0.2.39 黄金分割排版与流体设计 2.0
+
+- **φ 令牌**（`renderer/golden.css`，最后加载）：`--phi` 1.618、`--phi-1` .618、`--phi-2` .382、`--phi-3` .236、`--tempo` 1.382。字号 `--t-xs…--t-3xl` = 1rem × φ^(n/4)（n = −2, −1, 1, 2, 3, 5, 7；`--t-2xs` 保持 12px 下限）；行高 `--lh-ui` φ、`--lh-read` φ^5/4、`--lh-title` 1+φ⁻²、`--lh-display` 1+φ⁻³；字重 `--w-body/medium/strong/display` = 400 × φ^(0, ½, 1, 1½)；间距 `--sp-0…--sp-8` = φ^(−4, −3, −1.5, −.5, 0, .5, 1, 1.5, 2) rem；圆角 xl φ、lg φ^½、md φ^−½、sm φ^−1.5、xs φ⁻²；控件 `--ctl-h` 2.382rem、`--ctl-min` = 高 × φ、`--ctl-pad` = 高 × φ⁻²。
+- **版式**：`--aqua-rail-width` = clamp(15rem, (100vw − 2rem) / (1 + φ³), 19rem)；设置目录 : 正文 = 1fr : 4.236fr；`.banner-copy` flex 1.618；`.daily-head` 1.618fr : 1fr；`.storage-summary` 1fr : 2.618fr；`.set-row` 标签列 6.854rem（φ⁴）；`.card-pad` 上下 : 左右 = `--sp-5` : `--sp-7`（1 : φ）；`.card-thumb` aspect-ratio 1.618；模态弹窗 `top: 38.2%; left: 50%; translate: -50% -38.2%`，命令面板顶边 14.6%；空态上 : 下留白 = 1 : φ。
+- **节奏**：CSS `--dur*` 与 fluid.css 硬编码时长 × 1.382；`DomUtils.createMotion({ tempo, liquidIndicator })`：`spring()` 的时长、延迟与释放计时 × tempo，指示块按原时间尺度求解弹簧、帧序列铺满 duration × tempo；`liquidIndicator` 时主轴前缘按 1.382 倍、后缘按 0.786 倍时间尺度求值（终帧精确落定）。`createInteractionMotion` 的光波时长与寿命计时同乘 `motion.tempo`。极光引擎 `tempo`：WAAPI 时长 × tempo，弹簧刚度 ÷ tempo²、阻尼 +0.12；不传时全部保持 v0.2.38 参数。
+- **流体云**（`renderer/fluid-cloud.js`，`window.FluidCloud`）：`createFluidCloud({ document, window, tempo })` → `setActivity(key, { tone: info|busy|ready|error, title, value, progress 0–1, detail, facts ≤ 4, actions ≤ 2 })` / `clearActivity` / `collapse` / `getState` / `dispose`。`#fluidCloud[data-state]` = hidden | capsule | expanded | notice；`#toast` 位于外壳内，MutationObserver 观察其 class 与文本切到 notice。外壳宽高经 `--cloud-w/--cloud-h` 过渡（perf-guard 唯一豁免的布局过渡：fixed、`contain: layout style`）。app.js 以 `pipeline`（stats-controller 新增可选依赖 `onActivity`）与 `update`（update-pill 新增 `onChange`，返回值新增 `trigger()` / `version`）两个键驱动。
+- **凝光轮廓**：完整档、tempo > 1 时，指针所在 `.glass, .card, .set-panel, .release-entry, .common-links-card` 写入 `--gaze-x/--gaze-y/--gaze-o`（同一按需帧时钟 `gaze` 任务；已由跟手追光点亮的 `.motion-surface` 不重复）。浮岛 `.tower, .filter-dock, .settings-nav` 的 `--glass-blur` 下限 1.236rem。
+- **系统更新章节** `#settingsUpdate`：位于“系统”分组首位，设置章节 11 → 12（v0212 e2e 同步）；徽标 `#updateCenterBadge`、状态区 `#updateCenterHero[data-state]`（`--update-off` 驱动进度环）、`#btnUpdateCenter` 调用 `updatePill.trigger()`、`#btnUpdateCenterLog` 切到更新日志。
+- **删除星鲸粒子**：`aquaWhale` 不再是 UI 偏好字段（`UI_PREFERENCE_FIELDS` 29 项，旧值读取时丢弃），`#setAquaWhale`、`createStarWhale`、`createDshParticleWhale`、DSH 引擎 `mountWhale` 与相关样式全部移除。

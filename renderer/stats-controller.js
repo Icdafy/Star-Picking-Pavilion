@@ -10,7 +10,7 @@
   else if (root) root.StatsController = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createStatsControllerModule() {
   function createStatsController({
-    api, state, elements, prefersReducedMotion, now, frame
+    api, state, elements, prefersReducedMotion, now, frame, onActivity
   } = {}) {
     if (typeof api !== 'function' || !state || !elements
       || typeof prefersReducedMotion !== 'function'
@@ -52,6 +52,10 @@
         elements.btnRefresh.setAttribute('aria-label', detail || '立即采集分析');
       }
       elements.statStatusLabel.title = detail;
+      // v0.2.39 流体云：同一份管线状态交给顶部胶囊，进行中显示阶段、进度与计数。
+      if (typeof onActivity === 'function') {
+        try { onActivity({ busy, label, detail, progress: busy ? progress || null : null }); } catch { /* 增强层 */ }
+      }
       if (elements.collectScheduleStatus) {
         const date = value => new Date(value).toLocaleString('zh-CN', { hour12: false });
         elements.collectScheduleStatus.textContent = busy ? (detail || '采集分析任务正在运行；全部完成后恢复在线。')

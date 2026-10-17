@@ -7,7 +7,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.UpdatePill = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createUpdatePillModule() {
-  function createUpdatePill({ desktop, pill, progress, live, motion } = {}) {
+  function createUpdatePill({ desktop, pill, progress, live, motion, onChange } = {}) {
     if (!desktop || typeof desktop.onUpdateStatus !== 'function' || !pill) return null;
     const arc = pill.querySelector('[data-update-arc]');
     const value = pill.querySelector('[data-update-value]');
@@ -66,10 +66,14 @@
       // 下载只按 10% 播报，环形和可见数字仍逐百分比更新。
       const announcement = status === 'downloading' ? `${status}:${known ? Math.floor(amount / 10) : '?'}` : status;
       if (live && announcement !== lastAnnouncement) { live.textContent = label; lastAnnouncement = announcement; }
+      // v0.2.39：流体云与“设置 → 系统更新”共用同一份状态。
+      if (typeof onChange === 'function') {
+        try { onChange({ status, version: updateVersion, percent: known ? amount : null, label, message: message || '', pending: pendingUpdate }); } catch {}
+      }
     }
     render({ status: 'idle' });
     desktop.onUpdateStatus(render);
-    pill.addEventListener('click', async () => {
+    async function trigger() {
       if (['checking', 'available', 'downloading', 'installing'].includes(updState)) return;
       if (updState === 'downloaded') {
         render({ status: 'installing' });
@@ -87,9 +91,12 @@
       } catch (error) {
         if (updState === 'checking') render({ status: 'error', message: String(error?.message || error) });
       }
-    });
+    }
+    pill.addEventListener('click', trigger);
     return Object.freeze({
-      get status() { return updState; }
+      get status() { return updState; },
+      get version() { return updateVersion; },
+      trigger
     });
   }
 

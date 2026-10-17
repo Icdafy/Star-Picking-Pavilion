@@ -32,7 +32,6 @@ const EXPECTED_UI_PREFERENCE_KEYS = [
   'aquaMode',
   'aquaWallpaperBlur',
   'aquaWallpaperFrost',
-  'aquaWhale',
   'category',
   'closeToTray',
   'commonLinksFavorites',

@@ -19,7 +19,6 @@ const AQUA_FIELDS = Object.freeze([
   'aquaBackground',
   'aquaWallpaperBlur',
   'aquaWallpaperFrost',
-  'aquaWhale',
   'aquaCritters'
 ]);
 const schemaDefaults = UiPreferenceSchema.getDefaultUiPreferences(CommonLinks);

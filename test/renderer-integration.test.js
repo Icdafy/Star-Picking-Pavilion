@@ -54,7 +54,6 @@ const AQUA_DEFAULTS = Object.freeze({
   aquaBackground: 'fluid',
   aquaWallpaperBlur: 0,
   aquaWallpaperFrost: 0,
-  aquaWhale: true,
   aquaCritters: true,
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
@@ -70,7 +69,6 @@ const AQUA_NON_DEFAULTS = Object.freeze({
   aquaBackground: 'wallpaper',
   aquaWallpaperBlur: 40,
   aquaWallpaperFrost: 100,
-  aquaWhale: false,
   aquaCritters: false,
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
@@ -389,7 +387,6 @@ test('production preference actions persist all Aqua values as minimal patches a
     ['aquaBackground', 'wallpaper', { aquaBackground: 'wallpaper' }],
     ['aquaWallpaperBlur', 40, { aquaWallpaperBlur: 40 }],
     ['aquaWallpaperFrost', 100, { aquaWallpaperFrost: 100 }],
-    ['aquaWhale', false, { aquaWhale: false }],
     ['aquaCritters', false, { aquaCritters: false }],
     ['view', 'daily', { view: 'daily' }],
     ['domain', 'lowaltitude', { domain: 'lowaltitude' }],
@@ -503,7 +500,7 @@ test('Aqua 外观实验室完整接入恢复、控件、最小持久化与本机
   assert.match(html, /data-aqua-mode="compat"[^>]*aria-pressed="false"/);
   assert.match(html, /data-aqua-background="fluid"[^>]*aria-pressed="true"/);
   assert.match(html, /data-aqua-background="wallpaper"[^>]*aria-pressed="false"/);
-  assert.match(html, /id="setAquaWhale" type="checkbox" role="switch" checked/);
+  assert.doesNotMatch(html, /setAquaWhale|星鲸/, 'v0.2.39 已删除星鲸粒子');
   assert.match(html, /id="setAquaCritters" type="checkbox" role="switch" checked/);
   assert.match(html, /class="wallpaper-file-input" id="setAquaWallpaper" type="file" accept="image\/png,image\/jpeg,image\/webp"/);
   assert.doesNotMatch(html, /id="setAquaWallpaper"[^>]*\bhidden\b/, '壁纸文件控件必须可由键盘聚焦');

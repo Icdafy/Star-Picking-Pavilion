@@ -26,7 +26,6 @@ const defaultAquaPreferences = Object.freeze({
   aquaBackground: 'fluid',
   aquaWallpaperBlur: 0,
   aquaWallpaperFrost: 0,
-  aquaWhale: false,
   aquaCritters: false,
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
@@ -88,7 +87,6 @@ test('normalizes every supported field and discards unknown fields', () => {
     aquaBackground: 'wallpaper',
     aquaWallpaperBlur: 40,
     aquaWallpaperFrost: 100,
-    aquaWhale: false,
     aquaCritters: false,
     view: 'daily',
     domain: 'aerospace',
@@ -118,7 +116,6 @@ test('normalizes every supported field and discards unknown fields', () => {
     aquaBackground: 'wallpaper',
     aquaWallpaperBlur: 40,
     aquaWallpaperFrost: 100,
-    aquaWhale: false,
     aquaCritters: false,
     view: 'daily',
     domain: 'aerospace',
@@ -189,7 +186,6 @@ test('Aqua numeric bounds are inclusive and invalid explicit updates are rejecte
     ['aquaWallpaperFrost', 100.01],
     ['aquaMode', 'glass'],
     ['aquaBackground', 'video'],
-    ['aquaWhale', 1],
     ['aquaCritters', 'false']
   ]) {
     assert.throws(

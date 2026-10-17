@@ -63,7 +63,7 @@ test('desktop window and every renderer path reserve a draggable overlay title b
   assert.doesNotMatch(aqua, /\.desktop-titlebar-liquid-glass::(?:before|after)/);
 });
 
-test('standalone Aqua engine retains the exact DSH 1.1.0 fluid and whale contracts', () => {
+test('standalone Aqua engine retains the exact DSH 1.1.0 fluid contract and no longer ships the whale', () => {
   const engine = fs.readFileSync(
     path.join(projectRoot, 'renderer', 'dsh-aqua-engine.js'),
     'utf8'
@@ -71,8 +71,7 @@ test('standalone Aqua engine retains the exact DSH 1.1.0 fluid and whale contrac
   assert.match(engine, /@deepseek-ai\/dsh-client-ui-aqua 1\.1\.0/);
   assert.match(engine, /mouseRadius:\s*\.22/);
   assert.match(engine, /color1:\s*"#8AA3D6"/);
-  assert.match(engine, /const GRID = 60/);
-  assert.match(engine, /const FPS = 30/);
   assert.match(engine, /function attachFluidShader\(canvas, params\)/);
-  assert.match(engine, /function mountWhale\(host, dark\)/);
+  // v0.2.39 删除星鲸粒子：引擎只保留流体着色器。
+  assert.doesNotMatch(engine, /mountWhale|WHALE_SVG/);
 });

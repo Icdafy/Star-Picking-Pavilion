@@ -287,6 +287,11 @@
     const setTimer = deps.setTimeout || win?.setTimeout?.bind(win);
     const clearTimer = deps.clearTimeout || win?.clearTimeout?.bind(win);
     const active = new Map();
+    // v0.2.39 节奏：所有时长 × tempo（应用传入 1 + φ⁻² = 1.382），弹簧按同一时间尺度放慢；
+    // 单测与旧调用方不传时为 1，交互时限保持原值。
+    const tempo = Number(deps.tempo) > 0 ? Math.min(3, Number(deps.tempo)) : 1;
+    // 流体指示块：前缘先到、后缘随后跟上，移动途中像一滴水被拉长再收拢。
+    const liquidIndicator = deps.liquidIndicator === true;
     let disposed = false;
     let media = null;
     try { media = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null; } catch {}
@@ -387,7 +392,7 @@
       }
       cancel(el);
       const preset = MOTION_STIFFNESS[stiffness] || MOTION_STIFFNESS.medium;
-      const total = Number(duration) > 0 ? Number(duration) : preset.duration;
+      const total = (Number(duration) > 0 ? Number(duration) : preset.duration) * tempo;
       const endStyle = to || lastFrameStyle(keyframes);
       const original = {};
       if (restoreStyles && el.style) {
@@ -404,7 +409,7 @@
         settle(el, endStyle);
         const animation = el.animate(frames, {
           duration: total,
-          delay: Number(delay) > 0 ? Number(delay) : 0,
+          delay: Number(delay) > 0 ? Number(delay) * tempo : 0,
           easing: preBaked ? 'linear' : curves ? springEasing({ bounce }) : SPRING_EASING,
           fill: 'backwards'
         });
@@ -413,7 +418,7 @@
         // 视觉时钟或 finished 回调延迟时，仍按交互时限提交已写入的终态。
         // 重新定向与环境清理会撤销旧时限，不让旧回调覆盖最新意图。
         if (typeof setTimer === 'function') record.timeout = setTimer(
-          () => release(el, record), total + (Number(delay) > 0 ? Number(delay) : 0) + 50
+          () => release(el, record), total + (Number(delay) > 0 ? Number(delay) * tempo : 0) + 50
         );
         // 结束后取消动画对象，释放合成层资源；终态已落在 inline style，
         // 取消不产生视觉跳变。rAF 缺失时直接取消，不作资源兜底的依赖，
@@ -555,14 +560,31 @@
       const dx = before.left - after.left, dy = before.top - after.top;
       const sx = before.width / after.width, sy = before.height / after.height;
       const duration = fxTier() === 'lite' ? 180 : 300;
+      const span = duration * tempo;
       const displacement = [dx, dy, (sx - 1) * after.width, (sy - 1) * after.height];
       const trajectory = displacement.map((position, index) => ({ position,
         velocity: fxTier() === 'lite' ? 0 : Math.max(-2200, Math.min(2200, momentum?.[index] || 0))
       }));
-      const samples = samplesFor(duration);
+      const samples = samplesFor(span);
+      // 主运动轴：前缘按 1.382 倍时间尺度先到，后缘按 0.786 倍滞后，指示块沿途被拉长后收拢。
+      const axisIndex = Math.abs(dy) > Math.abs(dx) ? 1 : 0;
+      const liquid = liquidIndicator && fxTier() !== 'lite' && Math.abs(axisIndex ? dy : dx) > 4;
+      const forward = (axisIndex ? dy : dx) < 0;
       const frames = Array.from({ length: samples + 1 }, (_, i) => {
         const t = i / samples;
-        const offsets = trajectory.map(axis => t === 1 ? 0 : indicatorSpring(axis.position, axis.velocity, t * duration / 1000).position);
+        const seconds = t * duration / 1000;
+        const offsets = trajectory.map(axis => t === 1 ? 0 : indicatorSpring(axis.position, axis.velocity, seconds).position);
+        if (liquid && t < 1) {
+          const size = axisIndex ? after.height : after.width;
+          const start = trajectory[axisIndex], grow = trajectory[axisIndex + 2];
+          const fast = indicatorSpring(start.position, start.velocity, seconds * 1.382).position;
+          const slow = indicatorSpring(start.position, start.velocity, seconds * .786).position;
+          const sizeOffset = indicatorSpring(grow.position, grow.velocity, seconds).position;
+          const lead = forward ? fast : slow, trail = forward ? slow : fast;
+          offsets[axisIndex] = trail;
+          offsets[axisIndex + 2] = (lead + size + sizeOffset) - (trail + size) + 0;
+          offsets[axisIndex + 2] = lead - trail + sizeOffset;
+        }
         return {
           offset: t,
           transform: `translate(${x + offsets[0]}px, ${y + offsets[1]}px) scale(${Math.max(.01, 1 + offsets[2] / after.width)}, ${Math.max(.01, 1 + offsets[3] / after.height)})`
@@ -585,6 +607,7 @@
       cancelAll,
       cancelTree,
       frameRate: () => refresh?.hz || 60,
+      tempo,
       dispose() {
         disposed = true;
         cancelAll();
@@ -1017,12 +1040,12 @@
         wave.animation = node.animate([
           { transform: 'translate(-50%, -50%) scale(.25)', opacity: .38 },
           { transform: `translate(-50%, -50%) scale(${Math.max(bounds.width, bounds.height) / 18})`, opacity: 0 }
-        ], { duration: 420, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+        ], { duration: 420 * (motion.tempo || 1), easing: 'cubic-bezier(.16, 1, .3, 1)' });
         wave.animation.finished.then(() => { if (waves.get(button) === wave) clearWave(button); })
           .catch(() => { if (waves.get(button) === wave) clearWave(button); });
         // 渲染时钟暂停或完成回调延迟时也有 500ms 的资源寿命上限。
         // 正常完成先清理；替换、减少动画、失焦和销毁都撤销此计时器。
-        wave.timeout = win.setTimeout(() => { if (waves.get(button) === wave) clearWave(button); }, 500);
+        wave.timeout = win.setTimeout(() => { if (waves.get(button) === wave) clearWave(button); }, 500 * (motion.tempo || 1));
       } catch { clearWave(button); }
     }
     function removeLight(records, element) {

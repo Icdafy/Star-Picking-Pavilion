@@ -42,7 +42,6 @@
     aquaBackground: 'fluid',
     aquaWallpaperBlur: 0,
     aquaWallpaperFrost: 0,
-    aquaWhale: false,
     aquaCritters: false,
     ...POINTER_DEFAULTS,
     fluidMode: 'auto'
@@ -72,7 +71,6 @@
     'aquaBackground',
     'aquaWallpaperBlur',
     'aquaWallpaperFrost',
-    'aquaWhale',
     'aquaCritters',
     'pointerEnabled',
     'pointerStyle',
@@ -155,7 +153,6 @@
       aquaBackground: 'fluid',
       aquaWallpaperBlur: 0,
       aquaWallpaperFrost: 0,
-      aquaWhale: true,
       aquaCritters: true,
       ...POINTER_DEFAULTS,
       fluidMode: 'auto',
@@ -305,12 +302,6 @@
         defaults.aquaWallpaperFrost
       ),
       aquaEnabled: chooseValue(source.aquaEnabled, secondary.aquaEnabled, value => typeof value === 'boolean', defaults.aquaEnabled),
-      aquaWhale: chooseValue(
-        source.aquaWhale,
-        secondary.aquaWhale,
-        value => typeof value === 'boolean',
-        defaults.aquaWhale
-      ),
       aquaCritters: chooseValue(
         source.aquaCritters,
         secondary.aquaCritters,
@@ -374,7 +365,6 @@
     if (field === 'aquaWallpaperBlur') return isFiniteNumberInRange(value, 0, 40);
     if (field === 'aquaWallpaperFrost') return isFiniteNumberInRange(value, 0, 100);
     if (field === 'aquaEnabled') return typeof value === 'boolean';
-    if (field === 'aquaWhale') return typeof value === 'boolean';
     if (field === 'aquaCritters') return typeof value === 'boolean';
     if (field === 'pointerEnabled') return typeof value === 'boolean';
     if (field === 'pointerStyle') return typeof value === 'string' && Object.hasOwn(POINTER_STYLES, value);

@@ -13,7 +13,7 @@ async function fixture(t) {
   fs.writeFileSync(path.join(profile, 'settings.json'), '{}');
   fs.writeFileSync(path.join(profile, 'ui-preferences.json'), JSON.stringify({
     version: 2, view: 'settings', theme: 'light', realtime: false, aquaEnabled: false,
-    aquaWhale: false, aquaCritters: false, pointerEnabled: true
+    aquaCritters: false, pointerEnabled: true
   }));
   fs.mkdirSync(output, { recursive: true });
   const apps = [];

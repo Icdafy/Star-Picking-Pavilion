@@ -95,6 +95,11 @@
     const doc = deps.document;
     const win = deps.window;
     const motion = deps.motion || null;
+    // v0.2.39 节奏：时长 × tempo，弹簧刚度 ÷ tempo²（同一条运动曲线按时间轴整体放慢），阻尼略增，
+    // 回弹更柔、更像真实的手与材料。单测不传 tempo 时保持 v0.2.38 的原始参数。
+    const tempo = Number(deps.tempo) > 0 ? Math.min(3, Number(deps.tempo)) : 1;
+    const soft = 1 / (tempo * tempo);
+    const calm = tempo > 1 ? .12 : 0;
     const inert = Object.freeze({
       enterView() { return false; }, refresh() {}, dispose() {},
       getStatus() { return { level: 'off', mode: 'auto', reason: 'unsupported' }; }
@@ -117,8 +122,8 @@
     }
     try {
       if (typeof deps.springEasing === 'function' && win.CSS?.supports?.('transition-timing-function', 'linear(0, 1)')) {
-        root.style.setProperty('--fluid-spring', deps.springEasing({ bounce: .32 }));
-        root.style.setProperty('--fluid-spring-soft', deps.springEasing({ bounce: .14 }));
+        root.style.setProperty('--fluid-spring', deps.springEasing({ bounce: tempo > 1 ? .22 : .32 }));
+        root.style.setProperty('--fluid-spring-soft', deps.springEasing({ bounce: tempo > 1 ? .08 : .14 }));
       }
     } catch { /* 回落到样式表里的贝塞尔曲线 */ }
 
@@ -274,16 +279,16 @@
           { transform: 'scale(.12)', opacity: 0 },
           { transform: 'scale(.42)', opacity: 1, offset: .16 },
           { transform: 'scale(1)', opacity: 0 }
-        ], { duration: 760, easing: 'cubic-bezier(.2, .7, .2, 1)' }));
+        ], { duration: 760 * tempo, easing: 'cubic-bezier(.2, .7, .2, 1)' }));
         ringNodes.forEach((ring, index) => {
           record.animations.push(ring.animate([
             { transform: 'scale(.02)', opacity: 0 },
             { transform: 'scale(.14)', opacity: .95 - index * .22, offset: .1 },
             { transform: 'scale(1)', opacity: 0 }
-          ], { duration: 1150 + index * 120, delay: index * 150, easing: 'cubic-bezier(.12, .8, .3, 1)', fill: 'backwards' }));
+          ], { duration: (1150 + index * 120) * tempo, delay: index * 150 * tempo, easing: 'cubic-bezier(.12, .8, .3, 1)', fill: 'backwards' }));
         });
       } catch { dropRipple(record); return; }
-      record.timer = win.setTimeout(() => dropRipple(record), 1600 + rings * 150);
+      record.timer = win.setTimeout(() => dropRipple(record), (1600 + rings * 150) * tempo);
     }
 
     // ---------- 柔性反馈：按压收缩、拖拽拉伸、松手 Q 弹 ----------
@@ -295,7 +300,7 @@
       if (!body) {
         const selected = element.matches('.active, [aria-selected="true"], [aria-pressed="true"]');
         const mirror = selected ? element.parentElement?.querySelector(':scope > .selection-indicator, :scope > .tab-indicator') : null;
-        body = { el: element, mirror, x: axis(), y: axis(), s: axis(1), kx: 900, zx: .7, ks: 900, zs: .7, pressed: false, attracted: false };
+        body = { el: element, mirror, x: axis(), y: axis(), s: axis(1), kx: 900 * soft, zx: .7 + calm, ks: 900 * soft, zs: .7 + calm, pressed: false, attracted: false };
         bodies.set(element, body);
         element.classList.add('fluid-body');
       }
@@ -346,13 +351,18 @@
     function isDisabled(element) {
       return element.disabled || element.getAttribute('aria-disabled') === 'true' || element.closest?.('fieldset:disabled');
     }
-    function press(element) {
+    function press(element, clientX, clientY) {
       const rect = element.getBoundingClientRect();
       if (!rect.width || rect.width * rect.height > 160000 || rect.height > 140) return null;
       const body = bodyOf(element);
       body.pressed = true;
       body.s.t = 1 - pressDepth(rect);
-      body.ks = 1300; body.zs = .78;
+      body.ks = 1300 * soft; body.zs = .78 + calm;
+      // 受力挤压：按在哪一侧，材质就朝那一侧轻轻让开（最多 1.5px），松手随回弹归位。
+      if (tempo > 1 && Number.isFinite(clientX) && Number.isFinite(clientY)) {
+        body.x.t = clamp((clientX - rect.left) / rect.width - .5, -.5, .5) * 3;
+        body.y.t = clamp((clientY - rect.top) / rect.height - .5, -.5, .5) * 2;
+      }
       run('soft', stepBodies);
       return body;
     }
@@ -361,10 +371,10 @@
       const lite = governor.level !== 'full';
       body.pressed = false;
       body.s.t = 1;
-      body.ks = 560; body.zs = lite ? .55 : .3;
+      body.ks = 560 * soft; body.zs = (lite ? .55 : .3) + calm;
       body.x.t = 0; body.y.t = 0;
       const energy = clamp(Math.hypot(velocityX, velocityY) / 2400, 0, 1);
-      body.kx = 260 + 360 * energy; body.zx = lite ? .6 : .3 - .06 * energy;
+      body.kx = (260 + 360 * energy) * soft; body.zx = (lite ? .6 : .3 - .06 * energy) + calm;
       run('soft', stepBodies);
     }
 
@@ -460,7 +470,7 @@
       g.layer = full() ? ensureBridgeLayer(g.el) : null;
       g.el.classList.add('fluid-droplet', 'fluid-lifted');
       if (win.getComputedStyle(g.el).position === 'static') g.el.classList.add('fluid-lift-positioned');
-      g.body.kx = 1500; g.body.zx = .92;
+      g.body.kx = 1500 * Math.sqrt(soft); g.body.zx = .92;
       g.body.s.t = Math.max(g.body.s.t, .96);
     }
     function endGesture(event, cancelled = false) {
@@ -493,7 +503,7 @@
       const control = target.closest(PRESS_SELECTOR);
       if (control && !isDisabled(control) && !control.closest('.fluid-scrim')) {
         if (gesture) endGesture(event, true);
-        const body = press(control);
+        const body = press(control, event.clientX, event.clientY);
         if (body) {
           gesture = { el: control, body, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
             lastX: event.clientX, lastY: event.clientY, lastT: now(), vx: 0, vy: 0, dragging: false, neighbors: [], layer: null };
@@ -580,14 +590,14 @@
       // 快速滑动：幅度更大、回弹更快；慢慢滑：动画放缓、回弹更轻。
       const energy = clamp(jelly.speed / 3400, 0, 1);
       const gain = .035 + .095 * energy;
-      const stiffness = 150 + 420 * energy;
-      const ratio = .52 - .14 * energy;
+      const stiffness = (150 + 420 * energy) * soft;
+      const ratio = .52 - .14 * energy + calm * .5;
       const span = Math.max(1, viewport.clientHeight);
       const origin = jelly.pointerY != null && t - jelly.pointerAt < 4000
         ? clamp(jelly.pointerY - viewport.getBoundingClientRect().top, 0, span) : span / 2;
       if (jelly.edgePull && t - jelly.edgeAt > 150) jelly.edgePull = 0;
       jelly.edge.t = rubberBand(jelly.edgePull, Math.min(110, span * .1), .55);
-      const edgeSettled = stepSpring(jelly.edge, dt, 300, .42, .1);
+      const edgeSettled = stepSpring(jelly.edge, dt, 300 * soft, .42 + calm * .5, .1);
       const limit = 18 + 22 * energy;
       let alive = !edgeSettled || Boolean(jelly.edgePull);
       for (const item of jelly.items) {
@@ -673,7 +683,7 @@
           { '--fluid-glint': 1, offset: .18 },
           { '--fluid-glint': 1, offset: .78 },
           { '--fluid-comet': 1.12, '--fluid-glint': 0 }
-        ], { duration: governor.level === 'full' ? 1500 : 1100, iterations: loop && full() ? Infinity : 1,
+        ], { duration: (governor.level === 'full' ? 1500 : 1100) * tempo, iterations: loop && full() ? Infinity : 1,
           easing: 'cubic-bezier(.45, 0, .2, 1)' });
         comets.set(input, animation);
         animation.finished.then(() => { if (comets.get(input) === animation) comets.delete(input); }).catch(() => {});
@@ -732,19 +742,67 @@
     function enterView(panel, direction = 1) {
       if (!panel || !allowed() || typeof motion?.spring !== 'function') return false;
       const lite = governor.level !== 'full';
-      const distance = (lite ? 10 : 28) * (direction < 0 ? -1 : 1);
+      const distance = (lite ? 10 : 24) * (direction < 0 ? -1 : 1);
       try {
+        // 流体融合入场：从切换方向浮上来，同时由略小舒展到原尺寸。整页失焦滤镜实测让切换期
+        // p95 帧耗时从约 7ms 升到约 21ms，因此只用合成层友好的位移、缩放与透明度。
+        const fuse = tempo > 1 && !lite;
         motion.spring(panel, {
-          from: { transform: `translateY(${distance}px)`, opacity: '0' },
+          from: { transform: `translateY(${distance}px)${fuse ? ' scale(.985)' : ''}`, opacity: '0' },
           to: { transform: 'none', opacity: '1' },
-          duration: lite ? 260 : 560, bounce: lite ? .06 : .26, restoreStyles: true
+          duration: lite ? 260 : 560, bounce: lite ? .06 : tempo > 1 ? .14 : .26, restoreStyles: true
         });
         return true;
       } catch { return false; }
     }
 
+    // ---------- 凝光：指针靠近的那一段轮廓被点亮，光随手势在边缘上流动 ----------
+    const GAZE_SELECTOR = '.glass, .card, .set-panel, .release-entry, .common-links-card';
+    const gazes = new Map();
+    let gazeTarget = null, gazeX = 0, gazeY = 0;
+    const gazeAllowed = () => full() && tempo > 1;
+    function clearGaze(element) {
+      gazes.delete(element);
+      for (const name of ['--gaze-x', '--gaze-y', '--gaze-o']) element.style.removeProperty(name);
+    }
+    function stepGaze(dt) {
+      if (!gazeAllowed()) { for (const element of [...gazes.keys()]) clearGaze(element); return false; }
+      let alive = false;
+      for (const [element, record] of [...gazes]) {
+        if (!element.isConnected) { clearGaze(element); continue; }
+        const target = element === gazeTarget && !element.classList.contains('motion-surface') ? 1 : 0;
+        if (target) {
+          const rect = element.getBoundingClientRect();
+          const px = gazeX - rect.left, py = gazeY - rect.top;
+          if (!record.seen) { record.x = px; record.y = py; record.seen = true; }
+          const follow = 1 - Math.exp(-dt * 16 / tempo);
+          record.x += (px - record.x) * follow;
+          record.y += (py - record.y) * follow;
+        }
+        record.o += (target - record.o) * (1 - Math.exp(-dt * (target ? 7 : 4) / tempo));
+        if (!target && record.o < .01) { clearGaze(element); continue; }
+        element.style.setProperty('--gaze-x', `${record.x.toFixed(1)}px`);
+        element.style.setProperty('--gaze-y', `${record.y.toFixed(1)}px`);
+        element.style.setProperty('--gaze-o', record.o.toFixed(3));
+        alive = true;
+      }
+      return alive;
+    }
+    function onGazeMove(event) {
+      if (!gazeAllowed() || event.pointerType === 'touch' || gesture?.dragging) return;
+      const surface = event.target?.closest?.(GAZE_SELECTOR);
+      gazeX = event.clientX; gazeY = event.clientY;
+      gazeTarget = surface && !surface.closest('.fluid-cloud') ? surface : null;
+      if (gazeTarget && !gazes.has(gazeTarget)) gazes.set(gazeTarget, { x: 0, y: 0, o: 0, seen: false });
+      if (gazes.size) run('gaze', stepGaze);
+    }
+    listen(doc, 'pointermove', onGazeMove, { passive: true });
+    listen(doc.documentElement, 'pointerleave', () => { gazeTarget = null; if (gazes.size) run('gaze', stepGaze); }, { passive: true });
+
     function settleEverything() {
       endGesture(null, true);
+      gazeTarget = null;
+      for (const element of [...gazes.keys()]) clearGaze(element);
       for (const body of [...bodies.values()]) clearBody(body);
       for (const record of [...ripples]) dropRipple(record);
       for (const input of [...comets.keys()]) stopComet(input);

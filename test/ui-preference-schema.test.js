@@ -20,7 +20,6 @@ const AQUA_FIELDS = Object.freeze([
   'aquaBackground',
   'aquaWallpaperBlur',
   'aquaWallpaperFrost',
-  'aquaWhale',
   'aquaCritters'
 ]);
 
@@ -82,7 +81,6 @@ test('renderer and Electron normalize normal and damaged snapshots identically',
       aquaBackground: 'wallpaper',
       aquaWallpaperBlur: 40,
       aquaWallpaperFrost: 100,
-      aquaWhale: false,
       aquaCritters: false,
       view: 'daily',
       domain: 'aerospace',
@@ -135,7 +133,6 @@ test('every Aqua field produces one minimal patch and rejects invalid enum, type
     ['aquaBackground', 'wallpaper'],
     ['aquaWallpaperBlur', 40],
     ['aquaWallpaperFrost', 100],
-    ['aquaWhale', false],
     ['aquaCritters', false],
     ['pointerEnabled', false], ['pointerSize', 80], ['pointerSize', 800], ['pointerColor', '#19c7a8']
   ];
@@ -172,10 +169,9 @@ test('every Aqua field produces one minimal patch and rejects invalid enum, type
     schema.sanitizeUiPreferencesPatch({
       aquaBlur: 12,
       aquaHue: 999,
-      aquaWhale: false,
       unknownAquaField: true
     }, CommonLinks),
-    { aquaBlur: 12, aquaWhale: false },
+    { aquaBlur: 12 },
     'batch sanitization keeps valid fields without replacing invalid siblings with defaults'
   );
 });

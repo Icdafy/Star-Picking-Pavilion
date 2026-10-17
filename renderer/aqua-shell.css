@@ -1,5 +1,5 @@
 /* 摘星阁 · DSH Aqua 指挥舱
-   桌面骨架沿用摘星阁业务 DOM；流体、鲸鱼、玻璃参数和窗口融合语义对齐
+   桌面骨架沿用摘星阁业务 DOM；流体、玻璃参数和窗口融合语义对齐
    DSH-Transparent-UI-Plugin 1.1.0 与官方 DeepSeek Harness 桌面壳。 */
 
 :root {
@@ -189,20 +189,6 @@ body {
 }
 [data-theme="light"] .aqua-fluid-canvas { opacity: 1; }
 
-[data-dsh-aqua-whale] {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  mix-blend-mode: screen;
-  opacity: .92;
-  transition: opacity var(--dur-slow) var(--ease);
-}
-
-[data-dsh-aqua-whale][data-scheme="light"] { mix-blend-mode: multiply; }
-[data-dsh-aqua-whale] canvas { display: block; width: 100%; height: 100%; }
-[data-aqua-whale="off"] [data-dsh-aqua-whale],
-[data-dsh-aqua-whale][data-dsh-whale-paused] { opacity: 0; }
-
 .aqua-wallpaper {
   z-index: -1;
   overflow: hidden;
@@ -233,32 +219,6 @@ body {
 [data-aqua-background="wallpaper"] .aqua-wallpaper { opacity: 1; }
 [data-aqua-background="wallpaper"] .aurora,
 [data-aqua-background="wallpaper"] .blob { opacity: .08; }
-
-.aqua-particle-whale {
-  position: fixed;
-  z-index: 0;
-  left: calc(50% + 4rem);
-  top: 54%;
-  width: min(38rem, 62vw);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  opacity: .2;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  transition: opacity var(--dur-slow) var(--ease);
-}
-.aqua-particle-whale canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-[data-theme="light"] .aqua-particle-whale {
-  mix-blend-mode: multiply;
-  opacity: .11;
-}
-
-[data-aqua-whale="off"] .aqua-particle-whale { opacity: 0; }
 
 .aqua-critter {
   position: fixed;
@@ -768,7 +728,6 @@ main { order: 5; width: 100%; }
   .filter-dock.glass:hover { transform: none; box-shadow: var(--glass-shadow); }
 
   main { max-width: var(--shell); padding-inline: 0; }
-  .aqua-particle-whale { left: calc(var(--aqua-rail-width) + (100vw - var(--aqua-rail-width)) / 2); }
   .to-top { right: var(--sp-7); }
 }
 
@@ -828,7 +787,6 @@ main { order: 5; width: 100%; }
 @media (forced-colors: active) {
   .aqua-fluid-canvas,
   .aqua-wallpaper,
-  .aqua-particle-whale,
   .aqua-critter,
   .aqua-edge-fade,
   .banner-art { display: none !important; }
@@ -844,9 +802,7 @@ main { order: 5; width: 100%; }
 }
 
 [data-fx-tier="lite"] .aqua-fluid-canvas { opacity: .46; }
-[data-fx-tier="lite"] .aqua-particle-whale { opacity: .1; }
 [data-fx-tier="static"] .aqua-fluid-canvas { opacity: .32; }
-[data-fx-tier="static"] .aqua-particle-whale { opacity: .08; }
 [data-fx-tier="static"] .aqua-critter { animation: none; }
 
 /* v0.2.10：选择轨迹、局部追光与触压反馈。只移动装饰层，正文和命中区域保持稳定。 */

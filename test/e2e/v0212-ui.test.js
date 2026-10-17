@@ -74,7 +74,7 @@ test('v0212 native navigation, category cancellation, release history and settin
   await page.locator('[data-view="settings"]').click();
   await page.waitForSelector('#modelsSection .models-active');
   const chapters = await page.locator('#settingsNav [data-settings-target]').evaluateAll(links => links.map(link => link.dataset.settingsTarget));
-  assert.equal(chapters.length, 11);
+  assert.equal(chapters.length, 12);
   assert.deepEqual(await page.locator('[data-settings-section]').evaluateAll(sections => sections.map(section => section.id)), chapters);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const id of chapters) {

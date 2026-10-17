@@ -2,7 +2,7 @@
 
 /* 摘星阁 · Aqua 外观控制器
    单一 UMD 模块承接外观状态、设置控件、原创 Canvas 流体星云、按钮涟漪、
-   原创星鲸粒子和本地壁纸。算法未复制参考插件的官网 shader、品牌鱼路径或
+   与本地壁纸（v0.2.39 起不再提供星鲸）。算法未复制参考插件的官网 shader、品牌鱼路径或
    Harness 徽标；它只复用“可调玻璃 + 动态背景 + 低功耗降级”的产品思想。 */
 
 (function exposeAquaShell(root, factory) {
@@ -76,7 +76,6 @@
         100,
         DEFAULTS.aquaWallpaperFrost
       ),
-      aquaWhale: typeof value.aquaWhale === 'boolean' ? value.aquaWhale : DEFAULTS.aquaWhale,
       aquaEnabled: typeof value.aquaEnabled === 'boolean' ? value.aquaEnabled : DEFAULTS.aquaEnabled,
       pointerEnabled: typeof value.pointerEnabled === 'boolean' ? value.pointerEnabled : DEFAULTS.pointerEnabled,
       pointerStyle: Object.hasOwn(Schema.POINTER_STYLES, value.pointerStyle) ? value.pointerStyle : DEFAULTS.pointerStyle,
@@ -316,189 +315,6 @@
     });
   }
 
-  function createStarWhale({ host, document: doc, window: win } = {}) {
-    if (!host || !doc || !win) {
-      return Object.freeze({ setTheme() {}, setPaused() {}, dispose() {} });
-    }
-    const holder = doc.createElement('div');
-    holder.className = 'aqua-particle-whale';
-    holder.setAttribute('aria-hidden', 'true');
-    const canvas = doc.createElement('canvas');
-    holder.appendChild(canvas);
-    host.appendChild(holder);
-    const context = canvas.getContext('2d');
-    if (!context) {
-      holder.remove();
-      return Object.freeze({ setTheme() {}, setPaused() {}, dispose() {} });
-    }
-
-    const random = createSeededRandom();
-    const points = [];
-    const addPoint = (x, y, edge = 0) => {
-      const angle = random() * Math.PI * 2;
-      const radius = .7 + random() * .8;
-      points.push({
-        x,
-        y,
-        edge,
-        sx: Math.cos(angle) * radius,
-        sy: Math.sin(angle) * radius,
-        phase: random() * Math.PI * 2,
-        size: .7 + random() * 1.5
-      });
-    };
-
-    // 原创轮廓：椭圆星鲸躯干、双叶尾与舒展胸鳍，不使用任何品牌 SVG 路径。
-    for (let index = 0; index < 250; index += 1) {
-      const angle = random() * Math.PI * 2;
-      const radius = Math.sqrt(random());
-      const x = -.14 + Math.cos(angle) * radius * .76;
-      const y = Math.sin(angle) * radius * (.3 + .08 * (x + .8));
-      addPoint(x, y, radius > .82 ? 1 : 0);
-    }
-    for (let index = 0; index < 72; index += 1) {
-      const t = random();
-      const branch = random() > .5 ? 1 : -1;
-      addPoint(.5 + t * .48, branch * t * .3 * (1 - t * .18), 1);
-    }
-    for (let index = 0; index < 56; index += 1) {
-      const t = random();
-      const branch = random() > .5 ? 1 : -1;
-      addPoint(-.15 + t * .55, branch * (.18 + t * .28) * (1 - t), 1);
-    }
-
-    let dark = doc.documentElement.dataset.theme !== 'light';
-    let pointerX = 0;
-    let pointerY = 0;
-    let width = 0;
-    let height = 0;
-    let dpr = 1;
-    let animationFrame = 0;
-    let previousFrame = 0;
-    let paused = false;
-    let disposed = false;
-    const startedAt = win.performance.now();
-
-    function resize() {
-      const rect = holder.getBoundingClientRect();
-      const nextWidth = Math.max(1, rect.width);
-      const nextHeight = Math.max(1, rect.height);
-      const nextDpr = Math.min(win.devicePixelRatio || 1, 1.25);
-      if (nextWidth === width && nextHeight === height && nextDpr === dpr) return false;
-      width = nextWidth;
-      height = nextHeight;
-      dpr = nextDpr;
-      canvas.width = Math.max(1, Math.round(width * dpr));
-      canvas.height = Math.max(1, Math.round(height * dpr));
-      return true;
-    }
-
-    function draw(now, forceComplete = false) {
-      if (width <= 1 || height <= 1) resize();
-      const time = now / 1000;
-      const raw = forceComplete ? 1 : Math.min(1, Math.max(0, (now - startedAt - 240) / 2100));
-      const assembly = 1 - Math.pow(1 - raw, 3);
-      const scale = Math.min(width, height) * .37;
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      context.clearRect(0, 0, width, height);
-      context.globalCompositeOperation = dark ? 'lighter' : 'source-over';
-      const base = dark ? [178, 231, 236] : [46, 99, 108];
-      for (let index = 0; index < points.length; index += 1) {
-        const point = points[index];
-        const sway = Math.sin(time * .72 + point.phase + point.x * 4) * (.009 + point.edge * .018);
-        let x = point.sx + (point.x - point.sx) * assembly;
-        let y = point.sy + (point.y + sway - point.sy) * assembly;
-        const dx = x - pointerX;
-        const dy = y - pointerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < .32 && distance > .001 && assembly > .88) {
-          const push = Math.pow(1 - distance / .32, 2) * .08;
-          x += dx / distance * push;
-          y += dy / distance * push;
-        }
-        const shimmer = .52 + .34 * Math.sin(time * 1.3 + point.phase);
-        const alpha = Math.max(.06, shimmer) * assembly * (point.edge ? .8 : .48);
-        context.fillStyle = `rgba(${base[0]}, ${base[1]}, ${base[2]}, ${alpha.toFixed(3)})`;
-        const size = point.size * (dark ? 1 : .85);
-        context.fillRect(
-          width / 2 + x * scale - size / 2,
-          height / 2 - y * scale - size / 2,
-          size,
-          size
-        );
-      }
-      context.globalCompositeOperation = 'source-over';
-    }
-
-    function reduced() {
-      return doc.documentElement.dataset.fxTier === 'static'
-        || Boolean(win.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-    }
-
-    function schedule() {
-      if (disposed || paused || animationFrame || reduced()) return;
-      animationFrame = win.requestAnimationFrame(frame);
-    }
-
-    function frame(now) {
-      animationFrame = 0;
-      if (disposed || paused) return;
-      const fps = doc.documentElement.dataset.fxTier === 'lite' ? 10 : 20;
-      const interval = 1000 / fps;
-      if (now - previousFrame >= interval) {
-        previousFrame = now - ((now - previousFrame) % interval);
-        draw(now);
-      }
-      schedule();
-    }
-
-    function onPointerMove(event) {
-      if (disposed || paused) return;
-      const rect = holder.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return;
-      pointerX += ((((event.clientX - rect.left) / rect.width) * 2 - 1) - pointerX) * .14;
-      pointerY += ((-(((event.clientY - rect.top) / rect.height) * 2 - 1)) - pointerY) * .14;
-    }
-
-    function onResize() {
-      const changed = resize();
-      if (changed && (paused || reduced())) draw(win.performance.now(), reduced());
-    }
-
-    win.addEventListener('pointermove', onPointerMove, { passive: true });
-    win.addEventListener('resize', onResize, { passive: true });
-    resize();
-    draw(win.performance.now(), reduced());
-    schedule();
-
-    return Object.freeze({
-      setTheme(nextDark) {
-        dark = Boolean(nextDark);
-        if (reduced()) draw(win.performance.now(), true);
-      },
-      setPaused(nextPaused) {
-        paused = Boolean(nextPaused);
-        if (paused && animationFrame) {
-          win.cancelAnimationFrame(animationFrame);
-          animationFrame = 0;
-        } else if (!paused) {
-          if (reduced()) draw(win.performance.now(), true);
-          schedule();
-        }
-      },
-      dispose() {
-        disposed = true;
-        if (animationFrame) win.cancelAnimationFrame(animationFrame);
-        win.removeEventListener('pointermove', onPointerMove);
-        win.removeEventListener('resize', onResize);
-        holder.remove();
-      }
-    });
-  }
-
-  /* DSH-Transparent-UI-Plugin 1.1.0 compatibility adapters. The standalone
-     engine is extracted from the plugin's compiled client, so these wrappers
-     only translate 摘星阁's lifecycle API (theme / pause / dispose). */
   function createDshFluidBackdrop({ canvas, window: win, engine } = {}) {
     if (!canvas || !win || !engine?.attachFluidShader || !engine?.SITE_FLUID_PARAMS) {
       return Object.freeze({ stir() {}, setTheme() {}, setPaused() {}, dispose() {} });
@@ -559,36 +375,6 @@
         if (paused === shouldPause) return;
         paused = shouldPause;
         canvas.toggleAttribute('data-dsh-fluid-paused', paused);
-        handle?.setPaused?.(paused);
-      },
-      dispose() {
-        if (disposed) return;
-        disposed = true;
-        handle?.dispose();
-        handle = null;
-      }
-    });
-  }
-
-  function createDshParticleWhale({ host, document: doc, engine } = {}) {
-    if (!host || !doc || !engine?.mountWhale) {
-      return Object.freeze({ setTheme() {}, setPaused() {}, dispose() {} });
-    }
-    let dark = doc.documentElement.dataset.theme !== 'light';
-    let paused = false;
-    let disposed = false;
-    let handle = engine.mountWhale(host, dark);
-    const holder = host.querySelector('[data-dsh-aqua-whale]');
-    return Object.freeze({
-      setTheme(nextDark) {
-        dark = Boolean(nextDark);
-        handle?.setDark(dark);
-      },
-      setPaused(nextPaused) {
-        const shouldPause = Boolean(nextPaused);
-        if (paused === shouldPause) return;
-        paused = shouldPause;
-        if (holder) holder.toggleAttribute('data-dsh-whale-paused', paused);
         handle?.setPaused?.(paused);
       },
       dispose() {
@@ -693,9 +479,6 @@
     const fluid = dshEngine
       ? createDshFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win, engine: dshEngine })
       : createFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win });
-    const whale = dshEngine
-      ? createDshParticleWhale({ host: atmosphere, document: doc, window: win, engine: dshEngine })
-      : createStarWhale({ host: atmosphere, document: doc, window: win });
     const wallpaper = byId('aquaWallpaperImage');
     const wallpaperStatus = byId('aquaWallpaperStatus');
     const wallpaperControls = byId('aquaWallpaperControls');
@@ -820,14 +603,12 @@
         if (input) input.setAttribute('aria-valuetext', `${value}${unit}`);
         if (output) output.textContent = `${value}${unit}`;
       }
-      const whaleSwitch = byId('setAquaWhale');
       const enabledSwitch = byId('setAquaEnabled');
       if (enabledSwitch) {
         enabledSwitch.setAttribute('aria-pressed', String(state.aquaEnabled));
         enabledSwitch.title = state.aquaEnabled ? '动态背景：开启' : '动态背景：关闭';
       }
       const critterSwitch = byId('setAquaCritters');
-      if (whaleSwitch) whaleSwitch.checked = state.aquaWhale;
       if (critterSwitch) critterSwitch.checked = state.aquaCritters;
       if (byId('setPointerEnabled')) byId('setPointerEnabled').checked = state.pointerEnabled;
       if (byId('setPointerStyle')) byId('setPointerStyle').value = state.pointerStyle;
@@ -855,7 +636,6 @@
       root.dataset.aquaBackground = state.aquaBackground === 'wallpaper' && wallpaperData
         ? 'wallpaper'
         : 'fluid';
-      root.dataset.aquaWhale = state.aquaWhale ? 'on' : 'off';
       root.dataset.aquaCritters = state.aquaCritters ? 'on' : 'off';
       root.dataset.pointerEnabled = state.pointerEnabled ? 'on' : 'off';
       root.dataset.pointerStyle = state.pointerStyle;
@@ -894,7 +674,6 @@
       const dark = currentThemeIsDark();
       if (dark !== appliedDark) {
         fluid.setTheme(dark);
-        whale.setTheme(dark);
         appliedDark = dark;
       }
       syncControls();
@@ -1017,11 +796,6 @@
     listen(byId('btnPointerReset'), 'click', () => {
       for (const field of FIELDS.filter(field => field.startsWith('pointer'))) update(field, DEFAULTS[field], { immediate: true });
     });
-    listen(byId('setAquaWhale'), 'change', event => update(
-      'aquaWhale',
-      Boolean(event.currentTarget.checked),
-      { immediate: true }
-    ));
     listen(byId('setAquaCritters'), 'change', event => update(
       'aquaCritters',
       Boolean(event.currentTarget.checked),
@@ -1104,7 +878,6 @@
       const idle = !state.aquaEnabled || doc.hidden || (typeof doc.hasFocus === 'function' && !doc.hasFocus());
       const fluidVisible = state.aquaBackground !== 'wallpaper' || !wallpaperData;
       fluid.setPaused(idle || !fluidVisible);
-      whale.setPaused(idle || !state.aquaWhale);
     }
     listen(doc, 'visibilitychange', syncPlayback);
     listen(win, 'blur', syncPlayback);
@@ -1181,7 +954,6 @@
         cleanups.splice(0).forEach(cleanup => cleanup());
         environmentObserver?.disconnect();
         fluid.dispose();
-        whale.dispose();
         dust.forEach(node => node.remove());
       }
     });
@@ -1196,7 +968,6 @@
     fluidHueRotation,
     normalizeSettings,
     createFluidBackdrop,
-    createStarWhale,
     compressWallpaper,
     createAquaShell
   });

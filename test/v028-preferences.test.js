@@ -18,7 +18,7 @@ const baseline = {
   theme: 'light', textScale: 'md', aquaMode: 'mica', aquaEnabled: false,
   aquaBlur: 2, aquaFrost: 20, aquaHue: 40, aquaBrightness: 42,
   aquaBackground: 'fluid', aquaWallpaperBlur: 0, aquaWallpaperFrost: 0,
-  aquaWhale: false, aquaCritters: false, view: 'featured', domain: '', category: '',
+  aquaCritters: false, view: 'featured', domain: '', category: '',
   dailyDate: null, linksCategory: '督办计划', commonLinksFavorites: [],
   realtime: true, closeToTray: false
 };
@@ -38,7 +38,7 @@ test('new profiles use the approved local baseline, saved profiles retain every 
     version: 2, ...Schema.getLegacyUiPreferences(CommonLinks), theme: 'dark', textScale: 'xl',
     aquaMode: 'compat', aquaHue: 260, aquaBrightness: 38, aquaBlur: 12,
     aquaFrost: 60, aquaWallpaperBlur: 7, aquaWallpaperFrost: 30, aquaBackground: 'wallpaper',
-    aquaEnabled: true, aquaWhale: false, aquaCritters: true, view: 'links', domain: 'aerospace',
+    aquaEnabled: true, aquaCritters: true, view: 'links', domain: 'aerospace',
     linksCategory: 'AI', commonLinksFavorites: [], realtime: false, closeToTray: true
   };
   const serialized = JSON.stringify(old, null, 4);
@@ -66,7 +66,7 @@ test('old partial snapshots keep the previous implicit defaults instead of apply
 
 test('desktop migration retains modern browser preferences including false, zero and empty favorites', () => {
   const choices = { version: 2, theme: 'dark', textScale: 'xl', aquaEnabled: false,
-    aquaHue: 0, aquaBrightness: 0, aquaBlur: 0, aquaWhale: false, commonLinksFavorites: [], realtime: false };
+    aquaHue: 0, aquaBrightness: 0, aquaBlur: 0, commonLinksFavorites: [], realtime: false };
   const result = Bootstrap.resolveInitialUiPreferences({
     desktop: { hasStoredPreferences: false, preferences: baseline },
     storage: storage({ [Bootstrap.STORAGE_KEYS.uiPreferences]: JSON.stringify(choices), 'wc-theme': 'light' }),

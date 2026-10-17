@@ -2029,7 +2029,7 @@ main { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) 6rem; }
   position: fixed; bottom: var(--sp-7); left: 50%; transform: translate(-50%, 20px);
   padding: .6875rem var(--sp-6); border-radius: 99px; font-size: var(--t-md);
   background: var(--glass-bg); border: 1px solid var(--accent-line);
-  color: var(--accent-ink); backdrop-filter: blur(14px) saturate(150%); font-weight: 700;
+  color: var(--accent-ink); font-weight: 700;
   opacity: 0; pointer-events: none; z-index: 200; max-width: min(92vw, 35rem);
   box-shadow: var(--glass-shadow-lift);
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--spring-medium);

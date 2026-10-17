@@ -25,7 +25,6 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
     aquaBackground: 'fluid',
     aquaWallpaperBlur: 4,
     aquaWallpaperFrost: 18,
-    aquaWhale: true,
     aquaCritters: true,
     view: 'featured',
     domain: '',
