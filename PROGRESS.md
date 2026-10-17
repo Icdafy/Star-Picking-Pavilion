@@ -2,7 +2,7 @@
 
 黄金分割排版与流体设计 2.0：φ 令牌与版式、动效节奏 × 1.382、流体云、凝光轮廓、全局浮岛、系统更新章节，删除星鲸粒子。
 
-v0.2.39 正在经 tag 工作流发布，结果与证据见[验证记录](docs/v0239-validation.md)。
+[v0.2.39](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.39) 于2026-10-17 10:12:26（北京时间）发布为最新正式版，无发布阻塞。精确提交 `0a1ac16` 的[main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38993279073)与[Release](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/38993283645)完整通过（前两次 tag 运行分别因追光帧耗时门禁与 v0228 悬停等待失败、未发布，修正后重打 tag）；本地 1153/1153 单元与集成、40/40 真实 Electron、零生产依赖漏洞、1303 项包边界。六项公开附件齐全：安装器 101,361,052 B，SHA-256 `3d9dfad621911ebe80eb72f4c27423360d88af1cc98a99c6badd50b665051475`（与 SHA256SUMS.txt 一致），latest.yml 指向 0.2.39；用户数据保留。证据见[验证记录](docs/v0239-validation.md)。
 ---
 
 # v0.2.38 发布状态（历史）

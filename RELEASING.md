@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
 
-v0.2.39 以黄金分割（φ）重构全局排版，动效节奏 × 1.382，新增流体云、凝光轮廓、全局浮岛与“系统更新”章节，删除星鲸粒子；发布由 tag 工作流完成，证据见 [本版验证](docs/v0239-validation.md)。
+[v0.2.39](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.39) 已于北京时间 2026-10-17 10:12:26 发布：以黄金分割（φ）重构全局排版，动效节奏 × 1.382，新增流体云、凝光轮廓、全局浮岛与“系统更新”章节，删除星鲸粒子。tag Release 与 main CI 全部门禁通过，沿用 NotSigned 策略；完整证据见 [本版验证](docs/v0239-validation.md)。
 
 ## 发布前授权门槛
 
