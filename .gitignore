@@ -29,7 +29,6 @@ docs/design/**/*.png
 /build/*
 !/build/icon.ico
 !/build/icon.png
-!/build/make-icon.py
 
 # Completed implementation plans and design prompts are available in Git history.
 /docs/design/

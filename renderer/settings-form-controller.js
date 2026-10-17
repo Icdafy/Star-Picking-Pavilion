@@ -18,13 +18,14 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createSettingsFormModule() {
   const FIELD_NAMES = Object.freeze([
     'automatic',
+    'automaticCleanup',
     'intervalMinutes',
     'rsshubBase',
     'retentionDays',
     'irrelevantRetentionDays'
   ]);
   const COLLECT_FIELD_NAMES = Object.freeze(['automatic', 'intervalMinutes', 'rsshubBase']);
-  const RETENTION_FIELD_NAMES = Object.freeze(['retentionDays', 'irrelevantRetentionDays']);
+  const RETENTION_FIELD_NAMES = Object.freeze(['automaticCleanup', 'retentionDays', 'irrelevantRetentionDays']);
   const RETENTION_DEFAULTS = Object.freeze({ retentionDays: 180, irrelevantRetentionDays: 21 });
   const COLLECT_INTERVAL_PRESETS = Object.freeze([
     [15, '15 分钟'], [30, '30 分钟'], [60, '1 小时'], [120, '2 小时'], [180, '3 小时'], [360, '6 小时'], [720, '12 小时']
@@ -89,6 +90,10 @@
       if (sequence !== latestLoadSequence) return settings;
 
       if (canApplyLoad('automatic', prior)) elements.automatic.checked = settings.collect.automatic === true;
+      if (canApplyLoad('automaticCleanup', prior)) {
+        elements.automaticCleanup.checked = settings.collect.automaticCleanup !== false;
+      }
+      elements.automaticCleanup.disabled = false;
 
       if (canApplyLoad('intervalMinutes', prior)) {
         elements.intervalMinutes.value = settings.collect.intervalMinutes;
@@ -97,6 +102,7 @@
         elements.rsshubBase.value = settings.collect.rsshubBase || '';
       }
       for (const name of RETENTION_FIELD_NAMES) {
+        if (name === 'automaticCleanup') continue;
         if (canApplyLoad(name, prior)) {
           elements[name].value = settings.collect[name] ?? RETENTION_DEFAULTS[name];
         }
@@ -149,6 +155,7 @@
     async function saveRetention(names) {
       const fields = pick(names, RETENTION_FIELD_NAMES);
       const values = {};
+      if (fields.includes('automaticCleanup')) values.automaticCleanup = elements.automaticCleanup.checked === true;
       if (fields.includes('retentionDays')) values.retentionDays = wholeDays('retentionDays', 7, '情报保留天数');
       if (fields.includes('irrelevantRetentionDays')) {
         values.irrelevantRetentionDays = wholeDays('irrelevantRetentionDays', 1, '无关内容保留天数');

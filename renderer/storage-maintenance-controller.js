@@ -88,11 +88,13 @@
       elements.database.textContent = formatBytes(asBytes(storage.fileBytes));
       elements.reclaimable.textContent = formatBytes(asBytes(storage.reclaimableBytes));
       const ratio = Math.max(0, Math.min(1, Number(storage.reclaimableRatio) || 0));
-      // 每日清理挂在自动调度上（scheduler 的 08:25 任务只在自动采集开启时运行），文案必须说清这层依赖
+      // 清理有独立偏好，但仍随自动采集调度；关闭任一开关都不会自动删除过期内容。
       elements.hint.textContent = (
-        (snapshot.scheduler?.activeSchedule?.enabled
-          ? '已开启：每天 08:25 随自动采集清理过期内容并整理数据库'
-          : '未开启：每日自动清理随“自动采集”一起运行；现在可在下方手动清理')
+        (snapshot.automaticCleanup === false
+          ? '已关闭：不再自动清理过期内容；仍可在下方手动清理'
+          : snapshot.scheduler?.activeSchedule?.enabled
+            ? '已开启：每天 08:25 随自动采集清理过期内容并整理数据库'
+            : '已开启，等待自动采集：开启“自动采集”后每天 08:25 清理；现在可在下方手动清理')
         + ` · 情报保留 ${snapshot.retentionDays} 天，无关内容保留 ${snapshot.irrelevantRetentionDays} 天`
         + ` · 当前可回收 ${Math.round(ratio * 100)}%`
       );

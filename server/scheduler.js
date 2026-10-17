@@ -425,12 +425,14 @@ function refreshSchedulerSettings() {
   if (!schedulerStarted || schedulerStopping) return false;
   const settings = loadSettings();
   const enabled = settings.collect.automatic === true;
+  const automaticCleanup = settings.collect.automaticCleanup !== false;
   const intervalMs = collectionIntervalMs(settings.collect.intervalMinutes);
   const analyzeMs = Math.max(20, settings.collect.analyzeIntervalSeconds || 75) * 1000;
-  if (activeSchedule?.enabled === enabled && activeSchedule?.collectionIntervalMs === intervalMs
+  if (activeSchedule?.enabled === enabled && activeSchedule?.automaticCleanup === automaticCleanup
+    && activeSchedule?.collectionIntervalMs === intervalMs
     && activeSchedule?.analysisIntervalMs === analyzeMs) return false;
   const collectionChanged = activeSchedule?.enabled !== enabled || activeSchedule?.collectionIntervalMs !== intervalMs;
-  activeSchedule = { enabled, collectionIntervalMs: intervalMs, analysisIntervalMs: analyzeMs };
+  activeSchedule = { enabled, automaticCleanup, collectionIntervalMs: intervalMs, analysisIntervalMs: analyzeMs };
   for (const task of cronTasks) enabled ? task.start?.() : task.stop?.();
   if (collectionChanged) scheduleNextCollection();
   notifyStatus();
@@ -468,7 +470,7 @@ function startScheduler() {
   }));
   // 保留清理（日报之后 25 分钟，避开采集与日报的忙时）
   cronTasks.add(cron.schedule(`25 ${settings.dailyReportHour ?? 8} * * *`, () => {
-    if (!activeSchedule?.enabled || schedulerStopping) return;
+    if (!activeSchedule?.enabled || !activeSchedule.automaticCleanup || schedulerStopping) return;
     try {
       pruneReceipts();
       const result = pruneOnce('cron');

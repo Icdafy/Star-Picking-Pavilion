@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS = {
   // —— 采集 ——
   collect: {
     automatic: false,                  // 只有明确开启自动调度后才运行后台任务
+    automaticCleanup: true,            // 随自动调度清理过期内容；旧设置保持原有行为，可单独关闭
     intervalMinutes: 60,               // v0.2.8 原始状态；已有 settings.json 的值优先
     analyzeIntervalSeconds: 75,        // 兼容已有配置；分析随采集任务运行，不再独立轮询
     keepDays: 30,                      // 入库保留天数（过老的抓取项直接丢弃）
@@ -118,6 +119,8 @@ function normalizeSettings(raw, { existing = false } = {}) {
   settings.ai.requestTimeoutMs = boundedInteger(settings.ai.requestTimeoutMs, 1000, 120000, DEFAULT_SETTINGS.ai.requestTimeoutMs);
   settings.collect.intervalMinutes = boundedInteger(settings.collect.intervalMinutes, 1, 720, defaults.collect.intervalMinutes);
   settings.collect.automatic = settings.collect.automatic === true;
+  settings.collect.automaticCleanup = typeof settings.collect.automaticCleanup === 'boolean'
+    ? settings.collect.automaticCleanup : DEFAULT_SETTINGS.collect.automaticCleanup;
   settings.collect.analyzeIntervalSeconds = boundedInteger(
     settings.collect.analyzeIntervalSeconds, 20, 3600, DEFAULT_SETTINGS.collect.analyzeIntervalSeconds
   );
@@ -185,7 +188,7 @@ function applySettingsPatch(currentSettings, patch) {
     throw new HttpError(400, '包含不支持的 AI 设置字段');
   }
   if (patch.collect && Object.keys(patch.collect).some(
-    key => !['automatic', 'intervalMinutes', 'rsshubBase', 'retentionDays', 'irrelevantRetentionDays'].includes(key)
+    key => !['automatic', 'automaticCleanup', 'intervalMinutes', 'rsshubBase', 'retentionDays', 'irrelevantRetentionDays'].includes(key)
   )) {
     throw new HttpError(400, '包含不支持的采集设置字段');
   }
@@ -241,6 +244,10 @@ function applySettingsPatch(currentSettings, patch) {
   if (patch?.collect && Object.hasOwn(patch.collect, 'automatic')) {
     if (typeof patch.collect.automatic !== 'boolean') throw new HttpError(400, '自动采集开关必须为布尔值');
     settings.collect.automatic = patch.collect.automatic;
+  }
+  if (patch?.collect && Object.hasOwn(patch.collect, 'automaticCleanup')) {
+    if (typeof patch.collect.automaticCleanup !== 'boolean') throw new HttpError(400, '自动清理开关必须为布尔值');
+    settings.collect.automaticCleanup = patch.collect.automaticCleanup;
   }
   if (patch?.collect && Object.hasOwn(patch.collect, 'intervalMinutes')) {
     const interval = Number(patch.collect.intervalMinutes);

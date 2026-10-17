@@ -16,7 +16,7 @@ function deferred() {
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 function schedulerFixture(t, overrides = {}) {
-  const events = [], intervals = [], timers = [];
+  const events = [], intervals = [], timers = [], cronTasks = [];
   let clock = Date.parse('2026-10-07T00:00:00Z');
   class FixtureDate extends Date {
     constructor(...args) { super(...(args.length ? args : [clock])); }
@@ -24,7 +24,10 @@ function schedulerFixture(t, overrides = {}) {
   }
   const settings = { collect: { automatic: overrides.automatic ?? true, intervalMinutes: 10, analyzeIntervalSeconds: 75 }, ai: {}, dailyReportHour: 8 };
   const dependencies = {
-    'node-cron': { schedule: () => ({ stop() {}, destroy() {} }) },
+    'node-cron': { schedule: (expression, callback) => {
+      const task = { expression, callback, active: true, start() { this.active = true; }, stop() { this.active = false; }, destroy() {} };
+      cronTasks.push(task); return task;
+    } },
     './collectors': { collectAll: async onProgress => { events.push('collect'); await overrides.collect?.(onProgress); return { results: [], skipped: 0 }; } },
     './ai/pipeline': {
       pendingAnalysisCount: () => overrides.remaining?.() || 0,
@@ -38,12 +41,12 @@ function schedulerFixture(t, overrides = {}) {
     './ai/hot': { computeHotRanking: () => events.push('hot'), snapshotHeat() {} },
     './ai/daily': { generateDaily() {} },
     './ai/reports': { generatePeriod() {}, previousPeriodKey() {}, enhanceLeads: async () => {} },
-    './ai/receipts': { pruneReceipts() {} },
+    './ai/receipts': { pruneReceipts() { events.push('pruneReceipts'); } },
     './retention': { pruneDatabase: () => { events.push('prune'); return overrides.prune?.() || { removedArticles: 0, removedReports: 0 }; } },
     './config': { loadSettings: () => settings },
     './schedule-policy': require('../server/schedule-policy'),
     './db': { db: {}, DATABASE_PATH: 'fixture' },
-    './database-maintenance': { compactDatabase: () => ({ skipped: false }) }
+    './database-maintenance': { compactDatabase: () => { events.push('compact'); return { skipped: false }; } }
   };
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../server/scheduler.js'), 'utf8'), {
@@ -67,8 +70,40 @@ function schedulerFixture(t, overrides = {}) {
     }
     clock = end;
   };
-  return { scheduler, settings, events, intervals, timers, advance, elapse: ms => { clock += ms; }, clock: () => clock };
+  return { scheduler, settings, events, intervals, timers, cronTasks, advance, elapse: ms => { clock += ms; }, clock: () => clock };
 }
+
+test('automatic cleanup opt-out blocks scheduled deletion and compaction without stopping collection or manual maintenance', async t => {
+  const { scheduler, settings, events, timers, cronTasks } = schedulerFixture(t);
+  scheduler.startScheduler();
+  const cleanup = cronTasks.find(task => task.expression === '25 8 * * *');
+  assert.ok(cleanup);
+  cleanup.callback();
+  assert.deepEqual(events, ['pruneReceipts', 'prune', 'compact']);
+  const collectionTimer = timers.find(timer => !timer.cancelled);
+
+  settings.collect.automaticCleanup = false;
+  assert.equal(scheduler.refreshSchedulerSettings(), true);
+  assert.equal(scheduler.getStatus().activeSchedule.enabled, true);
+  assert.equal(scheduler.getStatus().activeSchedule.automaticCleanup, false);
+  assert.equal(collectionTimer.cancelled, undefined, 'cleanup preference must not reset collection deadline');
+  events.length = 0;
+  cleanup.callback();
+  assert.deepEqual(events, [], 'the already registered callback must honor the disabled setting');
+  assert.equal((await scheduler.requestPrune('manual').completion).ok, true);
+  assert.deepEqual(events, ['prune'], 'manual cleanup remains available');
+
+  settings.collect.automaticCleanup = true;
+  assert.equal(scheduler.refreshSchedulerSettings(), true);
+  events.length = 0;
+  cleanup.callback();
+  assert.deepEqual(events, ['pruneReceipts', 'prune', 'compact']);
+  settings.collect.automatic = false;
+  scheduler.refreshSchedulerSettings();
+  events.length = 0;
+  cleanup.callback();
+  assert.deepEqual(events, [], 'automatic cleanup remains coupled to automatic collection');
+});
 
 test('a failed parallel branch waits for its siblings before releasing the caller', async () => {
   const gate = deferred();

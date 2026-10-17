@@ -7,10 +7,57 @@ const assert = require('node:assert/strict');
 const {
   comparePublicVersions,
   createPublicUpdateSupport,
+  createUpdateDownloadedNotifier,
   createUpdateInstallCoordinator,
   publicVersionFromPackage,
   publicVersionFromUpdateInfo
 } = require('../electron/update-coordinator');
+
+test('download notification uses the supplied current icon and opens the app without installing', () => {
+  const { EventEmitter } = require('node:events');
+  const notices = [];
+  let opened = 0;
+  class Notification extends EventEmitter {
+    static isSupported() { return true; }
+    constructor(options) { super(); this.options = options; notices.push(this); }
+    show() { this.shown = true; }
+  }
+  const notifier = createUpdateDownloadedNotifier({
+    Notification, iconPath: 'resources/tray-icon.ico', onClick: () => opened++
+  });
+  assert.equal(notifier.notify({ version: '0.2.40' }), true);
+  assert.deepEqual(notices[0].options, {
+    title: '摘星阁更新已就绪',
+    body: 'v0.2.40 已下载。点击打开摘星阁，选择“重启安装”完成更新。',
+    icon: 'resources/tray-icon.ico'
+  });
+  assert.equal(notices[0].shown, true);
+  assert.equal(opened, 0);
+  notices[0].emit('click');
+  assert.equal(opened, 1);
+  notices[0].emit('close');
+  assert.equal(notifier.notify({ version: '0.2.40' }), false);
+  assert.equal(notifier.notify({ tag: 'v0.2.41', version: '0.2.99' }), true);
+  assert.match(notices[1].options.body, /^v0\.2\.41 /);
+  assert.equal(notices.length, 2);
+});
+
+test('unsupported or failed system notifications do not reject downloaded updates', () => {
+  const errors = [];
+  class Notification {
+    static isSupported() { return true; }
+    constructor() { throw new Error('Windows notification unavailable'); }
+  }
+  const notifier = createUpdateDownloadedNotifier({ Notification, onError: error => errors.push(error.message) });
+  assert.equal(notifier.notify({ version: '0.2.40' }), false);
+  assert.deepEqual(errors, ['Windows notification unavailable']);
+  assert.equal(notifier.notify({ version: '0.2.40' }), false, 'failed delivery can retry');
+  assert.equal(errors.length, 2);
+  Notification.isSupported = () => false;
+  assert.equal(notifier.notify({ version: '0.2.40' }), false);
+  assert.equal(errors.length, 2);
+  assert.equal(createUpdateDownloadedNotifier().notify({ version: '0.2.40' }), false);
+});
 
 test('manual update checks reject duplicates, active downloads and rapid retries', async () => {
   let finish, stamp = 0, status = 'idle', count = 0;

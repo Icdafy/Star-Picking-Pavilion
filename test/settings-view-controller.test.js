@@ -210,7 +210,8 @@ test('v0.2.37 自动采集改动即保存：开关、胶囊、回车各自只提
   env.$('#setInterval').value = '60';
   env.$('#setAutomaticCollect').checked = true;
   await env.fire('#setAutomaticCollect', 'change');
-  assert.deepEqual(env.formCalls.at(-1), ['saveCollect', ['automatic']]);
+  assert.deepEqual(env.formCalls.filter(Array.isArray).at(-1), ['saveCollect', ['automatic']]);
+  assert.equal(env.formCalls.at(-1), 'maintenance-load');
   assert.match(env.toasts.at(-1)[0], /自动采集已开启：每 1 小时采集一次/);
   assert.equal(env.$('#collectHeroTitle').textContent, '每 1 小时采集一次');
   assert.match(env.$('#collectIntervalChips').innerHTML, /data-value="60"[^>]*>1 小时/);
@@ -249,6 +250,21 @@ test('v0.2.37 保存被拒时提示原因并读回服务器值（discard），�
   await env.fire('#setIrrelevantRetentionDays', 'change');
   assert.deepEqual(env.formCalls.at(-1), ['discard', ['irrelevantRetentionDays']]);
   assert.match(env.toasts.at(-1)[0], /^保留期限保存失败：/);
+});
+
+test('automatic cleanup switch saves only its preference, refreshes its policy and restores server state after failure', async () => {
+  const env = createController();
+  env.$('#setAutomaticCleanup').checked = false;
+  await env.fire('#setAutomaticCleanup', 'change');
+  assert.ok(env.formCalls.some(call => Array.isArray(call) && call[0] === 'saveRetention' && call[1][0] === 'automaticCleanup'));
+  assert.ok(env.formCalls.includes('maintenance-load'));
+  assert.equal(env.$('#setAutomaticCleanup').disabled, false);
+  assert.match(env.toasts.at(-1)[0], /自动清理已关闭/);
+  const failed = createController({ rejectSave: true });
+  await failed.fire('#setAutomaticCleanup', 'change');
+  assert.ok(failed.formCalls.some(call => Array.isArray(call) && call[0] === 'discard' && call[1][0] === 'automaticCleanup'));
+  assert.match(failed.toasts.at(-1)[0], /自动清理设置保存失败/);
+  assert.equal(failed.$('#setAutomaticCleanup').disabled, false);
 });
 
 test('情报备忘：空列表给出提示，Ctrl+Enter 与按钮同样记下', async () => {

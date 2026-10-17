@@ -842,7 +842,7 @@
           <div>
             <span class="set-kicker">STORAGE</span>
             <h3 id="heading-settingsStorage" tabindex="-1">存储与清理</h3>
-            <p>情报只存在本机。设好保留期限，过期内容会被自动清理；星标和备忘永远保留。</p>
+            <p>情报只存在本机。可按保留期限开启自动清理，或自行手动清理；星标和备忘永远保留。</p>
           </div>
           <span class="set-badge">本机专属</span>
         </div>
@@ -879,12 +879,14 @@
                 <small>被判定与关注领域无关的内容保留多久（1—3650 天），通常比相关情报短。</small>
               </div>
             </div>
-            <div class="set-row">
-              <span>自动清理</span>
-              <div class="set-row-body">
+            <label class="desktop-switch">
+              <span class="switch-copy">
+                <strong>自动清理</strong>
                 <small class="storage-policy-hint" id="lastPruneHint" aria-live="polite">正在读取本机存储状态…</small>
-              </div>
-            </div>
+              </span>
+              <input id="setAutomaticCleanup" type="checkbox" role="switch" aria-label="自动清理过期情报" aria-describedby="lastPruneHint" disabled>
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
           </div>
         </div>
         <div class="set-step">

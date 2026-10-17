@@ -63,6 +63,21 @@ test('failed atomic rename preserves the previous valid settings file', async ()
   assert.equal((await fs.promises.readdir(dataDir)).some(file => file.endsWith('.tmp')), false);
 });
 
+test('automatic cleanup preserves legacy behavior, validates booleans and persists both switch states', async () => {
+  await fs.promises.writeFile(SETTINGS_PATH, JSON.stringify({ collect: { automatic: true } }), 'utf8');
+  assert.equal(loadSettings().collect.automaticCleanup, true, 'old settings keep their existing cleanup schedule');
+  for (const value of ['false', 0, null]) {
+    assert.throws(() => applySettingsPatch(loadSettings(), { collect: { automaticCleanup: value } }), /自动清理开关必须为布尔值/);
+  }
+  for (const automaticCleanup of [false, true]) {
+    const update = applySettingsPatch(loadSettings(), { collect: { automaticCleanup } });
+    await saveSettings(update.settings);
+    assert.equal(loadSettings().collect.automaticCleanup, automaticCleanup);
+    assert.equal(JSON.parse(await fs.promises.readFile(SETTINGS_PATH, 'utf8')).collect.automaticCleanup, automaticCleanup);
+    assert.equal(loadSettings().collect.automatic, true, 'cleanup toggle does not alter automatic collection');
+  }
+});
+
 test('changing a remote AI base URL clears the credential unless a replacement is supplied', () => {
   const current = loadSettings();
   const cleared = applySettingsPatch(current, { ai: { baseUrl: 'https://models.example/v1' } });

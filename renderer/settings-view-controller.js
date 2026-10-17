@@ -109,6 +109,7 @@
     const settingsForm = SettingsFormController.createSettingsFormController({
       elements: {
         automatic: $('#setAutomaticCollect'),
+        automaticCleanup: $('#setAutomaticCleanup'),
         intervalMinutes: $('#setInterval'),
         rsshubBase: $('#setRsshub'),
         retentionDays: $('#setRetentionDays'),
@@ -312,6 +313,7 @@
         await settingsForm.saveCollect([field]);
         toast(describe());
         await refreshStats();
+        if (field === 'automatic') await loadMaintenance();
       } catch (error) {
         toast('自动采集设置保存失败：' + error.message, true);
         await settingsForm.discard?.([field]).catch(() => {});
@@ -338,6 +340,20 @@
     const describeRsshub = () => ($('#setRsshub').value.trim() ? 'RSSHub 地址已保存，rsshub:// 信源下一轮生效' : '已清除 RSSHub 地址');
 
     $('#setAutomaticCollect').addEventListener('change', () => saveCollectField('automatic', describeAutomatic));
+    $('#setAutomaticCleanup').addEventListener('change', async () => {
+      const input = $('#setAutomaticCleanup');
+      input.disabled = true;
+      try {
+        await settingsForm.saveRetention(['automaticCleanup']);
+        toast(input.checked ? '自动清理已开启：随自动采集每天清理过期内容' : '自动清理已关闭：可随时手动清理过期内容');
+      } catch (error) {
+        toast('自动清理设置保存失败：' + error.message, true);
+        await settingsForm.discard?.(['automaticCleanup']).catch(() => {});
+      } finally {
+        input.disabled = false;
+        await loadMaintenance();
+      }
+    });
     $('#setInterval').addEventListener('change', () => saveCollectField('intervalMinutes', describeInterval));
     $('#setRsshub').addEventListener('change', () => saveCollectField('rsshubBase', describeRsshub));
     $('#collectIntervalChips').addEventListener('click', event => {

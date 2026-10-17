@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 
@@ -226,6 +227,16 @@ test('retention days are validated and persisted through the settings endpoint',
   const maintenance = JSON.parse((await server.request({ pathname: '/api/maintenance', headers })).body);
   assert.equal(maintenance.retentionDays, 45);
   assert.equal(maintenance.irrelevantRetentionDays, 5);
+  assert.equal(settings.collect.automaticCleanup, true);
+  assert.equal((await post({ collect: { automaticCleanup: 'false' } })).status, 400);
+  for (const automaticCleanup of [false, true]) {
+    assert.equal((await post({ collect: { automaticCleanup } })).status, 200);
+    const persisted = JSON.parse((await server.request({ pathname: '/api/settings', headers })).body);
+    const snapshot = JSON.parse((await server.request({ pathname: '/api/maintenance', headers })).body);
+    assert.equal(persisted.collect.automaticCleanup, automaticCleanup);
+    assert.equal(snapshot.automaticCleanup, automaticCleanup);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(server.dataDir, 'settings.json'), 'utf8')).collect.automaticCleanup, automaticCleanup);
+  }
 });
 
 test('source health is exposed and a manual retry clears the backoff', async t => {

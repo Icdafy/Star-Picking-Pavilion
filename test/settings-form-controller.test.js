@@ -39,6 +39,7 @@ class FakeInput extends EventTarget {
 function createElements() {
   return {
     automatic: new FakeInput(),
+    automaticCleanup: new FakeInput(),
     intervalMinutes: new FakeInput(),
     rsshubBase: new FakeInput(),
     retentionDays: new FakeInput(),
@@ -127,6 +128,50 @@ test('late settings load preserves every user edit', async () => {
   assert.equal(elements.intervalMinutes.value, '45');
   assert.equal(elements.rsshubBase.value, 'https://user-rsshub.example');
   assert.equal(elements.retentionDays.value, '30');
+});
+
+test('automatic cleanup defaults on for old settings, saves independently and rolls back only after discard', async () => {
+  const elements = createElements();
+  const bodies = [];
+  let saved = {}, fail = false;
+  const controller = SettingsFormController.createSettingsFormController({
+    elements, request: async (_path, options) => {
+      if (!options) return { collect: { ...settingsWithPrefix('loaded').collect, ...saved } };
+      if (fail) throw new Error('disk full');
+      bodies.push(options.body);
+      saved = { ...saved, ...options.body.collect };
+      return { ok: true };
+    }
+  });
+  await controller.load();
+  assert.equal(elements.automaticCleanup.checked, true);
+  elements.automaticCleanup.checked = false;
+  elements.automaticCleanup.dispatchEvent(new Event('input'));
+  elements.retentionDays.fill('invalid');
+  await controller.saveRetention(['automaticCleanup']);
+  assert.deepEqual(bodies.at(-1), { collect: { automaticCleanup: false } });
+  await controller.load();
+  assert.equal(elements.automaticCleanup.checked, false);
+  elements.automaticCleanup.checked = true;
+  elements.automaticCleanup.dispatchEvent(new Event('input'));
+  fail = true;
+  await assert.rejects(controller.saveRetention(['automaticCleanup']), /disk full/);
+  await controller.load();
+  assert.equal(elements.automaticCleanup.checked, true, 'ordinary loads preserve an unsaved edit');
+  await controller.discard(['automaticCleanup']);
+  assert.equal(elements.automaticCleanup.checked, false, 'failed toggle restores persisted setting');
+});
+
+test('a late load cannot replace a cleanup toggle edited while loading', async () => {
+  const loadGate = deferred();
+  const elements = createElements();
+  const controller = SettingsFormController.createSettingsFormController({ elements, request: () => loadGate.promise });
+  const loading = controller.load();
+  elements.automaticCleanup.checked = false;
+  elements.automaticCleanup.dispatchEvent(new Event('input'));
+  loadGate.resolve(settingsWithPrefix('loaded'));
+  await loading;
+  assert.equal(elements.automaticCleanup.checked, false);
 });
 
 test('an older settings load resolving last cannot roll back a newer load', async () => {

@@ -45,11 +45,13 @@ const {
 const {
   createPublicUpdateSupport,
   createUpdateCheckCoordinator,
+  createUpdateDownloadedNotifier,
   createUpdateInstallCoordinator,
   publicVersionFromPackage,
   publicVersionFromUpdateInfo
 } = require('./update-coordinator');
 const packageMetadata = require('../package.json');
+if (process.platform === 'win32') app.setAppUserModelId(require('../config/brand.json').appId);
 const applicationIconPath = app.isPackaged
   ? path.join(process.resourcesPath, 'tray-icon.ico')
   : path.join(__dirname, '..', 'build', 'icon.ico');
@@ -445,16 +447,23 @@ function setupAutoUpdate() {
     version: publicVersionFromUpdateInfo(i)
   }));
   autoUpdater.on('download-progress', p => sendUpdateStatus('downloading', { percent: Math.round(p.percent) }));
-  autoUpdater.on('update-downloaded', i => sendUpdateStatus('downloaded', {
-    version: publicVersionFromUpdateInfo(i)
-  }));
+  // electron-updater's default toast discards icon options and falls back to the
+  // Windows shell's cached logo. Always supply our packaged, current brand icon.
+  const updateNotifier = createUpdateDownloadedNotifier({
+    Notification,
+    iconPath: applicationIconPath,
+    onClick: () => focusExistingWindow(win),
+    onError: error => console.warn('[更新] 无法显示系统通知:', error.message)
+  });
+  autoUpdater.on('update-downloaded', i => {
+    sendUpdateStatus('downloaded', { version: publicVersionFromUpdateInfo(i) });
+    updateNotifier.notify(i);
+  });
   autoUpdater.on('error', error => {
     if (updateInstallCoordinator?.reportFailure(error)) return;
     sendUpdateStatus('error', { message: String(error?.message || error) });
   });
-  autoUpdater.checkForUpdatesAndNotify().catch(error => sendUpdateStatus('error', {
-    message: String(error?.message || error)
-  }));
+  updateCheckCoordinator.check();
   // 之后每 6 小时再查一次
   autoUpdateTimer = setInterval(() => {
     updateCheckCoordinator.check();

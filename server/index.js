@@ -649,6 +649,7 @@ const server = http.createServer(async (req, res) => {
           expiring: countExpiring(plan),
           retentionDays: plan.retentionDays,
           irrelevantRetentionDays: plan.irrelevantRetentionDays,
+          automaticCleanup: settings.collect.automaticCleanup,
           // prune 已改为 202 异步契约：前端靠这个布尔判断后台清理是否结束，
           // 结束前轮询到的数字都是清理前旧值，不得拿去刷新界面
           pruneRunning: schedulerStatus.pruneRunning,

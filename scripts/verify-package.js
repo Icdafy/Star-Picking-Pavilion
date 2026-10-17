@@ -130,6 +130,26 @@ function assertRequiredLegalResources(readResource) {
   }
 }
 
+function assertWindowsIconResources(executable, canonicalIcon, label = 'executable') {
+  const resedit = require('resedit');
+  const resources = resedit.NtExecutableResource.from(resedit.NtExecutable.from(executable, { ignoreCert: true }));
+  const groups = resedit.Resource.IconGroupEntry.fromEntries(resources.entries);
+  const expected = resedit.Data.IconFile.from(canonicalIcon).icons.map(item => item.data);
+  if (groups.length === 0) throw new Error(`${label} has no Windows icon resources`);
+  const bytes = item => Buffer.from(item.isRaw() ? item.bin : item.generate());
+  for (const group of groups) {
+    const actual = group.getIconItemsFromEntries(resources.entries);
+    if (actual.length !== expected.length) throw new Error(`${label} is missing canonical Windows icon sizes`);
+    for (const frame of expected) {
+      const embedded = actual.find(item => (item.width || 256) === frame.width && (item.height || 256) === frame.height);
+      if (!embedded || !bytes(embedded).equals(bytes(frame))) {
+        throw new Error(`${label} has a stale ${frame.width} × ${frame.height} Windows icon`);
+      }
+    }
+  }
+  return expected.length;
+}
+
 const mib = bytes => (bytes / 1024 / 1024).toFixed(2);
 
 // 只量不拦。产物必须存在且确实是文件（构建没出东西仍然要失败），
@@ -163,6 +183,12 @@ function verifyPackage(options = {}) {
     const file = path.join(resourcesDir, name);
     return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
   });
+  const canonicalIcon = fs.readFileSync(path.join(projectRoot, 'build', 'icon.ico'));
+  const trayIcon = fs.readFileSync(path.join(resourcesDir, 'tray-icon.ico'));
+  if (!trayIcon.equals(canonicalIcon)) throw new Error('Packaged tray/notification icon is stale');
+  const executable = path.join(distDir, 'win-unpacked', `${packageJson.build.executableName}.exe`);
+  const iconFrames = assertWindowsIconResources(fs.readFileSync(executable), canonicalIcon, 'Application executable');
+  assertWindowsIconResources(fs.readFileSync(installer), canonicalIcon, 'Update installer');
   const asarBytes = measureFile(archive, 'app.asar');
   const installerBytes = measureFile(installer, 'installer');
 
@@ -170,6 +196,7 @@ function verifyPackage(options = {}) {
     archive,
     installer,
     entryCount: entries.length,
+    iconFrames,
     asarBytes,
     installerBytes
   };
@@ -179,6 +206,7 @@ if (require.main === module) {
   try {
     const result = verifyPackage();
     console.log(`Verified ${result.entryCount} ASAR entries`);
+    console.log(`Verified ${result.iconFrames} canonical Windows icon sizes in app, update installer and tray/notification resources`);
     // 报告用途：发布记录里留一个可比对的数字，方便回头看某版为什么变大。
     // 精确到字节，因为 MiB 四舍五入会把「涨了 1.7 KB」和「一字未动」显示成同一个数。
     console.log(`app.asar: ${result.asarBytes} bytes (${mib(result.asarBytes)} MiB)`);
@@ -198,6 +226,7 @@ module.exports = {
   assertNoEmbeddedSecrets,
   assertProductionDependencyEntries,
   assertRequiredLegalResources,
+  assertWindowsIconResources,
   expectedInstallerName,
   verifyPackage
 };

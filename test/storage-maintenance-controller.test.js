@@ -143,6 +143,19 @@ test('combines database and desktop snapshots into one truthful storage dashboar
   assert.match(view.hint.textContent, /可回收 20%/);
 });
 
+test('cleanup policy distinguishes disabled preference, active scheduling and waiting for automatic collection', async () => {
+  for (const [automaticCleanup, enabled, message] of [
+    [false, true, /已关闭：不再自动清理/],
+    [true, true, /已开启：每天 08:25/],
+    [true, false, /已开启，等待自动采集/]
+  ]) {
+    const { view, controller } = pruneFixture({ snapshot: { automaticCleanup, scheduler: { activeSchedule: { enabled } } } });
+    await controller.load();
+    assert.match(view.hint.textContent, message);
+    assert.equal(view.pruneButton.disabled, false, 'manual cleanup must stay available in every automatic mode');
+  }
+});
+
 test('unavailable desktop storage is never rendered as zero and total becomes a lower bound', async () => {
   const view = elements();
   const controller = createStorageMaintenanceController({

@@ -122,8 +122,36 @@ function createUpdateCheckCoordinator({ autoUpdater, getStatus, reportStatus, no
   return Object.freeze({ check });
 }
 
+function createUpdateDownloadedNotifier({ Notification, iconPath, onClick, onError } = {}) {
+  const shown = new Set();
+  let current = null;
+  function notify(info) {
+    const version = publicVersionFromUpdateInfo(info);
+    if (!version || shown.has(version) || !Notification || Notification.isSupported?.() === false) return false;
+    try {
+      const notification = new Notification({
+        title: '摘星阁更新已就绪',
+        body: `v${version} 已下载。点击打开摘星阁，选择“重启安装”完成更新。`,
+        icon: iconPath
+      });
+      notification.on('click', () => onClick?.());
+      notification.on('close', () => { if (current === notification) current = null; });
+      notification.show();
+      current = notification;
+      shown.add(version);
+      return true;
+    } catch (error) {
+      // Windows notifications are best-effort; the downloaded update remains usable.
+      onError?.(error);
+      return false;
+    }
+  }
+  return Object.freeze({ notify });
+}
+
 module.exports = {
   createUpdateCheckCoordinator,
+  createUpdateDownloadedNotifier,
   createUpdateInstallCoordinator,
   comparePublicVersions,
   createPublicUpdateSupport,

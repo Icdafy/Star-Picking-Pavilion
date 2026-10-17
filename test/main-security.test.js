@@ -184,7 +184,12 @@ test('auto update starts independently and reports failures to the renderer', ()
   const updaterIndex = source.indexOf('setupAutoUpdate();', readyIndex);
   const serverIndex = source.indexOf('await startServer(', readyIndex);
   assert.ok(updaterIndex > readyIndex && updaterIndex < serverIndex);
-  assert.match(source, /checkForUpdatesAndNotify\(\)\.catch\([^)]*sendUpdateStatus\('error'/s);
+  assert.match(source, /reportStatus:\s*sendUpdateStatus/);
+  assert.match(source, /updateCheckCoordinator\.check\(\)/);
+  assert.doesNotMatch(source, /checkForUpdatesAndNotify\(/);
+  assert.match(source, /app\.setAppUserModelId\(require\('\.\.\/config\/brand\.json'\)\.appId\)/);
+  assert.match(source, /createUpdateDownloadedNotifier\(\{\s*Notification,\s*iconPath:\s*applicationIconPath/s);
+  assert.match(source, /autoUpdater\.on\('update-downloaded',[\s\S]*?updateNotifier\.notify\(i\)/);
 });
 
 test('update installation is fire-and-forget and coordinates shutdown before NSIS', () => {

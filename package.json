@@ -1,8 +1,8 @@
 {
   "name": "star-picking-pavilion",
   "productName": "摘星阁",
-  "version": "0.2.39",
-  "shortVersionWindows": "0.2.39",
+  "version": "0.2.40",
+  "shortVersionWindows": "0.2.40",
   "description": "摘星阁（Star-Picking-Pavilion）· 低空经济与商业航天热点情报站（聚合信源 + AI 精选，本地运行）",
   "author": "摘星阁",
   "license": "MIT",
@@ -21,7 +21,7 @@
     "start": "electron .",
     "server": "node server/index.js",
     "pipeline": "node scripts/run-pipeline.js",
-    "icon": "python build/make-icon.py",
+    "icon": "node scripts/generate-icons.js",
     "verify:package": "node scripts/verify-package.js",
     "verify:version": "node scripts/verify-version.js",
     "notices": "node scripts/generate-third-party-notices.js",
@@ -30,7 +30,7 @@
     "audit:sources": "node scripts/audit-sources.js",
     "eval:selection": "node scripts/eval-selection.js",
     "eval:relations": "node scripts/eval-relations.js",
-    "dist": "node scripts/sync-release-history.js --check && electron-builder --win --publish never && node scripts/prepare-update-metadata.js",
+    "dist": "node scripts/sync-release-history.js --check && npm run icon -- --check && electron-builder --win --publish never && node scripts/prepare-update-metadata.js",
     "releases:sync": "node scripts/sync-release-history.js",
     "releases:check": "node scripts/sync-release-history.js --check"
   },
@@ -54,7 +54,7 @@
     "undici": "^8.10.2"
   },
   "build": {
-    "buildVersion": "0.2.39",
+    "buildVersion": "0.2.40",
     "appId": "com.icdafy.star-picking-pavilion",
     "productName": "摘星阁",
     "executableName": "Star-Picking-Pavilion",
