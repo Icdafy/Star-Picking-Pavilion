@@ -1,6 +1,10 @@
 # v0.2.43 发布状态
 
-已实现 DeepSeek-V4.1-Flash-1017 模型适配、系统显示器刷新率读取、自动匹配与 60 / 70 / 120 / 144Hz 手动设置。完整单元与集成 1205 / 1205、刷新率真实 Electron 定向测试、图标检查与两项零漏洞依赖审计均已通过。完整桌面回归、构建与公开发布进行中；尚未将候选写成已发布。验证证据见 [本版验证](docs/v0243-validation.md)。
+[v0.2.43](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.43) 已于 2026-10-18 17:24:53（北京时间）发布为最新正式版，非 draft、非 prerelease，六项公开附件重新下载复核全部通过。已实现 DeepSeek-V4.1-Flash-1017 模型适配、旧 Flash 名称归一、系统显示器刷新率读取、自动匹配与 60 / 70 / 120 / 144Hz 手动设置。
+
+精确提交 `790477cf0f54e4e0fd5b7f4d307ed61fca2481ec` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39087333855) 和 [Release 第 2 次作业](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39088261973/attempts/2) 全部门禁通过：1205 / 1205 单元与集成、44 / 44 真实 Electron、两项零漏洞依赖审计、1305 项包边界、七尺寸图标及一次性 Windows 安装、原生窗口图标与 Shell 身份、单实例、退出、卸载和用户数据保留。最终 Release ASAR 15,909,839 B，安装器 102,147,891 B，产品/文件版本 0.2.43，NotSigned；SHA-256 `6e889468c0c2789f6a3da0e41971db1e26c4f01ebc3784ee38bf99568cd600fa` 与校验文件及 GitHub 摘要相同，更新元数据、4863 块 blockmap、SBOM、图标、声明与正文均一致。
+
+首轮 main CI 的三项测试流程问题仅修改测试后复验通过；Release 首轮另有两项既有桌面测试失败，第 2 次保持同提交、同代码、同断言及同 tag 完整重跑成功。全部失败沿革、本地候选与正式附件尺寸的区别、144Hz 实跑和其他验证边界见 [本版验证](docs/v0243-validation.md)。
 
 ---
 

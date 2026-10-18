@@ -1,6 +1,6 @@
 # v0.2.43 验证记录
 
-本版适配 DeepSeek-V4.1-Flash-1017 与显示器刷新率自动匹配。以下实现已经完成；完整验证与公开发布结果在运行后补充，不将未执行的项目记为通过。
+本版适配 DeepSeek-V4.1-Flash-1017 与显示器刷新率自动匹配。[v0.2.43](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.43) 已于 2026-10-18 17:24:53（北京时间）发布为最新正式版，非 draft、非 prerelease；六项公开附件重新下载复核全部通过。以下记录区分本地候选、main CI 与最终 Release。
 
 ## 实现与依据
 
@@ -20,17 +20,39 @@
 - 本地候选构建成功，1305 项 ASAR 包边界、7 种 Windows 图标尺寸及带产物的 v0.2.43 版本校验通过；ASAR 15,896,936 B，安装器 102,150,496 B，签名状态 NotSigned。这些数字属于本地候选包，不是最终 Release 附件。
 - 本地打包 EXE 使用隔离测试资料实际启动，确认 isPackaged、ASAR 路径、0.2.43 版本、原生 144Hz 自动匹配、Flash 1017 默认模型与图文输入、原生窗口图标和 Shell 身份全部通过；无渲染错误。记录 `work/v0243/packaged-runtime.json`，页面截图 `work/v0243/packaged-refresh-settings.png`。
 - 本机 144Hz 打包程序短测：动态背景关闭、开启、再次关闭、开启并轻量滚动四组各约 1.5 秒，p95 为 7.2 / 7.2 / 7.3 / 7.1 ms，均无超过 12.5 ms 的帧间隔。测量开始前调速器已进入轻盈冷却期，跟手效果关闭，不能把这组数据解释为完整交互档或其他电脑的持续性能保证；记录 `work/v0243/packaged-performance.json`。
-- main CI、一次性 Windows 安装/卸载、tag Release 和公开附件复核：进行中。
+- 精确提交 `790477cf0f54e4e0fd5b7f4d307ed61fca2481ec` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39087333855) 全部门禁通过：1205 / 1205 单元与集成、44 / 44 真实 Electron（704357.3307 ms）、生产及工具链零漏洞审计、1305 项包边界，以及安装、原生窗口图标与 Shell 身份、单实例、退出、卸载与用户数据保留烟测。main CI 候选 ASAR 15,909,839 B，安装器 102,147,944 B，记录 `work/v0243/main-ci-success.log`。
+- `v0.2.43` 标签指向同一精确提交；[Release 第 2 次作业](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39088261973/attempts/2) 全部门禁通过：1205 / 1205 单元与集成（40303.39 ms）、44 / 44 真实 Electron（712826.1569 ms）、两项零漏洞审计、1305 项包边界、七尺寸图标、带产物版本校验，以及安装后原生窗口图标与 Shell 身份、单实例、退出、卸载和用户数据保留。最终 Release ASAR 15,909,839 B，安装器 102,147,891 B；成功日志 `work/v0243/release-success.log` 保留。
+
+## 公开附件复核
+
+六项公开附件下载到独立目录 `work/v0243/published/`，文件尺寸和 SHA-256 均与 GitHub REST 元数据一致。安装器 SHA-256 为 `6e889468c0c2789f6a3da0e41971db1e26c4f01ebc3784ee38bf99568cd600fa`，与 `SHA256SUMS.txt` 一致。
+
+| 附件 | 字节数 |
+| --- | ---: |
+| `Star-Picking-Pavilion-Setup-0.2.43.exe` | 102,147,891 |
+| `Star-Picking-Pavilion-Setup-0.2.43.exe.blockmap` | 106,741 |
+| `latest.yml` | 374 |
+| `SHA256SUMS.txt` | 106 |
+| `sbom.cdx.json` | 82,051 |
+| `THIRD_PARTY_NOTICES.txt` | 6,347 |
+
+安装器 PE 产品及文件版本均为 0.2.43，签名状态 NotSigned；七尺寸图标与规范资源一致。`latest.yml` 的版本、文件名、尺寸及两处 SHA-512 均与实际安装器一致；blockmap 为格式 2，4863 块覆盖完整文件。CycloneDX 1.6 schema 校验通过，47 项组件包含锁定且作为实际运行依赖的 Electron 42.11.11；第三方声明换行归一化后与仓库一致。
+
+公开 Release ID 为 `416351575`，最新正式版标志与发布时间已核对，正文与精确提交的 `RELEASE_NOTES.md` 一致；远端 annotated tag 对象为 `d2424a899e7a845e22096249403a3e22c2da73c7`，解析至 `790477cf0f54e4e0fd5b7f4d307ed61fca2481ec`。复核报告为 `work/v0243/published-verification.json` 与 `work/v0243/published-release-state.json`，原始 REST 元数据为 `work/v0243/release.json`。本地复核脚本遇到安全模块自动加载失败后，显式从 Windows PowerShell 自身目录加载系统安全模块完成签名读取；未执行下载的安装器。
 
 ## 首轮 CI 与修复记录
 
-精确提交 `353561bc681d7a9bb56a316a7c5d0ff161fa37b7` 的 [首轮 main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39086352967) 为 1205 / 1205 单元通过、桌面回归 41 / 44，尚未打 tag 或发布。日志 `work/v0243/main-live.log` 保留三项失败：
+精确提交 `353561bc681d7a9bb56a316a7c5d0ff161fa37b7` 的 [首轮 main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39086352967) 为 1205 / 1205 单元通过、桌面回归 41 / 44；该轮失败时尚未打 tag 或发布。日志 `work/v0243/main-live.log` 保留三项失败：
 
 - 既有导航测试固定等待 450 ms 后读取几何，早于 300 × 1.382 + 50 = 464.6 ms 的提交兜底期限；缩放后键盘导航在 CI 触发该竞争。诊断确认 WAAPI 初始处于 pending 且最终几何正确；改为有界观察动画结束和连续三帧稳定几何，保留全部小于 1px 的断言和暂停动画的原有检查，超时输出几何与时钟诊断。
 - 既有设置测试退出后同步删除临时资料，Chromium DIPS 句柄仍被占用。改为等待 Electron 实际 close、校验临时目录边界，再作有界异步删除重试，失败仍明确报错。
 - 新刷新率测试未明确前台与非减少动态效果的动画测量条件，并假定所有设备使用完整档时长。改为确认原生聚焦、显式启用非减少动态效果，按真实硬件推导的 full / lite 档验证相应固定时长及采样密度，保留每档动画和等时长断言；未改变产品的硬件分级策略。
 
 三项修复均仅涉及测试流程，未修改运行时代码。
+
+## Release 首轮与重跑记录
+
+同一精确提交 `790477cf0f54e4e0fd5b7f4d307ed61fca2481ec` 的 [Release 首轮](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39088261973/attempts/1) 为 1205 / 1205 单元通过、桌面回归 42 / 44，未进入发布步骤，未创建 Release。失败为既有模型设置测试等待 `.nav` 可见 30 秒超时，以及既有主题测试等待 1000 ms 后仍观察到 `theme-transition`；原始日志 `work/v0243/release-first-failed.log` 保留。补充定向复验均通过，但不能据此认定首轮原因已解决。[第 2 次执行](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39088261973/attempts/2) 保持相同提交、代码、测试断言及 tag，完整门禁全部通过后发布。
 
 ## 验证边界
 

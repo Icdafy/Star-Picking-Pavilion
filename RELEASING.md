@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 **v0.2.43**：适配 DeepSeek-V4.1-Flash-1017 与显示器刷新率自动匹配及四档设置。发布验证进行中，只有精确提交的 main CI、完整安装/卸载和 tag 工作流全部通过后才形成正式 Release；证据见 [本版验证](docs/v0243-validation.md)。上一正式版 [v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 的原始记录见 [历史验证](docs/v0242-validation.md)。
+当前正式版为 [v0.2.43](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.43)，于 2026-10-18 17:24:53（北京时间）发布：适配 DeepSeek-V4.1-Flash-1017 与显示器刷新率自动匹配及四档设置。精确提交 `790477cf0f54e4e0fd5b7f4d307ed61fca2481ec` 的 main CI、完整安装/卸载及 tag 第 2 次作业全部通过，六项公开附件重新下载复核通过；首轮失败沿革、正式附件尺寸与哈希见 [本版验证](docs/v0243-validation.md)。上一版 [v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 的原始记录见 [历史验证](docs/v0242-validation.md)。
 
 ## 发布前授权门槛
 
