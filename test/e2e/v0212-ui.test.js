@@ -17,7 +17,27 @@ test('v0212 native navigation, category cancellation, release history and settin
   fs.writeFileSync(path.join(directory, 'ui-preferences.json'), JSON.stringify({ version: 2,
     ...Schema.getLegacyUiPreferences(CommonLinks), view: 'all', realtime: false, aquaEnabled: false }));
   const app = await launchNativeElectron(root, directory);
-  t.after(async () => { await app.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  // Observe close before teardown starts: the launcher may have to kill Electron,
+  // and that request can finish before the process and its stdio actually close.
+  const processClosed = new Promise(resolve => app.process().once('close', resolve));
+  t.after(async () => {
+    await app.close();
+    let closeTimer;
+    try {
+      await Promise.race([
+        processClosed,
+        new Promise((_, reject) => {
+          closeTimer = setTimeout(() => reject(new Error('Electron did not close before profile cleanup')), 10_000);
+        })
+      ]);
+    } finally { clearTimeout(closeTimer); }
+    const cleanupTarget = path.resolve(directory);
+    assert.equal(path.dirname(cleanupTarget), path.resolve(os.tmpdir()), 'profile cleanup must stay directly inside the temporary directory');
+    assert.match(path.basename(cleanupTarget), /^spp-v0212-ui-[a-zA-Z0-9]+$/, 'profile cleanup must target this test fixture');
+    // Chromium helper processes can briefly retain DIPS handles after Electron
+    // exits on Windows. Native async retries are bounded and still surface failure.
+    await fs.promises.rm(cleanupTarget, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
   const page = await app.firstWindow();
   await page.waitForLoadState('load');
   await page.waitForSelector('#catChips .chip');

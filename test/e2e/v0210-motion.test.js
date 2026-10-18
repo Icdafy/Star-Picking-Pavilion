@@ -153,6 +153,39 @@ const selectedGeometry = selector => {
   return ['left', 'top', 'width', 'height'].map(key => Math.abs(selected[key] - indicator[key]));
 };
 
+async function waitForSelectionGeometry(page, selector) {
+  // The 414.6ms animation can still be pending for its first compositor frame;
+  // its existing wall-clock commitment deadline is 464.6ms. A fixed 450ms sleep
+  // can therefore inspect an allowed in-flight frame on a busy Windows runner.
+  // Observe completion and three stable frames without finishing the animation
+  // ourselves; retain the same strict <1px terminal-geometry contract below.
+  await page.evaluate(selector => { window.motionSelectionProbe = { selector, stableFrames: 0 }; }, selector);
+  try {
+    await page.waitForFunction(selector => {
+      const group = document.querySelector(selector);
+      const selected = group?.querySelector('button.active');
+      const indicator = group?.querySelector('.selection-indicator, .tab-indicator');
+      if (!selected || !indicator) return false;
+      const selectedRect = selected.getBoundingClientRect(), indicatorRect = indicator.getBoundingClientRect();
+      const keys = ['left', 'top', 'width', 'height'];
+      const deltas = keys.map(key => Math.abs(selectedRect[key] - indicatorRect[key]));
+      const coordinates = [...keys.map(key => selectedRect[key]), ...keys.map(key => indicatorRect[key])];
+      const animations = indicator.getAnimations().map(animation => ({ pending: animation.pending,
+        state: animation.playState, currentTime: animation.currentTime, timing: animation.effect.getComputedTiming() }));
+      const previous = window.motionSelectionProbe;
+      const stable = previous.coordinates && coordinates.every((value, index) => Math.abs(value - previous.coordinates[index]) < .1);
+      const terminal = !animations.some(animation => animation.pending || animation.state === 'running' || animation.state === 'paused');
+      const ready = terminal && deltas.every(delta => delta < 1) && selectedRect.width > 0 && stable;
+      window.motionSelectionProbe = { selector, coordinates, deltas, animations, target: indicator.dataset.motionTarget,
+        stableFrames: ready ? previous.stableFrames + 1 : 0 };
+      return window.motionSelectionProbe.stableFrames >= 3;
+    }, selector, { timeout: 2000 });
+  } catch (error) {
+    error.message += '\nSelection geometry: ' + JSON.stringify(await page.evaluate(() => window.motionSelectionProbe));
+    throw error;
+  }
+}
+
 test('v0210 Electron: current version, continuous navigation redirection, filters and resize', { timeout: 90000 }, async t => {
   const { page, native, errors } = await open(t);
   const version = require('../../package.json').version;
@@ -171,7 +204,7 @@ test('v0210 Electron: current version, continuous navigation redirection, filter
   });
   assert.ok(continuity.delta < 2, JSON.stringify(continuity)); assert.equal(continuity.running, 1);
   await page.evaluate(() => { for (let i = 0; i < 30; i++) document.querySelector(`.tab[data-view="${i % 2 ? 'featured' : 'links'}"]`).click(); });
-  await page.waitForTimeout(450);
+  await waitForSelectionGeometry(page, '.nav-tabs');
   assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'featured');
   assert.ok((await page.evaluate(selectedGeometry, '.nav-tabs')).every(delta => delta < 1));
   const domain = page.locator('.domain-pills button[data-domain="aerospace"]');
@@ -190,7 +223,7 @@ test('v0210 Electron: current version, continuous navigation redirection, filter
   assert.ok((await page.evaluate(selectedGeometry, '.domain-pills')).every(delta => delta < 1));
   const tab = page.locator('.tab[data-view="featured"]'); await tab.focus();
   await page.keyboard.press('ArrowRight'); assert.equal(await page.locator('.tab.active').getAttribute('data-view'), 'all');
-  await page.waitForTimeout(450);
+  await waitForSelectionGeometry(page, '.nav-tabs');
   assert.ok((await page.evaluate(selectedGeometry, '.nav-tabs')).every(delta => delta < 1));
   assert.deepEqual(errors, []);
 });

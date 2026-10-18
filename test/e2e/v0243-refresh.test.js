@@ -24,6 +24,10 @@ test('v0243 real desktop: native refresh, four sampling profiles, live display c
     const page = await app.firstWindow();
     page.on('pageerror', error => errors.push(error.message));
     await page.waitForLoadState('load');
+    // Animation assertions require the real foreground, non-reduced environment.
+    // Keep the application's hardware-derived full/lite policy intact.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.waitForFunction(() => document.documentElement.dataset.fxTier !== 'static');
     await page.locator('[data-view="settings"]').click();
     await page.locator('#settingsNav [data-settings-target="settingsAppearance"]').click();
     await page.locator('#setRefreshRate').waitFor({ state: 'visible' });
@@ -57,6 +61,11 @@ test('v0243 real desktop: native refresh, four sampling profiles, live display c
   for (const hz of [60, 70, 120, 144]) {
     await page.locator('#setRefreshRate').selectOption(String(hz));
     await page.waitForFunction(rate => document.documentElement.dataset.refreshRate === String(rate), hz);
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      win.focus(); win.webContents.focus();
+    });
+    await page.waitForFunction(() => document.hasFocus() && !document.hidden);
     const sample = await page.evaluate(() => {
       const node = document.createElement('div');
       node.style.cssText = 'position:fixed;left:0;top:0;width:100px;height:40px';
@@ -66,13 +75,22 @@ test('v0243 real desktop: native refresh, four sampling profiles, live display c
       node.animate = (frames, options) => { result = { samples: frames.length, duration: options.duration }; return animate(frames, options); };
       motion.retargetIndicator(node, { x: 50, y: 100, width: 100, height: 40 });
       motion.cancel(node); node.remove();
-      return result;
+      return { ...result, tier: document.documentElement.dataset.fxTier,
+        focused: document.hasFocus(), hidden: document.hidden,
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
     });
-    assert.equal(sample.samples, Math.max(10, Math.min(48, Math.round(.3 * 1.382 * hz))) + 1);
-    durations.push(sample.duration);
+    const expectedDuration = (sample.tier === 'lite' ? 180 : 300) * 1.382;
+    assert.equal(sample.focused, true, JSON.stringify(sample));
+    assert.equal(sample.reduced, false, JSON.stringify(sample));
+    assert.equal(sample.samples, Math.max(10, Math.min(48, Math.round(expectedDuration * hz / 1000))) + 1, JSON.stringify(sample));
+    assert.ok(Math.abs(sample.duration - expectedDuration) < .01, JSON.stringify(sample));
+    durations.push({ tier: sample.tier, duration: sample.duration });
     assert.match(await page.locator('#refreshRateStatus').textContent(), new RegExp(`手动 ${hz} Hz`));
   }
-  durations.forEach(duration => assert.ok(Math.abs(duration - 300 * 1.382) < .01));
+  for (const tier of ['full', 'lite']) {
+    const values = durations.filter(value => value.tier === tier).map(value => value.duration);
+    assert.ok(values.every(duration => duration === values[0]), `${tier} duration stays independent of refresh rate`);
+  }
   await page.waitForFunction(async () => (await starPickingPavilion.updatePreferences({})).refreshRate === '144');
   const saved = JSON.parse(fs.readFileSync(path.join(profile, 'ui-preferences.json'), 'utf8'));
   assert.equal(saved.refreshRate, '144');
