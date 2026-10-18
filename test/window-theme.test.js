@@ -71,7 +71,7 @@ test('standalone Aqua engine retains the exact DSH 1.1.0 fluid contract and no l
   assert.match(engine, /@deepseek-ai\/dsh-client-ui-aqua 1\.1\.0/);
   assert.match(engine, /mouseRadius:\s*\.22/);
   assert.match(engine, /color1:\s*"#8AA3D6"/);
-  assert.match(engine, /function attachFluidShader\(canvas, params\)/);
+  assert.match(engine, /function attachFluidShader\(canvas, params, options = \{\}\)/);
   // v0.2.39 删除星鲸粒子：引擎只保留流体着色器。
   assert.doesNotMatch(engine, /mountWhale|WHALE_SVG/);
 });

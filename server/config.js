@@ -12,7 +12,7 @@ const SETTINGS_PATH = path.join(DATA_DIR, 'settings.json');
 const SCORING_PATH = path.join(__dirname, '..', 'config', 'scoring.json');
 const BREAKTHROUGHS_PATH = path.join(__dirname, '..', 'config', 'breakthroughs.json');
 
-// 默认分析模型：DeepSeek V4.1 Flash（deepseek-flash，原生图文）；v0.2.3 起可在「模型」设置中换成任意已配置提供商的模型。
+// 默认分析模型：DeepSeek V4.1 Flash 1017（deepseek-flash，原生图文）；v0.2.3 起可在「模型」设置中换成任意已配置提供商的模型。
 const DEEPSEEK_MODEL = catalog.DEFAULT_MODEL;
 const DEEPSEEK_MODEL_RELEASE = catalog.DEFAULT_MODEL_NAME;
 // 运行时派生字段：由 providers + activeProvider 解析得出，只存在于内存，不落盘。

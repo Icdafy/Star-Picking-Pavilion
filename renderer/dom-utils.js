@@ -152,58 +152,164 @@
     return easing;
   }
 
-  // 显示器刷新率探测：只在前台、聚焦时取 24 个 rAF 间隔的较快四分位（启动
-  // 负载或可变刷新率会拉长部分间隔）。启动 4 秒后复测一次并取较高值；窗口
-  // 跨显示器（resize）时强制重测并替换。结果写到 data-refresh-rate 供诊断，
-  // 并决定逐帧采样动画的关键帧密度。
-  function createFrameRateProbe({ document: doc, window: win } = {}) {
-    let hz = 60, measuring = false, measuredAt = -Infinity, disposed = false;
+  const REFRESH_MODES = Object.freeze(['auto', '60', '70', '120', '144']);
+  function normalizeRefreshRate(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 24 || value > 1000) return null;
+    // 59.94/119.88 等时钟按标称刷新率显示；75/165/240 及其他真实档位不被压到四档。
+    const common = [24, 25, 30, 48, 50, 60, 70, 72, 75, 85, 90, 100, 120, 144, 165, 180, 200, 240, 280, 300, 360, 480, 500, 540];
+    const nearest = common.reduce((best, rate) => Math.abs(rate - value) < Math.abs(best - value) ? rate : best, common[0]);
+    return Math.abs(nearest - value) / value < .015 ? nearest : Math.round(value * 100) / 100;
+  }
+
+  // 单一刷新率时钟：优先使用窗口所在显示器的系统信息；浏览器才回落到前台
+  // RAF 测量。手动档改变采样密度，不改变动画墙钟时长，也不改系统显示设置。
+  function createFrameRateProbe({ document: doc, window: win, desktop, mode = 'auto' } = {}) {
+    let detectedHz = 60, source = 'default', disposed = false, nativeTrusted = false;
+    let selectedMode = REFRESH_MODES.includes(String(mode)) ? String(mode) : 'auto';
+    let generation = 0, frame = null, measuredAt = -Infinity, signature = '';
+    let resizeTimer = null, confirmTimer = null, readTimer = null, completion = null;
     const listeners = [];
-    let confirmTimer = null;
-    // mode：'replace' 换屏后替换结果；'confirm' 不受 30 秒间隔限制但取较高值。
-    function measure(mode) {
-      const force = mode === 'replace';
-      if (disposed || measuring || !win?.requestAnimationFrame || doc?.hidden) return;
-      if (typeof doc?.hasFocus === 'function' && !doc.hasFocus()) return;
-      const now = win.performance?.now?.() || 0;
-      if (!mode && now - measuredAt < 30_000) return;
-      measuring = true;
+    const active = () => !disposed && !doc?.hidden && (typeof doc?.hasFocus !== 'function' || doc.hasFocus());
+    const effectiveHz = () => selectedMode === 'auto' ? detectedHz : Math.min(Number(selectedMode), detectedHz);
+    const now = () => win?.performance?.now?.() ?? 0;
+    function publish() {
+      if (disposed) return;
+      const detail = { hz: effectiveHz(), detectedHz, mode: selectedMode, source };
+      const nextSignature = JSON.stringify(detail);
+      if (signature === nextSignature) return;
+      signature = nextSignature;
+      if (doc?.documentElement?.dataset) Object.assign(doc.documentElement.dataset, {
+        refreshRate: String(detail.hz), refreshRateDetected: String(detectedHz),
+        refreshRateMode: selectedMode, refreshRateSource: source
+      });
+      // 旧测试夹具与嵌入环境可以没有 CustomEvent/dispatchEvent。
+      try {
+        const EventClass = win?.CustomEvent || (typeof CustomEvent === 'function' ? CustomEvent : null);
+        if (EventClass && win?.dispatchEvent) win.dispatchEvent(new EventClass('refresh-rate-change', { detail }));
+      } catch { /* 诊断通知不影响探测本身 */ }
+    }
+    function cancelSample() {
+      generation += 1;
+      if (frame != null) win?.cancelAnimationFrame?.(frame);
+      frame = null;
+      win?.clearTimeout?.(readTimer); readTimer = null;
+      if (completion) { completion.resolve(false); completion = null; }
+    }
+    function finish(token, success) {
+      if (completion?.token !== token) return;
+      completion.resolve(success); completion = null;
+      win?.clearTimeout?.(readTimer); readTimer = null;
+    }
+    function applyDetected(rate, nextSource) {
+      detectedHz = rate; source = nextSource; measuredAt = now(); publish();
+    }
+    function sample(token) {
+      if (!active() || token !== generation || nativeTrusted || frame != null) return;
+      if (!win?.requestAnimationFrame) { if (!completion?.nativePending) finish(token, false); return; }
       const stamps = [];
       const step = time => {
-        if (disposed) return;
+        if (token !== generation || nativeTrusted) return;
+        frame = null;
+        if (!active()) { finish(token, false); return; }
         stamps.push(time);
-        if (stamps.length < 25 && !doc?.hidden) { win.requestAnimationFrame(step); return; }
-        measuring = false;
-        const gaps = stamps.slice(1).map((value, index) => value - stamps[index]).filter(gap => gap > 2 && gap < 50).sort((a, b) => a - b);
-        if (gaps.length < 12) return;
-        // 四分位排除偶发长帧；吸附到常见档位，避免 143.9/144.2 来回抖动。
-        const raw = 1000 / gaps[gaps.length >> 2];
-        const common = [60, 75, 90, 100, 120, 144, 165, 180, 240, 280, 360];
-        const snapped = common.reduce((best, rate) => Math.abs(rate - raw) < Math.abs(best - raw) ? rate : best, 60);
-        const next = Math.abs(snapped - raw) / raw < .06 ? snapped : Math.round(raw);
-        hz = force ? next : Math.max(hz, next);
-        measuredAt = win.performance?.now?.() || 0;
-        if (doc?.documentElement?.dataset) doc.documentElement.dataset.refreshRate = String(hz);
+        if (stamps.length < 25) { frame = win.requestAnimationFrame(step); return; }
+        const gaps = stamps.slice(1).map((value, index) => value - stamps[index])
+          .filter(gap => gap > 0 && gap < 50).sort((a, b) => a - b);
+        if (gaps.length < 12) { finish(token, false); return; }
+        // 较快四分位剔除偶发长帧；允许换到更低的刷新率，避免最高值锁定。
+        const rate = normalizeRefreshRate(1000 / gaps[gaps.length >> 2]);
+        if (rate != null) applyDetected(rate, 'raf');
+        finish(token, rate != null);
       };
-      win.requestAnimationFrame(step);
+      frame = win.requestAnimationFrame(step);
+    }
+    function measure(requestedMode) {
+      if (disposed) return Promise.resolve(false);
+      if (REFRESH_MODES.includes(String(requestedMode))) setMode(requestedMode);
+      if (!active() || (!requestedMode && now() - measuredAt < 30_000)) return Promise.resolve(false);
+      cancelSample();
+      const token = generation;
+      const result = new Promise(resolve => { completion = { token, resolve, nativePending: typeof desktop?.getDisplayRefreshRate === 'function' }; });
+      if (typeof desktop?.getDisplayRefreshRate === 'function') {
+        readTimer = win?.setTimeout?.(() => {
+          readTimer = null;
+          if (!active() || token !== generation) return;
+          if (completion?.token === token) completion.nativePending = false;
+          // 原生桥接迟迟未返回时，保留上次有效的系统数据；尚无系统数据才用 RAF。
+          if (nativeTrusted) finish(token, true);
+          else sample(token);
+        }, 1500);
+        try {
+          Promise.resolve(desktop.getDisplayRefreshRate()).then(info => {
+            if (!active() || token !== generation) return;
+            if (completion?.token === token) completion.nativePending = false;
+            const rate = normalizeRefreshRate(info?.refreshRate);
+            nativeTrusted = rate != null;
+            if (nativeTrusted) {
+              if (frame != null) win?.cancelAnimationFrame?.(frame);
+              frame = null;
+              applyDetected(rate, 'native');
+              finish(token, true);
+            } else sample(token);
+          }).catch(() => {
+            if (!active() || token !== generation) return;
+            if (completion?.token === token) completion.nativePending = false;
+            nativeTrusted = false; sample(token);
+          });
+        } catch { nativeTrusted = false; if (completion?.token === token) completion.nativePending = false; }
+      } else nativeTrusted = false;
+      sample(token);
+      return result;
+    }
+    function setMode(nextMode) {
+      if (disposed) return selectedMode;
+      selectedMode = REFRESH_MODES.includes(String(nextMode)) ? String(nextMode) : 'auto';
+      publish();
+      return selectedMode;
     }
     function listen(target, event, handler) {
       target?.addEventListener?.(event, handler);
       listeners.push(() => target?.removeEventListener?.(event, handler));
     }
-    let resizeTimer = null;
-    listen(win, 'focus', () => measure());
+    function suspend() {
+      cancelSample();
+      win?.clearTimeout?.(resizeTimer); resizeTimer = null;
+    }
+    listen(win, 'blur', suspend);
+    listen(win, 'focus', () => measure('replace'));
+    listen(win, 'pageshow', () => measure('replace'));
     listen(win, 'resize', () => {
-      win.clearTimeout?.(resizeTimer);
-      resizeTimer = win.setTimeout?.(() => measure('replace'), 600);
+      suspend();
+      if (active()) resizeTimer = win?.setTimeout?.(() => { resizeTimer = null; measure('replace'); }, 200);
     });
-    listen(doc, 'visibilitychange', () => { if (!doc.hidden) measure(); });
+    listen(doc, 'visibilitychange', () => { if (doc.hidden) suspend(); else measure('replace'); });
+    try {
+      const unsubscribe = desktop?.onDisplayRefreshRateChanged?.(info => {
+        if (disposed) return;
+        const rate = normalizeRefreshRate(info?.refreshRate);
+        if (rate != null) finish(generation, true);
+        suspend();
+        nativeTrusted = rate != null;
+        if (nativeTrusted) applyDetected(rate, 'native');
+        else measure('replace');
+      });
+      if (typeof unsubscribe === 'function') listeners.push(unsubscribe);
+    } catch { /* 没有原生桥接时由 RAF 探测 */ }
+    publish();
     measure('replace');
-    confirmTimer = win?.setTimeout?.(() => measure('confirm'), 4000);
+    confirmTimer = win?.setTimeout?.(() => { confirmTimer = null; measure('confirm'); }, 4000);
     return Object.freeze({
-      get hz() { return hz; },
+      get hz() { return effectiveHz(); },
+      get detectedHz() { return detectedHz; },
+      get source() { return source; },
+      get mode() { return selectedMode; },
+      setMode,
       measure,
-      dispose() { disposed = true; win?.clearTimeout?.(resizeTimer); win?.clearTimeout?.(confirmTimer); listeners.splice(0).forEach(remove => remove()); }
+      dispose() {
+        if (disposed) return;
+        disposed = true; suspend(); win?.clearTimeout?.(confirmTimer); confirmTimer = null;
+        listeners.splice(0).forEach(remove => remove());
+      }
     });
   }
 
@@ -654,7 +760,7 @@
     let host = null, canvas = null, context = null, ring = null, sprites = null;
     let width = 0, height = 0, ratio = 1, dirty = null, topLayer = null;
     let bufferWidth = 0, bufferHeight = 0;
-    let slowFrames = 0, compositionLite = false;
+    let slowSeconds = 0, compositionLite = false, budgetHz = 0;
     let cursor = null, present = false, carry = 0, seed = 0x02315a, slot = 0, orbitAngle = 0;
     function allowed() {
       return !disposed && !doc.hidden && !reduced?.matches && !contrast?.matches
@@ -678,7 +784,7 @@
     }
     function reset() {
       if (frame != null) win.cancelAnimationFrame(frame);
-      frame = null; lastTime = 0; carry = 0;
+      frame = null; lastTime = 0; carry = 0; slowSeconds = 0;
       pending.length = 0; trail.length = 0;
       pool.forEach(p => { p.alive = false; });
       clearPixels(); hide();
@@ -763,8 +869,12 @@
     }
     function recordFrame(elapsed, cost) {
       if (!compositionLite) {
-        slowFrames = elapsed > 1 / 45 && elapsed < .2 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
-        if (slowFrames >= 4) compositionLite = true;
+        const hz = Number(root.dataset.refreshRateDetected || root.dataset.refreshRate) || 60;
+        if (hz !== budgetHz || elapsed >= .2) { slowSeconds = 0; budgetHz = hz; }
+        const budget = 1 / hz;
+        const strained = elapsed > budget * 1.85 || cost > budget * 800;
+        slowSeconds = Math.max(0, slowSeconds + (strained ? elapsed : -elapsed * 2));
+        if (slowSeconds >= 1.2) compositionLite = true;
       }
       if (compositionLite && root.dataset.pointerEnabled !== 'off') root.dataset.pointerComposition = 'lite';
       metrics.frames++; metrics.totalMs += cost; metrics.maxMs = Math.max(metrics.maxMs, cost);

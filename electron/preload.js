@@ -22,6 +22,13 @@ const desktopApi = Object.freeze({
   preferences: cloneAndFreeze(initialPreferencesState.preferences),
   hasStoredPreferences: initialPreferencesState.hasStoredPreferences === true,
   updatePreferences: patch => ipcRenderer.invoke('preferences:update', patch),
+  getDisplayRefreshRate: () => ipcRenderer.invoke('display-refresh-rate:get').then(cloneAndFreeze),
+  onDisplayRefreshRateChanged: cb => {
+    if (typeof cb !== 'function') return () => {};
+    const listener = (_event, payload) => cb(cloneAndFreeze(payload));
+    ipcRenderer.on('display-refresh-rate:changed', listener);
+    return () => ipcRenderer.removeListener('display-refresh-rate:changed', listener);
+  },
   getAppearanceWallpaper: () => ipcRenderer.invoke('appearance-wallpaper:get'),
   saveAppearanceWallpaper: dataUrl => ipcRenderer
     .invoke('appearance-wallpaper:save', { dataUrl })

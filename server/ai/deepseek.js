@@ -7,8 +7,8 @@ const { readBoundedBody } = require('../collectors/fetch-util');
 const { fetch: undiciFetch } = require('undici');
 const { setTimeout: delay } = require('node:timers/promises');
 
-const { VISION_MODEL } = require('./model-policy');
-const { KEYLESS_PLACEHOLDER } = require('./model-catalog');
+const { resolveRequestModel } = require('./model-policy');
+const { DEFAULT_PROVIDER, KEYLESS_PLACEHOLDER, normalizeProviderModels } = require('./model-catalog');
 
 const ANTHROPIC_VERSION = '2023-06-01';
 const MAX_AI_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -51,7 +51,8 @@ async function chat(messages, {
   if (!validateAiBaseUrl(baseUrl)) throw new Error('AI 基础地址必须使用 HTTPS（本机回环地址除外）');
   if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0) throw new Error('AI 响应大小上限无效');
   const label = settings.ai.providerName || 'DeepSeek';
-  const modelId = typeof model === 'string' && model.trim() ? model.trim() : (settings.ai.model || VISION_MODEL);
+  // 最后一道归一化也覆盖显式 model 参数、连接测试与未经设置加载器的旧调用方。
+  const modelId = resolveRequestModel(settings, model);
   if (settings.ai.api === 'anthropic-messages') {
     return anthropicChat(messages, {
       settings, model: modelId, temperature, maxTokens, fetchImpl, maxResponseBytes, label
@@ -247,7 +248,7 @@ function positiveCount(value) {
 
 // 向端点询问可用模型（OpenAI 形态 GET /models；Anthropic 形态 GET /v1/models）。
 // 只采信端点自己报告的字段：id 必有，名称、上下文窗口、输出上限、输入模态有则带上。
-async function discoverModels({ baseUrl, api = 'openai-completions', apiKey = '', fetchImpl = undiciFetch,
+async function discoverModels({ baseUrl, provider, api = 'openai-completions', apiKey = '', fetchImpl = undiciFetch,
   timeoutMs = 20_000, maxResponseBytes = MAX_AI_RESPONSE_BYTES } = {}) {
   if (!validateAiBaseUrl(baseUrl)) throw new Error('API 地址必须使用 HTTPS（本机回环地址除外）');
   const anthropic = api === 'anthropic-messages';
@@ -290,7 +291,11 @@ async function discoverModels({ baseUrl, api = 'openai-completions', apiKey = ''
       }
       models.push(model);
     }
-    return models.sort((a, b) => a.id.localeCompare(b.id));
+    // 路由传入明确的提供商；直接调用官方端点时也可识别。自定义网关未声明为
+    // DeepSeek 时不改写它提供的模型名，避免破坏同名的私有模型。
+    const modelProvider = provider || (new URL(baseUrl).hostname === 'api.deepseek.com' ? DEFAULT_PROVIDER : '');
+    const normalized = modelProvider === DEFAULT_PROVIDER ? normalizeProviderModels(modelProvider, models) : models;
+    return normalized.sort((a, b) => a.id.localeCompare(b.id));
   } catch (error) {
     if (ctrl.signal.aborted) throw new Error('询问端点超时，请检查 API 地址或网络');
     throw error;

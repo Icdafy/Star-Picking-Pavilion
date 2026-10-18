@@ -80,7 +80,7 @@ test('command palette, go-to sequences and the V4.1 Flash default model', { time
   assert.equal(models.activeModel, 'deepseek-flash');
   const deepseek = models.providers.find(provider => provider.provider === 'deepseek');
   assert.deepEqual(deepseek.models.map(model => model.id), ['deepseek-flash', 'deepseek-v4-pro']);
-  assert.equal(deepseek.models[0].name, 'DeepSeek V4.1 Flash');
+  assert.equal(deepseek.models[0].name, 'DeepSeek V4.1 Flash 1017');
 
   // 最近使用：再次打开时刚执行过的命令排在最前
   await page.keyboard.press('Control+k');

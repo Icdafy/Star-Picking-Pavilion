@@ -29,7 +29,7 @@ const defaultAquaPreferences = Object.freeze({
   aquaCritters: false,
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
-  fluidMode: 'auto'
+  fluidMode: 'auto', refreshRate: 'auto'
 });
 
 async function makeDirectory(t) {
@@ -103,7 +103,7 @@ test('normalizes every supported field and discards unknown fields', () => {
   assert.deepEqual(normalized, {
     pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
     pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
-    fluidMode: 'auto',
+    fluidMode: 'auto', refreshRate: 'auto',
     version: 2,
     theme: 'light',
     textScale: 'lg',

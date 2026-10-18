@@ -248,7 +248,7 @@ function createModelRoutes({ loadSettings, coordinator, credentials, discoverMod
   async function discover(body) {
     const target = probeTarget(loadSettings(), body);
     try {
-      const models = await discoverModels({ baseUrl: target.baseUrl, api: target.api, apiKey: target.apiKey });
+      const models = await discoverModels({ provider: target.id, baseUrl: target.baseUrl, api: target.api, apiKey: target.apiKey });
       return { ok: true, models };
     } catch (error) {
       return { ok: false, error: String(error?.message || error) };
@@ -258,8 +258,8 @@ function createModelRoutes({ loadSettings, coordinator, credentials, discoverMod
   async function test(body) {
     const settings = loadSettings();
     const target = probeTarget(settings, body);
-    const model = textField(body.model, { field: '模型', maximum: 200 })
-      || (target.id === settings.ai.activeProvider ? settings.ai.model : target.described.models[0]?.id);
+    const model = catalog.upgradeRetiredModel(target.id, textField(body.model, { field: '模型', maximum: 200 })
+      || (target.id === settings.ai.activeProvider ? settings.ai.model : target.described.models[0]?.id));
     if (!model) return { ok: false, error: '该提供商还没有模型，请先添加或获取模型' };
     if (!target.apiKey) return { ok: false, error: '请先填写 API 密钥' };
     const probeSettings = structuredClone(settings);

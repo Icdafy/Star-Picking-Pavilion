@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.42 · Windows 任务栏图标修复
+## v0.2.43 · DeepSeek Flash 1017 与刷新率自适应
 
-- **修复任务栏身份**：修复打开应用后 Windows 任务栏仍显示 Electron 默认图标的问题。开发版与正式版使用独立身份，每个窗口明确设置任务栏图标和启动信息，正式版启动时更新指向本应用的已有快捷方式图标。
-- **统一静态 Logo**：采用本次上传的原始 PNG，保留白色圆角底、金色星星与紫色弧线。桌面快捷方式、任务栏、应用窗口、托盘、更新通知、安装器、卸载器、网页页签与系统更新页共用该图案。
-- **保留主页面动效**：仅主页面左上角继续使用原有 SVG Logo、悬停动效与第一帧回退图，行为和外观保持不变。
-- **图标一致性检查**：Windows 多尺寸 ICO 从上传 PNG 生成并使用带版本号的资源路径，窗口和通知显式读取 PNG；构建与包校验验证资源一致性。
+- **DeepSeek 最新 Flash**：使用 `deepseek-flash` 调用 DeepSeek-V4.1-Flash-1017，设置页标明 1017；旧 Flash 名称自动归一，支持原生图文。模型身份依据 [DeepSeek 官方 2026-10-17 更新](https://api-docs.deepseek.com/zh-cn/updates/)。
+- **刷新率自动匹配**：默认读取当前窗口所在显示器，跨屏、显示参数变化与恢复前台后重测；系统值不可用时使用帧间隔测量。
+- **四档手动适配**：设置 → 氛围与动效 → 动效采样档位，选择自动或 60 / 70 / 120 / 144Hz，查看检测结果并重新检测。每台电脑独立检测，仅保存个人选择；手动档不会提高屏幕的物理刷新率。
+- **保持动效节奏**：不同档位按时间推进动画并调整采样密度；保留减少动态效果、后台暂停与性能降级，实际流畅度仍取决于硬件、驱动和负载。
 
-版本、界面与更新元数据统一为 0.2.42，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0242-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.43，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0243-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.42.exe`，双击并按向导安装。v0.2.42 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.43.exe`，双击并按向导安装。v0.2.43 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.42.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.43.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -54,7 +54,7 @@ Get-Content .\SHA256SUMS.txt
 - 存储治理面板、数据保留策略、数据库安全压缩与桌面缓存白名单清理
 - 失效信源自动退避重试，避免长期不可达的信源每轮空转
 - Ctrl+K 命令面板，中文、拼音与英文别名检索命令；G + 字母切换视图，J / K 移动卡片焦点，O 打开原文、S 星标、C 复制、E 展开关联
-- 模型设置支持内置提供商、自定义 OpenAI / Anthropic 协议接口、获取与选择模型及连接测试；默认使用 DeepSeek V4.1 Flash（`deepseek-flash`）
+- 模型设置支持内置提供商、自定义 OpenAI / Anthropic 协议接口、获取与选择模型及连接测试；默认使用 DeepSeek V4.1 Flash 1017（`deepseek-flash`）
 
 信源被“移出监控”时会从列表删除入口并停止采集；历史文章及其来源信息保留，可通过明确提报同一地址重新加入。
 

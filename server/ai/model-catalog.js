@@ -11,11 +11,12 @@ const PROTOCOL_LABELS = Object.freeze({
 });
 
 const DEFAULT_PROVIDER = 'deepseek';
-// 2026-09-10 DeepSeek 发布 V4.1 Flash（原生多模态），官方模型 ID 为 deepseek-flash；
-// V4 Flash 与 V4 Flash Vision Exp 已退役，旧名暂由官方路由到 V4.1 Flash。
+// 2026-10-17 DeepSeek 将 V4.1 Flash（原生多模态）更新为 1017，
+// 官方滚动模型 ID 仍为 deepseek-flash；旧 V4 Flash / Vision Exp 仅保留兼容路由。
 // 依据：https://api-docs.deepseek.com/zh-cn/updates/ 与 /quick_start/pricing
 const DEFAULT_MODEL = 'deepseek-flash';
-const DEFAULT_MODEL_NAME = 'DeepSeek V4.1 Flash';
+const DEFAULT_MODEL_RELEASE = 'DeepSeek-V4.1-Flash-1017';
+const DEFAULT_MODEL_NAME = 'DeepSeek V4.1 Flash 1017';
 // 已退役的 DeepSeek 模型 ID → 现行 ID。旧设置里选着它们时自动改指 V4.1 Flash，
 // 免得官方停止兼容路由那天整条精选链突然失效。
 const RETIRED_MODELS = Object.freeze({
@@ -107,6 +108,20 @@ function upgradeRetiredModel(provider, id) {
     : id;
 }
 
+// 旧 Flash 文本模型与视觉实验模型现在是同一个原生图文模型。归并 ID 的同时
+// 补齐现行名称与视觉能力，避免旧目录的 text-only 标记使升级后仍跳过图片分析。
+// 其它提供商即便使用相同 ID，也必须尊重它自己的目录与能力声明。
+function normalizeProviderModels(provider, value) {
+  const models = sanitizeModels(value);
+  if (!models || provider !== DEFAULT_PROVIDER) return models;
+  return sanitizeModels(models.map(model => {
+    const id = upgradeRetiredModel(provider, model.id);
+    return id === DEFAULT_MODEL
+      ? { ...model, id, name: DEFAULT_MODEL_NAME, input: ['text', 'image'] }
+      : model;
+  }));
+}
+
 // providers 字典：键是路由 ID。目录路由只存用户覆盖的字段；手工声明的路由
 // （declared）自己持有显示名称与协议。DeepSeek 永远在场，不可删除。
 function sanitizeProviders(raw) {
@@ -118,11 +133,7 @@ function sanitizeProviders(raw) {
     const next = {};
     const baseUrl = cleanText(profile.baseUrl, 2048);
     if (baseUrl) next.baseUrl = baseUrl.replace(/\/+$/, '');
-    let models = sanitizeModels(profile.models);
-    if (models && id === DEFAULT_PROVIDER) {
-      const upgraded = models.map(model => ({ ...model, id: upgradeRetiredModel(id, model.id) }));
-      models = sanitizeModels(upgraded);
-    }
+    const models = normalizeProviderModels(id, profile.models);
     if (models) next.models = models;
     if (!catalog) {
       if (!next.baseUrl) continue;
@@ -140,7 +151,7 @@ function sanitizeProviders(raw) {
 function describeProvider(id, profile = {}) {
   const catalog = CATALOG_BY_ID.get(id);
   const baseUrl = profile.baseUrl || catalog?.baseUrl || '';
-  const models = profile.models || (catalog?.models ? structuredClone(catalog.models) : []);
+  const models = normalizeProviderModels(id, profile.models) || (catalog?.models ? structuredClone(catalog.models) : []);
   return {
     provider: id,
     displayName: profile.displayName || catalog?.displayName || id,
@@ -162,7 +173,8 @@ function describeProvider(id, profile = {}) {
 function resolveActive(providers, activeProvider, model) {
   const provider = providers[activeProvider] ? activeProvider : DEFAULT_PROVIDER;
   const described = describeProvider(provider, providers[provider]);
-  const chosen = described.models.find(entry => entry.id === model) || described.models[0];
+  const selected = upgradeRetiredModel(provider, model);
+  const chosen = described.models.find(entry => entry.id === selected) || described.models[0];
   if (chosen) return { provider, model: chosen.id, described, entry: chosen };
   if (provider !== DEFAULT_PROVIDER) return resolveActive(providers, DEFAULT_PROVIDER, model);
   return { provider, model: DEFAULT_MODEL, described, entry: { id: DEFAULT_MODEL, input: ['text', 'image'] } };
@@ -187,6 +199,7 @@ module.exports = {
   CATALOG,
   DEFAULT_MODEL,
   DEFAULT_MODEL_NAME,
+  DEFAULT_MODEL_RELEASE,
   DEFAULT_PROVIDER,
   KEYLESS_PLACEHOLDER,
   PROTOCOLS,
@@ -197,6 +210,7 @@ module.exports = {
   catalogEntries,
   describeProvider,
   isCatalogProvider: id => CATALOG_BY_ID.has(id),
+  normalizeProviderModels,
   resolveActive,
   sanitizeModels,
   sanitizeProviders,

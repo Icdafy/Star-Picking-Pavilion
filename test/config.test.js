@@ -229,7 +229,7 @@ test('loadScoring/loadBreakthroughs 解析失败时返回缓存或内置默认�
   assert.ok(Array.isArray(breakthroughs.eligibleCategories));
 });
 
-test('retired DeepSeek model IDs are upgraded to V4.1 Flash on load', async () => {
+test('retired DeepSeek model IDs are upgraded to Flash 1017 with native vision on load and save', async () => {
   await fs.promises.writeFile(SETTINGS_PATH, JSON.stringify({
     ai: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' }
   }), 'utf8');
@@ -239,11 +239,21 @@ test('retired DeepSeek model IDs are upgraded to V4.1 Flash on load', async () =
     ai: {
       activeProvider: 'deepseek',
       model: 'deepseek-v4-flash-vision-exp',
-      providers: { deepseek: { models: [{ id: 'deepseek-v4-flash-vision-exp', input: ['text', 'image'] }, { id: 'deepseek-v4-flash' }] } }
+      providers: { deepseek: { models: [
+        { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', input: ['text'] },
+        { id: 'deepseek-v4-flash-vision-exp', input: ['text', 'image'] }
+      ] } }
     }
   }), 'utf8');
   const loaded = loadSettings();
   assert.equal(loaded.ai.model, 'deepseek-flash');
   assert.deepEqual(loaded.ai.providers.deepseek.models.map(model => model.id), ['deepseek-flash']);
   assert.deepEqual(loaded.ai.modelInput, ['text', 'image']);
+  assert.equal(loaded.ai.providers.deepseek.models[0].name, 'DeepSeek V4.1 Flash 1017');
+  await saveSettings(loaded);
+  const saved = JSON.parse(await fs.promises.readFile(SETTINGS_PATH, 'utf8'));
+  assert.equal(saved.ai.model, 'deepseek-flash');
+  assert.deepEqual(saved.ai.providers.deepseek.models, [
+    { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash 1017', input: ['text', 'image'] }
+  ]);
 });

@@ -98,6 +98,9 @@ function validatePatch(patch, today) {
   if (Object.hasOwn(patch, 'fluidMode') && !UiPreferenceSchema.isValidUiPreferenceValue('fluidMode', patch.fluidMode, CommonLinks, { today })) {
     throw new TypeError('fluidMode must be auto, full, lite or off');
   }
+  if (Object.hasOwn(patch, 'refreshRate') && !UiPreferenceSchema.isValidUiPreferenceValue('refreshRate', patch.refreshRate, CommonLinks, { today })) {
+    throw new TypeError('refreshRate must be auto, 60, 70, 120 or 144');
+  }
   for (const field of UiPreferenceSchema.UI_PREFERENCE_FIELDS.filter(field => field.startsWith('pointer'))) {
     if (Object.hasOwn(patch, field) && !UiPreferenceSchema.isValidUiPreferenceValue(field, patch[field], CommonLinks, { today })) {
       throw new TypeError(`${field} is not a supported pointer effect value`);

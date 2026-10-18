@@ -12,6 +12,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createAuroraModule() {
   const FLUID_MODES = Object.freeze(['auto', 'full', 'lite', 'off']);
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const smoothValue = (value, target, dt, retention = .72) => target + (value - target) * Math.pow(retention, Math.max(0, dt) * 60);
 
   // 越拉越重的橡皮筋位移：位移趋近 dimension，手感与系统边界回弹一致。
   function rubberBand(offset, dimension = 320, constant = .55) {
@@ -20,16 +21,31 @@
     return Math.sign(offset) * (1 - 1 / (distance * constant / dimension + 1)) * dimension;
   }
 
-  // 半隐式欧拉 + 240Hz 子步：长帧后依旧稳定；返回是否已经静止。
+  // 解析阻尼弹簧按真实秒数推进；60/70/120/144Hz 同一时刻得到同一姿态。
+  // 长帧仍限幅，避免恢复窗口的第一帧让装饰突然跳过整段运动。
   function stepSpring(axis, dt, stiffness, ratio, epsilon = .05) {
-    const damping = 2 * ratio * Math.sqrt(stiffness);
-    let remaining = clamp(dt, 0, .064);
-    while (remaining > 1e-6) {
-      const h = Math.min(remaining, 1 / 240);
-      axis.v += (-stiffness * (axis.p - axis.t) - damping * axis.v) * h;
-      axis.p += axis.v * h;
-      remaining -= h;
+    const elapsed = clamp(dt, 0, .064), frequency = Math.sqrt(stiffness);
+    const decay = ratio * frequency, offset = axis.p - axis.t;
+    let position, velocity;
+    if (ratio < 1) {
+      const damped = frequency * Math.sqrt(1 - ratio * ratio);
+      const a = offset, b = (axis.v + decay * offset) / damped;
+      const cosine = Math.cos(damped * elapsed), sine = Math.sin(damped * elapsed);
+      const envelope = Math.exp(-decay * elapsed);
+      position = envelope * (a * cosine + b * sine);
+      velocity = envelope * damped * (-a * sine + b * cosine) - decay * position;
+    } else if (ratio === 1) {
+      const b = axis.v + frequency * offset, envelope = Math.exp(-frequency * elapsed);
+      position = envelope * (offset + b * elapsed);
+      velocity = envelope * b - frequency * position;
+    } else {
+      const root = frequency * Math.sqrt(ratio * ratio - 1);
+      const r1 = -decay + root, r2 = -decay - root;
+      const b = (axis.v - r1 * offset) / (r2 - r1), a = offset - b;
+      position = a * Math.exp(r1 * elapsed) + b * Math.exp(r2 * elapsed);
+      velocity = r1 * a * Math.exp(r1 * elapsed) + r2 * b * Math.exp(r2 * elapsed);
     }
+    axis.p = axis.t + position; axis.v = velocity;
     if (Math.abs(axis.p - axis.t) < epsilon && Math.abs(axis.v) < epsilon * 12) {
       axis.p = axis.t; axis.v = 0;
       return true;
@@ -43,6 +59,26 @@
     if (mode === 'full') return 'full';
     if (mode === 'lite') return 'lite';
     return fxTier === 'lite' || saver || strained ? 'lite' : 'full';
+  }
+
+  // 两秒墙钟窗口、至少 1.2 秒持续负载后才降级。刷新率变化会清空旧屏幕的
+  // 预算，避免 144Hz 比 60Hz 更早触发，或换屏后的几个抖动帧造成误判。
+  function createFrameBudgetMonitor() {
+    const samples = [];
+    let duration = 0, dropped = 0, refreshRate = 0;
+    function reset() { samples.length = 0; duration = dropped = refreshRate = 0; }
+    return Object.freeze({ reset, record(dt, cost, hz = 60) {
+      if (!Number.isFinite(dt) || dt <= 0 || dt > .25) { reset(); return false; }
+      if (refreshRate !== hz) { reset(); refreshRate = hz; }
+      const budget = 1 / Math.max(24, Number(hz) || 60);
+      const miss = dt > budget * 1.85 || cost > budget * 800;
+      samples.push({ duration: dt, dropped: miss ? dt : 0 });
+      duration += dt; dropped += miss ? dt : 0;
+      while (samples.length > 1 && duration - samples[0].duration >= 2) {
+        const oldest = samples.shift(); duration -= oldest.duration; dropped -= oldest.dropped;
+      }
+      return duration >= 1.2 - 1e-9 && dropped / duration > .34;
+    } });
   }
 
   // 两个圆之间的水滴连桥（metaball）。距离过远或完全包含时返回空串。
@@ -130,10 +166,10 @@
     // ---------- 融合帧时钟：所有流体任务合并到同一个 RAF ----------
     const tasks = new Map();
     let frameHandle = null;
-    let lastFrame = 0;
+    let lastFrame = null;
     function loop(time) {
       frameHandle = null;
-      const dt = lastFrame ? clamp((time - lastFrame) / 1000, 0, .1) : 1 / 60;
+      const dt = lastFrame != null ? clamp((time - lastFrame) / 1000, 0, .1) : 1 / (Number(root.dataset.refreshRate) || 60);
       lastFrame = time;
       const started = now();
       for (const [name, task] of [...tasks]) {
@@ -143,31 +179,27 @@
       }
       recordFrame(dt, now() - started);
       if (tasks.size && !disposed) frameHandle = win.requestAnimationFrame(loop);
-      else lastFrame = 0;
+      else { lastFrame = null; governor.budget.reset(); }
     }
     function run(name, task) {
       if (disposed) return;
       tasks.set(name, task);
-      if (frameHandle == null) frameHandle = win.requestAnimationFrame(loop);
+      if (frameHandle == null) { lastFrame = now(); frameHandle = win.requestAnimationFrame(loop); }
     }
 
     // ---------- 调速器：刷新率、硬件、电量与实测掉帧 ----------
-    const governor = { level: '', saver: false, strained: false, strainTimer: 0, drops: [], battery: null };
+    const governor = { level: '', saver: false, strained: false, strainTimer: 0, budget: createFrameBudgetMonitor(), battery: null };
     const focused = () => !doc.hidden && (typeof doc.hasFocus !== 'function' || doc.hasFocus());
     const mode = () => (FLUID_MODES.includes(root.dataset.fluidMode) ? root.dataset.fluidMode : 'auto');
     const allowed = () => !disposed && governor.level !== 'off' && focused() && !forcedQuery?.matches;
     const full = () => governor.level === 'full' && allowed();
     function recordFrame(dt, cost) {
       if (mode() !== 'auto' || governor.strained) return;
-      const budget = 1 / (Number(root.dataset.refreshRate) || 60);
-      governor.drops.push(dt > budget * 1.85 || cost > budget * 450 ? 1 : 0);
-      if (governor.drops.length > 120) governor.drops.shift();
-      if (governor.drops.length < 72) return;
-      const ratio = governor.drops.reduce((sum, value) => sum + value, 0) / governor.drops.length;
-      if (ratio <= .34) return;
+      const hz = Number(root.dataset.refreshRateDetected || root.dataset.refreshRate) || 60;
+      if (!governor.budget.record(dt, cost, hz)) return;
       // 连续掉帧：自动档暂降轻盈 20 秒，再试探回到完整档。
       governor.strained = true;
-      governor.drops.length = 0;
+      governor.budget.reset();
       win.clearTimeout(governor.strainTimer);
       governor.strainTimer = win.setTimeout(() => { governor.strained = false; syncLevel(); }, 20000);
       syncLevel();
@@ -586,7 +618,7 @@
       const delta = jelly.pending;
       jelly.pending = 0;
       const instant = Math.abs(delta) / Math.max(dt, 1 / 240);
-      jelly.speed = jelly.speed * .72 + instant * .28;
+      jelly.speed = smoothValue(jelly.speed, instant, dt);
       // 快速滑动：幅度更大、回弹更快；慢慢滑：动画放缓、回弹更轻。
       const energy = clamp(jelly.speed / 3400, 0, 1);
       const gain = .035 + .095 * energy;
@@ -863,7 +895,9 @@
     FLUID_MODES,
     rubberBand,
     stepSpring,
+    smoothValue,
     resolveFluidLevel,
+    createFrameBudgetMonitor,
     metaballPath,
     rectGap,
     capsuleCircle,

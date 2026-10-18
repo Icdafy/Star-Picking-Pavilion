@@ -13,6 +13,7 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   const exposed = new Map();
   const ipcCalls = [];
   let updateListener;
+  const displayListeners = new Set();
   const initialPreferences = {
     version: 1,
     theme: 'dark',
@@ -68,9 +69,18 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
         throw new Error(`Unexpected sendSync channel: ${channel}`);
       },
       send(channel, ...args) { ipcCalls.push(['send', channel, ...args]); },
-      on(channel, listener) { ipcCalls.push(['on', channel]); updateListener = listener; },
+      on(channel, listener) {
+        ipcCalls.push(['on', channel]);
+        if (channel === 'display-refresh-rate:changed') displayListeners.add(listener);
+        else updateListener = listener;
+      },
+      removeListener(channel, listener) {
+        assert.equal(channel, 'display-refresh-rate:changed');
+        displayListeners.delete(listener);
+      },
       invoke(channel, ...args) {
         ipcCalls.push(['invoke', channel, ...args]);
+        if (channel === 'display-refresh-rate:get') return Promise.resolve({ displayId: '7', refreshRate: 143.9 });
         if (channel === 'appearance-wallpaper:get') return Promise.resolve(wallpaperDataUrl);
         if (channel === 'appearance-wallpaper:save') return Promise.resolve(savedWallpaper);
         if (channel === 'appearance-wallpaper:clear') return Promise.resolve(clearedWallpaper);
@@ -131,6 +141,19 @@ test('preload exposes one deeply frozen preferences API under new and compatibil
   const patch = { theme: 'light', commonLinksFavorites: ['caac'] };
   await api.updatePreferences(patch);
   assert.deepEqual(ipcCalls.at(-1), ['invoke', 'preferences:update', patch]);
+
+  const display = await api.getDisplayRefreshRate();
+  assert.deepEqual(JSON.parse(JSON.stringify(display)), { displayId: '7', refreshRate: 143.9 });
+  assert.equal(Object.isFrozen(display), true);
+  let refreshPayload;
+  const unsubscribe = api.onDisplayRefreshRateChanged(value => { refreshPayload = value; });
+  const nativePayload = { displayId: '2', refreshRate: 70 };
+  [...displayListeners].forEach(listener => listener({}, nativePayload));
+  assert.equal(Object.isFrozen(refreshPayload), true);
+  assert.notEqual(refreshPayload, nativePayload);
+  unsubscribe(); unsubscribe();
+  assert.equal(displayListeners.size, 0);
+  assert.equal(typeof api.onDisplayRefreshRateChanged(null), 'function');
 
   const wallpaper = await api.getAppearanceWallpaper();
   assert.equal(wallpaper, wallpaperDataUrl);

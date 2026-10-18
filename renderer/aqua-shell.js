@@ -89,7 +89,8 @@
       aquaCritters: typeof value.aquaCritters === 'boolean'
         ? value.aquaCritters
         : DEFAULTS.aquaCritters,
-      fluidMode: Schema.FLUID_MODES.includes(value.fluidMode) ? value.fluidMode : DEFAULTS.fluidMode
+      fluidMode: Schema.FLUID_MODES.includes(value.fluidMode) ? value.fluidMode : DEFAULTS.fluidMode,
+      refreshRate: Schema.REFRESH_RATES.includes(value.refreshRate) ? value.refreshRate : DEFAULTS.refreshRate
     };
   }
 
@@ -101,7 +102,7 @@
     };
   }
 
-  function createFluidBackdrop({ canvas, document: doc, window: win } = {}) {
+  function createFluidBackdrop({ canvas, document: doc, window: win, frameRate: refresh } = {}) {
     const context = canvas?.getContext?.('2d', { alpha: true });
     if (!canvas || !context || !doc || !win) {
       return Object.freeze({ stir() {}, setTheme() {}, setPaused() {}, dispose() {} });
@@ -130,7 +131,10 @@
 
     function frameRate() {
       if (tier() === 'static') return 0;
-      return tier() === 'lite' ? 10 : 24;
+      const detected = Number(refresh?.hz ?? doc.documentElement.dataset.refreshRate);
+      const effective = Number.isFinite(detected) && detected >= 24 && detected <= 360 ? detected : 60;
+      // 轻盈档按显示节拍整除，完整档跟随当前显示器与用户选择；运动仍以时间推进。
+      return tier() === 'lite' ? effective / 2 : effective;
     }
 
     function resize() {
@@ -217,7 +221,7 @@
     }
 
     function schedule() {
-      if (disposed || paused || animationFrame) return;
+      if (disposed || paused || animationFrame || frameRate() === 0) return;
       animationFrame = win.requestAnimationFrame(frame);
     }
 
@@ -230,8 +234,10 @@
         return;
       }
       const interval = 1000 / fps;
-      if (now - previousFrame >= interval) {
-        previousFrame = now - ((now - previousFrame) % interval);
+      const elapsed = now - previousFrame;
+      // rAF 时间戳有小幅抖动，允许半毫秒误差，避免 60/70/120/144 Hz 整档被误跳帧。
+      if (elapsed >= interval - .5) {
+        previousFrame += interval * Math.max(1, Math.floor((elapsed + .5) / interval));
         draw(now);
       }
       schedule();
@@ -315,7 +321,7 @@
     });
   }
 
-  function createDshFluidBackdrop({ canvas, window: win, engine } = {}) {
+  function createDshFluidBackdrop({ canvas, window: win, engine, frameRate: refresh } = {}) {
     if (!canvas || !win || !engine?.attachFluidShader || !engine?.SITE_FLUID_PARAMS) {
       return Object.freeze({ stir() {}, setTheme() {}, setPaused() {}, dispose() {} });
     }
@@ -341,7 +347,7 @@
     let dark = true;
     let paused = false;
     let disposed = false;
-    let handle = engine.attachFluidShader(canvas, palettes.dark);
+    let handle = engine.attachFluidShader(canvas, palettes.dark, { frameRate: refresh });
     let previous = { x: .5, y: .5 };
 
     function normalized(clientX, clientY) {
@@ -472,13 +478,14 @@
 
     const root = doc.documentElement;
     const state = normalizeSettings(deps.preferences);
+    const refresh = deps.frameRate;
     const byId = id => doc.getElementById(id);
     const atmosphere = doc.querySelector('.atmosphere');
     const dshEngine = win.DshAquaEngine;
     root.dataset.dshEngine = dshEngine ? 'plugin-1.1.0' : 'compatibility';
     const fluid = dshEngine
-      ? createDshFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win, engine: dshEngine })
-      : createFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win });
+      ? createDshFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win, engine: dshEngine, frameRate: refresh })
+      : createFluidBackdrop({ canvas: byId('aquaFluidCanvas'), document: doc, window: win, frameRate: refresh });
     const wallpaper = byId('aquaWallpaperImage');
     const wallpaperStatus = byId('aquaWallpaperStatus');
     const wallpaperControls = byId('aquaWallpaperControls');
@@ -495,6 +502,8 @@
     let wallpaperWriteQueue = Promise.resolve();
     let appliedWallpaper = null;
     let appliedDark = null;
+    let appliedRefreshMode = null;
+    let refreshRequest = 0;
     const cleanups = [];
 
     const dustPositions = [
@@ -521,6 +530,26 @@
 
     function currentThemeIsDark() {
       return root.dataset.theme !== 'light';
+    }
+
+    function syncRefreshStatus() {
+      const selector = byId('setRefreshRate');
+      if (selector && selector.value !== state.refreshRate) selector.value = state.refreshRate;
+      const status = byId('refreshRateStatus');
+      if (!status) return;
+      const source = refresh?.source || 'default';
+      const sourceLabel = { native: '系统显示器信息', raf: '本机动效实测', default: '保守默认值' }[source] || '本机检测';
+      const detected = Number(refresh?.detectedHz);
+      const effective = Number(refresh?.hz);
+      const formatHz = value => `${Math.round(value * 10) / 10} Hz`;
+      const detectedLabel = source !== 'default' && Number.isFinite(detected) && detected > 0
+        ? `检测到 ${formatHz(detected)}` : '等待检测当前显示器';
+      const appliedLabel = Number.isFinite(effective) && effective > 0 ? formatHz(effective) : '60 Hz';
+      const modeLabel = state.refreshRate === 'auto' ? '自动适配' : `手动 ${state.refreshRate} Hz`;
+      const capped = source !== 'default' && state.refreshRate !== 'auto' && Number.isFinite(detected) && Number(state.refreshRate) > detected + .5;
+      const message = `${detectedLabel} · 当前动效采样 ${appliedLabel} · 来源：${sourceLabel} · ${modeLabel}${capped ? '（受显示器刷新率限制）' : ''}`;
+      // 硬件状态变化不回写偏好，也不触发 apply() 或模式重新设置。
+      if (status.textContent !== message) status.textContent = message;
     }
 
     function applyBrightness() {
@@ -628,9 +657,14 @@
       if (wallpaperControls) wallpaperControls.hidden = !showWallpaper;
       wallpaperOnly.forEach(node => { node.hidden = !showWallpaper; });
       syncPalettePresets();
+      syncRefreshStatus();
     }
 
     function apply() {
+      if (appliedRefreshMode !== state.refreshRate) {
+        appliedRefreshMode = state.refreshRate;
+        refresh?.setMode?.(state.refreshRate);
+      }
       root.dataset.aquaEnabled = state.aquaEnabled ? 'on' : 'off';
       root.dataset.aquaMode = state.aquaMode;
       root.dataset.aquaBackground = state.aquaBackground === 'wallpaper' && wallpaperData
@@ -780,6 +814,31 @@
     for (const button of doc.querySelectorAll('[data-fluid-mode]')) {
       listen(button, 'click', () => update('fluidMode', button.dataset.fluidMode, { immediate: true }));
     }
+    listen(byId('setRefreshRate'), 'change', event => update('refreshRate', event.currentTarget.value, { immediate: true }));
+    listen(win, 'refresh-rate-change', syncRefreshStatus);
+    listen(byId('btnRefreshRateDetect'), 'click', async event => {
+      if (disposed || !refresh?.measure) return;
+      const button = event.currentTarget;
+      const request = ++refreshRequest;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      const status = byId('refreshRateStatus');
+      if (status) status.textContent = '正在检测当前显示器刷新率…';
+      try {
+        const measured = await refresh.measure('replace');
+        if (!disposed && request === refreshRequest) {
+          if (measured === false && status) status.textContent = '本次检测未完成，继续使用当前采样档位；可再次检测。';
+          else syncRefreshStatus();
+        }
+      } catch {
+        if (!disposed && request === refreshRequest && status) status.textContent = '本次检测未完成，继续使用当前采样档位；可再次检测。';
+      } finally {
+        if (!disposed && request === refreshRequest) {
+          button.disabled = false;
+          button.setAttribute('aria-busy', 'false');
+        }
+      }
+    });
     listen(byId('setPointerEnabled'), 'change', event => update('pointerEnabled', event.currentTarget.checked, { immediate: true }));
     listen(byId('setPointerStyle'), 'change', event => update('pointerStyle', event.currentTarget.value, { immediate: true }));
     for (const id of ['setPointerColor', 'setPointerColorHex']) {
@@ -802,10 +861,10 @@
       { immediate: true }
     ));
 
-    // “恢复默认外观”只复位玻璃与背景参数：动态背景的开关是用户的显式选择，
+    // “恢复默认外观”复位玻璃、背景参数与刷新率自动适配：动态背景的开关是用户的显式选择，
     // 跟手动效另有自己的“恢复默认动效”，此前这里会把两者一并改掉。
     const AQUA_RESET = Object.freeze(Object.fromEntries(
-      FIELDS.filter(field => field.startsWith('aqua') && field !== 'aquaEnabled').map(field => [field, DEFAULTS[field]])
+      FIELDS.filter(field => (field.startsWith('aqua') && field !== 'aquaEnabled') || field === 'refreshRate').map(field => [field, DEFAULTS[field]])
     ));
     listen(byId('btnAquaReset'), 'click', () => {
       wallpaperRequest += 1;

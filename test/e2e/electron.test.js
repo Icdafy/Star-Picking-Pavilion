@@ -48,6 +48,7 @@ const EXPECTED_UI_PREFERENCE_KEYS = [
   'pointerStarsSize',
   'pointerStyle',
   'realtime',
+  'refreshRate',
   'textScale',
   'theme',
   'version',

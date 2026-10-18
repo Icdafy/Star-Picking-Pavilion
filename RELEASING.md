@@ -1,16 +1,8 @@
 # 摘星阁发布指南
 
-本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程只允许通过受门禁保护的 tag 工作流执行，不再提供会绕过测试的本地 `--publish always` 命令。
+本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-[v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 已于北京时间 **2026-10-18 00:56:27** 发布为最新正式版，非 draft、非 prerelease：修复打开应用后 Windows 任务栏仍显示 Electron 默认图标的问题；开发版与正式版分离身份，每个窗口明确设置 Shell 图标与重新启动信息，使用带版本号的 ICO 并升级指向本应用的已有快捷方式。全部静态图标继续采用本次上传的 PNG，仅保留主页面左上角原有 SVG 动效与首帧回退图。六项公开附件已重新下载且全部复核通过，发布验证完成，详见 [本版验证](docs/v0242-validation.md)。
-
-精确提交 `69167db3a51fd73aff81acc9eca435cd096edee6` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39048402604) 与同提交的 [Release 第 2 次作业](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/39049461836/attempts/2) 均已全部通过，含 1170 / 1170 单元与集成、43 / 43 真实 Electron、零漏洞依赖审计、1304 项包边界与一次性 Windows 安装/原生图标和 Shell 身份/单实例/退出/卸载/保留用户数据烟测。本地打包程序隔离实跑也已通过。最终 Release ASAR 15,884,592 B、安装器 102,142,132 B，PE 产品/文件版本 0.2.42，NotSigned；SHA-256 `991033ed7dc12272521cd8f63edba608e6a9089992e66f7570cee1dc42adb421` 与 SHA256SUMS 及 GitHub 摘要一致，六项公开附件的更新元数据、blockmap、七尺寸图标、SBOM、声明与发布正文均复核通过。main CI 的 102,142,131 B 安装器属于单独候选产物。
-
-Release 首轮桌面回归为 42 / 43：既有 `v0210-motion.test.js` 连续导航测试在固定 450 ms 后的选中指示器几何断言失败，新增图标测试通过。首轮失败日志保存在 `work/v0242/release-failed.log`，原因尚未定位；第 2 次作业保持同提交、同代码、同断言和同 tag，完整重跑成功后发布，成功日志为 `work/v0242/release-success.log`。
-
-[v0.2.41](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.41) 已于北京时间 2026-10-17 21:00:11 发布：使用本次上传的 PNG 统一全部静态 Logo，保留主页面左上角 SVG 动效与首帧回退图。精确提交 `f1380c9` 的 main CI 与 tag Release 全部门禁通过，沿用已接受的 NotSigned 策略；六项公开附件已重新下载复核，完整证据见 [本版验证](docs/v0241-validation.md)。
-
-上一正式版 [v0.2.40](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.40) 已于北京时间 2026-10-17 18:57:32 发布：修复更新弹窗旧 Logo，并新增自动清理开关。精确提交 42b4504 的 main CI 与 tag Release 全部门禁通过，公开附件已重新下载校验，历史证据见 [v0.2.40 验证](docs/v0240-validation.md)。
+当前候选为 **v0.2.43**：适配 DeepSeek-V4.1-Flash-1017 与显示器刷新率自动匹配及四档设置。发布验证进行中，只有精确提交的 main CI、完整安装/卸载和 tag 工作流全部通过后才形成正式 Release；证据见 [本版验证](docs/v0243-validation.md)。上一正式版 [v0.2.42](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.42) 的原始记录见 [历史验证](docs/v0242-validation.md)。
 
 ## 发布前授权门槛
 
@@ -29,7 +21,7 @@ Release 首轮桌面回归为 42 / 43：既有 `v0210-motion.test.js` 连续导�
 npm ci
 node node_modules/electron/install.js
 npm run releases:sync
-npm run verify:version -- --tag v0.2.42
+npm run verify:version -- --tag v0.2.43
 npm test
 npm run test:e2e
 npm run audit:sources -- --strict
@@ -39,11 +31,11 @@ npm run notices
 git diff --exit-code -- THIRD_PARTY_NOTICES.txt
 npm run dist
 npm run verify:package
-npm run verify:version -- --tag v0.2.42 --artifacts
-Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.42.exe
+npm run verify:version -- --tag v0.2.43 --artifacts
+Get-AuthenticodeSignature .\dist\Star-Picking-Pavilion-Setup-0.2.43.exe
 ```
 
-v0.2.42 的签名状态预期为 `NotSigned`。
+v0.2.43 的签名状态预期为 `NotSigned`。
 
 ### 更新日志同步（每次发版必做）
 
@@ -92,25 +84,25 @@ v0.2.42 的签名状态预期为 `NotSigned`。
 v0.1.3 的一次性更新桥已在 v0.1.4 移除。更新元数据与公开号完全一致；旧 v0.1.2 内部同号客户端可手动安装。创建 tag 前先运行：
 
 ```powershell
-npm run verify:version -- --tag v0.2.42
-git tag -a v0.2.42 -m "摘星阁 v0.2.42"
-git push origin v0.2.42
+npm run verify:version -- --tag v0.2.43
+git tag -a v0.2.43 -m "摘星阁 v0.2.43"
+git push origin v0.2.43
 ```
 
 推送 `v*` tag 后，`.github/workflows/release.yml` 会显式安装锁定的 Electron 二进制，再依次执行版本检查、单元测试、真实 Electron 测试、生产及完整工具链依赖审计、第三方声明生成与差异检查、构建、包审计、SHA-256 和 SBOM。SBOM 先生成生产 JS 图，再补入与锁文件一致的实际 Electron 运行时并重新校验 CycloneDX 1.6。全部成功后才会运行 `gh release create`。
 
 ## 发布资产
 
-v0.2.42 Release 应包含：
+v0.2.43 Release 应包含：
 
-- `Star-Picking-Pavilion-Setup-0.2.42.exe`
-- `Star-Picking-Pavilion-Setup-0.2.42.exe.blockmap`
+- `Star-Picking-Pavilion-Setup-0.2.43.exe`
+- `Star-Picking-Pavilion-Setup-0.2.43.exe.blockmap`
 - `latest.yml`
 - `SHA256SUMS.txt`
 - `sbom.cdx.json`
 - `THIRD_PARTY_NOTICES.txt`
 
-发布完成后将六项资产下载到work/v0242/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
+发布完成后将六项资产下载到work/v0243/下新的隔离目录，按 `SHA256SUMS.txt` 重新校验，核对PE产品版本、latest.yml版本/文件名/尺寸及实际安装器SHA-512。安装、启动、单实例、退出和卸载烟测只在既有一次性Windows CI执行，本机不运行安装器或伪设CI=true。确认Release非draft、非prerelease且为最新正式版。
 
 ## 回滚
 

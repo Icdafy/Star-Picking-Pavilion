@@ -57,7 +57,8 @@ const AQUA_DEFAULTS = Object.freeze({
   aquaCritters: true,
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
-  fluidMode: 'auto'
+  fluidMode: 'auto',
+  refreshRate: 'auto'
 });
 const AQUA_NON_DEFAULTS = Object.freeze({
   aquaMode: 'compat',
@@ -72,7 +73,8 @@ const AQUA_NON_DEFAULTS = Object.freeze({
   aquaCritters: false,
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
-  fluidMode: 'lite'
+  fluidMode: 'lite',
+  refreshRate: '120'
 });
 
 function createStorage(entries = {}) {

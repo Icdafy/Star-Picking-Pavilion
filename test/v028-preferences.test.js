@@ -15,6 +15,7 @@ const baseline = {
   pointerEnabled: true, pointerStyle: 'glow', pointerSize: 320,
   pointerCometSize: 240, pointerStarsSize: 6, pointerRingSize: 40, pointerColor: '#8b5cf6', pointerOpacity: 100,
   fluidMode: 'auto',
+  refreshRate: 'auto',
   theme: 'light', textScale: 'md', aquaMode: 'mica', aquaEnabled: false,
   aquaBlur: 2, aquaFrost: 20, aquaHue: 40, aquaBrightness: 42,
   aquaBackground: 'fluid', aquaWallpaperBlur: 0, aquaWallpaperFrost: 0,

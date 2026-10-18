@@ -19,6 +19,8 @@
   const AQUA_BACKGROUNDS = new Set(['fluid', 'wallpaper']);
   // v0.2.38 流体设计档位：auto 按刷新率、硬件、电量与实测掉帧自动选择。
   const FLUID_MODES = new Set(['auto', 'full', 'lite', 'off']);
+  // 仅保存用户选择。显示器信息与运行时测量结果随所在电脑重新检测。
+  const REFRESH_RATES = new Set(['auto', '60', '70', '120', '144']);
   const POINTER_STYLES = Object.freeze({
     glow: Object.freeze({ field: 'pointerSize', min: 80, max: 800, label: '光晕大小', hint: '柔光照亮鼠标附近的表面，边缘反光轻轻跟随。' }),
     comet: Object.freeze({ field: 'pointerCometSize', min: 80, max: 800, label: '尾迹长度', hint: '连续、渐细的流星尾迹，停下后自然消散。' }),
@@ -44,7 +46,8 @@
     aquaWallpaperFrost: 0,
     aquaCritters: false,
     ...POINTER_DEFAULTS,
-    fluidMode: 'auto'
+    fluidMode: 'auto',
+    refreshRate: 'auto'
   });
   const INITIAL_UI_PREFERENCES = Object.freeze({
     theme: 'light',
@@ -81,6 +84,7 @@
     'pointerColor',
     'pointerOpacity',
     'fluidMode',
+    'refreshRate',
     'view',
     'domain',
     'category',
@@ -156,6 +160,7 @@
       aquaCritters: true,
       ...POINTER_DEFAULTS,
       fluidMode: 'auto',
+      refreshRate: 'auto',
       view: 'featured',
       domain: '',
       category: '',
@@ -317,6 +322,7 @@
       pointerColor: chooseValue(source.pointerColor, secondary.pointerColor, value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value), defaults.pointerColor),
       pointerOpacity: chooseValue(source.pointerOpacity, secondary.pointerOpacity, value => isFiniteNumberInRange(value, 10, 100), defaults.pointerOpacity),
       fluidMode: chooseValue(source.fluidMode, secondary.fluidMode, value => FLUID_MODES.has(value), defaults.fluidMode),
+      refreshRate: chooseValue(source.refreshRate, secondary.refreshRate, value => REFRESH_RATES.has(value), defaults.refreshRate),
       view: chooseValue(source.view, secondary.view, value => VIEWS.has(value), defaults.view),
       domain: chooseValue(source.domain, secondary.domain, value => DOMAINS.has(value), defaults.domain),
       category: chooseValue(
@@ -375,6 +381,7 @@
     if (field === 'pointerColor') return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
     if (field === 'pointerOpacity') return isFiniteNumberInRange(value, 10, 100);
     if (field === 'fluidMode') return FLUID_MODES.has(value);
+    if (field === 'refreshRate') return REFRESH_RATES.has(value);
     if (field === 'view') return VIEWS.has(value);
     if (field === 'domain') return DOMAINS.has(value);
     if (field === 'category') return isValidCategory(value);
@@ -421,6 +428,7 @@
     DEFAULT_APPEARANCE,
     POINTER_STYLES,
     FLUID_MODES: Object.freeze([...FLUID_MODES]),
+    REFRESH_RATES: Object.freeze([...REFRESH_RATES]),
     INITIAL_UI_PREFERENCES,
     TEXT_SCALES: Object.freeze([...TEXT_SCALES]),
     isPlainObject,

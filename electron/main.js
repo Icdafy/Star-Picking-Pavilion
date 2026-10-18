@@ -14,7 +14,8 @@ const {
   safeStorage,
   powerMonitor,
   nativeTheme,
-  nativeImage
+  nativeImage,
+  screen
 } = require('electron');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -40,6 +41,7 @@ const { createDailyArchiveBundleRequester } = require('./daily-archive-request')
 const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
 const { getWindowTheme } = require('./window-theme');
 const { refreshApplicationShortcuts } = require('./desktop-branding');
+const { registerDisplayRefreshRateIpc, watchDisplayRefreshRate } = require('./display-refresh-rate');
 const {
   createAppearanceWallpaperStore,
   registerAppearanceWallpaperIpc
@@ -390,6 +392,7 @@ async function createWindow(serverPort, initialTheme = 'dark') {
     }
   }
   applyWindowTheme(initialTheme);
+  watchDisplayRefreshRate({ screen, window: win });
   if (!startHidden) win.show();
   win.on('page-title-updated', event => {
     event.preventDefault();
@@ -521,6 +524,8 @@ registerUiPreferencesIpc({
     if (Object.hasOwn(patch, 'theme')) applyWindowTheme(snapshot.theme);
   }
 });
+registerDisplayRefreshRateIpc({ ipcMain, screen, getWindow: () => win });
+
 registerDesktopSettingsIpc({
   ipcMain,
   getController: () => backgroundMode

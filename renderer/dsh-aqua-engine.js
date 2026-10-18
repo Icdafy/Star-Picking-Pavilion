@@ -3,9 +3,9 @@
 /*
  * Standalone Aqua visual engine for Star-Picking-Pavilion.
  *
- * The implementation below is extracted without algorithmic changes from
- * DSH-Transparent-UI-Plugin 1.1.0's compiled client bundle; only pause/resume
- * lifecycle hooks were added for Electron visibility and power management:
+ * The implementation below is adapted from
+ * DSH-Transparent-UI-Plugin 1.1.0's compiled client bundle. Local changes add
+ * pause/resume lifecycle hooks and elapsed-time, display-refresh adaptation:
  *   src/client/fluid-shader.ts
  * v0.2.39 removed the particle whale (src/client/whale.ts) together with its setting.
  *
@@ -61,6 +61,7 @@ uniform vec2 u_velocity;
 uniform float u_brushRadius;
 uniform float u_brushStrength;
 uniform float u_decay;
+uniform float u_frameScale;
 out vec4 fragColor;
 
 void main() {
@@ -80,7 +81,7 @@ void main() {
   float totalStrength = presenceStrength + velBonus;
 
   prev.r = max(prev.r, influence * totalStrength);
-  float blendAmt = influence * min(totalStrength, 0.4) * 0.3;
+  float blendAmt = 1.0 - pow(1.0 - influence * min(totalStrength, 0.4) * 0.3, u_frameScale);
   prev.g = mix(prev.g, clamp(u_velocity.x * 2.0 + 0.5, 0.0, 1.0), blendAmt);
   prev.b = mix(prev.b, clamp(u_velocity.y * 2.0 + 0.5, 0.0, 1.0), blendAmt);
 
@@ -187,7 +188,21 @@ function hexToRgb(value) {
 * @param params - simulation parameters (site defaults are the natural input).
 * @returns the live handle.
 */
-function attachFluidShader(canvas, params) {
+// 上游 30Hz 指针滤波的解析延拓；一次 1/30 秒仍得到相同结果，高刷只提高采样密度。
+function advanceFluidPointer(pointer, elapsed) {
+	const frames = Math.max(0, elapsed) * 30;
+	const positionDecay = Math.pow(.88, frames);
+	const velocityDecay = Math.pow(.94 * .85, frames);
+	const force = .075 * .88 * (positionDecay - velocityDecay) / (.88 - .94 * .85);
+	for (const [target, smooth, velocity] of [["x", "smoothX", "svx"], ["y", "smoothY", "svy"]]) {
+		const offset = pointer[target] - pointer[smooth];
+		pointer[velocity] = pointer[velocity] * velocityDecay + offset * force;
+		pointer[smooth] = pointer[target] - offset * positionDecay;
+	}
+}
+
+function attachFluidShader(canvas, params, options = {}) {
+	const frameRate = options.frameRate;
 	const gl = canvas.getContext("webgl2", {
 		alpha: true,
 		premultipliedAlpha: false,
@@ -239,7 +254,8 @@ function attachFluidShader(canvas, params) {
 		velocity: gl.getUniformLocation(flowProgram, "u_velocity"),
 		brushRadius: gl.getUniformLocation(flowProgram, "u_brushRadius"),
 		brushStrength: gl.getUniformLocation(flowProgram, "u_brushStrength"),
-		decay: gl.getUniformLocation(flowProgram, "u_decay")
+		decay: gl.getUniformLocation(flowProgram, "u_decay"),
+		frameScale: gl.getUniformLocation(flowProgram, "u_frameScale")
 	};
 	const display = {
 		time: gl.getUniformLocation(displayProgram, "u_time"),
@@ -319,7 +335,18 @@ function attachFluidShader(canvas, params) {
 		svx: 0,
 		svy: 0
 	};
-	const dprCap = Math.min(window.devicePixelRatio || 1, 1.5);
+	const root = canvas.ownerDocument?.documentElement;
+	const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+	const tier = () => root?.dataset?.fxTier || "full";
+	const targetHz = () => {
+		const rate = Number(frameRate?.hz ?? root?.dataset?.refreshRate);
+		const effective = Number.isFinite(rate) && rate >= 24 && rate <= 1000 ? rate : 60;
+		return tier() === "lite" ? effective / 2 : effective;
+	};
+	// 高刷把预算留给输入与正文：限制背景像素数量，而非固定降到 30fps。
+	const pixelRatio = () => Math.min(window.devicePixelRatio || 1, tier() === "lite" ? 1 : 1.5,
+		Math.sqrt((tier() === "lite" ? 800_000 : 1_600_000) / Math.max(1, canvas.clientWidth * canvas.clientHeight)));
+	const dprCap = pixelRatio();
 	width = Math.round(canvas.clientWidth * dprCap);
 	height = Math.round(canvas.clientHeight * dprCap);
 	canvas.width = width;
@@ -346,14 +373,18 @@ function attachFluidShader(canvas, params) {
 	if (!coarse && !windows) window.addEventListener("mousemove", onMouseMove);
 	const start = performance.now();
 	let raf = 0;
-	let previous = 0;
-	const step = 1e3 / 30;
+	let previous = null, lastRendered = null, lastStirred = null;
 	const frame = (now) => {
 		if (disposed || paused) return;
-		raf = requestAnimationFrame(frame);
-		if (now - previous < step) return;
-		previous = now - (now - previous) % step;
-		const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+		const stationary = tier() === "static" || reduced.matches;
+		if (!stationary) raf = requestAnimationFrame(frame);
+		const step = 1e3 / targetHz();
+		const sincePrevious = previous == null ? step : now - previous;
+		if (!stationary && sincePrevious + .1 < step) return;
+		previous = previous == null ? now : previous + Math.max(1, Math.floor((sincePrevious + .1) / step)) * step;
+		const elapsed = lastRendered == null ? 1 / targetHz() : Math.min(.1, Math.max(0, (now - lastRendered) / 1000));
+		lastRendered = now;
+		const ratio = pixelRatio();
 		const nextWidth = Math.round(canvas.clientWidth * ratio);
 		const nextHeight = Math.round(canvas.clientHeight * ratio);
 		if (nextWidth !== width || nextHeight !== height) {
@@ -364,12 +395,7 @@ function attachFluidShader(canvas, params) {
 		}
 		const p = current;
 		const s = pointer;
-		s.svx *= .94;
-		s.svy *= .94;
-		s.smoothX += (s.x - s.smoothX) * .12;
-		s.smoothY += (s.y - s.smoothY) * .12;
-		s.svx += ((s.x - s.smoothX) * .5 - s.svx) * .15;
-		s.svy += ((s.y - s.smoothY) * .5 - s.svy) * .15;
+		advanceFluidPointer(s, elapsed);
 		const read = flip ? targetA : targetB;
 		const write = flip ? targetB : targetA;
 		flip = !flip;
@@ -384,7 +410,8 @@ function attachFluidShader(canvas, params) {
 		gl.uniform2f(flow.velocity, s.svx, s.svy);
 		gl.uniform1f(flow.brushRadius, p.mouseRadius);
 		gl.uniform1f(flow.brushStrength, p.mouseStrength);
-		gl.uniform1f(flow.decay, p.decay);
+		gl.uniform1f(flow.decay, Math.pow(p.decay, elapsed * 30));
+		gl.uniform1f(flow.frameScale, elapsed * 30);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		gl.viewport(0, 0, width, height);
@@ -395,7 +422,7 @@ function attachFluidShader(canvas, params) {
 		gl.uniform1i(display.flowmap, 0);
 		const time = (performance.now() - start) * .001 * (p.speed / 100);
 		gl.uniform1f(display.time, time);
-		gl.uniform1f(display.pixelRatio, window.devicePixelRatio || 1);
+		gl.uniform1f(display.pixelRatio, ratio);
 		gl.uniform2f(display.resolution, width, height);
 		gl.uniform1f(display.scale, p.scale);
 		gl.uniform1f(display.rotation, p.rotation / 90);
@@ -419,32 +446,50 @@ function attachFluidShader(canvas, params) {
 		gl.uniform1f(display.swirlBoost, p.swirlBoost);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	};
+	const syncMotion = () => {
+		if (disposed || paused) return;
+		cancelAnimationFrame(raf);
+		previous = lastRendered = lastStirred = null;
+		if (reduced.matches || tier() === "static") frame(performance.now());
+		else raf = requestAnimationFrame(frame);
+	};
+	reduced.addEventListener?.("change", syncMotion);
+	const tierObserver = window.MutationObserver && root ? new window.MutationObserver(syncMotion) : null;
+	tierObserver?.observe(root, { attributes: true, attributeFilter: ["data-fx-tier"] });
 	const handle = {
 		setParams: (next) => {
 			current = { ...next };
 		},
 		stir: (x, y, vx, vy) => {
-			pointer.x += (x - pointer.x) * .35;
-			pointer.y += (y - pointer.y) * .35;
-			pointer.svx += (vx - pointer.svx) * .3;
-			pointer.svy += (vy - pointer.svy) * .3;
+			if (disposed || paused) return;
+			const now = performance.now();
+			const elapsed = lastStirred == null ? 1 / 30 : Math.min(.1, Math.max(1 / 1000, (now - lastStirred) / 1000));
+			lastStirred = now;
+			const blend = 1 - Math.pow(.7, elapsed * 30);
+			pointer.x = x; pointer.y = y;
+			pointer.svx += (vx / (elapsed * 30) - pointer.svx) * blend;
+			pointer.svy += (vy / (elapsed * 30) - pointer.svy) * blend;
 		},
 		setPaused: (nextPaused) => {
 			const next = Boolean(nextPaused);
 			if (paused === next || disposed) return;
 			paused = next;
 			cancelAnimationFrame(raf);
-			if (!paused && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-				raf = requestAnimationFrame(frame);
+			previous = lastRendered = lastStirred = null;
+			if (!paused) {
+				if (reduced.matches || tier() === "static") frame(performance.now());
+				else raf = requestAnimationFrame(frame);
 			}
 		},
 		dispose: () => {
 			disposed = true;
 			cancelAnimationFrame(raf);
+			reduced.removeEventListener?.("change", syncMotion);
+			tierObserver?.disconnect();
 			window.removeEventListener("mousemove", onMouseMove);
 		}
 	};
-	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+	if (reduced.matches || tier() === "static") {
 		frame(performance.now());
 		cancelAnimationFrame(raf);
 		return handle;
@@ -455,6 +500,7 @@ function attachFluidShader(canvas, params) {
 
   return Object.freeze({
     SITE_FLUID_PARAMS: Object.freeze({ ...SITE_FLUID_PARAMS }),
+    advanceFluidPointer,
     attachFluidShader
   });
 });

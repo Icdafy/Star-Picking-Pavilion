@@ -83,6 +83,7 @@ const state = {
   pointerColor: restoredPreferences.pointerColor,
   pointerOpacity: restoredPreferences.pointerOpacity,
   fluidMode: restoredPreferences.fluidMode,
+  refreshRate: restoredPreferences.refreshRate,
   view: restoredPreferences.view,  // featured | all | daily | links | sources | settings
   domain: restoredPreferences.domain,
   category: restoredPreferences.category,
@@ -132,8 +133,13 @@ reducedMotionQuery?.addEventListener?.('change', syncFxTier);
 // 经 deps 注入；视图切换入场与信息流错峰入场共用这一套 WAAPI 弹簧
 // v0.2.39 节奏：全部动效时长 × (1 + φ⁻²)，弹簧按同一时间尺度放慢，更接近真实的手与材料。
 const MOTION_TEMPO = 1.382;
+const frameRate = DomUtils.createFrameRateProbe({
+  document, window, desktop: Desktop, mode: restoredPreferences.refreshRate
+});
+window.addEventListener('pagehide', () => frameRate.dispose(), { once: true });
 const motion = DomUtils.createMotion({
   document,
+  frameRate,
   tempo: MOTION_TEMPO,
   liquidIndicator: true,
   matchMedia: window.matchMedia ? query => window.matchMedia(query) : null,
@@ -403,6 +409,7 @@ const preferenceActions = Bootstrap.createUiPreferenceActions({
 const aquaShell = AquaShell.createAquaShell({
   document,
   window,
+  frameRate,
   storage,
   preferences: restoredPreferences,
   wallpaperStore: Desktop?.isElectron

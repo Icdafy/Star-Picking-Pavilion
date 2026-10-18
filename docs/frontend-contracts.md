@@ -991,3 +991,12 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 - **凝光轮廓**：完整档、tempo > 1 时，指针所在 `.glass, .card, .set-panel, .release-entry, .common-links-card` 写入 `--gaze-x/--gaze-y/--gaze-o`（同一按需帧时钟 `gaze` 任务；已由跟手追光点亮的 `.motion-surface` 不重复）。浮岛 `.tower, .filter-dock, .settings-nav` 的 `--glass-blur` 下限 1.236rem。
 - **系统更新章节** `#settingsUpdate`：位于“系统”分组首位，设置章节 11 → 12（v0212 e2e 同步）；徽标 `#updateCenterBadge`、状态区 `#updateCenterHero[data-state]`（`--update-off` 驱动进度环）、`#btnUpdateCenter` 调用 `updatePill.trigger()`、`#btnUpdateCenterLog` 切到更新日志。
 - **删除星鲸粒子**：`aquaWhale` 不再是 UI 偏好字段（`UI_PREFERENCE_FIELDS` 29 项，旧值读取时丢弃），`#setAquaWhale`、`createStarWhale`、`createDshParticleWhale`、DSH 引擎 `mountWhale` 与相关样式全部移除。
+
+## v0.2.43 刷新率与运动时钟
+
+- `refreshRate` 是本机偏好，字符串枚举 auto / 60 / 70 / 120 / 144，旧设置缺省 auto；只保存采样档位，不保存本机检测值。Electron 与浏览器共用 schema，主进程更新拒绝无效枚举、数值以及硬件诊断字段。
+- app.js 创建一个 `DomUtils.createFrameRateProbe({ document, window, desktop, mode })`，由运动引擎和外观控制器共享。接口为只读 hz / detectedHz / source / mode、setMode、异步 measure、dispose。source 为 native / raf / default；有效采样率为自动检测值或不超过检测值的手动档位。
+- 根节点诊断字段 `data-refresh-rate`、`data-refresh-rate-detected`、`data-refresh-rate-mode`、`data-refresh-rate-source` 与窗口 `refresh-rate-change` 通知同步；硬件通知不回写用户偏好。手动档改变交互关键帧密度和动态背景绘制目标，浏览器合成器仍按系统刷新率呈现 CSS / WAAPI 动画。
+- 沙箱桥 `getDisplayRefreshRate()` / `onDisplayRefreshRateChanged(cb)` 只暴露 `{displayId,refreshRate}`，订阅返回解绑函数。主进程依据窗口相交最多的显示器读取，不接受渲染器指定显示器。移动、恢复、显示参数及热插拔更新，前台五秒原生轮询兜底驱动漏报。
+- 有效系统值优先；rAF 只作无系统信息时的前台回退，分数频率吸附包含 70Hz 的常见档。测量支持换屏升降、取消与异步代次保护，隐藏/失焦取消测量，页面卸载清理全部监听、计时器及订阅。
+- Aurora 弹簧按实际秒数解析求值，果冻能量与流体衰减按时间归一；性能降级依据持续时间并在空闲时清空统计。DSH 背景跟随共享采样节拍，同时限制像素预算；减少动态效果与静态档停止持续绘制，恢复时重新调度。
