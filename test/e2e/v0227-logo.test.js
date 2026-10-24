@@ -102,7 +102,7 @@ test('v0.2.27 logo stays still, loops only on hover and resets on exit', { timeo
   assert.deepEqual(await page.evaluate(clock), { time: 0, paused: true }, 'Background window must stop the clock');
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
-    win.show(); win.focus(); win.webContents.focus();
+    win.setAlwaysOnTop(false); win.show(); win.focus(); win.webContents.focus();
   });
   // Native show/focus returns before Chromium's visibility lifecycle settles;
   // hidden renderers cannot use rAF polling to prove they have resumed.
@@ -116,6 +116,8 @@ test('v0.2.27 logo stays still, loops only on hover and resets on exit', { timeo
     }));
     throw error;
   }
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
+    win.setAlwaysOnTop(true); win.focus(); win.webContents.focus(); });
   await page.mouse.move(700, 400);
   for (const width of [1440, 800]) {
     await app.evaluate(({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setContentSize(width, 960), width);

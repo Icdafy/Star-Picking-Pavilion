@@ -317,7 +317,10 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
   // polling. Observe the actual visibility/focus lifecycle on a timer instead.
   await page.waitForFunction(() => document.hidden && !document.hasFocus(), undefined, { polling: 50 });
   assert.equal(await page.locator('.press-wave, .surface-glow').count(), 0);
-  await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); win.webContents.focus(); });
+  // The fixture's Windows always-on-top window can stay renderer-occluded after
+  // hide/show. Restore as an ordinary native window before reapplying test pinning.
+  await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
+    win.setAlwaysOnTop(false); win.show(); win.focus(); win.webContents.focus(); });
   try {
     await page.waitForFunction(() => document.hasFocus() && !document.hidden, undefined, { polling: 50 });
   } catch (error) {
@@ -328,6 +331,8 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
     }));
     throw error;
   }
+  await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
+    win.setAlwaysOnTop(true); win.focus(); win.webContents.focus(); });
   await page.evaluate(() => { document.documentElement.dataset.fxTier = 'lite'; });
   await page.locator('#feedList .card').first().hover(); assert.equal(await page.locator('.surface-glow').count(), 0);
   await page.evaluate(() => interactionMotion.dispose());
