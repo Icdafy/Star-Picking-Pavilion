@@ -106,7 +106,7 @@ test('v0.2.28 real desktop: idle backend, synchronized work, supplied update art
   await page.screenshot({ path: path.join(output, 'idle-light.png') });
   await page.locator('#btnRefresh').click();
   await feedEntered;
-  await page.waitForFunction(() => document.getElementById('statStatusLabel').textContent === '采集中' && document.getElementById('btnRefresh').classList.contains('spinning'));
+  await page.waitForFunction(() => document.getElementById('statStatusLabel').textContent === '信源采集' && document.getElementById('btnRefresh').classList.contains('spinning'));
   assert.equal(await page.locator('#btnRefresh').isDisabled(), true);
   const active = await page.evaluate(() => fetch('/api/stats').then(response => response.json()));
   assert.equal(active.pipeline.activity, 'collecting'); assert.equal(active.pipeline.collectRunning, true);

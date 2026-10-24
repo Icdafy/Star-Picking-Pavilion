@@ -319,7 +319,7 @@ async function analyzePending(onProgress, limit = 200, { deferMaintenance = fals
       }
       analyzed++;
       reportProgress(onProgress, { channel: 'analyzing', stage: 'scoring', status: 'running',
-        done: analyzed, total: pending.length, message: '词库启发式分析', current: a });
+        done: analyzed, total: pending.length, featured: selectedIds.length, message: '词库启发式分析', current: a });
     }
     return { analyzed, featured: selectedIds.length, cleaned, backfilled, mode: 'heuristic', translation, remaining: pendingAnalysisCount() };
   }
@@ -477,7 +477,7 @@ async function analyzePending(onProgress, limit = 200, { deferMaintenance = fals
         }
       }
       reportProgress(onProgress, { channel: 'analyzing', stage: 'scoring', status: 'running',
-        done: analyzed, total: pending.length, message: '分析结果已保存', current: a });
+        done: analyzed, total: pending.length, featured: selectedIds.length, message: '分析结果已保存', current: a });
     }
   }
   // 任何分支失败仍抽干已启动的调用，调度锁释放后不会再有后台写库。

@@ -541,3 +541,84 @@ test('pipeline defers repeated full-window rescoring to its tail while standalon
   await standalone.scheduler.analyzeOnce();
   assert.equal(standalone.events.filter(event => event === 'rescore').length, 1);
 });
+
+test('persisted batch results update global counts before return and returning does not count them twice', async t => {
+  const gate = deferred();
+  t.after(() => gate.resolve());
+  let calls = 0, pending = 40, countQueries = 0;
+  const fixture = schedulerFixture(t, { automatic: false,
+    remaining: () => { countQueries++; return pending; },
+    analyze: async (onProgress, limit) => {
+      if (!limit || calls++) return { analyzed: 0, featured: 0 };
+      pending = 24;
+      onProgress({ stage: 'scoring', status: 'running', done: 16, total: 40, featured: 5 });
+      onProgress({ stage: 'prefilter', status: 'running', done: 40, total: 40 });
+      onProgress({ stage: 'scoring', taskId: 'score:another', status: 'running', done: 0, total: 1 });
+      onProgress({ stage: 'scoring', taskId: 'score:another', status: 'completed', done: 1, total: 1 });
+      onProgress({ stage: 'scoring', status: 'running', done: 16, total: 40, featured: 5 });
+      await gate.promise;
+      pending = 0;
+      return { analyzed: 40, featured: 8, remaining: 0 };
+    }
+  });
+  const operation = fixture.scheduler.runPipeline();
+  await tick();
+  let progress = fixture.scheduler.getStatus().pipelineProgress;
+  assert.equal(progress.analyzed, 16);
+  assert.equal(progress.featured, 5);
+  assert.equal(progress.remaining, 24);
+  assert.equal(countQueries, 1, 'aggregate callbacks, duplicate events and per-request 1/1 never query the full queue');
+  assert.equal(fixture.scheduler.getStatus().analyzeRunning, true);
+  gate.resolve();
+  const result = await operation;
+  progress = fixture.scheduler.getStatus().pipelineProgress;
+  assert.equal(result.analyzed, 40);
+  assert.equal(result.featured, 8);
+  assert.equal(progress.analyzed, 40, 'the batch return replaces its partial progress instead of adding it again');
+  assert.equal(progress.featured, 8);
+  assert.equal(progress.remaining, 0);
+});
+
+test('newly collected articles join the live queue without per-item queries or stale batch snapshot loss', async t => {
+  const source = deferred(), batch = deferred();
+  t.after(() => { source.resolve(); batch.resolve(); });
+  let calls = 0, pending = 40, countQueries = 0;
+  const fixture = schedulerFixture(t, { automatic: false,
+    remaining: () => { countQueries++; return pending; },
+    collect: async progress => {
+      await source.promise;
+      pending += 3;
+      progress({ stage: 'collecting', status: 'completed', taskId: 'source:late',
+        source: 'late', added: 3, done: 1, completed: 1, total: 1 });
+    },
+    analyze: async (onProgress, limit) => {
+      if (!limit || calls++) return { analyzed: 0, featured: 0, remaining: pending };
+      pending -= 16;
+      onProgress({ stage: 'scoring', status: 'running', done: 16, total: 40, featured: 4 });
+      await batch.promise;
+      return { analyzed: 16, featured: 4, remaining: 24 };
+    }
+  });
+  const snapshots = [];
+  fixture.scheduler.subscribeStatus(status => snapshots.push(status));
+  const operation = fixture.scheduler.runPipeline();
+  await tick();
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.remaining, 24);
+  assert.equal(countQueries, 1);
+  source.resolve();
+  await tick();
+  let progress = fixture.scheduler.getStatus().pipelineProgress;
+  assert.equal(progress.analyzed, 16);
+  assert.equal(progress.featured, 4);
+  assert.equal(progress.remaining, 27);
+  assert.equal(countQueries, 1, 'source arrivals update the live count by their committed additions');
+  const afterArrival = snapshots.length;
+  batch.resolve();
+  const result = await operation;
+  progress = fixture.scheduler.getStatus().pipelineProgress;
+  assert.equal(result.analyzed, 16);
+  assert.equal(result.featured, 4);
+  assert.equal(progress.remaining, 27);
+  assert.ok(snapshots.slice(afterArrival).every(status => status.pipelineProgress.remaining === 27),
+    'the batch return cannot overwrite newly collected articles using its older remaining snapshot');
+});

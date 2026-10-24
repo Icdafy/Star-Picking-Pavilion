@@ -98,12 +98,24 @@ test('v0.2.27 logo stays still, loops only on hover and resets on exit', { timeo
   await page.waitForFunction(() => !document.querySelector('[data-brand-logo] > svg').animationsPaused());
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
-  await page.waitForFunction(() => document.hidden);
+  await page.waitForFunction(() => document.hidden, undefined, { polling: 50 });
   assert.deepEqual(await page.evaluate(clock), { time: 0, paused: true }, 'Background window must stop the clock');
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
     win.show(); win.focus(); win.webContents.focus();
   });
+  // Native show/focus returns before Chromium's visibility lifecycle settles;
+  // hidden renderers cannot use rAF polling to prove they have resumed.
+  try {
+    await page.waitForFunction(() => document.hasFocus() && !document.hidden, undefined, { polling: 50 });
+  } catch (error) {
+    console.log('Logo restore visibility:', JSON.stringify({
+      native: await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
+        return { visible: win.isVisible(), focused: win.isFocused(), minimized: win.isMinimized(), bounds: win.getBounds() }; }),
+      renderer: await page.evaluate(() => ({ hidden: document.hidden, focused: document.hasFocus(), visibility: document.visibilityState }))
+    }));
+    throw error;
+  }
   await page.mouse.move(700, 400);
   for (const width of [1440, 800]) {
     await app.evaluate(({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setContentSize(width, 960), width);

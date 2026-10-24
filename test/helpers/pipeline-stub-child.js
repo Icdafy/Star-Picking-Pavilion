@@ -700,6 +700,11 @@ async function scenarioPrefilterScoringOverlap() {
 }
 
 async function scenarioTranslationOverlap() {
+  // Correctness uses a causal gate; the separate benchmark keeps its fixed latency.
+  const gated = scenario === 'translation-overlap-gated';
+  let releaseTranslation, markTranslationStarted, gateTimedOut = false;
+  const domesticPersisted = new Promise(resolve => { releaseTranslation = resolve; });
+  const translationStarted = new Promise(resolve => { markTranslationStarted = resolve; });
   let translating = false, firstResultMs = null, firstWhileTranslating = false;
   let active = 0, peakActive = 0;
   const stub = await startStub(async ({ kind, payload }) => {
@@ -707,11 +712,21 @@ async function scenarioTranslationOverlap() {
     try {
       if (kind === 'translation') {
         translating = true;
-        await new Promise(resolve => setTimeout(resolve, 200));
+        markTranslationStarted();
+        if (gated) {
+          let fallback;
+          try {
+            await Promise.race([domesticPersisted, new Promise(resolve => {
+              // A sequential implementation must fail the overlap assertion instead of deadlocking.
+              fallback = setTimeout(() => { gateTimedOut = true; resolve(); }, 5000);
+            })]);
+          } finally { clearTimeout(fallback); }
+        } else await new Promise(resolve => setTimeout(resolve, 200));
         translating = false;
         return ok({ items: JSON.parse(payload.messages[1].content).map(item => ({ id: item.id,
           titleZh: 'SpaceX完成火箭飞行试验', summaryZh: 'SpaceX完成火箭飞行试验。', names: [] })) });
       }
+      if (gated && kind === 'prefilter') await translationStarted;
       await new Promise(resolve => setTimeout(resolve, 15));
       if (kind === 'prefilter') return ok({ results: Array.from({ length:
         (payload.messages[1].content.match(/<item id="/g) || []).length }, (_, i) => ({ i, label: 'PASS', d: 'B' })) });
@@ -745,13 +760,17 @@ async function scenarioTranslationOverlap() {
   for (let pass = 0; pass < 4; pass++) {
     const result = await analyzePending(p => {
       if (p.stage !== 'scoring' || p.taskId || p.done < 1 || firstResultMs != null) return;
+      if (gated && db.prepare(`SELECT COUNT(*) count FROM articles WHERE analyzed>0
+        AND translation_status IS NULL`).get().count < 1) return;
       firstResultMs = Math.round(performance.now() - started);
       firstWhileTranslating = translating;
+      releaseTranslation();
     }, 200, { deferMaintenance: true });
     analyzed += result.analyzed;
     if (!result.remaining) break;
   }
   const out = { analyzed, firstResultMs, elapsedMs: Math.round(performance.now() - started), firstWhileTranslating, peakActive,
+    ...(gated ? { gateTimedOut } : {}),
     requests: stub.requests.length, outcomeDigest: require('node:crypto').createHash('sha256').update(JSON.stringify(db.prepare(`
       SELECT id,analyzed,relevant,domain,category,score_a,score_b,featured,attention_score,ai_summary,ai_reason,
         item_type,author_role,tags_json,subjects_json,events_json,entities_json,deal_json FROM articles ORDER BY id`).all())).digest('hex') };
@@ -759,6 +778,7 @@ async function scenarioTranslationOverlap() {
 }
 
 const SCENARIOS = {
+  'translation-overlap-gated': scenarioTranslationOverlap,
   'translation-overlap': scenarioTranslationOverlap,
   'prefilter-scoring-overlap': scenarioPrefilterScoringOverlap,
   'early-failure-drain': scenarioEarlyFailureDrain,

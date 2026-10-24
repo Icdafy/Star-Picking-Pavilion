@@ -127,7 +127,7 @@ test('translation overlap retains company/deal maintenance when callers request 
 test('domestic analyses are persisted while overseas translation is in flight', () => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-v0244-overlap-'));
   try {
-    const child = spawnSync(process.execPath, [path.join(__dirname, 'helpers/pipeline-stub-child.js'), 'translation-overlap'], {
+    const child = spawnSync(process.execPath, [path.join(__dirname, 'helpers/pipeline-stub-child.js'), 'translation-overlap-gated'], {
       encoding: 'utf8', timeout: 30000,
       env: { ...process.env, STAR_PICKING_PAVILION_DATA_DIR: profile, STAR_PICKING_PAVILION_AI_API_KEY: 'fixture-local-only' }
     });
@@ -135,6 +135,7 @@ test('domestic analyses are persisted while overseas translation is in flight', 
     const result = JSON.parse(child.stdout);
     assert.equal(result.analyzed, 11);
     assert.equal(result.firstWhileTranslating, true);
+    assert.equal(result.gateTimedOut, false, 'translation must be released by a persisted domestic result, not the timeout');
     assert.ok(result.peakActive <= 11);
     assert.equal(result.requests, 36);
   } finally { fs.rmSync(profile, { recursive: true, force: true }); }

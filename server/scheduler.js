@@ -349,6 +349,8 @@ async function executePipeline(trigger) {
       sourcesCompleted: p.sourcesCompleted ?? (sourceEvent ? p.completed : null) ?? pipelineProgress.sourcesCompleted,
       sourcesTotal: p.sourcesTotal ?? (sourceEvent ? p.total : null) ?? pipelineProgress.sourcesTotal,
       collected: pipelineProgress.collected + (p.added || 0),
+      ...(Number.isFinite(pipelineProgress.remaining) && p.added > 0
+        ? { remaining: pipelineProgress.remaining + p.added } : {}),
       ...(p.error ? { warning: `信源“${String(p.source || '').slice(0, 80)}”采集失败，已继续其他信源。` } : {}) });
     if (p.added) signalAnalysis();
   } }).catch(error => { collectionFailed = true; throw error; }).finally(() => {
@@ -368,16 +370,29 @@ async function executePipeline(trigger) {
       observedGeneration = generation;
       updatePipelineProgress({ phase: collectionDone ? 'analyzing' : 'collecting-analyzing', stage: 'analyzing',
         remaining: pendingAnalysisCount(), message: '正在分析并归组已采集资料' });
+      const batchId = pass + 1;
+      let batchDone = 0, batchFeatured = 0;
       const r = await analyzeOnce(trigger, Math.min(40, 2400 - total), { pipeline: true, deferEditorial: true,
         deferConsolidation: true, deferMaintenance: true, deferRescore: true,
-        onProgress: p => reportWork({ ...p, batchId: pass + 1 }) });
+        onProgress: p => {
+          let queuePatch = {};
+          if (p.stage === 'scoring' && !p.taskId) {
+            const done = Number.isFinite(p.done) && p.done >= 0 ? Math.floor(p.done) : batchDone;
+            const delta = Math.max(0, done - batchDone);
+            batchDone += delta;
+            if (Number.isFinite(p.featured) && p.featured >= 0) batchFeatured = Math.max(batchFeatured, Math.floor(p.featured));
+            if (Number.isFinite(pipelineProgress.remaining)) queuePatch = { remaining: Math.max(0, pipelineProgress.remaining - delta) };
+          }
+          reportWork({ ...p, batchId, analyzed: total + batchDone, featured: featured + batchFeatured, ...queuePatch });
+        } });
       if (r.skipped) break;
       pass++;
       lastAnalysis = r;
       total += r.analyzed || 0;
       featured += r.featured || 0;
       budgetPaused ||= Boolean(r.budgetPaused || r.translation?.budgetPaused);
-      updatePipelineProgress({ analyzed: total, featured, batches: pass, remaining: r.remaining ?? pendingAnalysisCount() });
+      // Grouping can await models after analyzePending took its snapshot; late source arrivals still count.
+      updatePipelineProgress({ analyzed: total, featured, batches: pass, remaining: pendingAnalysisCount() });
       if (budgetPaused) {
         hasMore = Boolean(r.remaining ?? true);
         break;

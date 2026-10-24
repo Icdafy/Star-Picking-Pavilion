@@ -318,7 +318,16 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
   await page.waitForFunction(() => document.hidden && !document.hasFocus(), undefined, { polling: 50 });
   assert.equal(await page.locator('.press-wave, .surface-glow').count(), 0);
   await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); win.webContents.focus(); });
-  await page.waitForFunction(() => document.hasFocus() && !document.hidden, undefined, { polling: 50 });
+  try {
+    await page.waitForFunction(() => document.hasFocus() && !document.hidden, undefined, { polling: 50 });
+  } catch (error) {
+    console.log('Motion restore visibility:', JSON.stringify({
+      native: await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0];
+        return { visible: win.isVisible(), focused: win.isFocused(), minimized: win.isMinimized(), bounds: win.getBounds() }; }),
+      renderer: await page.evaluate(() => ({ hidden: document.hidden, focused: document.hasFocus(), visibility: document.visibilityState }))
+    }));
+    throw error;
+  }
   await page.evaluate(() => { document.documentElement.dataset.fxTier = 'lite'; });
   await page.locator('#feedList .card').first().hover(); assert.equal(await page.locator('.surface-glow').count(), 0);
   await page.evaluate(() => interactionMotion.dispose());
