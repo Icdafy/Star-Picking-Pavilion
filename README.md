@@ -2,26 +2,26 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.43 · DeepSeek Flash 1017 与刷新率自适应
+## v0.2.44 · 采集分析提速与全流程透明
 
-- **DeepSeek 最新 Flash**：使用 `deepseek-flash` 调用 DeepSeek-V4.1-Flash-1017，设置页标明 1017；旧 Flash 名称自动归一，支持原生图文。模型身份依据 [DeepSeek 官方 2026-10-17 更新](https://api-docs.deepseek.com/zh-cn/updates/)。
-- **刷新率自动匹配**：默认读取当前窗口所在显示器，跨屏、显示参数变化与恢复前台后重测；系统值不可用时使用帧间隔测量。
-- **四档手动适配**：设置 → 氛围与动效 → 动效采样档位，选择自动或 60 / 70 / 120 / 144Hz，查看检测结果并重新检测。每台电脑独立检测，仅保存个人选择；手动档不会提高屏幕的物理刷新率。
-- **保持动效节奏**：不同档位按时间推进动画并调整采样密度；保留减少动态效果、后台暂停与性能降级，实际流畅度仍取决于硬件、驱动和负载。
+- **看见每一步**：信源采集、海外网络探测、发布时间核验、翻译、正文与配图、双次独立评分、内容理解、归组、合并、综述和历史时间修补均报告真实步骤与活动任务。
+- **耗时与等待有据可查**：顶部状态胶囊展开后显示当前步骤计数、剩余待分析、总用时、活动任务用时、模型重试和限流等待；任务期间每秒更新，未知总量明确为不定进度。
+- **完成后可回看**：结果、步骤记录、耗时、失败提示和预算暂缓保留在胶囊及设置 → 自动采集的“本轮处理记录”；信源 201/201 只代表采集完成。
+- **减少串行等待与重复计算**：海外翻译与国内分析交叠，配图最多两路下载，独立事件综述最多两路处理；渐进批次保留即时归组，整个窗口的门槛重判统一到任务尾部。保留行业边界、双次独立评分、预算与回执复用。
 
-版本、界面与更新元数据统一为 0.2.43，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0243-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
+版本、界面与更新元数据统一为 0.2.44，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v0244-validation.md)，完整信源目录见 [信源梳理](docs/v0221-sources.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.43.exe`，双击并按向导安装。v0.2.43 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.44.exe`，双击并按向导安装。v0.2.44 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.43.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.44.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

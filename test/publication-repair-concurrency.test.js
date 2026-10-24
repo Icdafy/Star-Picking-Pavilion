@@ -41,7 +41,8 @@ test('一个日期修复请求抛错后等待其他工作全部退出，返回�
   let release;
   const blocked = new Promise(resolve => { release = resolve; });
   let settled = false, active = 0;
-  const operation = repairPublicationTimes(db, { enrich: async row => {
+  const updates = [];
+  const operation = repairPublicationTimes(db, { onProgress: p => updates.push(p), enrich: async row => {
     active++;
     try {
       if (row.id === 2) throw new Error('repair fixture failure');
@@ -54,9 +55,33 @@ test('一个日期修复请求抛错后等待其他工作全部退出，返回�
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(settled, false);
     assert.equal(active, 1);
+    assert.ok(updates.some(p => p.taskId === 'publication:2' && p.status === 'failed'));
+    assert.ok(updates.some(p => p.taskId === 'publication:1' && p.status === 'running'));
+    assert.equal(updates.some(p => p.taskId === 'publication:1' && p.status !== 'running'), false, '另一条日期核验仍在进行');
+    assert.equal(updates.some(p => !p.taskId && p.status === 'failed'), false, '全部在途请求结束后才报告整阶段失败');
     release();
     await assert.rejects(operation, /fixture failure/);
     assert.equal(active, 0);
+    assert.equal(updates.at(-1).status, 'failed');
+    assert.equal(updates.at(-1).done, 2);
     assert.equal(db.prepare('SELECT COUNT(*) n FROM articles WHERE published_at IS NOT NULL').get().n, 1);
   } finally { release(); await operation.catch(() => {}); db.close(); }
+});
+
+test('日期修补空队列报告0/0完成，进度订阅失败不改变修补结果', async () => {
+  const empty = fixture(0), db = fixture(2);
+  const emptyUpdates = [];
+  try {
+    assert.deepEqual(await repairPublicationTimes(empty, { onProgress: p => emptyUpdates.push(p) }), { attempted: 0, repaired: 0 });
+    assert.deepEqual(emptyUpdates.map(p => [p.status, p.done, p.total]), [['running', 0, 0], ['completed', 0, 0]]);
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      assert.deepEqual(await repairPublicationTimes(db, {
+        onProgress() { throw new Error('observer failure'); },
+        enrich: async row => ({ status: 'ok', publishedAt: row.fetched_at })
+      }), { attempted: 2, repaired: 2 });
+    } finally { console.warn = warn; }
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM articles WHERE published_at IS NOT NULL').get().n, 2);
+  } finally { empty.close(); db.close(); }
 });

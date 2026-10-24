@@ -28,6 +28,7 @@ function classify(system) {
   if (system.includes('内容理解编辑')) return 'understand';
   if (system.includes('原子事件提取器')) return 'timing';
   if (system.includes('归组判断员')) return 'group';
+  if (system.includes('新闻翻译编辑')) return 'translation';
   return 'other';
 }
 
@@ -681,7 +682,7 @@ async function scenarioPrefilterScoringOverlap() {
   }
   started = performance.now();
   const result = await analyzePending(p => {
-    if (p.stage !== 'scoring' || firstResultMs != null) return;
+    if (p.stage !== 'scoring' || p.taskId || p.done < 1 || firstResultMs != null) return;
     firstResultMs = Math.round(performance.now() - started);
     firstWhilePrefilterRunning = secondPrefilterRunning;
     releaseSecond();
@@ -698,7 +699,67 @@ async function scenarioPrefilterScoringOverlap() {
   closeDatabase(); await stopStub(stub); return out;
 }
 
+async function scenarioTranslationOverlap() {
+  let translating = false, firstResultMs = null, firstWhileTranslating = false;
+  let active = 0, peakActive = 0;
+  const stub = await startStub(async ({ kind, payload }) => {
+    active++; peakActive = Math.max(peakActive, active);
+    try {
+      if (kind === 'translation') {
+        translating = true;
+        await new Promise(resolve => setTimeout(resolve, 200));
+        translating = false;
+        return ok({ items: JSON.parse(payload.messages[1].content).map(item => ({ id: item.id,
+          titleZh: 'SpaceX完成火箭飞行试验', summaryZh: 'SpaceX完成火箭飞行试验。', names: [] })) });
+      }
+      await new Promise(resolve => setTimeout(resolve, 15));
+      if (kind === 'prefilter') return ok({ results: Array.from({ length:
+        (payload.messages[1].content.match(/<item id="/g) || []).length }, (_, i) => ({ i, label: 'PASS', d: 'B' })) });
+      return ok(VALID_SCORING);
+    } finally { active--; }
+  });
+  writeSettings(stub.baseUrl);
+  const { db, closeDatabase } = require(serverModule('db'));
+  let { analyzePending } = require(serverModule('ai', 'pipeline'));
+  if (process.argv[3]) {
+    const Module = require('node:module');
+    const { execFileSync } = require('node:child_process');
+    const filename = serverModule('ai', 'pipeline.js');
+    const baseline = new Module(filename, module);
+    baseline.filename = filename;
+    baseline.paths = Module._nodeModulePaths(path.dirname(filename));
+    baseline._compile(execFileSync('git', ['show', `${process.argv[3]}:server/ai/pipeline.js`],
+      { cwd: root, encoding: 'utf8' }), filename);
+    ({ analyzePending } = baseline.exports);
+  }
+  const source = insertSource(db, '翻译并发桩', 'T1');
+  for (let index = 0; index < 11; index++) {
+    const translated = index >= 3;
+    const id = insertArticle(db, source, translated ? `SpaceX completes rocket flight test ${index}`
+      : `${RELEVANT_TITLES[0]}（本地第${index}条）`, translated ? 'SpaceX completed rocket flight test.' : '火箭完成回收试验。');
+    db.prepare("UPDATE articles SET content_status='ok',content_text='火箭完成回收试验。',translation_status=? WHERE id=?")
+      .run(translated ? 'pending' : null, id);
+  }
+  const started = performance.now();
+  let analyzed = 0;
+  for (let pass = 0; pass < 4; pass++) {
+    const result = await analyzePending(p => {
+      if (p.stage !== 'scoring' || p.taskId || p.done < 1 || firstResultMs != null) return;
+      firstResultMs = Math.round(performance.now() - started);
+      firstWhileTranslating = translating;
+    }, 200, { deferMaintenance: true });
+    analyzed += result.analyzed;
+    if (!result.remaining) break;
+  }
+  const out = { analyzed, firstResultMs, elapsedMs: Math.round(performance.now() - started), firstWhileTranslating, peakActive,
+    requests: stub.requests.length, outcomeDigest: require('node:crypto').createHash('sha256').update(JSON.stringify(db.prepare(`
+      SELECT id,analyzed,relevant,domain,category,score_a,score_b,featured,attention_score,ai_summary,ai_reason,
+        item_type,author_role,tags_json,subjects_json,events_json,entities_json,deal_json FROM articles ORDER BY id`).all())).digest('hex') };
+  closeDatabase(); await stopStub(stub); return out;
+}
+
 const SCENARIOS = {
+  'translation-overlap': scenarioTranslationOverlap,
   'prefilter-scoring-overlap': scenarioPrefilterScoringOverlap,
   'early-failure-drain': scenarioEarlyFailureDrain,
   'timing-repair-budget': scenarioTimingRepairBudget,

@@ -36,15 +36,19 @@ test('国内入库和进度通知不等待海外探测，海外请求仍等探�
   const progress = [];
   const operation = collectAll(p => {
     progress.push(p);
-    if (p.source === 'domestic') completeDomestic();
+    if (p.source === 'domestic' && p.status === 'completed') completeDomestic();
   }, { network: { detect: () => probe }, enrich: async () => ({ status: 'unavailable' }) });
   let timer;
   try {
     await Promise.race([domestic, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('国内采集被海外探测阻塞')), 2000); })]);
     assert.equal(internationalRequests, 0);
     assert.equal(db.prepare("SELECT COUNT(*) n FROM articles WHERE url='https://example.test/probe-domestic'").get().n, 1);
-    assert.equal(progress[0].completed, 1);
-    assert.equal(progress[0].total, 2);
+    const committed = progress.find(p => p.source === 'domestic' && p.status === 'completed');
+    assert.equal(committed.completed, 1);
+    assert.equal(committed.total, 2);
+    assert.equal(progress.find(p => p.source === 'domestic').status, 'running');
+    assert.equal(progress.find(p => p.source === 'domestic').completed, 0);
+    assert.ok(progress.some(p => p.stage === 'network-check' && p.status === 'running'));
   } finally {
     clearTimeout(timer);
     releaseProbe({ available: true });
@@ -113,7 +117,8 @@ test('进度回调故障不改变成功采集计数，全量进度包含退避�
   assert.equal(result.results.find(row => row.source === 'progress-active').added, 1);
   assert.equal(db.prepare('SELECT error_count FROM sources WHERE id=?').get(active).error_count, 0);
   assert.equal(updates.at(-1).completed, 3);
-  assert.ok(updates.every(p => p.total === 3));
+  assert.ok(updates.every(p => p.sourcesTotal === 3));
+  assert.ok(updates.filter(p => p.stage === 'collecting').every(p => p.total === 3));
   assert.deepEqual(updates.map(p => p.completed), [...updates.map(p => p.completed)].sort((a, b) => a - b));
 });
 
@@ -141,4 +146,69 @@ test('公众号已核验全文复用给分析，未知日期不触发第二次�
     assert.equal(dated.publication_precision, 'day');
     assert.equal(dated.publication_date_text, '正式发布日期');
   } finally { wechat.fetch = original; }
+});
+
+test('慢信源开始即透明，信源全部结束后日期修补仍逐条报告且不提前完成', { timeout: 10000 }, async () => {
+  const [fastId, slowId] = sources([['transparent-fast'], ['transparent-slow']]);
+  db.exec('DELETE FROM articles');
+  for (let index = 0; index < 2; index++) db.prepare(`INSERT INTO articles(source_id,title,url,fetched_at,analyzed,relevant)
+    VALUES(?,?,?, ?,1,1)`).run(fastId, `历史商业航天资料${index}`, `https://example.test/history-${index}`, new Date().toISOString());
+  let releaseFast, releaseSlow, fastCompleted, repairsStarted;
+  const fast = new Promise(resolve => { releaseFast = resolve; });
+  const slow = new Promise(resolve => { releaseSlow = resolve; });
+  const firstResult = new Promise(resolve => { fastCompleted = resolve; });
+  const bothRepairs = new Promise(resolve => { repairsStarted = resolve; });
+  const repairGates = [];
+  rss.fetch = async source => {
+    await (source.id === fastId ? fast : slow);
+    return [item(`https://example.test/${source.name}`)];
+  };
+  const updates = [];
+  let settled = false;
+  const operation = collectAll(p => {
+    updates.push(p);
+    if (p.taskId === `source:${fastId}` && p.status === 'completed') fastCompleted();
+  }, { force: true, network, enrich: async row => {
+    await new Promise(resolve => {
+      repairGates.push(() => resolve());
+      if (repairGates.length === 2) repairsStarted();
+    });
+    return { status: 'ok', publishedAt: row.fetched_at };
+  } });
+  operation.then(() => { settled = true; }, () => { settled = true; });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    const running = updates.filter(p => p.stage === 'collecting' && p.status === 'running');
+    assert.deepEqual(running.map(p => p.taskId).sort(), [`source:${fastId}`, `source:${slowId}`].sort());
+    assert.ok(running.every(p => p.completed === 0 && p.done === 0 && !p.added && !p.error));
+    releaseFast();
+    await firstResult;
+    assert.equal(updates.find(p => p.taskId === `source:${fastId}` && p.status === 'completed').completed, 1);
+    assert.equal(updates.some(p => p.taskId === `source:${slowId}` && p.status === 'completed'), false);
+    releaseSlow();
+    await bothRepairs;
+    assert.equal(settled, false);
+    const repairEvents = updates.filter(p => p.stage === 'publication-repair');
+    assert.equal(repairEvents[0].status, 'running');
+    assert.equal(repairEvents[0].done, 0);
+    assert.equal(repairEvents[0].total, 2);
+    assert.ok(repairEvents.every(p => p.sourcesCompleted === 2 && p.sourcesTotal === 2));
+    assert.equal(repairEvents.filter(p => p.taskId && p.status === 'running').length, 2);
+    assert.ok(repairEvents.filter(p => p.taskId).every(p => p.current.title.startsWith('历史商业航天资料')));
+    repairGates[0]();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false);
+    assert.equal(updates.filter(p => p.stage === 'publication-repair' && p.taskId && p.status === 'completed').length, 1);
+    repairGates[1]();
+    const result = await operation;
+    assert.equal(result.results.reduce((sum, row) => sum + row.added, 0), 2);
+    assert.deepEqual(result.publicationRepair, { attempted: 2, repaired: 2 });
+    assert.equal(updates.at(-1).status, 'completed');
+    assert.equal(updates.at(-1).done, 2);
+    assert.equal(updates.at(-1).total, 2);
+    assert.ok(updates.every(p => p.stage === 'collecting' || !p.added));
+  } finally {
+    releaseFast(); releaseSlow(); repairGates.forEach(release => release());
+    await operation.catch(() => {});
+  }
 });

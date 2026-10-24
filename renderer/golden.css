@@ -228,6 +228,7 @@ body { line-height: var(--lh-ui); }
   border-radius: 999px; background: var(--hover-bg);
 }
 .fluid-cloud-meter[hidden] { display: none; }
+.fluid-cloud-meter[data-indeterminate="true"] .fluid-cloud-fill { opacity: 0; }
 .fluid-cloud-fill {
   position: absolute; inset: 0; border-radius: inherit; transform-origin: left center;
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 50%, transparent), var(--accent));
@@ -239,7 +240,8 @@ body { line-height: var(--lh-ui); }
   background: linear-gradient(90deg, transparent, rgb(255 255 255 / 85%), transparent); translate: -100% 0;
 }
 .fluid-cloud-panel {
-  display: grid; gap: var(--sp-3); width: 23.6rem; padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  display: grid; gap: var(--sp-3); width: min(34rem, calc(100vw - 2rem)); max-height: 80vh; overflow-y: auto;
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
   white-space: normal; opacity: 0; filter: blur(4px); translate: 0 -.618rem; pointer-events: none;
 }
 .fluid-cloud[data-state="expanded"] .fluid-cloud-panel { opacity: 1; filter: none; translate: 0 0; pointer-events: auto; transition-delay: 120ms; }
@@ -252,6 +254,12 @@ body { line-height: var(--lh-ui); }
 .fluid-cloud-facts div { display: grid; gap: .125rem; padding: var(--sp-2); border-radius: var(--radius-md); background: var(--hover-bg); text-align: center; }
 .fluid-cloud-facts dt { color: var(--c-fg-faint); font-size: var(--t-2xs); }
 .fluid-cloud-facts dd { margin: 0; color: var(--c-fg); font: var(--w-strong) var(--t-md)/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.fluid-cloud-process { display: grid; gap: var(--sp-3); }
+.fluid-cloud-process[hidden] { display: none; }
+.fluid-cloud-process h3 { margin: 0 0 var(--sp-1); font: var(--w-strong) var(--t-xs)/var(--lh-ui) var(--font-ui); color: var(--c-fg-dim); }
+.fluid-cloud-process ul { list-style: none; padding: 0; margin: 0; }
+.fluid-cloud-process li { padding: .236rem 0; font-size: var(--t-xs); color: var(--c-fg-dim); overflow-wrap: anywhere; }
+.pipeline-run-lines { white-space: pre-line; overflow-wrap: anywhere; max-height: 32rem; overflow-y: auto; font-size: var(--t-sm); line-height: var(--lh-ui); color: var(--c-fg-dim); }
 .fluid-cloud-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .fluid-cloud-actions:empty { display: none; }
 /* 提示并入流体云：从胶囊里长出来，读完再缩回去。 */

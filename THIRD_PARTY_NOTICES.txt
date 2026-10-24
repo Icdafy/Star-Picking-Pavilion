@@ -1,5 +1,5 @@
 THIRD-PARTY SOFTWARE NOTICES
-摘星阁 (Star-Picking-Pavilion) 0.2.43
+摘星阁 (Star-Picking-Pavilion) 0.2.44
 
 This distribution includes the following production dependencies.
 Each package remains subject to its own license terms.
@@ -212,7 +212,7 @@ tiny-typed-emitter@2.1.0
 License: MIT
 Source: https://github.com/binier/tiny-typed-emitter.git
 
-undici@8.11.2
+undici@8.12.3
 License: MIT
 Source: git+https://github.com/nodejs/undici.git
 

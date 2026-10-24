@@ -2,10 +2,11 @@
 const { normalizeEvents, primaryEventKey } = require('./events');
 const { timingFields } = require('./event-time');
 const { clampPublishedAt } = require('../date-time');
+const { reportProgress, progressTask } = require('./progress');
 
 const REPAIR_VERSION = 3;
 // A separate events-only repair never resets relevance, scores, stars or summaries.
-async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {}) {
+async function repairTiming(database, { hasKey, enrich, extract, limit = 5, onProgress = null } = {}) {
   if (!hasKey) return { attempted: 0, repaired: 0 };
   const rows = database.prepare(`SELECT * FROM articles
     WHERE analyzed > 0 AND (relevant=1 OR starred=1)
@@ -15,6 +16,8 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
     ORDER BY starred DESC, featured DESC, id DESC LIMIT 200`).all();
   let attempted = 0, repaired = 0;
   let budgetPaused = false;
+  reportProgress(onProgress, { channel: 'maintenance', stage: 'timing-repair', status: 'running',
+    done: 0, total: Math.min(limit, rows.length), message: '检查历史事件日期证据（不重做评分）' });
   for (const row of rows) {
     if (attempted >= limit) break;
     const timing = timingFields(row);
@@ -30,7 +33,8 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
     attempted++;
     try {
       if (!row.content_text || !row.published_at) {
-        const content = await enrich(row);
+        const content = await progressTask(onProgress, { channel: 'maintenance', stage: 'content',
+          taskId: `timing-content:${row.id}`, current: row, message: '补齐历史文章正文与发布日期' }, () => enrich(row));
         const publication = database.prepare('SELECT published_at,publication_precision,publication_date_text FROM articles WHERE id=?').get(row.id);
         if (publication?.published_at) Object.assign(row, publication);
         row.content_text = content.text || row.content_text || '';
@@ -43,7 +47,8 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
         database.prepare('UPDATE articles SET content_text=?,content_status=?,published_at=?,publication_precision=?,publication_date_text=? WHERE id=?')
           .run(row.content_text,row.content_status,row.published_at,row.publication_precision || null,row.publication_date_text || null,row.id);
       }
-      const raw = await extract(row);
+      const raw = await progressTask(onProgress, { channel: 'maintenance', stage: 'timing-repair',
+        taskId: `timing-extract:${row.id}`, current: row, message: '模型复核历史事件日期证据' }, () => extract(row));
       if (!Array.isArray(raw)) throw new Error('事件补提取响应无效');
       const events = normalizeEvents(raw, { article: row });
       if (!events.length) throw new Error('未取得有效主事件');
@@ -67,7 +72,11 @@ async function repairTiming(database, { hasKey, enrich, extract, limit = 5 } = {
       database.prepare('UPDATE articles SET timing_repair_error=? WHERE id=?')
         .run('补提取未完成；保留原分析，最多尝试两次',row.id);
     }
+    reportProgress(onProgress, { channel: 'maintenance', stage: 'timing-repair', status: 'running',
+      done: attempted, total: Math.min(limit, rows.length), message: `已复核 ${attempted} 条，修复 ${repaired} 条` });
   }
+  reportProgress(onProgress, { channel: 'maintenance', stage: 'timing-repair', status: budgetPaused ? 'paused' : 'completed',
+    done: attempted, total: Math.min(limit, rows.length), message: `历史日期复核结束，修复 ${repaired} 条` });
   return { attempted, repaired, ...(budgetPaused ? { budgetPaused: true } : {}) };
 }
 module.exports = { repairTiming, REPAIR_VERSION };

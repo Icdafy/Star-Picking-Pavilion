@@ -40,24 +40,49 @@ function saveInTransaction(database, row, publication, checkedAt) {
   return true;
 }
 
-async function repairPublicationTimes(database, { enrich, network, limit = 10 } = {}) {
+async function repairPublicationTimes(database, { enrich, network, limit = 10, onProgress = null } = {}) {
   const cutoff = new Date(Date.now() - RETRY_MS).toISOString();
   const rows = database.prepare(`SELECT a.*,s.intl FROM articles a JOIN sources s ON s.id=a.source_id
     WHERE a.published_at IS NULL AND (a.relevant=1 OR a.starred=1)
       AND s.enabled=1 AND s.removed_at IS NULL AND s.type<>'external'
       AND (a.publication_checked_at IS NULL OR a.publication_checked_at<=?)
     ORDER BY a.starred DESC, (s.tier='T1') DESC, a.featured DESC, a.id DESC LIMIT ?`).all(cutoff, limit);
-  let attempted = 0, repaired = 0;
+  let attempted = 0, repaired = 0, done = 0;
+  const report = progress => {
+    // 进度订阅故障不能改变已保存的日期或把核验记为失败。
+    try { onProgress?.({ stage: 'publication-repair', done, total: rows.length, ...progress }); }
+    catch (error) { console.warn('[publication] 进度通知失败:', String(error.message || error).slice(0, 180)); }
+  };
+  report({ status: 'running', message: `正在核验 ${rows.length} 条历史资料的原文发布时间` });
   let position = 0;
-  await settleAll(Array.from({ length: Math.min(2, rows.length) }, async () => {
-    while (position < rows.length) {
-      const row = rows[position++];
-      const content = await enrich(row, { network });
-      if (content.status === 'network-wait') continue;
-      attempted++;
-      repaired += savePublicationTime(database, row, content) ? 1 : 0;
-    }
-  }));
+  try {
+    await settleAll(Array.from({ length: Math.min(2, rows.length) }, async () => {
+      while (position < rows.length) {
+        const row = rows[position++];
+        const task = { taskId: `publication:${row.id}`, current: { id: row.id, title: row.title || '历史资料' } };
+        report({ ...task, status: 'running', message: '正在读取原文并核验发布时间' });
+        try {
+          const content = await enrich(row, { network });
+          const waiting = content.status === 'network-wait';
+          if (!waiting) {
+            attempted++;
+            repaired += savePublicationTime(database, row, content) ? 1 : 0;
+          }
+          done++;
+          report({ ...task, status: 'completed', skipped: waiting,
+            message: waiting ? '等待海外网络恢复后核验' : content.publishedAt ? '原文发布时间核验完成' : '原文未提供可确认的发布时间' });
+        } catch (error) {
+          done++;
+          report({ ...task, status: 'failed', message: '原文发布时间核验失败，已保留原数据' });
+          throw error;
+        }
+      }
+    }));
+    report({ status: 'completed', message: `发布时间核验完成：检查 ${attempted} 条，补齐 ${repaired} 条` });
+  } catch (error) {
+    report({ status: 'failed', message: '发布时间核验未完成，已保留原数据' });
+    throw error;
+  }
   return { attempted, repaired };
 }
 

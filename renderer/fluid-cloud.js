@@ -25,7 +25,7 @@
 
   function normalizeActivity(key, spec = {}, at = 0) {
     const tone = TONES.includes(spec.tone) ? spec.tone : 'info';
-    const progress = Number(spec.progress);
+    const progress = spec.progress == null ? NaN : Number(spec.progress);
     return {
       key: String(key),
       tone,
@@ -34,6 +34,10 @@
       detail: spec.detail == null ? '' : String(spec.detail),
       progress: Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : null,
       facts: Array.isArray(spec.facts) ? spec.facts.slice(0, 4).map(([label, value]) => [String(label), String(value)]) : [],
+      sections: Array.isArray(spec.sections) ? spec.sections.slice(0, 3).map(section => ({
+        label: String(section.label || ''),
+        lines: Array.isArray(section.lines) ? section.lines.slice(0, 32).map(String) : []
+      })) : [],
       actions: Array.isArray(spec.actions) ? spec.actions.filter(action => typeof action?.run === 'function').slice(0, 2) : [],
       at
     };
@@ -77,7 +81,11 @@
     function renderMeter(meter, progress) {
       if (!meter) return;
       meter.hidden = progress == null && current?.tone !== 'busy';
-      host.style.setProperty('--cloud-p', String(progress == null ? .382 : Math.max(.04, progress)));
+      meter.setAttribute('data-indeterminate', String(progress == null));
+      meter.setAttribute('aria-valuetext', progress == null ? '当前步骤进度未知，任务仍在运行' : `当前步骤 ${Math.round(progress * 100)}%`);
+      if (progress == null) meter.removeAttribute('aria-valuenow');
+      else meter.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+      host.style.setProperty('--cloud-p', String(progress == null ? 0 : progress));
     }
 
     function renderPanel(item) {
@@ -98,8 +106,26 @@
           return cell;
         }));
       }
+      const process = $('.fluid-cloud-process');
+      if (process) {
+        process.hidden = !item.sections.some(section => section.lines.length);
+        process.replaceChildren(...item.sections.filter(section => section.lines.length).map(section => {
+          const group = doc.createElement('section');
+          const title = doc.createElement('h3');
+          const list = doc.createElement('ul');
+          title.textContent = section.label;
+          list.replaceChildren(...section.lines.map(line => {
+            const row = doc.createElement('li');
+            row.textContent = line;
+            return row;
+          }));
+          group.append(title, list);
+          return group;
+        }));
+      }
       const actions = $('.fluid-cloud-actions');
       if (actions) {
+        const focusedLabel = actions.contains(doc.activeElement) ? doc.activeElement.textContent : null;
         actions.replaceChildren(...item.actions.map(action => {
           const button = doc.createElement('button');
           button.type = 'button';
@@ -108,6 +134,8 @@
           button.addEventListener('click', () => { collapse(); action.run(); });
           return button;
         }));
+        // 每秒心跳更新不能把键盘用户的焦点从操作按钮上移走。
+        if (focusedLabel) [...actions.children].find(button => button.textContent === focusedLabel)?.focus({ preventScroll: true });
       }
     }
 
@@ -144,7 +172,7 @@
       } else if (state === 'capsule' && capsule) {
         width = Math.ceil(capsule.scrollWidth || capsule.offsetWidth || 0);
       }
-      const max = Math.max(160, (win?.innerWidth || 1200) - 280);
+      const max = Math.max(160, (win?.innerWidth || 1200) - (state === 'expanded' ? 32 : 280));
       host.style.setProperty('--cloud-w', `${Math.min(max, Math.max(CAPSULE_HEIGHT, width))}px`);
       host.style.setProperty('--cloud-h', `${Math.max(CAPSULE_HEIGHT, height)}px`);
       syncGlint();

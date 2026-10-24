@@ -22,6 +22,7 @@ const { modelFor, modelIdentity } = require('./model-policy');
 const { neutralize } = require('./editorial');
 const { SECTION_ORDER } = require('../archive/daily-bundle');
 const { localDateString } = require('../date-time');
+const { reportProgress, progressTask } = require('./progress');
 
 const DOMAIN_LABEL = { lowaltitude: '低空经济', aerospace: '商业航天' };
 const KINDS = new Set(['weekly', 'monthly']);
@@ -336,33 +337,50 @@ async function rewriteLead(issue, settings, periodLabel) {
 }
 
 // 今日日报、本周与上周周报、本月月报：还是事实型导语的，改写一次
-async function enhanceLeads({ settings }) {
+async function enhanceLeads({ settings, onProgress = null }) {
   if (!settings?.ai?.apiKey) return { rewritten: 0 };
-  let rewritten = 0;
+  let rewritten = 0, budgetPaused = false, failed = false;
   const { getDaily } = require('./daily');
   const today = localDateString();
+  let checked = 0;
+  reportProgress(onProgress, { channel: 'editorial', stage: 'report-leads', status: 'running',
+    done: 0, total: 4, message: '检查日报、两期周报与月报导语' });
   try {
     const daily = getDaily(today);
     if (daily && !daily.corrupt && daily.leadSource === 'factual' && daily.totals?.relevant > 0) {
       const before = db.prepare('SELECT content_json FROM daily_reports WHERE date = ?').get(today)?.content_json;
-      daily.lead = await rewriteLead(daily, settings, '日报');
+      daily.lead = await progressTask(onProgress, { channel: 'editorial', stage: 'report-leads',
+        taskId: `lead:daily:${today}`, current: { id: today, title: '今日日报' }, message: '生成日报导语' },
+      () => rewriteLead(daily, settings, '日报'));
       daily.leadSource = 'model';
       rewritten += db.prepare('UPDATE daily_reports SET content_json = ? WHERE date = ? AND content_json = ?')
         .run(JSON.stringify(daily), today, before ?? null).changes;
     }
+    checked++;
+    reportProgress(onProgress, { channel: 'editorial', stage: 'report-leads', status: 'running',
+      done: checked, total: 4, message: '今日日报检查完成' });
     for (const [kind, key] of [['weekly', periodKeyOf('weekly')], ['weekly', previousPeriodKey('weekly')], ['monthly', periodKeyOf('monthly')]]) {
       const issue = generatePeriod(kind, key);
+      checked++;
+      reportProgress(onProgress, { channel: 'editorial', stage: 'report-leads', status: 'running',
+        done: checked - 1, total: 4, message: `检查${kind === 'weekly' ? '周报' : '月报'} ${key}` });
       if (issue.leadSource !== 'factual' || !issue.totals?.relevant) continue;
       const before = db.prepare('SELECT content_json FROM period_reports WHERE kind = ? AND period_key = ?').get(kind, key)?.content_json;
-      issue.lead = await rewriteLead(issue, settings, kind === 'weekly' ? '周报' : '月报');
+      issue.lead = await progressTask(onProgress, { channel: 'editorial', stage: 'report-leads',
+        taskId: `lead:${kind}:${key}`, current: { id: key, title: issue.label }, message: '生成刊期导语' },
+      () => rewriteLead(issue, settings, kind === 'weekly' ? '周报' : '月报'));
       issue.leadSource = 'model';
       rewritten += db.prepare('UPDATE period_reports SET content_json = ? WHERE kind = ? AND period_key = ? AND content_json = ?')
         .run(JSON.stringify(issue), kind, issue.key, before ?? null).changes;
     }
   } catch (error) {
+    budgetPaused = Boolean(error?.budgetExceeded);
+    failed = !budgetPaused;
     if (!error?.budgetExceeded) console.warn('[reports] 导语改写失败:', error.message);
   }
-  return { rewritten };
+  reportProgress(onProgress, { channel: 'editorial', stage: 'report-leads', status: budgetPaused ? 'paused' : failed ? 'failed' : 'completed',
+    done: checked, total: 4, message: `刊期导语检查结束，更新 ${rewritten} 期` });
+  return { rewritten, ...(budgetPaused ? { budgetPaused: true } : {}) };
 }
 
 module.exports = {

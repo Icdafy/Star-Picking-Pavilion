@@ -6,6 +6,7 @@ const { validateAiBaseUrl } = require('../http-security');
 const { readBoundedBody } = require('../collectors/fetch-util');
 const { fetch: undiciFetch } = require('undici');
 const { setTimeout: delay } = require('node:timers/promises');
+const { beginTask } = require('../task-progress');
 
 const { resolveRequestModel } = require('./model-policy');
 const { DEFAULT_PROVIDER, KEYLESS_PLACEHOLDER, normalizeProviderModels } = require('./model-catalog');
@@ -37,14 +38,29 @@ function retryAfterMs(headerValue) {
   return null;
 }
 
-async function chat(messages, {
+async function chat(messages, options) {
+  const task = beginTask({ stage: 'request', taskOnly: true, label: '等待模型响应',
+    current: options.model || options.settings?.ai?.model || '分析模型', attempt: 1 });
+  try {
+    const result = await chatRequest(messages, { ...options, progressTask: task });
+    task.end();
+    return result;
+  } catch (error) {
+    task.update({ status: 'failed', warning: error?.name === 'AbortError'
+      ? '模型请求超时，未完成资料将保留重试。' : '模型请求失败，正在按失败策略处理；未完成资料保留待重试。' });
+    throw error;
+  }
+}
+
+async function chatRequest(messages, {
   settings,
   model,
   temperature = 0.2,
   reasoning = false,
   maxTokens = 4000,
   fetchImpl = undiciFetch,
-  maxResponseBytes = MAX_AI_RESPONSE_BYTES
+  maxResponseBytes = MAX_AI_RESPONSE_BYTES,
+  progressTask
 }) {
   const { apiKey, baseUrl, requestTimeoutMs } = settings.ai;
   if (!apiKey) throw new Error('NO_API_KEY');
@@ -55,7 +71,7 @@ async function chat(messages, {
   const modelId = resolveRequestModel(settings, model);
   if (settings.ai.api === 'anthropic-messages') {
     return anthropicChat(messages, {
-      settings, model: modelId, temperature, maxTokens, fetchImpl, maxResponseBytes, label
+      settings, model: modelId, temperature, maxTokens, fetchImpl, maxResponseBytes, label, progressTask
     });
   }
   const ctrl = new AbortController();
@@ -85,6 +101,7 @@ async function chat(messages, {
     let attempt = 0;
     let thinkingDropped = false;
     for (;;) {
+      progressTask?.update({ status: 'running', label: '等待模型响应', attempt: attempt + 1 });
       // 网络层错误（连不上、被重置等）参与退避重试；总超时触发的 abort 除外——
       // 时间预算是整次调用共享的，重试只会再次撞上同一个截止时间
       let res;
@@ -93,6 +110,7 @@ async function chat(messages, {
       } catch (error) {
         if (ctrl.signal.aborted || attempt >= MAX_RETRIES) throw error;
         attempt += 1;
+        progressTask?.update({ status: 'retrying', label: '网络重试等待', attempt: attempt + 1, retryInMs: BASE_BACKOFF_MS * 2 ** (attempt - 1) });
         await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
@@ -111,6 +129,7 @@ async function chat(messages, {
           delete payload.reasoning_effort;
           // 少数兼容服务不支持 JSON 模式；提示词本身要求 JSON，extractJson 能宽容解析
           delete payload.response_format;
+          progressTask?.update({ status: 'running', label: '兼容参数重试' });
           continue;
         }
         throw new Error(`${label} HTTP 400: ${raw400.slice(0, 200)}`);
@@ -123,6 +142,8 @@ async function chat(messages, {
           throw new Error(`${label} HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
         }
         attempt += 1;
+        progressTask?.update({ status: 'retrying', label: res.status === 429 ? '模型限流等待' : '模型服务重试等待',
+          attempt: attempt + 1, retryInMs: waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1) });
         await sleep(waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
@@ -195,7 +216,7 @@ function toAnthropicMessages(messages) {
   return { system: system.join('\n\n'), messages: converted };
 }
 
-async function anthropicChat(messages, { settings, model, temperature, maxTokens, fetchImpl, maxResponseBytes, label }) {
+async function anthropicChat(messages, { settings, model, temperature, maxTokens, fetchImpl, maxResponseBytes, label, progressTask }) {
   const { apiKey, baseUrl, requestTimeoutMs } = settings.ai;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), requestTimeout(requestTimeoutMs));
@@ -210,6 +231,7 @@ async function anthropicChat(messages, { settings, model, temperature, maxTokens
     });
     let attempt = 0;
     for (;;) {
+      progressTask?.update({ status: 'running', label: '等待模型响应', attempt: attempt + 1 });
       let res;
       try {
         res = await fetchImpl(anthropicUrl(baseUrl, 'messages'), {
@@ -218,6 +240,7 @@ async function anthropicChat(messages, { settings, model, temperature, maxTokens
       } catch (error) {
         if (ctrl.signal.aborted || attempt >= MAX_RETRIES) throw error;
         attempt += 1;
+        progressTask?.update({ status: 'retrying', label: '网络重试等待', attempt: attempt + 1, retryInMs: BASE_BACKOFF_MS * 2 ** (attempt - 1) });
         await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }
@@ -225,6 +248,8 @@ async function anthropicChat(messages, { settings, model, temperature, maxTokens
       if ((RETRYABLE_STATUS.has(res.status) || res.status === 529) && attempt < MAX_RETRIES) {
         const waitMs = retryAfterMs(res.headers?.get ? res.headers.get('retry-after') : null);
         attempt += 1;
+        progressTask?.update({ status: 'retrying', label: res.status === 429 ? '模型限流等待' : '模型服务重试等待',
+          attempt: attempt + 1, retryInMs: waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1) });
         await sleep(waitMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1), ctrl.signal);
         continue;
       }

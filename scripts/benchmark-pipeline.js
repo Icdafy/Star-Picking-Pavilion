@@ -55,6 +55,7 @@ async function schedulerSample(source) {
     './retention': { pruneDatabase() {} },
     './config': { loadSettings: () => settings },
     './schedule-policy': require('../server/schedule-policy'),
+    './task-progress': require('../server/task-progress'),
     './db': { db: {}, DATABASE_PATH: 'benchmark-fixture' },
     './database-maintenance': { compactDatabase() {} }
   };

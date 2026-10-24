@@ -22,6 +22,7 @@ const { withReceipt } = require('./receipts');
 const { modelFor, modelIdentity } = require('./model-policy');
 const { neutralize } = require('./editorial');
 const { observedAt } = require('./companies');
+const { reportProgress, progressTask } = require('./progress');
 
 const TIER_RANK = { T1: 3, 'T1.5': 2, T2: 1 };
 const RELATIONS = new Set(['same', 'development', 'different']);
@@ -156,10 +157,12 @@ function normalizeJudgement(json, count) {
   return out;
 }
 
-async function judge(doc, candidates, settings, confirmation = false) {
+async function judge(doc, candidates, settings, confirmation = false, onProgress = null, stage = 'grouping') {
   const prompt = industry.renderPrompt('group-pair');
   const user = `<item id="NEW">\n${describe(doc)}\n</item>\n${candidates.map((c, i) => `<candidate id="${i}">\n${describe(c.evidence)}\n</candidate>`).join('\n')}`;
-  const { value } = await withReceipt({
+  const { value } = await progressTask(onProgress, { channel: 'grouping', stage,
+    taskId: `${stage}:${doc.id}:${confirmation ? 'confirm' : 'judge'}`, current: doc,
+    message: confirmation ? '独立复核事件归属' : '模型比较相似报道的事件关系' }, () => withReceipt({
     task: confirmation ? 'group-confirm' : 'group',
     keyParts: [prompt.version, modelIdentity(settings), user, confirmation ? 'independent-confirmation-v2' : 'complete-initial-v2'],
     validate: v => Array.isArray(v) && v.length === candidates.length && v.every(r => RELATIONS.has(r?.relation)
@@ -168,7 +171,7 @@ async function judge(doc, candidates, settings, confirmation = false) {
       { role: 'system', content: prompt.text + (confirmation ? '\n这是独立复核：必须核对主体、轮次、任务批次、日期及完成状态。没有足够证据表明是同一事件或明确后续进展时返回 different。不要因为同公司或同赛道就合并。' : '') },
       { role: 'user', content: user }
     ], { settings, model: modelFor(settings), maxTokens: 400 })), candidates.length)
-  });
+  }));
   return value;
 }
 
@@ -237,7 +240,7 @@ function storySize(storyId) {
 }
 
 // ---------- 主流程 ----------
-async function groupPending({ settings = null, limit = 200 } = {}) {
+async function groupPending({ settings = null, limit = 200, onProgress = null } = {}) {
   const config = industry.loadSelection().stories;
   migrateLegacyClusters();
   const recallCutoff = new Date(Date.now() - config.recallDays * 86400e3).toISOString();
@@ -248,7 +251,13 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
     WHERE a.relevant = 1 AND a.analyzed IN (1, 3) AND a.grouped_at IS NULL AND COALESCE(a.translation_status, '') <> 'pending'
     ORDER BY COALESCE(a.published_at, a.fetched_at), a.id LIMIT ?`).all(limit);
   const stats = { processed: 0, attached: 0, created: 0, judged: 0, merged: 0, skipped: 0 };
-  if (!rows.length) return stats;
+  reportProgress(onProgress, { channel: 'grouping', stage: 'grouping', status: 'running',
+    done: 0, total: rows.length, message: `待归组 ${rows.length} 条报道` });
+  if (!rows.length) {
+    reportProgress(onProgress, { channel: 'grouping', stage: 'grouping', status: 'completed', done: 0, total: 0,
+      message: '没有待归组报道' });
+    return stats;
+  }
   const hasKey = Boolean(settings?.ai?.apiKey);
   let judgeBudget = hasKey ? config.judgeLimitPerRound : 0;
   const pool = loadPool(config.recallDays, config.minSharedGrams);
@@ -257,6 +266,7 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
   for (const row of rows) {
     const doc = docOf(row);
     stats.processed++;
+    try {
     // 已被手工或旧版本挂到事件上的：只补信号与标记
     if (doc.storyId) {
       attach(doc, doc.storyId, 'report');
@@ -285,14 +295,14 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
         judgeBudget--;
         stats.judged++;
         try {
-          const verdicts = await judge(doc, grey, settings);
+          const verdicts = await judge(doc, grey, settings, false, onProgress);
           const best = verdicts
             .map((v, i) => ({ ...v, candidate: grey[i] }))
             .filter(v => v.relation !== 'different' && v.confidence >= config.sameMinConfidence)
             .sort((a, b) => Number(b.relation === 'same') - Number(a.relation === 'same') || b.confidence - a.confidence)[0];
           if (best) {
             // AIHOT 的灰区复核：不向第二次请求泄露第一次结论；独立回执避免重复付费。
-            const confirmation = best.confidence < 0.85 ? (await judge(doc, [best.candidate], settings, true))[0] : best;
+            const confirmation = best.confidence < 0.85 ? (await judge(doc, [best.candidate], settings, true, onProgress))[0] : best;
             if (confirmation.relation === best.relation && confirmation.confidence >= config.sameMinConfidence) {
               target = best.candidate.storyId;
               relation = best.relation === 'development' ? 'development' : 'report';
@@ -318,8 +328,15 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
       stats.created++;
     }
     pool.add(doc);
+    } finally {
+      reportProgress(onProgress, { channel: 'grouping', stage: 'grouping', status: 'running',
+        done: stats.processed, total: rows.length, current: doc,
+        message: `已归组 ${stats.processed}/${rows.length} 条，新事件 ${stats.created}，归入 ${stats.attached}` });
+    }
   }
   for (const storyId of touched) refreshStory(storyId);
+  reportProgress(onProgress, { channel: 'grouping', stage: 'grouping', status: stats.budgetPaused ? 'paused' : 'completed',
+    done: stats.processed, total: rows.length, message: '本批报道归组结束' });
   return stats;
 }
 
@@ -328,7 +345,7 @@ async function groupPending({ settings = null, limit = 200 } = {}) {
 // 之后再也不会互相比较，于是热榜上出现同一件事的两三个条目（例：星舰第 14 次试飞占了 9 个热点中的 6 个）。
 // 这里对近几天活跃的事件做一次事件级比较：标题几乎相同、或主报道事件键相同且日期状态不冲突 → 直接合并；
 // 相似但不确定的，有 Key 时交给同一套三分类（并独立复核），没有 Key 宁可不并。
-async function consolidateStories({ settings = null, nowMs = Date.now() } = {}) {
+async function consolidateStories({ settings = null, nowMs = Date.now(), onProgress = null } = {}) {
   const config = industry.loadSelection().stories;
   const rules = { windowDays: 4, titleOverlap: 0.8, judgeOverlap: 0.5, minShared: 6, judgeLimit: 6, ...(config.consolidate || {}) };
   const since = new Date(nowMs - rules.windowDays * 86400e3).toISOString();
@@ -376,7 +393,11 @@ async function consolidateStories({ settings = null, nowMs = Date.now() } = {}) 
   };
   const hasKey = Boolean(settings?.ai?.apiKey);
   let budget = hasKey ? rules.judgeLimit : 0;
-  for (const pair of pairs) {
+  reportProgress(onProgress, { channel: 'grouping', stage: 'consolidating', status: 'running',
+    done: 0, total: pairs.length, message: `检查 ${pairs.length} 对相似事件` });
+  for (const [pairIndex, pair] of pairs.entries()) {
+    reportProgress(onProgress, { channel: 'grouping', stage: 'consolidating', status: 'running',
+      done: pairIndex, total: pairs.length, current: pair.b.main, message: '核对重复事件与后续进展' });
     const a = rootOf(pair.a.id), b = rootOf(pair.b.id);
     if (a === b) continue;
     if (!compatible(pair.a.main, pair.b.main)) continue;
@@ -387,9 +408,9 @@ async function consolidateStories({ settings = null, nowMs = Date.now() } = {}) 
       stats.judged++;
       try {
         const candidate = { evidence: pair.a.main };
-        const [first] = await judge(pair.b.main, [candidate], settings);
+        const [first] = await judge(pair.b.main, [candidate], settings, false, onProgress, 'consolidating');
         if (first.relation !== 'different' && first.confidence >= config.sameMinConfidence) {
-          const confirmation = first.confidence < 0.85 ? (await judge(pair.b.main, [candidate], settings, true))[0] : first;
+          const confirmation = first.confidence < 0.85 ? (await judge(pair.b.main, [candidate], settings, true, onProgress, 'consolidating'))[0] : first;
           merge = confirmation.relation === first.relation && confirmation.confidence >= config.sameMinConfidence;
         }
       } catch (error) {
@@ -402,6 +423,8 @@ async function consolidateStories({ settings = null, nowMs = Date.now() } = {}) 
     refreshStory(into);
     stats.merged++;
   }
+  reportProgress(onProgress, { channel: 'grouping', stage: 'consolidating', status: stats.budgetPaused ? 'paused' : 'completed',
+    done: pairs.length, total: pairs.length, message: `重复事件检查完成，合并 ${stats.merged} 起` });
   return stats;
 }
 
@@ -445,23 +468,33 @@ function digestInput(storyId, prompt, settings) {
   return { user, hash, size: reports.length };
 }
 
-async function digestStories({ settings = null, call = chat, receipt = withReceipt } = {}) {
+async function digestStories({ settings = null, call = chat, receipt = withReceipt, onProgress = null } = {}) {
   const config = industry.loadSelection().stories;
   if (!settings?.ai?.apiKey || config.digestLimitPerRound <= 0) return { digested: 0 };
   const since = new Date(Date.now() - 3 * 86400e3).toISOString();
-  const stories = db.prepare(`SELECT id, digest_hash, digest FROM clusters
+  const stories = db.prepare(`SELECT id, title, digest_hash, digest FROM clusters
     WHERE merged_into IS NULL AND latest_at >= ? ORDER BY size DESC, latest_at DESC`).all(since);
   const prompt = industry.renderPrompt('story-digest');
-  let digested = 0, attempted = 0, budgetPaused = false;
+  let digested = 0, finished = 0, budgetPaused = false;
+  const pending = [];
   for (const story of stories) {
     const input = digestInput(story.id, prompt, settings);
     if (!input || input.hash === story.digest_hash) continue;
     if (story.digest || story.digest_hash) db.prepare('UPDATE clusters SET digest=NULL,digest_hash=NULL,digest_size=0 WHERE id=?').run(story.id);
-    if (input.size < config.digestMinReports || attempted >= config.digestLimitPerRound) continue;
-    attempted++;
+    if (input.size < config.digestMinReports || pending.length >= config.digestLimitPerRound) continue;
+    pending.push({ story, input });
+  }
+  reportProgress(onProgress, { channel: 'editorial', stage: 'editorial', status: 'running',
+    done: 0, total: pending.length, message: `更新 ${pending.length} 起事件综述` });
+  let index = 0;
+  // Independent stories can be written in two lanes; unchanged input still reuses receipts.
+  await Promise.all(Array.from({ length: Math.min(2, pending.length) }, async () => {
+    while (index < pending.length && !budgetPaused) {
+    const { story, input } = pending[index++];
     const { user } = input;
     try {
-      const { value } = await receipt({
+      const { value } = await progressTask(onProgress, { channel: 'editorial', stage: 'editorial',
+        taskId: `digest:${story.id}`, current: story, message: '根据多家报道生成事件综述' }, () => receipt({
         task: 'digest',
         keyParts: [prompt.version, modelIdentity(settings), input.hash, user],
         validate: v => v && typeof v.digest === 'string' && v.digest.trim(),
@@ -469,7 +502,7 @@ async function digestStories({ settings = null, call = chat, receipt = withRecei
           { role: 'system', content: prompt.text },
           { role: 'user', content: user }
         ], { settings, model: modelFor(settings), maxTokens: 700 }))
-      });
+      }));
       if (typeof value?.digest !== 'string' || !value.digest.trim()) throw new Error('事件综述响应无效');
       const digest = [...value.digest.trim()].slice(0, 240).join('');
       const title = typeof value.title === 'string' && value.title.trim() ? [...value.title.trim()].slice(0, 40).join('') : null;
@@ -481,8 +514,15 @@ async function digestStories({ settings = null, call = chat, receipt = withRecei
     } catch (error) {
       if (error?.budgetExceeded) { budgetPaused = true; break; }
       console.warn(`[stories] 事件综述失败 #${story.id}:`, error.message);
+    } finally {
+      finished++;
+      reportProgress(onProgress, { channel: 'editorial', stage: 'editorial', status: 'running',
+        done: finished, total: pending.length, message: `已检查 ${finished}/${pending.length} 起，更新 ${digested} 起综述` });
     }
-  }
+    }
+  }));
+  reportProgress(onProgress, { channel: 'editorial', stage: 'editorial', status: budgetPaused ? 'paused' : 'completed',
+    done: finished, total: pending.length, message: `事件综述结束，更新 ${digested} 起` });
   return { digested, ...(budgetPaused ? { budgetPaused: true } : {}) };
 }
 

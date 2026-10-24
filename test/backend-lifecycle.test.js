@@ -45,6 +45,7 @@ function schedulerFixture(t, overrides = {}) {
     './retention': { pruneDatabase: () => { events.push('prune'); return overrides.prune?.() || { removedArticles: 0, removedReports: 0 }; } },
     './config': { loadSettings: () => settings },
     './schedule-policy': require('../server/schedule-policy'),
+    './task-progress': require('../server/task-progress'),
     './db': { db: {}, DATABASE_PATH: 'fixture' },
     './database-maintenance': { compactDatabase: () => { events.push('compact'); return { skipped: false }; } }
   };
@@ -468,4 +469,75 @@ test('opting into automatic jobs runs the complete pipeline; turning off leaves 
   await fixture.advance(24 * 60 * 60000);
   assert.deepEqual(fixture.events, completed);
   assert.equal(fixture.scheduler.getStatus().nextCollectAt, null);
+});
+
+test('real request and article callbacks reach pipeline snapshots and heartbeat clocks until completion', async t => {
+  const { progressTask } = require('../server/ai/progress');
+  const { chat } = require('../server/ai/deepseek');
+  const gate = deferred();
+  t.after(() => gate.resolve());
+  let calls = 0;
+  const fixture = schedulerFixture(t, {
+    automatic: false,
+    collect: async progress => {
+      progress({ stage: 'collecting', taskId: 'source:1', status: 'running', current: { title: '本地慢源' }, done: 0, total: 1,
+        completed: 0, sourcesCompleted: 0, sourcesTotal: 1 });
+      progress({ stage: 'collecting', taskId: 'source:1', status: 'completed', current: { title: '本地慢源' }, done: 1, total: 1,
+        completed: 1, sourcesCompleted: 1, sourcesTotal: 1, added: 1 });
+    },
+    analyze: async (onProgress, limit) => {
+      if (!limit || calls++) return { analyzed: 0 };
+      onProgress({ stage: 'scoring', done: 0, total: 40, message: '真实回调等待模型' });
+      await progressTask(onProgress, { stage: 'scoring', taskId: 'score:1', current: { title: '商业航天试验' } },
+        () => chat([{ role: 'user', content: 'private-prompt' }], {
+          settings: { ai: { apiKey: 'sk-local-secret-fixture', baseUrl: 'http://127.0.0.1:4321/private', model: 'local', activeProvider: 'custom' } },
+          fetchImpl: async () => { await gate.promise; return new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] })); }
+        }));
+      onProgress({ stage: 'scoring', status: 'completed', done: 1, total: 40 });
+      return { analyzed: 1, featured: 1 };
+    }
+  });
+  const snapshots = [];
+  fixture.scheduler.subscribeStatus(status => snapshots.push(status));
+  const operation = fixture.scheduler.runPipeline();
+  await tick();
+  const first = fixture.scheduler.getStatus();
+  assert.equal(first.pipelineProgress.sourcesCompleted, 1);
+  assert.equal(first.pipelineRunning, true);
+  assert.equal(first.pipelineProgress.stageTotal, 40);
+  assert.equal(first.pipelineProgress.activeTasks.length, 2, 'article task and actual chat request are both observed');
+  const revision = first.revision;
+  await fixture.advance(3000);
+  const later = fixture.scheduler.getStatus();
+  assert.ok(later.revision >= revision + 3);
+  assert.equal(later.pipelineProgress.elapsedMs, 3000);
+  assert.ok(later.pipelineProgress.activeTasks.every(task => task.elapsedMs === 3000));
+  assert.equal(later.pipelineProgress.stageDone, 0);
+  assert.doesNotMatch(JSON.stringify(later.pipelineProgress), /private-prompt|sk-local|127\.0\.0\.1|headers|Authorization/);
+  gate.resolve();
+  await operation;
+  const finished = fixture.scheduler.getStatus();
+  assert.equal(finished.pipelineProgress.phase, 'completed');
+  assert.equal(finished.pipelineProgress.activeTasks.length, 0);
+  assert.deepEqual(finished.lastPipeline.progress, finished.pipelineProgress);
+  const revisions = snapshots.length;
+  await fixture.advance(5000);
+  assert.deepEqual(fixture.scheduler.getStatus().pipelineProgress, finished.pipelineProgress);
+  assert.equal(snapshots.length, revisions, 'completed runs stop heartbeat notifications');
+});
+
+test('pipeline defers repeated full-window rescoring to its tail while standalone batches still rescore', async t => {
+  let batches = 0;
+  const fixture = schedulerFixture(t, { automatic: false, analyze: (_onProgress, limit) => {
+    if (!limit) return { analyzed: 0 };
+    return { analyzed: ++batches <= 2 ? 2 : 0 };
+  } });
+  const result = await fixture.scheduler.runPipeline();
+  assert.equal(result.analyzed, 4);
+  assert.equal(fixture.events.filter(event => event === 'rescore').length, 1);
+  assert.equal(fixture.events.filter(event => event === 'group').length, 3);
+  assert.equal(fixture.events.filter(event => event === 'tail').length, 1);
+  const standalone = schedulerFixture(t, { analyze: () => ({ analyzed: 1 }) });
+  await standalone.scheduler.analyzeOnce();
+  assert.equal(standalone.events.filter(event => event === 'rescore').length, 1);
 });

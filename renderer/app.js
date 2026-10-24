@@ -436,6 +436,7 @@ const FEED_VIEWS = ['featured', 'all', 'starred'];
 // ---------- 塔台状态 ----------
 // setStat/refreshStats 拆入 renderer/stats-controller.js（批 2），
 // 时钟与帧回调经依赖注入，Node 单测可直接驱动补间
+let dismissedPipelineRun = null;
 const statsController = StatsController.createStatsController({
   api, state,
   elements: {
@@ -447,25 +448,29 @@ const statsController = StatsController.createStatsController({
     statStatusLabel: $('#statStatusLabel'),
     btnRefresh: $('#btnRefresh'),
     feedBanner: $('#feedBanner'),
-    collectScheduleStatus: $('#collectScheduleStatus')
+    collectScheduleStatus: $('#collectScheduleStatus'),
+    pipelineRunDetails: $('#pipelineRunDetails'),
+    pipelineRunSummary: $('#pipelineRunSummary'),
+    pipelineRunLines: $('#pipelineRunLines')
   },
   prefersReducedMotion,
   now: () => performance.now(),
   frame: callback => requestAnimationFrame(callback),
-  onActivity: ({ busy, label, detail, progress }) => {
-    if (!busy) { fluidCloud?.clearActivity('pipeline'); return; }
-    const count = value => Number.isFinite(value) && value >= 0 ? Math.floor(value).toLocaleString('zh-CN') : '0';
-    const total = Number(progress?.sourcesTotal) || 0;
-    const done = Number(progress?.sourcesCompleted) || 0;
+  onActivity: ({ busy, label, detail, progress, terminal, tone, value, ratio, facts, sections }) => {
+    const run = progress?.startedAt || 'latest';
+    if (busy) dismissedPipelineRun = null;
+    if ((!busy && !terminal) || dismissedPipelineRun === run) { fluidCloud?.clearActivity('pipeline'); return; }
     fluidCloud?.setActivity('pipeline', {
-      tone: 'busy',
+      tone,
       title: label,
-      value: total ? `${count(done)}/${count(total)}` : '',
-      progress: total ? done / total : null,
-      detail: progress?.message || '采集与分析在后台进行，完成后信息流自动更新。',
-      facts: progress ? [['信源', `${count(done)}/${count(total)}`], ['新增', count(progress.collected)],
-        ['已分析', count(progress.analyzed)], ['精选', count(progress.featured)]] : [],
-      actions: [{ label: '查看全部动态', run: () => switchView('all') }]
+      value,
+      progress: ratio,
+      detail: detail || '采集与分析在后台进行，完成后信息流自动更新。',
+      facts,
+      sections,
+      actions: [{ label: '查看全部动态', run: () => switchView('all') },
+        busy ? { label: '查看采集记录', run: () => { switchView('settings'); $('#pipelineRunDetails').open = true; $('#settingsCollect').scrollIntoView({ block: 'start' }); } }
+          : { label: '关闭提示', run: () => { dismissedPipelineRun = run; fluidCloud?.clearActivity('pipeline'); } }]
     });
   }
 });

@@ -1,6 +1,7 @@
 'use strict';
 
 const { cleanTitle, cleanSummary } = require('./normalize');
+const { reportProgress, progressTask } = require('./progress');
 const VERSION = 'zh-news-2';
 const NAMES = ['SpaceX', 'Rocket Lab', 'Blue Origin', 'Joby Aviation', 'Joby', 'Archer Aviation', 'Archer',
   'Vertical Aerospace', 'Wisk Aero', 'EHang', 'NASA', 'ESA', 'FAA', 'EASA', 'Starship', 'Starlink',
@@ -77,7 +78,7 @@ async function translateBatch(articles, settings) {
   return value;
 }
 
-async function translatePending(settings, { translate = translateBatch, limit = 40, nowMs = Date.now() } = {}) {
+async function translatePending(settings, { translate = translateBatch, limit = 40, nowMs = Date.now(), onProgress = null } = {}) {
   const { db, withTransaction } = require('../db');
   if (!settings.ai.apiKey) return { translated: 0, waitingForModel: true };
   const rows = db.prepare(`SELECT a.id, a.title, a.summary_raw, a.translation_retry_at FROM articles a
@@ -85,11 +86,18 @@ async function translatePending(settings, { translate = translateBatch, limit = 
     ORDER BY a.id ASC LIMIT ?`).all(new Date(nowMs).toISOString(), limit);
   let translated = 0;
   let deferred = 0;
+  reportProgress(onProgress, { channel: 'translation', stage: 'translation', status: 'running',
+    done: 0, total: rows.length, message: `待翻译 ${rows.length} 条海外新闻` });
+  if (!rows.length) reportProgress(onProgress, { channel: 'translation', stage: 'translation', status: 'completed',
+    done: 0, total: 0, message: '没有待翻译的海外新闻' });
   for (let i = 0; i < rows.length;) {
     const batch = rows.slice(i, i + (rows[i].translation_retry_at ? 1 : 8));
     i += batch.length;
     try {
-      const items = normalizeTranslations({ items: await translate(batch, settings) }, batch);
+      const items = normalizeTranslations({ items: await progressTask(onProgress, {
+        channel: 'translation', stage: 'translation', taskId: `translation:${batch[0].id}`,
+        current: batch[0], message: `翻译海外新闻 ${i - batch.length + 1}–${i}/${rows.length}` },
+      () => translate(batch, settings)) }, batch);
       withTransaction(() => {
         for (const item of items) {
           db.prepare(`UPDATE articles SET translation_status='translated', translation_json=?, translation_retry_at=NULL,
@@ -109,11 +117,18 @@ async function translatePending(settings, { translate = translateBatch, limit = 
       });
       translated += items.length;
     } catch (error) {
-      if (error.budgetExceeded) return { translated, deferred, budgetPaused: true };
+      if (error.budgetExceeded) {
+        reportProgress(onProgress, { channel: 'translation', stage: 'translation', status: 'paused',
+          done: translated + deferred, total: rows.length, message: '模型预算已用尽，未译新闻保留待下轮处理' });
+        return { translated, deferred, budgetPaused: true };
+      }
       for (const article of batch) db.prepare('UPDATE articles SET translation_retry_at=? WHERE id=?')
         .run(new Date(nowMs + 2 * 60000).toISOString(), article.id);
       deferred += batch.length;
     }
+    reportProgress(onProgress, { channel: 'translation', stage: 'translation', status: i === rows.length ? 'completed' : 'running',
+      done: translated + deferred, total: rows.length,
+      message: `已翻译 ${translated} 条${deferred ? `，${deferred} 条等待重试` : ''}` });
   }
   return { translated, deferred };
 }

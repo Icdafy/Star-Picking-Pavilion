@@ -136,7 +136,7 @@ test('流体云接线：提示并入胶囊，采集与更新状态驱动同一�
   assert.match(app, /fluidCloud\?\.setActivity\('pipeline'/);
   assert.match(app, /fluidCloud\?\.setActivity\('update'/);
   assert.doesNotMatch(app, /translate\(-50%, 6px\)/, '提示不再自带位移动画');
-  assert.match(read('renderer/stats-controller.js'), /onActivity\(\{ busy, label, detail, progress: busy \? progress \|\| null : null \}\)/);
+  assert.match(read('renderer/stats-controller.js'), /onActivity\(presentation\)/);
   assert.doesNotMatch(golden, /@keyframes/, '流体云与系统更新不新增关键帧');
 });
 

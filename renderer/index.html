@@ -458,6 +458,11 @@
             <span class="switch-track" aria-hidden="true"></span>
           </label>
         </section>
+        <details class="set-more" id="pipelineRunDetails" hidden>
+          <summary>本轮采集分析记录</summary>
+          <p class="hint" id="pipelineRunSummary"></p>
+          <div class="pipeline-run-lines" id="pipelineRunLines"></div>
+        </details>
         <div class="set-panel">
           <div class="set-row">
             <span>采集间隔</span>
@@ -1106,8 +1111,9 @@
     <div class="fluid-cloud-panel" id="fluidCloudPanel" role="group" aria-labelledby="fluidCloudPanelTitle" aria-hidden="true" inert>
       <h2><span class="fluid-cloud-orb" aria-hidden="true"></span><span class="fluid-cloud-panel-title" id="fluidCloudPanelTitle"></span></h2>
       <p class="fluid-cloud-detail" hidden></p>
-      <span class="fluid-cloud-meter" aria-hidden="true" hidden><span class="fluid-cloud-fill"></span></span>
+      <span class="fluid-cloud-meter" role="progressbar" aria-label="当前步骤进度" aria-valuemin="0" aria-valuemax="100" hidden><span class="fluid-cloud-fill"></span></span>
       <dl class="fluid-cloud-facts" hidden></dl>
+      <div class="fluid-cloud-process" hidden></div>
       <div class="fluid-cloud-actions"></div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>

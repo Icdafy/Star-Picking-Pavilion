@@ -239,14 +239,20 @@ async function collectAll(onProgress, { force = false, network = networkAccess, 
   const enrichOnce = createEnrichmentCache(enrich);
   const report = progress => {
     // 观察者故障不能把已提交成功的信源误记为采集失败。
-    try { onProgress?.({ ...progress, completed, total }); }
+    try { onProgress?.({ completed, sourcesCompleted: completed, sourcesTotal: total,
+      total, ...progress }); }
     catch (error) { console.warn('[collect] 进度通知失败:', String(error.message || error).slice(0, 180)); }
   };
-  const reportSkipped = () => report({ source: null, added: 0,
+  const reportSkipped = () => report({ stage: 'collecting', status: 'completed', done: completed, source: null, added: 0,
     skipped: skippedBackoff + skippedNetwork, skippedBackoff, skippedNetwork });
   if (skippedBackoff) reportSkipped();
   // 国内信源立即开工；海外探测并行进行，仍严格等探测通过后才发出海外请求。
-  const internationalReady = international.length ? Promise.resolve().then(() => network.detect({ force })).then(status => {
+  const networkTask = { stage: 'network-check', taskId: 'network:overseas',
+    current: { title: '海外网络可达性' }, done: 0, total: 1 };
+  const internationalReady = international.length ? Promise.resolve().then(() => {
+    report({ ...networkTask, status: 'running', message: '正在检测海外信源网络，国内采集同步进行' });
+    return network.detect({ force });
+  }).then(status => {
     networkStatus = status;
     const waiting = status.available ? [] : international;
     const reachable = status.available ? international : [];
@@ -258,7 +264,12 @@ async function collectAll(onProgress, { force = false, network = networkAccess, 
     results.push(...waiting.map(source => ({ source: source.name, url: source.url, type: source.type,
       intl: true, skipped: true, reason: 'network-unavailable' })));
     sources.push(...due);
+    report({ ...networkTask, status: 'completed', done: 1,
+      message: status.available ? '海外网络可用，开始采集海外信源' : `海外网络暂不可达，本轮跳过 ${waiting.length} 个入口` });
     if (waiting.length || backoff) reportSkipped();
+  }).catch(error => {
+    report({ ...networkTask, status: 'failed', done: 1, message: '海外网络检测失败' });
+    throw error;
   }) : Promise.resolve();
   const CONCURRENCY = 4;
   let idx = 0;
@@ -270,11 +281,15 @@ async function collectAll(onProgress, { force = false, network = networkAccess, 
       }
       const source = sources[idx++];
       const started = Date.now();
+      const task = { stage: 'collecting', taskId: `source:${source.id}`,
+        current: { id: source.id, title: source.name }, source: source.name };
+      report({ ...task, status: 'running', done: completed, message: '正在读取信源并核验新资料' });
       try {
         const r = await collectSource(source, settings, { enrich: enrichOnce, network });
         results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), ...r, ms: Date.now() - started });
         completed++;
-        report({ source: source.name, ...r });
+        report({ ...task, ...r, status: 'completed', done: completed,
+          message: r.skipped ? '信源配置已变更，跳过旧响应' : `信源采集完成，新增 ${r.added || 0} 条` });
       } catch (e) {
         const msg = String(e.message || e).slice(0, 200);
         const consecutive = (Number(source.consecutive_errors) || 0) + 1;
@@ -287,17 +302,19 @@ async function collectAll(onProgress, { force = false, network = networkAccess, 
         if (!recorded.changes) {
           results.push({ source: source.name, url: source.url, added: 0, skipped: true, reason: 'source-changed' });
           completed++;
-          report({ source: source.name, added: 0, skipped: true, reason: 'source-changed' });
+          report({ ...task, status: 'completed', done: completed, added: 0, skipped: true,
+            reason: 'source-changed', message: '信源配置已变更，跳过旧响应' });
           continue;
         }
         results.push({ source: source.name, url: source.url, type: source.type, intl: Boolean(source.intl), error: msg, consecutiveErrors: consecutive });
         completed++;
-        report({ source: source.name, error: msg, consecutiveErrors: consecutive });
+        report({ ...task, status: 'failed', done: completed, error: msg,
+          consecutiveErrors: consecutive, message: '信源采集失败，已记录并安排重试' });
       }
     }
   }
   await settleAll(Array.from({ length: CONCURRENCY }, worker));
-  const publicationRepair = await repairPublicationTimes(db, { enrich: enrichOnce, network });
+  const publicationRepair = await repairPublicationTimes(db, { enrich: enrichOnce, network, onProgress: report });
   publicationRepair.repaired += results.reduce((sum, row) => sum + (row.publicationRepaired || 0), 0);
   return { results, skipped: skippedBackoff + skippedNetwork, skippedBackoff, skippedNetwork, network: networkStatus, publicationRepair };
 }
