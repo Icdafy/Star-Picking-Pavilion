@@ -303,9 +303,9 @@ function runPipeline(trigger = 'manual') {
       }
       const result = await executePipeline(trigger);
       lastPipeline = { at: new Date().toISOString(), trigger, ms: Date.now() - started, ok: !result.skipped, ...result };
-      updatePipelineProgress({ phase: result.skipped ? 'stopped' : result.budgetPaused || result.hasMore ? 'paused' : 'completed',
+      updatePipelineProgress({ phase: result.skipped ? 'stopped' : result.budgetPaused ? 'paused' : 'completed',
         message: result.skipped ? '任务已停止' : result.budgetPaused ? '模型预算已用尽，待分析资料已保留'
-          : result.hasMore ? '本轮已完成，部分资料等待下轮分析' : '采集分析完成' });
+          : '本轮已完成' });
       lastPipeline.progress = progressTracker.snapshot();
       return result;
     } catch (error) {

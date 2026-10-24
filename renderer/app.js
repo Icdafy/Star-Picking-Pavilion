@@ -436,7 +436,6 @@ const FEED_VIEWS = ['featured', 'all', 'starred'];
 // ---------- 塔台状态 ----------
 // setStat/refreshStats 拆入 renderer/stats-controller.js（批 2），
 // 时钟与帧回调经依赖注入，Node 单测可直接驱动补间
-let dismissedPipelineRun = null;
 const statsController = StatsController.createStatsController({
   api, state,
   elements: {
@@ -456,10 +455,9 @@ const statsController = StatsController.createStatsController({
   prefersReducedMotion,
   now: () => performance.now(),
   frame: callback => requestAnimationFrame(callback),
-  onActivity: ({ busy, label, detail, progress, terminal, tone, value, ratio, facts, sections }) => {
-    const run = progress?.startedAt || 'latest';
-    if (busy) dismissedPipelineRun = null;
-    if ((!busy && !terminal) || dismissedPipelineRun === run) { fluidCloud?.clearActivity('pipeline'); return; }
+  onActivity: ({ busy, label, detail, tone, value, ratio, facts, sections }) => {
+    // 顶部胶囊只显示正在进行的任务，终态记录仍由设置页保留。
+    if (!busy) { fluidCloud?.clearActivity('pipeline'); return; }
     fluidCloud?.setActivity('pipeline', {
       tone,
       title: label,
@@ -469,8 +467,7 @@ const statsController = StatsController.createStatsController({
       facts,
       sections,
       actions: [{ label: '查看全部动态', run: () => switchView('all') },
-        busy ? { label: '查看采集记录', run: () => { switchView('settings'); $('#pipelineRunDetails').open = true; $('#settingsCollect').scrollIntoView({ block: 'start' }); } }
-          : { label: '关闭提示', run: () => { dismissedPipelineRun = run; fluidCloud?.clearActivity('pipeline'); } }]
+        { label: '查看采集记录', run: () => { switchView('settings'); $('#pipelineRunDetails').open = true; $('#settingsCollect').scrollIntoView({ block: 'start' }); } }]
     });
   }
 });

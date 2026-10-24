@@ -8,7 +8,7 @@ const path = require('node:path');
 const { launchNativeElectron } = require('./native-electron.cjs');
 const root = path.resolve(__dirname, '../..');
 
-test('native activity view explains post-capture work, retries and elapsed time and keeps a reviewable result', { timeout: 60000 }, async t => {
+test('native activity view explains active work and hides after each round while preserving its record', { timeout: 60000 }, async t => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-v0244-progress-'));
   fs.writeFileSync(path.join(profile, 'ui-preferences.json'), JSON.stringify({ version: 2,
     theme: 'dark', aquaEnabled: false, pointerEnabled: false }));
@@ -55,7 +55,7 @@ test('native activity view explains post-capture work, retries and elapsed time 
     return Number(getComputedStyle(panel).opacity) > .99 && b.width + 2 >= a.width && b.height + 2 >= a.height;
   });
   assert.equal(await page.locator('#fluidCloudPanel').evaluate(panel => panel.scrollWidth <= panel.clientWidth + 1), true, 'long task details wrap inside the panel');
-  const shots = path.join(root, 'work/v0244/screenshots');
+  const shots = path.join(root, 'work/v0245/screenshots');
   fs.mkdirSync(shots, { recursive: true });
   await page.screenshot({ path: path.join(shots, 'analysis-progress.png') });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 600));
@@ -85,13 +85,11 @@ test('native activity view explains post-capture work, retries and elapsed time 
   Object.assign(paused.pipelineProgress, { phase: 'paused', activeTasks: [], message: '预算已用完，待分析资料保留到下一轮。',
     warnings: ['本小时预算已用完；16 条资料保留待分析。'] });
   await emit(paused);
+  await page.waitForSelector('#fluidCloud[data-state="hidden"]');
   assert.equal(await page.locator('#btnRefresh').isDisabled(), false);
   assert.equal(await page.locator('#btnRefresh').getAttribute('aria-label'), '立即采集分析');
-  assert.equal(await page.locator('.fluid-cloud-panel-title').textContent(), '本轮暂缓');
-  assert.equal(await page.locator('#fluidCloudPanel [role="progressbar"]').isVisible(), false);
-  assert.match(await page.locator('.fluid-cloud-process').textContent(), /16 条资料保留待分析/);
-  await page.getByRole('button', { name: '关闭提示', exact: true }).click();
-  await page.waitForSelector('#fluidCloud[data-state="hidden"]');
+  assert.equal(await page.locator('#fluidCloudPanel').getAttribute('aria-hidden'), 'true');
+  assert.equal(await page.locator('#statStatusLabel').textContent(), '在线');
   await page.locator('[data-view="settings"]').click();
   await page.locator('#pipelineRunDetails summary').click();
   assert.match(await page.locator('#pipelineRunSummary').textContent(), /本轮暂缓.*总用时 1分15秒/);
@@ -99,5 +97,37 @@ test('native activity view explains post-capture work, retries and elapsed time 
   assert.match(await page.locator('#pipelineRunLines').textContent(), /16 条资料保留待分析/);
   await emit(snapshot);
   assert.equal(await page.locator('#btnRefresh').isDisabled(), false, 'late running snapshots cannot undo the result');
+  assert.equal(await page.locator('#fluidCloud').getAttribute('data-state'), 'hidden');
+  await emit(paused);
+  await emit({ revision: paused.revision + 1, activity: 'online', lastPipeline: { progress: paused.pipelineProgress } });
+  assert.equal(await page.locator('#fluidCloud').getAttribute('data-state'), 'hidden', 'replayed SSE and stats snapshots cannot restore a finished capsule');
+  await page.screenshot({ path: path.join(shots, 'paused-round-record.png') });
+
+  // A new round reappears, and every kind of terminal result clears itself.
+  let revision = paused.revision + 1;
+  for (const phase of ['completed', 'failed', 'stopped']) {
+    const next = structuredClone(snapshot);
+    next.revision = ++revision;
+    next.pipelineProgress.startedAt = `2026-10-24T07:00:0${revision % 10}.000Z`;
+    await emit(next);
+    await page.waitForSelector('#fluidCloud[data-state="capsule"]');
+    assert.equal(await page.locator('#btnRefresh').isDisabled(), true);
+    const finished = structuredClone(next);
+    finished.revision = ++revision;
+    finished.activity = 'online';
+    Object.assign(finished.pipelineProgress, { phase, activeTasks: [], message: phase === 'completed' ? '本轮已完成' : '任务已结束' });
+    await emit(finished);
+    await page.waitForSelector('#fluidCloud[data-state="hidden"]');
+    assert.equal(await page.locator('#btnRefresh').isDisabled(), false);
+    assert.equal(await page.locator('#pipelineRunDetails').isVisible(), true);
+    if (phase === 'completed') {
+      assert.match(await page.locator('#pipelineRunSummary').textContent(), /本轮已完成/);
+      assert.doesNotMatch(await page.locator('#pipelineRunSummary').textContent(), /部分资料等待下轮分析/);
+    }
+  }
+  await page.evaluate(() => fluidCloud.setActivity('update', { tone: 'ready', title: '更新已就绪' }));
+  await emit({ revision: ++revision, activity: 'online', pipelineProgress: { ...paused.pipelineProgress, phase: 'completed', message: '本轮已完成' } });
+  assert.equal(await page.locator('#fluidCloud').getAttribute('data-state'), 'capsule', 'pipeline completion preserves independent update notifications');
+  assert.equal(await page.locator('.fluid-cloud-title').textContent(), '更新已就绪');
   assert.deepEqual(errors, []);
 });

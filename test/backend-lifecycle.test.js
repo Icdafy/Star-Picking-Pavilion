@@ -226,6 +226,7 @@ test('budget exhaustion waits for collection without hot-looping analysis', asyn
   assert.equal(result.hasMore, true);
   assert.equal(calls, 1, '预算阻断不重入抽干与付费修补');
   assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'paused');
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.message, '模型预算已用尽，待分析资料已保留');
 });
 
 test('a failed collection drains in-flight analysis before another pipeline may run', async t => {
@@ -245,6 +246,7 @@ test('a failed collection drains in-flight analysis before another pipeline may 
   assert.equal(analyzed, true);
   assert.equal(fixture.scheduler.getStatus().pipelineRunning, false);
   assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'failed');
+  assert.equal(fixture.scheduler.getStatus().pipelineProgress.message, '任务未完成，请查看运行日志后重试');
 });
 
 test('UNKNOWN enrichment and translation-only progress receive a follow-up analysis batch', async t => {
@@ -298,7 +300,12 @@ test('articles arriving after the 2400 article cap remain visible in final pendi
   const result = await fixture.scheduler.runPipeline();
   assert.equal(result.analyzed, 2400);
   assert.equal(result.hasMore, true);
-  assert.equal(fixture.scheduler.getStatus().pipelineProgress.phase, 'paused');
+  const status = fixture.scheduler.getStatus();
+  assert.equal(status.activity, 'online');
+  assert.equal(status.pipelineProgress.phase, 'completed');
+  assert.equal(status.pipelineProgress.message, '本轮已完成');
+  assert.equal(status.pipelineProgress.remaining, 1, 'pending data remains inspectable after this round completes');
+  assert.equal(status.lastPipeline.progress.message, '本轮已完成');
 });
 
 test('a grouping budget pause remains visible after all articles are already scored', async t => {
@@ -518,6 +525,7 @@ test('real request and article callbacks reach pipeline snapshots and heartbeat 
   await operation;
   const finished = fixture.scheduler.getStatus();
   assert.equal(finished.pipelineProgress.phase, 'completed');
+  assert.equal(finished.pipelineProgress.message, '本轮已完成');
   assert.equal(finished.pipelineProgress.activeTasks.length, 0);
   assert.deepEqual(finished.lastPipeline.progress, finished.pipelineProgress);
   const revisions = snapshots.length;
