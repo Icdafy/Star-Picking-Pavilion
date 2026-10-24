@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-本次候选版本为 v0.2.44：采集分析提速与全流程透明。实际验证与发布状态见 [本版验证](docs/v0244-validation.md)。上一正式版 [v0.2.43](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.43) 的完整门禁与六附件核验记录见 [历史验证](docs/v0243-validation.md)。
+当前正式版为 [v0.2.44](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.44)，于 2026-10-24 11:28:01（北京时间）发布：采集分析提速与全流程透明。精确提交`53641eee7c25abe056bef7f7ce38c05801311306`的main CI和Release首轮完整门禁均通过，六项公开附件重新下载核验通过；实际验证、性能口径、失败排查及附件哈希见[本版验证](docs/v0244-validation.md)。上一正式版[v0.2.43](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.43)见[历史验证](docs/v0243-validation.md)。
 
 ## 发布前授权门槛
 

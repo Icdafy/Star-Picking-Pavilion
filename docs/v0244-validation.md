@@ -1,6 +1,6 @@
 # v0.2.44 验证记录
 
-本版优化采集与分析的等待链路，并补齐任务全流程进度。以下记录区分本地验证、可复跑的隔离性能实验与最终发布结果。
+本版优化采集与分析的等待链路，并补齐任务全流程进度。[v0.2.44](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.44) 已于 2026-10-24 11:28:01（北京时间）发布为最新正式版，非draft、非prerelease；六项公开附件重新下载复核全部通过。以下区分本地候选、隔离性能实验、main门禁与正式发布。
 
 ## 实现
 
@@ -41,7 +41,30 @@
 
 - 进一步原生诊断确认，测试夹具一直置顶时show/focus返回native可见且聚焦，但Chromium仍报告hidden；仅改定时轮询和bringToFront均未解决。与已通过的v027生命周期测试对照，采用先取消测试置顶、show/focus、观察真实focus与非hidden、再恢复测试置顶的顺序。产品窗口没有此置顶策略，无产品代码变动，无伪造visibility事件，也未放宽断言或延长超时。两项定向2/2通过（28.316秒），记录work/v0244/e2e-show-native-topmost.log。
 
-远端最终完整门禁与正式附件核验仍在进行，发布后补齐。
+## 最终main门禁
+
+精确提交 `53641eee7c25abe056bef7f7ce38c05801311306` 的 [main CI](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/40056568473) 全部通过：1242/1242单元与集成（44626.5482ms）、45/45真实Electron（679959.9845ms）、两项零漏洞审计、第三方声明一致性、1311项ASAR包边界、7种规范图标尺寸，以及实际安装、启动、单实例、原生窗口和Shell图标、退出、卸载和用户数据保留。日志work/v0244/main-ci-success.log，状态work/v0244/main-ci.json。该main CI候选ASAR16,180,108字节、安装器102,243,730字节，不冒充最终Release附件。
+
+同一精确提交的本地三文件定向7/7通过，0失败，94488.5122ms；记录work/v0244/e2e-native-fixes-final.log。此前完整本地桌面轮为42/45，三项失败均已在保留原断言后修正，并由此定向及最终main完整45项通过验证。
+
+## 最终Release与公开附件
+
+`v0.2.44` annotated标签在main全部通过后创建，指向同一精确提交。其 [Release工作流](https://github.com/Icdafy/Star-Picking-Pavilion/actions/runs/40057604264) 首轮全通过：1242/1242单元与集成（41742.3891ms）、45/45真实Electron（563828.7548ms）、两项零漏洞审计、1311项包边界、七尺寸图标、带产物版本校验，以及安装、启动、单实例、原生窗口/Shell图标、退出、卸载与用户数据保留。最终ASAR16,180,108字节，安装器102,243,677字节；日志work/v0244/release-success.log。
+
+六项公开附件下载到独立目录work/v0244/published/，逐一SHA-256和字节数全部匹配GitHub REST元数据。安装器SHA-256为 `487c160bd6a8199bd9efa724cafcc72061a256d5d4dd25f1a741dbdaa5df1ac0`，与SHA256SUMS.txt一致。
+
+| 附件 | 字节数 |
+| --- | ---: |
+| `Star-Picking-Pavilion-Setup-0.2.44.exe` | 102,243,677 |
+| `Star-Picking-Pavilion-Setup-0.2.44.exe.blockmap` | 107,860 |
+| `latest.yml` | 374 |
+| `SHA256SUMS.txt` | 106 |
+| `sbom.cdx.json` | 82,051 |
+| `THIRD_PARTY_NOTICES.txt` | 6,347 |
+
+安装器PE产品及文件版本均为0.2.44，签名状态NotSigned，七尺寸图标与规范资源一致。latest.yml的版本、文件名、尺寸与两处SHA-512匹配实际安装器；blockmap格式2、4914块覆盖完整文件。CycloneDX1.6 schema校验通过，47个组件包含实际运行依赖Electron42.11.18；第三方声明换行归一化后与仓库一致。
+
+公开Release ID为`422490417`，最新正式版、发布时间及非draft/非prerelease标志已核对；正文匹配精确提交的RELEASE_NOTES.md。远端annotated tag对象`f94313cea6424e83212e09e976e2de9890467899`，解析到`53641eee7c25abe056bef7f7ce38c05801311306`。公开复核报告work/v0244/published-verification.json、published-release-state.json，原始元数据release.json；复核脚本verify-published.cjs和verify-release-state.cjs保留。未执行下载的安装器。
 
 ## 边界
 
