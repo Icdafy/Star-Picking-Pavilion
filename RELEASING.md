@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 v0.2.45：修复采集分析结束后的灵动岛提示与完成文案。验证与发布进展见[本版验证](docs/v0245-validation.md)。上一正式版为 [v0.2.44](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.44)，其完整门禁与六项公开附件复核结果见[历史验证](docs/v0244-validation.md)。
+当前正式版为 [v0.2.45](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.45)，于2026-10-24 13:33:12（北京时间）发布：修复采集分析结束后的灵动岛提示与完成文案。精确提交`7b8c91a15eb0e33a62801e4664eb4871086ab10b`的main CI与Release第2次完整作业全部通过，六项公开附件重新下载核验通过；首轮旧测试失败、额外实网信源巡检与完整结果见[本版验证](docs/v0245-validation.md)。上一正式版[v0.2.44](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.44)见[历史验证](docs/v0244-validation.md)。
 
 ## 发布前授权门槛
 
