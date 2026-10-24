@@ -370,7 +370,7 @@ async function executePipeline(trigger) {
         remaining: pendingAnalysisCount(), message: '正在分析并归组已采集资料' });
       const r = await analyzeOnce(trigger, Math.min(40, 2400 - total), { pipeline: true, deferEditorial: true,
         deferConsolidation: true, deferMaintenance: true, deferRescore: true,
-        onProgress: reportWork });
+        onProgress: p => reportWork({ ...p, batchId: pass + 1 }) });
       if (r.skipped) break;
       pass++;
       lastAnalysis = r;

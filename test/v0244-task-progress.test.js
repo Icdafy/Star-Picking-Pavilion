@@ -56,6 +56,70 @@ test('completed stages stop accumulating time and resumed stages add only active
   assert.equal(tracker.snapshot().stages[0].elapsedMs, 50);
 });
 
+test('new batch request starts clear the prior 100 percent until new aggregate counts arrive', () => {
+  const { tracker, advance } = fixture();
+  tracker.update({ stage: 'scoring', batchId: 1, status: 'running', done: 0, total: 40 });
+  advance(30);
+  tracker.update({ stage: 'scoring', batchId: 1, status: 'completed', done: 40, total: 40 });
+  assert.equal(tracker.snapshot().stageDone, 40);
+  assert.equal(tracker.snapshot().stageTotal, 40);
+  advance(20);
+  tracker.update({ stage: 'scoring', batchId: 2, taskId: 'score:next-a', status: 'running', done: 0, total: 1 });
+  let snapshot = tracker.snapshot();
+  assert.equal(snapshot.stageDone, null);
+  assert.equal(snapshot.stageTotal, null);
+  assert.equal(snapshot.stageElapsedMs, 30, 'scope reset preserves prior batch elapsed time');
+  tracker.update({ stage: 'scoring', batchId: 2, taskId: 'score:next-b', status: 'running', done: 0, total: 1 });
+  assert.equal(tracker.snapshot().stageTotal, null);
+  advance(10);
+  tracker.update({ stage: 'scoring', batchId: 2, done: 3, total: 20 });
+  tracker.update({ stage: 'scoring', batchId: 2, taskId: 'score:next-c', status: 'running', done: 0, total: 1 });
+  snapshot = tracker.snapshot();
+  assert.equal(snapshot.stageDone, 3, 'same-batch concurrency preserves current aggregate progress');
+  assert.equal(snapshot.stageTotal, 20);
+  assert.equal(snapshot.stageElapsedMs, 40);
+  tracker.update({ stage: 'scoring', batchId: 2, taskId: 'score:next-a', status: 'completed', done: 1, total: 1 });
+  assert.equal(tracker.snapshot().stageDone, 3, 'same-batch task completion does not replace its denominator');
+  assert.equal(tracker.snapshot().stageTotal, 20);
+  tracker.update({ stage: 'scoring', done: 4, total: 20 });
+  assert.equal(tracker.snapshot().stageDone, 4, 'unscoped maintenance remains compatible with aggregate updates');
+  assert.doesNotMatch(JSON.stringify(tracker.snapshot()), /batchId|activeSince/);
+});
+
+test('unscoped collection and tail events do not reset scoped batch counts by themselves', () => {
+  const { tracker } = fixture();
+  tracker.update({ stage: 'collecting', taskId: 'source:1', status: 'running', done: 0, total: 201 });
+  tracker.update({ stage: 'grouping', batchId: 1, status: 'completed', done: 40, total: 40 });
+  tracker.update({ stage: 'collecting', taskId: 'source:1', status: 'completed', done: 1, total: 201 });
+  assert.equal(tracker.snapshot().stages.find(row => row.stage === 'collecting').total, 201);
+  tracker.update({ stage: 'grouping', batchId: 2, taskId: 'group:next', status: 'running', done: 0, total: 1 });
+  assert.equal(tracker.snapshot().stageTotal, null);
+  tracker.update({ stage: 'grouping', batchId: 2, status: 'running', done: 1, total: 5 });
+  tracker.update({ stage: 'grouping', status: 'running' });
+  assert.equal(tracker.snapshot().stageDone, 1);
+  assert.equal(tracker.snapshot().stageTotal, 5);
+  tracker.update({ stage: 'grouping', status: 'running', done: 0, total: 1000 });
+  assert.equal(tracker.snapshot().stageDone, 0);
+  assert.equal(tracker.snapshot().stageTotal, 1000, 'tail reports its own actual aggregate');
+});
+
+test('bounded active task lists report the full count and keep retry waits visible first', () => {
+  const { tracker, advance } = fixture();
+  for (let index = 0; index < 19; index++) tracker.update({ stage: 'request', taskOnly: true,
+    taskId: `request:${index}`, status: 'running', current: `模型任务 ${index}` });
+  tracker.update({ stage: 'request', taskOnly: true, taskId: 'request:18', status: 'retrying', retryInMs: 1000, attempt: 2 });
+  advance(300);
+  const snapshot = tracker.snapshot();
+  assert.equal(snapshot.activeTaskCount, 19);
+  assert.equal(snapshot.activeTasks.length, 16);
+  assert.equal(snapshot.activeTasks[0].id, 'request:18');
+  assert.equal(snapshot.activeTasks[0].status, 'retrying');
+  assert.equal(snapshot.activeTasks[0].retryInMs, 700);
+  tracker.update({ stage: 'request', taskOnly: true, taskId: 'request:18', status: 'completed' });
+  assert.equal(tracker.snapshot().activeTaskCount, 18);
+  assert.equal(tracker.snapshot().activeTasks.some(task => task.id === 'request:18'), false);
+});
+
 test('budget pauses remove the task and preserve paused stage instead of claiming completion', () => {
   const { tracker, advance } = fixture();
   tracker.update({ stage: 'editorial', status: 'running', done: 1, total: 4 });

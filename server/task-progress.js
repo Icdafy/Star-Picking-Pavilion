@@ -85,8 +85,16 @@ function createProgressTracker(initial = {}, { now = Date.now } = {}) {
     }
     if (stage && !event.taskOnly) {
       if (!stages.has(stage)) stages.set(stage, { stage, label: LABELS[stage] || clean(event.label || stage),
-        done: null, total: null, elapsedMs: 0, activeSince: null, status: 'running' });
+        done: null, total: null, elapsedMs: 0, activeSince: null, status: 'running', batchId: null });
       const row = stages.get(stage);
+      // A new analysis batch can begin with individual requests before its first aggregate update.
+      // Discard the previous batch denominator immediately, while retaining cumulative stage time.
+      const batchId = count(event.batchId);
+      if (batchId != null && batchId !== row.batchId) {
+        row.batchId = batchId;
+        row.done = null;
+        row.total = null;
+      }
       // Per-request 1/1 describes one task, never the whole batch or whole run.
       const aggregate = !event.taskId || stage === 'collecting';
       if (aggregate && count(event.done) != null) row.done = count(event.done);
@@ -117,7 +125,7 @@ function createProgressTracker(initial = {}, { now = Date.now } = {}) {
     return { ...data, analysisStage: currentStage, stageLabel: current?.label,
       stageDone: current?.done ?? null, stageTotal: current?.total ?? null,
       elapsedMs: Math.max(0, at - started), stageElapsedMs: elapsed(current),
-      stages: [...stages.values()].map(({ activeSince, failure, pause, ...row }) => ({ ...row,
+      stages: [...stages.values()].map(({ activeSince, failure, pause, batchId, ...row }) => ({ ...row,
         elapsedMs: elapsed(stages.get(row.stage)) })),
       activeTaskCount: tasks.size,
       activeTasks: [...tasks.values()].sort((a, b) => Number(b.status === 'retrying') - Number(a.status === 'retrying'))

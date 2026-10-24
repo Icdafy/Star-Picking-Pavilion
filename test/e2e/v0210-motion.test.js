@@ -313,10 +313,12 @@ test('v0210 Electron: runtime reduce, hidden cleanup, lite tier and disposal', {
   await page.waitForFunction(() => !reducedMotionQuery.matches && document.documentElement.dataset.fxTier === 'full');
   await page.locator('#feedList .card').first().hover();
   await native(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
-  await page.waitForFunction(() => document.hidden && !document.hasFocus());
+  // Hidden renderers can suspend rAF, including Playwright's default predicate
+  // polling. Observe the actual visibility/focus lifecycle on a timer instead.
+  await page.waitForFunction(() => document.hidden && !document.hasFocus(), undefined, { polling: 50 });
   assert.equal(await page.locator('.press-wave, .surface-glow').count(), 0);
   await native(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.show(); win.focus(); win.webContents.focus(); });
-  await page.waitForFunction(() => document.hasFocus() && !document.hidden);
+  await page.waitForFunction(() => document.hasFocus() && !document.hidden, undefined, { polling: 50 });
   await page.evaluate(() => { document.documentElement.dataset.fxTier = 'lite'; });
   await page.locator('#feedList .card').first().hover(); assert.equal(await page.locator('.surface-glow').count(), 0);
   await page.evaluate(() => interactionMotion.dispose());
