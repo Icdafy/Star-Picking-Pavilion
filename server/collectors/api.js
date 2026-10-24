@@ -1,5 +1,5 @@
 'use strict';
-// 公开 API 适配器 —— scheme 分派：eastmoney://关键词 | cninfo://检索词?column= | sse://关键词 | szse:// | cls://关键词
+// 公开 API 适配器 —— scheme 分派：eastmoney://关键词 | cninfo://检索词?column= | sse://关键词 | szse:// | cls://关键词 | govcn://[检索词]
 //
 // v0.0.7 修了一个一直在灌噪声的老问题：东财搜索是「分词 OR 匹配」，
 // 用 sort=time 取回的是**按时间排序的全网新闻**，长实体名（蓝箭航天、峰飞航空）
@@ -190,7 +190,7 @@ async function fetchEastmoney(spec, settings) {
 // 复用 fetchText 与 buildGuard 式入库守卫，严格 schema 校验，解析失败即 throw
 // （走退避、不入库脏数据）。端点均在 2026-08 实测，结果写进种子库 note。
 
-const API_SCHEMES = ['eastmoney://', 'cninfo://', 'sseipo://', 'szseipo://', 'sse://', 'szse://', 'cls://'];
+const API_SCHEMES = ['eastmoney://', 'cninfo://', 'sseipo://', 'szseipo://', 'sse://', 'szse://', 'cls://', 'govcn://'];
 const { looseDateIso } = require('./loose-date');
 
 // 中文站点常见的两种日期写法；解不出就返回 null，交给入库时间兜底
@@ -356,6 +356,34 @@ async function fetchCls(spec, settings) {
   return mapClsResponse(raw, spec);
 }
 
+// 中国政府网「最新政策」—— 国务院及其办公厅、中办国办文件的官方发布流。
+// 列表页由脚本渲染，数据来自同目录静态 JSON（2026-10 实测，按发布日期倒序，约千条）。
+// 只取最新 40 条；条目地址必须仍在 gov.cn 站内，检索词可选（govcn://低空 只留命中的文件）。
+const GOVCN_POLICY_URL = 'https://www.gov.cn/zhengce/zuixin/ZUIXINZHENGCE.json';
+function mapGovPolicyResponse(raw, spec) {
+  const list = JSON.parse(raw);
+  if (!Array.isArray(list)) throw new Error('gov.cn 返回结构异常：缺少政策数组');
+  const items = list.slice(0, 40).map(p => {
+    const url = validWebUrl(p && p.URL);
+    return {
+      title: decodeEntities(stripMarkup(p && p.TITLE, '')).trim(),
+      textFormat: 'plain',
+      url: url && /(^|\.)gov\.cn$/.test(new URL(url).hostname) ? url : null,
+      summary: decodeEntities(stripMarkup(p && p.SUB_TITLE, '')).trim(),
+      publishedAt: parseCnDate(p && p.DOCRELPUBTIME),
+      image: null
+    };
+  }).filter(p => p.title && p.url);
+  return spec.keyword ? items.filter(buildGuard(spec.keyword)) : items;
+}
+
+async function fetchGovPolicy(spec, settings) {
+  const raw = await fetchText(GOVCN_POLICY_URL, settings, {
+    headers: { Referer: 'https://www.gov.cn/zhengce/zuixin/', Accept: 'application/json,*/*;q=0.8' }
+  });
+  return mapGovPolicyResponse(raw, spec);
+}
+
 // ---------------------------------------------------------------------------
 // v0.2.2 · 交易所 IPO 审核项目（一级市场的“上市进程”一手数据，公开免费）
 //   sseipo://[名称关键词]?csrc=C37&days=540  上交所科创板项目动态（query.sse.com.cn，须携站内 Referer）
@@ -487,7 +515,8 @@ const SCHEME_FETCHERS = {
   'szseipo://': (url, settings) => fetchSzseIpo(parseIpoSpec(url, 'szseipo://'), settings),
   'sse://': (url, settings) => fetchSse(parseKeywordSpec(url, 'sse://'), settings),
   'szse://': (url, settings) => fetchSzse(parseKeywordSpec(url, 'szse://'), settings),
-  'cls://': (url, settings) => fetchCls(parseKeywordSpec(url, 'cls://'), settings)
+  'cls://': (url, settings) => fetchCls(parseKeywordSpec(url, 'cls://'), settings),
+  'govcn://': (url, settings) => fetchGovPolicy(parseKeywordSpec(url, 'govcn://'), settings)
 };
 
 async function fetch(source, settings) {
@@ -502,7 +531,7 @@ function parseApiSpec(url) {
   if (url.startsWith('cninfo://')) return parseCninfoSpec(url);
   if (url.startsWith('sseipo://')) return parseIpoSpec(url, 'sseipo://');
   if (url.startsWith('szseipo://')) return parseIpoSpec(url, 'szseipo://');
-  for (const scheme of ['sse://', 'szse://', 'cls://']) {
+  for (const scheme of ['sse://', 'szse://', 'cls://', 'govcn://']) {
     if (url.startsWith(scheme)) return parseKeywordSpec(url, scheme);
   }
   throw new Error('未知 API 信源格式: ' + url);
@@ -522,5 +551,6 @@ module.exports = {
   parseIpoSpec,
   mapSseResponse,
   mapSzseResponse,
-  mapClsResponse
+  mapClsResponse,
+  mapGovPolicyResponse
 };

@@ -12,7 +12,8 @@ const {
   mapCninfoResponse,
   mapSseResponse,
   mapSzseResponse,
-  mapClsResponse
+  mapClsResponse,
+  mapGovPolicyResponse
 } = require('../server/collectors/api');
 const { sanitizeSourceInput } = require('../server/input-validation');
 
@@ -143,9 +144,38 @@ test('cls errno 非 0 与结构异常都 throw', () => {
 });
 
 // ---------------------------------------------------------------------------
+// govcn://（中国政府网最新政策静态 JSON）—— 2026-10 实测可用
+
+const govOk = JSON.stringify([
+  { TITLE: '国务院关于促进低空经济高质量发展的意见', SUB_TITLE: '', URL: 'https://www.gov.cn/zhengce/content/202610/content_1.htm', DOCRELPUBTIME: '2026-10-23' },
+  { TITLE: '国务院办公厅关于残疾预防行动计划的通知', SUB_TITLE: '', URL: 'https://www.gov.cn/zhengce/content/202610/content_2.htm', DOCRELPUBTIME: '2026-10-08' },
+  { TITLE: '站外地址不得入库', URL: 'https://evil.example/zhengce.htm', DOCRELPUBTIME: '2026-10-08' },
+  { TITLE: '协议不对也不入库', URL: 'javascript:alert(1)', DOCRELPUBTIME: '2026-10-08' }
+]);
+
+test('govcn 正常返回：只留 gov.cn 站内文件，日期按北京时间解析', () => {
+  const items = mapGovPolicyResponse(govOk, { keyword: '' });
+  assert.deepEqual(items.map(i => i.url), [
+    'https://www.gov.cn/zhengce/content/202610/content_1.htm',
+    'https://www.gov.cn/zhengce/content/202610/content_2.htm'
+  ]);
+  assert.equal(items[0].publishedAt, '2026-10-22T16:00:00.000Z');
+  assert.equal(items[0].textFormat, 'plain');
+});
+
+test('govcn 带检索词时过守卫，结构异常 throw', () => {
+  assert.deepEqual(mapGovPolicyResponse(govOk, { keyword: '低空' }).map(i => i.title), ['国务院关于促进低空经济高质量发展的意见']);
+  assert.throws(() => mapGovPolicyResponse('{"list":[]}', { keyword: '' }), /政策数组/);
+  const many = JSON.stringify(Array.from({ length: 60 }, (_, i) => ({ TITLE: `国务院政策文件第${i}号通知`, URL: `https://www.gov.cn/zhengce/${i}.htm`, DOCRELPUBTIME: '2026-10-01' })));
+  assert.equal(mapGovPolicyResponse(many, { keyword: '' }).length, 40);
+});
+
+// ---------------------------------------------------------------------------
 // scheme 分派与校验层放宽
 
-test('地址解析覆盖全部 5 种 scheme，未知 scheme 被拒绝', () => {
+test('地址解析覆盖全部 6 种关键词类 scheme，未知 scheme 被拒绝', () => {
+  assert.deepEqual(parseApiSpec('govcn://'), { keyword: '' });
+  assert.deepEqual(parseApiSpec('govcn://低空'), { keyword: '低空' });
   assert.deepEqual(parseApiSpec('cninfo://?column=szse'),
     { keyword: '', column: 'szse', stock: '', category: '' });
   assert.deepEqual(parseApiSpec('cninfo://卫星互联网?column=sse'),
@@ -161,8 +191,8 @@ test('未知 scheme 的信源在采集入口直接 throw（走退避不入库）
   await assert.rejects(fetch({ url: 'weibo://话题' }, {}), /未知 API 信源格式/);
 });
 
-test('校验层接受全部 5 种 scheme，仍拒绝 http 地址冒充 api 源', () => {
-  for (const url of ['eastmoney://低空经济', 'cninfo://?column=szse', 'sse://', 'szse://', 'cls://低空经济']) {
+test('校验层接受全部 6 种关键词类 scheme，仍拒绝 http 地址冒充 api 源', () => {
+  for (const url of ['eastmoney://低空经济', 'cninfo://?column=szse', 'sse://', 'szse://', 'cls://低空经济', 'govcn://']) {
     assert.equal(sanitizeSourceInput({
       name: 'x', type: 'api', url, tier: 'T1', domain: 'both'
     }).url, url);

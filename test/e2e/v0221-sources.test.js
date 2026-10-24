@@ -24,7 +24,8 @@ test('v0221 native source controls, network waiting and Chinese overseas news', 
   await page.locator('[data-view="sources"]').click();
   await page.waitForSelector('.src-card');
   assert.match(await page.locator('#sourceNetworkStatus').textContent(), /外网尚未检测.*配置分析模型/);
-  assert.match(await page.locator('#sourcesSummary').textContent(), /201.*个信源/);
+  const seedCount = require('../../config/sources.default.json').sources.length;
+  assert.match(await page.locator('#sourcesSummary').textContent(), new RegExp(`${seedCount}.*个信源`));
   await page.locator('#btnAddSource').click();
   await page.locator('#srcForm [name="name"]').fill('海外桌面核验');
   await page.locator('#srcForm [name="url"]').fill('https://example.invalid/overseas.xml');

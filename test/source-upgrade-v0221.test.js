@@ -26,8 +26,9 @@ test('内置信源全部可验证，语义重复检索已合并，海外与国�
       assert.equal(Boolean(source.intl), false, '国内检索中的海外公司无需外网开关');
     }
   }
-  assert.equal(seed.sources.length, 201);
-  assert.equal(seed.sources.filter(s => s.intl).length, 16);
+  // v0.2.46 按实测产出整理：移出 28 个零贡献或噪声入口，新增 21 个经产品适配器核验的入口
+  assert.equal(seed.sources.length, 194);
+  assert.equal(seed.sources.filter(s => s.intl).length, 20);
   assert.equal(seed.sources.some(s => s.url === 'http://www.uav-cn.com/'), false);
 });
 

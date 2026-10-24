@@ -2,10 +2,17 @@
   "source": "https://github.com/Icdafy/Star-Picking-Pavilion/releases",
   "items": [
     {
+      "tag": "v0.2.46",
+      "name": "摘星阁 v0.2.46",
+      "publishedAt": null,
+      "body": "# 摘星阁 v0.2.46\n\n## 信源按实测产出重新梳理\n\n本版不改界面与分析策略，只整理信源。依据本机 2026-08-10 至 10-24 共 7,821 条入库记录逐源核算“入库、相关、精选”，删去长期不产出的入口，修复失效的一手源，补齐政策、招采与型号监控的盲区。内置信源由 201 个调整为 194 个，海外入口由 16 个增至 20 个。\n\n- **移出 28 个零贡献或噪声入口**：9 条资本检索线上线以来 68–71 轮仅 1 条独立入库，实测命中的融资新闻已由商业航天、eVTOL 等主检索线先行收录，属于重复检索；巨潮全市场公告流入库 338 条仅 2 条相关；另有投中网融资栏目、投资界退出与募资栏目、中科院传媒扫描、科学网、界面科技、嫦娥、空间站、Kuiper 等入口长期零贡献。移出只停止采集，历史文章、星标与统计全部保留；公司池里暂时没有新闻的公司监控线继续保留。\n- **修复一手源**：国家航天局、民航局的 HTTPS 入口持续请求失败，改走同站 HTTP 入口；中国民航网原“行业动态”栏目已改为航空保障、上线以来 0 条入库，改指民航局主管媒体的无人机频道。三处均保留原信源 ID 与统计。\n- **补齐政策与属地**：新增中国政府网最新政策（新 `govcn://` 接口，读取国务院政策发布流的静态 JSON）、国家发改委低空经济发展司、国家国防科工局、民航西北地区管理局、深圳市低空资讯与北京经开区，以及美国 FAA 作为海外监管对标。\n- **补齐招采先行信号**：新增中国政府采购网“低空经济”“卫星”两条关键词检索，项目落地前的平台、设施、发射服务与遥感数据采购可提前看到。\n- **型号与企业**：新增天龙三号、引力二号、力箭二号、陆地航母、盛世龙及法规用语“无人驾驶航空器”监控线；新增中科宇航、沃飞长空、时的科技官网与 Firefly 投资者新闻；新增 Payload、Ars Technica 两家海外商业航天媒体。\n\n新增入口均用产品自身的采集代码实测解析出带日期的新闻后才写入。升级时自动迁移，保留已有情报、星标、备忘、归档、密钥与全部设置，你自行停用或删除的信源不会被重新启用，无新增依赖。\n\n版本、安装器和自动更新元数据统一为 **0.2.46**。逐源依据见 [v0.2.46 信源梳理](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0246-sources.md)，实现与验证详见 [v0.2.46 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0246-validation.md)。正式附件由 GitHub Actions 完整门禁通过后构建并上传。\n\n下载 `Star-Picking-Pavilion-Setup-0.2.46.exe` 安装；升级安装会保留用户数据。附件包含安装器、自动更新 blockmap、`latest.yml`、`SHA256SUMS.txt`、CycloneDX SBOM 和第三方声明。安装包未签名，Windows SmartScreen 可能提示未知发布者，可先用 `SHA256SUMS.txt` 校验。",
+      "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.46"
+    },
+    {
       "tag": "v0.2.45",
       "name": "摘星阁 v0.2.45",
-      "publishedAt": null,
-      "body": "# 摘星阁 v0.2.45\n\n## 采集结束提示修复\n\n- **结束后自动收起灵动岛**：本轮采集分析结束后清除顶部管线提示，不再一直显示“本轮暂缓”。重复刷新状态不会重新弹出已结束的任务，新一轮运行时照常显示实时进度。\n- **完成文案更清楚**：将“本轮已完成，部分资料等待下轮分析”统一改为“本轮已完成”。\n- **处理记录仍可回看**：设置 → 自动采集 → 本轮处理记录继续保留结果、步骤、耗时与预算等详细说明。\n\n升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。\n\n版本、安装器和自动更新元数据统一为 **0.2.45**。实现与验证详见 [v0.2.45 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0245-validation.md)。正式附件由 GitHub Actions 完整门禁通过后构建并上传。\n\n下载 `Star-Picking-Pavilion-Setup-0.2.45.exe` 安装；升级安装会保留用户数据。附件包含安装器、自动更新 blockmap、`latest.yml`、`SHA256SUMS.txt`、CycloneDX SBOM 和第三方声明。安装包未签名，Windows SmartScreen 可能提示未知发布者，可先用 `SHA256SUMS.txt` 校验。",
+      "publishedAt": "2026-10-24T05:33:12.000Z",
+      "body": "# 摘星阁 v0.2.45\r\n\r\n## 采集结束提示修复\r\n\r\n- **结束后自动收起灵动岛**：本轮采集分析结束后清除顶部管线提示，不再一直显示“本轮暂缓”。重复刷新状态不会重新弹出已结束的任务，新一轮运行时照常显示实时进度。\r\n- **完成文案更清楚**：将“本轮已完成，部分资料等待下轮分析”统一改为“本轮已完成”。\r\n- **处理记录仍可回看**：设置 → 自动采集 → 本轮处理记录继续保留结果、步骤、耗时与预算等详细说明。\r\n\r\n升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。\r\n\r\n版本、安装器和自动更新元数据统一为 **0.2.45**。实现与验证详见 [v0.2.45 验证记录](https://github.com/Icdafy/Star-Picking-Pavilion/blob/main/docs/v0245-validation.md)。正式附件由 GitHub Actions 完整门禁通过后构建并上传。\r\n\r\n下载 `Star-Picking-Pavilion-Setup-0.2.45.exe` 安装；升级安装会保留用户数据。附件包含安装器、自动更新 blockmap、`latest.yml`、`SHA256SUMS.txt`、CycloneDX SBOM 和第三方声明。安装包未签名，Windows SmartScreen 可能提示未知发布者，可先用 `SHA256SUMS.txt` 校验。\r\n",
       "url": "https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.45"
     },
     {

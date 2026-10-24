@@ -102,8 +102,9 @@ test('新增默认信源均可被采集层解析，且地址唯一', () => {
     urls.add(source.url);
     if (source.type === 'api') assert.doesNotThrow(() => api.parseApiSpec(source.url), source.url);
   }
-  for (const url of ['sseipo://?csrc=C37&days=540', 'szseipo://?industry=航空航天&pages=3&days=540', 'eastmoney://商业航天 完成融资?pages=2&mode=both&guard=capital',
-    'https://www.chinaventure.com.cn/news/111.html', 'https://evtolinsights.com/feed/']) assert.ok(urls.has(url), url);
+  // 资本守卫检索线与投中网融资栏目在 v0.2.46 因零贡献移出，守卫本身仍由上方用例覆盖
+  for (const url of ['sseipo://?csrc=C37&days=540', 'szseipo://?industry=航空航天&pages=3&days=540',
+    'https://www.chinaventure.com.cn/', 'https://evtolinsights.com/feed/', 'govcn://']) assert.ok(urls.has(url), url);
 });
 
 test('关系评测：解析 AIHOT 四分类、确定性抽样、混淆矩阵与合并门槛', async () => {
