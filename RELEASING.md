@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 v0.2.46：按实测产出重新梳理内置信源（201 → 194）。验证与发布进展见[本版验证](docs/v0246-validation.md)，逐源依据见[信源梳理](docs/v0246-sources.md)。上一正式版为 [v0.2.45](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.45)，其完整门禁与六项公开附件复核结果见[历史验证](docs/v0245-validation.md)。
+当前正式版为 [v0.2.46](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.46)，于2026-10-24 18:38:22（北京时间）发布：按实测产出重新梳理内置信源（201 → 194），新增 `govcn://` 适配器。精确提交`9496ae3881546a6249ab6025eaa41181271a7640`的main CI与Release均首轮通过全部门禁，六项公开附件重新下载核验通过；完整结果见[本版验证](docs/v0246-validation.md)，逐源依据见[信源梳理](docs/v0246-sources.md)。上一正式版[v0.2.45](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.45)见[历史验证](docs/v0245-validation.md)。
 
 ## 发布前授权门槛
 
