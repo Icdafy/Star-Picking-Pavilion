@@ -38,6 +38,23 @@
 - 本地完整单元与集成 1263/1263 通过（22798.9555ms），日志 work/v033/unit.log；真实 Electron 全量 47/47 通过（530781.859ms，比上一版多出指挥栏一项），日志 work/v033/e2e.log；随包副本最后一次只改注释后重新校验，`test/cangyanlu.test.js` 与 v030 藏言录 e2e 复跑通过。CSS 总量按 CI 的 CRLF 检出计 334,188 字节，在 336 KiB 预算内。生产与完整工具链依赖审计均为 0 漏洞（work/v033/audit-runtime.log、audit-toolchain.log）；第三方声明已更新为本版；内置发布历史 78 条校验通过；`verify:version -- --tag v0.3.3 --artifacts` 通过。
 - 本地候选构建、包边界、七尺寸图标与带产物版本校验通过：1,315 个 ASAR 条目，ASAR 17,359,980 字节、安装器 102,531,058 字节（日志 work/v033/build.log、package.log）。以隔离测试数据目录启动打包后的 exe（work/v033/packaged-smoke.cjs）：版本显示 v0.3.3、侧栏 11 项、宽屏导航 `flex-wrap: nowrap`；藏言录在 `cangyanlu://app/` 正常载入，guest 内字体只有 `Source Han Sans SC`、默认自动隐藏，本版新增的 `lib-swing` / `compact3` / `.lbl.tuck` 规则均已打进包内。正式附件由 Release 工作流重新构建。
 
+## 远端门禁与公开发布
+
+精确提交 `bd3e7f9eda7717564137d3827f85c1c1d1b1b7ac` 的 main CI（运行 40210060781）与 Release（运行 40210063072）均全部通过：单元与集成 1263/1263、真实 Electron 47/47（含本版新增的工具坞让位、名牌避让与指挥栏单列断言；CI 运行器无显卡）、依赖审计、第三方声明差异、构建、包边界、带产物版本校验与安装卸载烟测。
+
+[v0.3.3](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.3)于2026-10-26 00:21:19（北京时间）发布，Release ID 423515487，非 draft、非 prerelease，已核对为最新正式版；远端注释 tag 解析到上述提交，正文与该提交的 RELEASE_NOTES.md 一致。六项附件下载到 work/v033/published-1/ 重新核验，GitHub 资产摘要全部匹配：
+
+| 附件 | 字节 |
+| --- | ---: |
+| Star-Picking-Pavilion-Setup-0.3.3.exe | 102,528,699 |
+| Star-Picking-Pavilion-Setup-0.3.3.exe.blockmap | 107,911 |
+| latest.yml | 371 |
+| SHA256SUMS.txt | 105 |
+| sbom.cdx.json | 81,884 |
+| THIRD_PARTY_NOTICES.txt | 7,528 |
+
+安装器 PE 产品及文件版本均为 0.3.3，签名状态 NotSigned，七尺寸图标一致，SHA-256 为 `bb4568cec7f79b621b85f349839cbef73db53b28bbf7ccf4a91c5f703aecb580`；latest.yml 版本、文件名、尺寸与 SHA-512 匹配实际安装器；blockmap 4917 块覆盖完整文件；CycloneDX SBOM 47 个组件含锁定的 Electron；第三方声明换行归一化后与仓库一致。核验报告为 work/v033/published-verification.json 及 published-release-state.json。未执行下载的安装器。
+
 ## 边界
 
 - 让位只针对工具坞与提示条；镜头提示和键位提示只在拖动或按键漫游小岛时出现，那时目录不会浮出。

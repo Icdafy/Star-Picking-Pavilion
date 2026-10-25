@@ -1,6 +1,6 @@
 # v0.3.3 当前状态
 
-暂无已确认的代码阻塞。藏言录自动隐藏目录压住工具坞的缺陷、名牌露半截、编辑器窄栏细节以及摘星阁指挥栏在矮窗口折成两列的问题已修复；本地单元、真实 Electron 全量与候选构建结果，以及 main CI、Release 与公开附件复核进展见[本版验证](docs/v033-validation.md)。
+无发布阻塞。[v0.3.3](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.3)已于2026-10-26 00:21:19（北京时间）发布为最新正式版，六项公开附件重新下载核验全部通过。精确提交`bd3e7f9eda7717564137d3827f85c1c1d1b1b7ac`的main CI与Release均通过1263/1263单元、47/47桌面及安装卸载等全部门禁。详见[本版验证](docs/v033-validation.md)。
 
 ---
 

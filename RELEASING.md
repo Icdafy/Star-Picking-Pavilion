@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 v0.3.3：藏言录自动隐藏的目录滑出时工具坞同步让位、不再被压住，建筑名牌避开卡片与面板，摘星阁指挥栏在矮窗口保持单列。验证与发布进展见[本版验证](docs/v033-validation.md)。上一正式版为 [v0.3.2](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.2)，于2026-10-25 22:56:14（北京时间）发布，其完整门禁与六项公开附件复核结果见[历史验证](docs/v032-validation.md)。
+当前正式版为 [v0.3.3](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.3)，于2026-10-26 00:21:19（北京时间）发布：藏言录自动隐藏的目录滑出时工具坞同步让位、不再被压住，建筑名牌避开卡片与面板，摘星阁指挥栏在矮窗口保持单列。精确提交`bd3e7f9eda7717564137d3827f85c1c1d1b1b7ac`的main CI与Release均通过，六项公开附件重新下载核验通过；完整结果见[本版验证](docs/v033-validation.md)。
 
 ## 发布前授权门槛
 
