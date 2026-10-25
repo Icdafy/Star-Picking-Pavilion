@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 v0.3.1：藏言录按黄金分割栅格重新排版（目录栏 19.1%、详情 : 小岛舞台 = 1 : φ、顶栏与工具坞同高对齐），并修正新用户流程中的摆放与措辞。验证与发布进展见[本版验证](docs/v031-validation.md)。上一正式版为 [v0.3.0](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.0)，于2026-10-25 18:25:22（北京时间）发布，其完整门禁与六项公开附件复核结果见[历史验证](docs/v030-validation.md)。
+当前正式版为 [v0.3.1](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.1)，于2026-10-25 20:05:45（北京时间）发布：藏言录按黄金分割栅格重新排版（目录栏 19.1%、详情 : 小岛舞台 = 1 : φ、顶栏与工具坞同高对齐），并修正新用户流程中的摆放与措辞。精确提交`3e07b4c4a395eb17e84dc10ecd1e65b0407e5ba1`的main CI首轮通过；Release首轮既有 v027 窗口隐藏用例超时、未发布，同提交同 tag 重跑第2次作业后全部门禁通过，六项公开附件重新下载核验通过；完整结果见[本版验证](docs/v031-validation.md)。上一正式版为 [v0.3.0](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.0)，于2026-10-25 18:25:22（北京时间）发布，其完整门禁与六项公开附件复核结果见[历史验证](docs/v030-validation.md)。
 
 ## 发布前授权门槛
 

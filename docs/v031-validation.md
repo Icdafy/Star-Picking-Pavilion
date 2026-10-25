@@ -32,6 +32,25 @@
 - 本地完整单元与集成 1261/1261 通过（22060.7022ms），日志 work/v031/unit.log；真实 Electron 全量 46/46 通过（518964.9676ms），日志 work/v031/e2e.log。生产与完整工具链依赖审计均为 0 漏洞（work/v031/audit-runtime.log、audit-toolchain.log）；第三方声明已更新为本版；内置发布历史 76 条校验通过；`verify:version -- --tag v0.3.1 --artifacts` 通过。
 - 本地候选构建、包边界、七尺寸图标与带产物版本校验通过：1,315 个 ASAR 条目，ASAR 17,332,568 字节、安装器 102,524,618 字节（日志 work/v031/build.log、package.log）。ASAR 内的藏言录与随包文件逐字节一致（SHA-256 同上）；以隔离测试数据目录启动打包后的 exe，版本显示 v0.3.1、侧栏 11 项，藏言录在 `cangyanlu://app/` 正常载入。正式附件由 Release 工作流重新构建。
 
+## 远端门禁与公开发布
+
+精确提交 `3e07b4c4a395eb17e84dc10ecd1e65b0407e5ba1` 的 main CI（运行 40189468267）首轮全部通过：单元与集成 1261/1261、真实 Electron 46/46（含本版新增的藏言录黄金栅格断言）、依赖审计、第三方声明差异、构建、包边界、带产物版本校验与安装卸载烟测。日志 work/v031/main-ci.log。
+
+Release（运行 40189471748）首轮在真实 Electron 步骤 45/46 失败、未发布任何附件：唯一失败是既有用例 `v027 Electron: runtime reduced-motion, static terminal state, hidden/resume and appearance off`，在隐藏原生窗口后等待 `document.hidden` 时 30 秒超时（`test/e2e/v027-motion.test.js:149`）。该用例自 v0.2.9 起未改，只涉及宿主窗口可见性，与藏言录无关；同一提交的 main CI 与本机全量均通过。按本仓库先例保持同提交、代码、断言与 tag 重跑第 2 次作业，单元与集成 1261/1261、真实 Electron 46/46 及其后全部门禁通过并发布。日志为 work/v031/release-run1-failed.log 与 release-run2.log；该超时的根因未进一步定位。
+
+[v0.3.1](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.1)于2026-10-25 20:05:45（北京时间）发布，Release ID 423376353，非 draft、非 prerelease，已核对为最新正式版；远端注释 tag 解析到上述提交，正文与该提交的 RELEASE_NOTES.md 一致。六项附件下载到 work/v031/published-1/ 重新核验，GitHub 资产摘要全部匹配：
+
+| 附件 | 字节 |
+| --- | ---: |
+| Star-Picking-Pavilion-Setup-0.3.1.exe | 102,522,371 |
+| Star-Picking-Pavilion-Setup-0.3.1.exe.blockmap | 107,832 |
+| latest.yml | 371 |
+| SHA256SUMS.txt | 105 |
+| sbom.cdx.json | 81,884 |
+| THIRD_PARTY_NOTICES.txt | 7,528 |
+
+安装器 PE 产品及文件版本均为 0.3.1，签名状态 NotSigned，七尺寸图标一致，SHA-256 为 `dbed6203422d549699e61a6b64739c99cf818bb5d95c6fb9b0d5da43ff3a8b7e`；latest.yml 版本、文件名、尺寸与 SHA-512 匹配实际安装器；blockmap 4914 块覆盖完整文件；CycloneDX SBOM 47 个组件含锁定的 Electron 42.11.18；第三方声明换行归一化后与仓库一致。核验报告为 work/v031/published-verification.json 及 published-release-state.json。未执行下载的安装器。
+
 ## 边界
 
 - 版式只针对藏言录本身；摘星阁宿主外框、塔台与侧栏不变。

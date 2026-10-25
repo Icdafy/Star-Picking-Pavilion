@@ -1,6 +1,6 @@
 # v0.3.1 当前状态
 
-暂无已确认的代码阻塞。藏言录黄金分割排版与新用户流程修正已完成；本地单元、真实 Electron 全量与候选构建结果，以及 main CI、Release 与公开附件复核进展见[本版验证](docs/v031-validation.md)。
+无发布阻塞。[v0.3.1](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.1)已于2026-10-25 20:05:45（北京时间）发布为最新正式版，六项公开附件重新下载核验全部通过。精确提交`3e07b4c4a395eb17e84dc10ecd1e65b0407e5ba1`的main CI首轮通过1261/1261单元、46/46桌面；Release首轮仅既有用例 v027（隐藏原生窗口后等待 document.hidden）在无显卡运行器上30秒超时、未发布任何附件，该用例与本版改动无关且main CI同提交通过；保持同提交、代码、断言与tag重跑第2次作业后全部门禁通过并发布。详见[本版验证](docs/v031-validation.md)。
 
 ---
 
