@@ -34,6 +34,23 @@
 - 本地完整单元与集成 1263/1263 通过（22207.1695ms），日志 work/v032/unit.log；真实 Electron 全量 46/46 通过（536378.6129ms），日志 work/v032/e2e.log。生产与完整工具链依赖审计均为 0 漏洞（work/v032/audit-runtime.log、audit-toolchain.log）；第三方声明已更新为本版；内置发布历史 77 条校验通过；`verify:version -- --tag v0.3.2 --artifacts` 通过。
 - 本地候选构建、包边界、七尺寸图标与带产物版本校验通过：1,315 个 ASAR 条目，ASAR 17,351,034 字节、安装器 102,528,905 字节（日志 work/v032/build.log、package.log）。以隔离测试数据目录启动打包后的 exe：版本显示 v0.3.2、侧栏 11 项，藏言录在 `cangyanlu://app/` 正常载入；guest 内已载入的字体只有 `Source Han Sans SC`（字体文件从 ASAR 内的 `renderer/fonts` 读取，含拉丁分片），标题 823 字重、中央名牌“藏言岛”、默认自动隐藏。正式附件由 Release 工作流重新构建。
 
+## 远端门禁与公开发布
+
+精确提交 `942d29045110bdffccea155f527d986036629b34` 的 main CI（运行 40203584416）与 Release（运行 40203588221）均首轮全部通过：单元与集成 1263/1263、真实 Electron 46/46（含本版新增的字体、藏言岛、自动隐藏与真实鼠标滑出 / 收回断言；CI 运行器无显卡）、依赖审计、第三方声明差异、构建、包边界、带产物版本校验与安装卸载烟测。
+
+[v0.3.2](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.2)于2026-10-25 22:56:14（北京时间）发布，Release ID 423468365，非 draft、非 prerelease，已核对为最新正式版；远端注释 tag 解析到上述提交，正文与该提交的 RELEASE_NOTES.md 一致。六项附件下载到 work/v032/published-1/ 重新核验，GitHub 资产摘要全部匹配：
+
+| 附件 | 字节 |
+| --- | ---: |
+| Star-Picking-Pavilion-Setup-0.3.2.exe | 102,526,517 |
+| Star-Picking-Pavilion-Setup-0.3.2.exe.blockmap | 107,645 |
+| latest.yml | 371 |
+| SHA256SUMS.txt | 105 |
+| sbom.cdx.json | 81,884 |
+| THIRD_PARTY_NOTICES.txt | 7,528 |
+
+安装器 PE 产品及文件版本均为 0.3.2，签名状态 NotSigned，七尺寸图标一致，SHA-256 为 `fa40a501c9ad003a3601a16ad86abdd6bad9a63b8bfaaa93c7f8d0251a698727`；latest.yml 版本、文件名、尺寸与 SHA-512 匹配实际安装器；blockmap 4908 块覆盖完整文件；CycloneDX SBOM 47 个组件含锁定的 Electron 42.11.18；第三方声明换行归一化后与仓库一致。核验报告为 work/v032/published-verification.json 及 published-release-state.json。未执行下载的安装器。
+
 ## 边界
 
 - 自动隐藏只看指针位置，不读系统“自动隐藏任务栏”等设置；触屏或无悬停指针的设备按“固定”处理。

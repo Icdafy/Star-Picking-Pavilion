@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 v0.3.2：藏言录目录栏默认自动隐藏（左边缘滑出、移开收回，可改为固定），字体统一为摘星阁随包的思源黑体并整体加重，中央建筑改名藏言岛。验证与发布进展见[本版验证](docs/v032-validation.md)。上一正式版为 [v0.3.1](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.1)，于2026-10-25 20:05:45（北京时间）发布，其完整门禁与六项公开附件复核结果见[历史验证](docs/v031-validation.md)。
+当前正式版为 [v0.3.2](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.2)，于2026-10-25 22:56:14（北京时间）发布：藏言录目录栏默认自动隐藏（左边缘滑出、移开收回，可改为固定），字体统一为摘星阁随包的思源黑体并整体加重，中央建筑改名藏言岛。精确提交`942d29045110bdffccea155f527d986036629b34`的main CI与Release均首轮通过，六项公开附件重新下载核验通过；完整结果见[本版验证](docs/v032-validation.md)。
 
 ## 发布前授权门槛
 
