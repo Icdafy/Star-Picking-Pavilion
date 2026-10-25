@@ -33,3 +33,7 @@ docs/design/**/*.png
 # Completed implementation plans and design prompts are available in Git history.
 /docs/design/
 /docs/superpowers/
+
+# Local branding uploads and disposable animation render frames.
+/LOGO.png
+/logo-motion/work/
