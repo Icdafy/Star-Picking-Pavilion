@@ -3,7 +3,7 @@
   藏言录 · 提示词仓库
   ─────────────────────────────────────────────────────────────────────
   一个文件就是一个完整的应用：用 Chrome 或 Edge 直接打开「藏言录.html」即可使用，无需安装、无需联网、没有构建步骤。
-  （唯一的外部请求是 Google Fonts 上标题用的书法字体子集，连不上时自动换用系统楷体。）
+  （唯一的外部请求是 Google Fonts 上的思源黑体 Noto Sans SC，连不上时换用系统黑体；嵌在摘星阁里时字体由摘星阁随包提供，完全离线。）
 
   数据
     · 全部保存在本机浏览器里（localStorage 为主，IndexedDB 存一份备用副本），不会上传，同事之间互不可见。
@@ -26,6 +26,8 @@
         管理面板里把「动效」设为「减弱」，会同时收弱风、雾、泛光与光柱。
   版式：黄金分割栅格——顶栏与底部工具坞同高、面板底栏与工具坞同一底线；目录栏占视口 19.1%，详情栏 : 小岛舞台 = 1 : φ。
         窗口较小（如嵌在摘星阁里）时自动换紧凑档，字号与间距取 φ 音阶和斐波那契数；布局令牌在 <style> 开头的 :root 里。
+  目录栏：默认「自动隐藏」——收在左缘，鼠标移到窗口左边缘滑出、移开收回，小岛舞台铺满；点搜索框旁的图钉或按 B 改为常驻（管理 → 外观 也可改）。
+  字体：与摘星阁同一套思源黑体（可变字重），标题 823 字重，正文 450，次要文字也保持 AA 对比度。
   开发用地址参数：?debug 在 window.__cyl 上挂出 3D 场景的内部对象；?nopcss 改用 three.js 自带的软阴影。
 
   第三方：three.js — Copyright © 2010-2023 three.js authors — MIT License — https://github.com/mrdoob/three.js
@@ -37,9 +39,16 @@
 <title>藏言录</title>
 <meta name="description" content="藏言录 · 私人提示词仓库：收录、取用、修改，皆在一座浮空小岛之上。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='14' fill='%23f3eedf'/%3E%3Cellipse cx='24' cy='37' rx='16' ry='4.5' fill='%237cbf5a'/%3E%3Cpath d='M14 18 Q24 9 34 18 L31 18.8 Q24 14 17 18.8Z' fill='%23e0603a'/%3E%3Crect x='19' y='18.5' width='10' height='6' fill='%23f6ead2'/%3E%3Cpath d='M10 27 Q24 17.5 38 27 L34.5 28 Q24 22.5 13.5 28Z' fill='%233f4c63'/%3E%3Crect x='15' y='27.5' width='18' height='8' fill='%23f6ead2'/%3E%3Crect x='22' y='30' width='4' height='5.5' rx='1' fill='%23e0603a'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=藏言录阁&display=swap">
+<script>
+/* 字体与摘星阁统一为思源黑体（Source Han Sans SC，可变字重 100–900）：嵌在摘星阁里时由它随包提供（离线、即刻就位）；
+   单独打开时从 Google Fonts 取同一套字形（发行名 Noto Sans SC）。用脚本插入样式表，连不上也不会卡住首屏，只是换用系统黑体 */
+(function () {
+  var l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = location.protocol === 'cangyanlu:' ? 'fonts/source-han-sans-sc/index.css' : 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300..900&display=swap';
+  document.head.appendChild(l);
+})();
+</script>
 <style>
 /* =====================================================================
    藏言录 · 私人提示词仓库
@@ -62,7 +71,8 @@
 @property --sunc  { syntax: '<color>';  inherits: true; initial-value: #fffcef; }
 
 :root{
-  --ink:#1c2230; --ink2:#4a5366; --ink3:#8a92a3; --ink4:#b9bfca;
+  /* 次要文字在白色玻璃上的对比度：ink2 ≈ 10:1、ink3 ≈ 5:1（WCAG AA），ink4 只给占位与装饰 */
+  --ink:#1a2030; --ink2:#373f51; --ink3:#626a7d; --ink4:#99a0ae;
   --line:rgba(28,34,48,.08); --line2:rgba(28,34,48,.13);
   --fill:rgba(28,34,48,.05); --fill2:rgba(28,34,48,.085);
   --glass:rgba(255,255,255,.76); --glass2:rgba(255,255,255,.92); --glass-b:rgba(255,255,255,.72);
@@ -74,9 +84,9 @@
   --ease:cubic-bezier(.22,1,.36,1);
   --ease-io:cubic-bezier(.65,0,.35,1);
   --spring:cubic-bezier(.34,1.42,.64,1);
-  --font:"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei UI","Microsoft YaHei","Noto Sans SC","Source Han Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font:"Source Han Sans SC","Noto Sans SC","Source Han Sans CN","PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei UI","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-num:"SF Pro Display","Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
-  --font-brand:"Ma Shan Zheng","STXingkai","华文行楷","STKaiti","KaiTi","楷体",serif;
+  --font-brand:var(--font);  /* 与摘星阁各模块大标题同一字体、同一 823 字重 */
   --font-mono:"JetBrains Mono","Cascadia Code","SF Mono",Consolas,"Microsoft YaHei UI",monospace;
   --ox:0px;
   /* 黄金分割栅格（φ = 1.618）：
@@ -99,7 +109,7 @@ html[data-phase="night"]{ --glass:rgba(244,246,255,.84); --glass-b:rgba(255,255,
 html,body{ margin:0; height:100%; overflow:hidden; }
 body{
   font-family:var(--font); color:var(--ink); background:var(--sky3);
-  font-size:14px; line-height:1.5; letter-spacing:.01em;
+  font-size:14px; font-weight:450; line-height:1.5; letter-spacing:.01em;
   -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
   user-select:none; -webkit-user-select:none;
 }
@@ -107,7 +117,7 @@ button{ font:inherit; color:inherit; border:0; background:none; padding:0; curso
 input,textarea,select{ font:inherit; color:inherit; user-select:text; -webkit-user-select:text; }
 button:focus-visible,[tabindex]:focus-visible{ outline:2px solid rgba(224,96,58,.55); outline-offset:2px; }
 kbd{
-  font-family:var(--font-num); font-size:11px; font-weight:500; line-height:1; color:var(--ink3);
+  font-family:var(--font-num); font-size:11px; font-weight:600; line-height:1; color:var(--ink2);
   background:rgba(28,34,48,.06); border-radius:5px; padding:3px 5px; box-shadow:inset 0 -1px 0 rgba(28,34,48,.08); white-space:nowrap;
 }
 .ic{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; }
@@ -194,12 +204,12 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   position:absolute; left:0; bottom:calc(22px + var(--lift,0px)); translate:-50% 0; display:flex; align-items:center; gap:8px; white-space:nowrap;
   padding:7px 13px 7px 11px; border-radius:13px; background:rgba(255,255,255,.93); color:var(--ink);
   box-shadow:0 0 0 .5px rgba(28,34,48,.08),0 10px 24px -10px rgba(12,28,20,.45),0 2px 4px rgba(12,28,20,.08);
-  font-size:15px; font-weight:650; pointer-events:auto; cursor:pointer;
+  font-size:15px; font-weight:700; pointer-events:auto; cursor:pointer;
   transition:transform .4s var(--spring),box-shadow .25s,background .25s,bottom .28s var(--ease);
 }
 .lbl .pill:hover,.lbl.hover .pill{ transform:translateY(-3px) scale(1.05); box-shadow:0 0 0 .5px rgba(28,34,48,.08),0 16px 30px -12px rgba(12,28,20,.5),0 0 0 3px color-mix(in srgb,var(--cc) 25%,transparent); }
 .lbl .dot{ width:10px; height:10px; border-radius:3px; background:var(--cc); box-shadow:0 0 0 3px color-mix(in srgb,var(--cc) 20%,transparent); }
-.lbl .sub{ font-size:12.5px; font-weight:500; color:var(--ink3); }
+.lbl .sub{ font-size:12.5px; font-weight:550; color:var(--ink3); }
 .lbl .sub.hot{ color:var(--green); }
 .lbl.center .pill{ font-size:16px; padding:8px 15px 8px 12px; }
 .lbl.center .dot{ border-radius:50%; }
@@ -226,8 +236,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .logo{ width:var(--logo); height:var(--logo); flex:none; border-radius:14px; overflow:hidden; box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 4px 10px -4px rgba(0,0,0,.2); transition:transform .5s var(--spring); }
 .brand:hover .logo{ transform:rotate(-6deg) scale(1.06); }
 .logo svg{ display:block; width:100%; height:100%; }
-.brand h1{ margin:0; font-family:var(--font-brand); font-weight:400; font-size:28px; line-height:1.05; letter-spacing:.08em; color:var(--ink); }
-.save-state{ display:flex; align-items:center; gap:7px; margin:4px 0 0; font-size:12.5px; color:var(--ink2); white-space:nowrap; }
+.brand h1{ margin:0; font-family:var(--font-brand); font-weight:823; font-size:27px; line-height:1.18; letter-spacing:.04em; color:var(--ink); }
+.save-state{ display:flex; align-items:center; gap:7px; margin:3px 0 0; font-size:12.5px; font-weight:500; color:var(--ink2); white-space:nowrap; }
 .save-state span{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .save-state button{ color:var(--accent); font-weight:600; }
 .live{ position:relative; width:8px; height:8px; border-radius:50%; background:var(--green); flex:none; }
@@ -236,13 +246,13 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .live.warn{ background:var(--red); } .live.warn::after{ border-color:var(--red); }
 @keyframes live{ 0%{ transform:scale(.4); opacity:.9; } 100%{ transform:scale(1.3); opacity:0; } }
 
-.stats{ position:fixed; top:var(--g); left:50%; height:var(--bar); translate:calc(-50% + var(--ox)) 0; display:flex; align-items:stretch; padding:8px; border-radius:20px; transition:translate .9s var(--ease),opacity .4s; }
+.stats{ position:fixed; top:var(--g); left:50%; height:var(--bar); translate:calc(-50% + var(--sx, var(--ox))) 0; display:flex; align-items:stretch; padding:8px; border-radius:20px; transition:translate .9s var(--ease),opacity .4s; }
 .stat{ min-width:96px; padding:0 18px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; position:relative; cursor:pointer; border-radius:12px; transition:background .2s; }
 .stat:hover{ background:rgba(28,34,48,.045); }
 .stat:active{ background:rgba(28,34,48,.08); }
 .stat + .stat::before{ content:""; position:absolute; left:0; top:8px; bottom:8px; width:1px; background:var(--line); }
 .stat b{ display:block; font-family:var(--font-num); font-size:30px; line-height:1.1; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
-.stat span{ font-size:12.5px; color:var(--ink3); margin-top:2px; }
+.stat span{ font-size:12.5px; font-weight:500; color:var(--ink2); margin-top:2px; }
 .stats.hide{ opacity:0; pointer-events:none; }
 
 /* 时钟横排：大字时间在左，日期与节气两行在右，整张卡与顶栏同高 */
@@ -252,8 +262,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .clock .time{ grid-row:1 / 3; font-family:var(--font-num); font-size:34px; font-weight:600; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums; }
 .clock .time i{ font-style:normal; animation:colon 2s steps(1) infinite; }
 @keyframes colon{ 50%{ opacity:.25; } }
-.clock .date{ grid-column:2; font-size:12.5px; line-height:1.45; color:var(--ink2); white-space:nowrap; }
-.clock .term{ grid-column:2; display:flex; align-items:center; gap:5px; font-size:12.5px; line-height:1.45; color:var(--ink2); white-space:nowrap; }
+.clock .date{ grid-column:2; font-size:12.5px; font-weight:500; line-height:1.45; color:var(--ink2); white-space:nowrap; }
+.clock .term{ grid-column:2; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; line-height:1.45; color:var(--ink2); white-space:nowrap; }
 .clock .term .ic{ width:15px; height:15px; color:var(--amber); }
 
 /* ---------- 左侧：藏书目录 ---------- */
@@ -270,9 +280,9 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .search .clear .ic{ width:14px; height:14px; }
 
 .seg{ position:relative; display:flex; padding:3px; border-radius:12px; background:rgba(28,34,48,.05); }
-.seg button{ position:relative; z-index:1; flex:1; height:28px; border-radius:9px; font-size:12.5px; color:var(--ink2); transition:color .2s; white-space:nowrap; padding:0 8px; }
+.seg button{ position:relative; z-index:1; flex:1; height:28px; border-radius:9px; font-size:12.5px; font-weight:500; color:var(--ink2); transition:color .2s; white-space:nowrap; padding:0 8px; }
 .seg button:hover{ color:var(--ink); }
-.seg button.on{ color:var(--ink); font-weight:600; }
+.seg button.on{ color:var(--ink); font-weight:650; }
 .seg .ind{ position:absolute; top:3px; bottom:3px; left:0; width:0; border-radius:9px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.09),0 0 0 .5px rgba(0,0,0,.05); transition:transform .5s var(--spring),width .5s var(--spring); }
 
 .lib-list{ position:relative; flex:1; overflow-y:auto; overflow-x:hidden; padding:2px 10px 16px; overscroll-behavior:contain;
@@ -289,9 +299,9 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .grp-h::before{ content:""; position:absolute; left:4px; top:9px; bottom:9px; width:3.5px; border-radius:3px; background:var(--cc); }
 .grp-h:hover{ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--cc) 30%,transparent),0 6px 14px -8px rgba(12,28,20,.4); }
 .grp-h .bld{ width:27px; height:23px; flex:none; margin-left:2px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.12)); }
-.grp-h b{ font-size:15px; font-weight:700; letter-spacing:.02em; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.grp-h .cnt{ margin-left:auto; display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:11px; font-family:var(--font-num); font-size:12px; font-weight:650;
-  color:color-mix(in srgb,var(--cc) 75%,#1c2230); background:color-mix(in srgb,var(--cc) 14%,rgba(255,255,255,.7)); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.grp-h b{ font-size:15px; font-weight:750; letter-spacing:.02em; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.grp-h .cnt{ margin-left:auto; display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:11px; font-family:var(--font-num); font-size:12px; font-weight:700;
+  color:color-mix(in srgb,var(--cc) 72%,#1a2030); background:color-mix(in srgb,var(--cc) 14%,rgba(255,255,255,.7)); white-space:nowrap; font-variant-numeric:tabular-nums; }
 .grp-h .cnt em{ display:inline-flex; align-items:center; gap:2px; font-style:normal; color:var(--amber); }
 .grp-h .cnt em .ic{ width:11px; height:11px; }
 .grp-h .ga{ width:28px; height:28px; border-radius:9px; flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink2); opacity:.38; transition:opacity .2s,background .2s,color .2s,transform .3s var(--spring); }
@@ -312,6 +322,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .grp-new span{ white-space:nowrap; }
 .grp-new small{ margin-left:auto; min-width:0; overflow:hidden; font-size:11.5px; font-weight:500; color:var(--ink3); white-space:nowrap; text-overflow:ellipsis; }
 @container (max-width:300px){ .grp-new small{ display:none; } }
+@container (max-width:320px){ .lib-row .search kbd{ display:none; } }
 /* 管理 → 分类 */
 .cm-head{ display:flex; align-items:flex-start; gap:14px; margin:6px 0 10px; }
 .cm-head p{ flex:1; margin:0; font-size:12.5px; color:var(--ink3); line-height:1.6; }
@@ -327,7 +338,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .cm-bld{ width:38px; height:32px; flex:none; }
 .cm-main{ flex:1; min-width:0; }
 .cm-main b{ display:block; color:var(--ink); font-size:14.5px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cm-main small{ display:block; color:var(--ink3); font-size:12px; }
+.cm-main small{ display:block; color:var(--ink3); font-size:12px; font-weight:500; }
 .cm-act{ display:flex; align-items:center; gap:4px; flex:none; }
 .cm-act .btn.icon .ic{ width:15px; height:15px; }
 .m-foot .btn.left{ margin-right:auto; }
@@ -339,42 +350,64 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .it .st{ flex:none; width:8px; height:8px; margin-top:7px; border-radius:50%; box-shadow:inset 0 0 0 1.6px var(--ink4); transition:background .3s,box-shadow .3s; }
 .it.today .st{ background:var(--green); box-shadow:0 0 0 3px rgba(47,179,106,.16); }
 .it-main{ flex:1; min-width:0; }
-.it-t{ font-size:14.5px; font-weight:550; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.it-t{ font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .it-t mark,.res-snip mark,.pc mark,.pal-row mark{ background:rgba(234,162,28,.28); color:inherit; border-radius:3px; padding:0 1px; }
-.it-m{ display:flex; align-items:center; gap:6px; margin-top:4px; font-size:12px; color:var(--ink3); white-space:nowrap; overflow:hidden; }
-.it-r{ flex:none; padding-top:2px; font-size:12px; color:var(--ink3); display:flex; align-items:center; gap:4px; }
+.it-m{ display:flex; align-items:center; gap:6px; margin-top:4px; font-size:12px; font-weight:500; color:var(--ink3); white-space:nowrap; overflow:hidden; }
+.it-r{ flex:none; padding-top:2px; font-size:12px; font-weight:500; color:var(--ink3); display:flex; align-items:center; gap:4px; }
 .it-r .ic{ width:14px; height:14px; }
 .it-r .star{ color:var(--amber); }
 .it.sel{ background:#fff; box-shadow:var(--shadow-sm); }
-.it.sel .it-t{ font-weight:650; }
+.it.sel .it-t{ font-weight:700; }
 .it.dragging{ opacity:.4; }
 .it.drop-before::before,.it.drop-after::after{ content:""; position:absolute; left:10px; right:10px; height:2px; border-radius:2px; background:var(--accent); }
 .it.drop-before::before{ top:-2px; } .it.drop-after::after{ bottom:-2px; }
 .it.flash{ animation:itflash 1s var(--ease); }
 @keyframes itflash{ 0%{ box-shadow:0 0 0 0 rgba(47,179,106,.5); } 40%{ box-shadow:0 0 0 6px rgba(47,179,106,0); background:rgba(47,179,106,.1); } }
-.mchip{ display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 7px; border-radius:6px; background:rgba(28,34,48,.05); color:var(--ink2); font-size:11.5px; }
+.mchip{ display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 7px; border-radius:6px; background:rgba(28,34,48,.06); color:var(--ink2); font-size:11.5px; font-weight:500; }
 .mchip i{ width:6px; height:6px; border-radius:50%; background:var(--mc); }
 .vtag{ display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 6px; border-radius:6px; background:color-mix(in srgb,var(--cc) 11%,transparent); color:color-mix(in srgb,var(--cc) 82%,#000); font-size:11.5px; font-weight:600; }
 .vtag .ic{ width:12px; height:12px; stroke-width:2.2; }
-.res-h{ position:relative; z-index:1; padding:10px 12px 4px; font-size:12px; color:var(--ink3); }
-.res-snip{ margin-top:3px; font-size:12px; color:var(--ink3); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; }
+.res-h{ position:relative; z-index:1; padding:10px 12px 4px; font-size:12px; font-weight:550; color:var(--ink3); }
+.res-snip{ margin-top:3px; font-size:12px; color:var(--ink2); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; }
 .sect{ position:relative; z-index:1; margin:14px 4px 4px; padding-top:12px; border-top:1px solid var(--line); }
-.sect h4{ margin:0 0 6px 8px; font-size:12px; font-weight:500; color:var(--ink3); letter-spacing:.04em; }
-.rc{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:11px; cursor:pointer; font-size:13.5px; transition:background .2s; }
+.sect h4{ margin:0 0 6px 8px; font-size:12px; font-weight:600; color:var(--ink3); letter-spacing:.04em; }
+.rc{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:11px; cursor:pointer; font-size:13.5px; font-weight:500; transition:background .2s; }
 .rc:hover{ background:rgba(28,34,48,.04); }
 .rc .dot{ width:7px; height:7px; border-radius:50%; background:var(--cc); flex:none; }
 .rc .t{ flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .rc .w{ font-size:12px; color:var(--ink3); flex:none; }
-.empty{ position:relative; z-index:1; padding:40px 18px; text-align:center; color:var(--ink3); font-size:13.5px; }
+.empty{ position:relative; z-index:1; padding:40px 18px; text-align:center; color:var(--ink3); font-size:13.5px; font-weight:500; }
 .empty .ic{ width:34px; height:34px; color:var(--ink4); margin-bottom:10px; stroke-width:1.4; }
-.empty b{ display:block; color:var(--ink2); font-size:15px; font-weight:600; margin-bottom:4px; }
+.empty b{ display:block; color:var(--ink); font-size:15px; font-weight:650; margin-bottom:4px; }
 /* 两侧面板的底栏与工具坞同高（面板自带 1px 描边，底栏少算 1px）：分隔线与工具坞上缘、按钮与工具坞按钮都在同一条水平线上 */
 .lib-foot{ flex:none; display:flex; align-items:center; gap:8px; height:calc(var(--bar) - 1px); padding:0 var(--pad); border-top:1px solid var(--line); }
 .lib-foot .btn{ height:40px; }
 .lib-foot .btn.primary{ flex:1; min-width:0; }
+/* 目录栏自动隐藏（同 macOS 程序坞、Arc 浏览器侧栏）：平时收在左缘，只露一枚细把手；鼠标贴到窗口左边缘滑出，
+   移开后稍等片刻收回。滑出走无回弹的指数减速（约 0.55 s），收回走对称缓动（约 0.4 s），浮在小岛之上时阴影加深 */
+.lib-row{ display:flex; align-items:center; gap:6px; }
+.lib-row .search{ flex:1; min-width:0; }
+.lib-row .btn.pin{ width:40px; height:40px; flex:none; border-radius:13px; color:var(--ink3); }
+.lib-row .btn.pin .ic{ width:17px; height:17px; transition:transform .5s var(--spring),fill .2s; }
+.lib-row .btn.pin:hover{ color:var(--ink); }
+.lib-row .btn.pin.on{ color:var(--accent); }
+.lib-row .btn.pin.on .ic{ fill:color-mix(in srgb,var(--accent) 24%,transparent); }
+body.lib-auto .lib-row .btn.pin .ic{ transform:rotate(45deg); }
+.lib-edge{ position:fixed; left:0; top:var(--top); bottom:var(--g); width:calc(var(--g) + 18px); display:none; }
+.lib-edge i{ position:absolute; left:calc(var(--g) / 2 - 2px); top:50%; width:4px; height:64px; margin-top:-32px; border-radius:4px; background:rgba(255,255,255,.9);
+  box-shadow:0 0 0 1px rgba(28,34,48,.16),0 4px 14px -4px rgba(12,28,20,.5); transition:opacity .3s,transform .5s var(--spring); }
+.lib-edge.hint i{ animation:edgeHint 1.5s var(--ease) 2; }
+@keyframes edgeHint{ 40%{ transform:translateX(5px) scaleY(1.3); background:#fff; box-shadow:0 0 0 .5px rgba(28,34,48,.14),0 0 18px 2px rgba(255,255,255,.7); } }
+body.lib-auto .lib-edge{ display:block; }
+body.lib-auto .lib{ translate:calc(-100% - var(--g) * 2) 0; scale:.985; opacity:0; visibility:hidden; pointer-events:none;
+  transition:translate .4s var(--ease-io),scale .4s var(--ease-io),opacity .26s .1s,visibility 0s .4s,box-shadow .3s; }
+body.lib-auto.lib-peek .lib{ translate:0 0; scale:1; opacity:1; visibility:visible; pointer-events:auto; z-index:2;
+  box-shadow:var(--shadow),0 34px 80px -28px rgba(12,28,20,.6);
+  transition:translate .56s cubic-bezier(.16,1,.3,1),scale .56s cubic-bezier(.16,1,.3,1),opacity .18s,visibility 0s,box-shadow .3s; }
+body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
 
 /* ---------- 按钮 ---------- */
-.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; border-radius:11px; font-size:13.5px; font-weight:550; color:var(--ink); background:rgba(28,34,48,.06); white-space:nowrap;
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; border-radius:11px; font-size:13.5px; font-weight:600; color:var(--ink); background:rgba(28,34,48,.06); white-space:nowrap;
   transition:background .2s,transform .35s var(--spring),box-shadow .2s,color .2s; }
 .btn:hover{ background:rgba(28,34,48,.1); }
 .btn:active{ transform:scale(.95); transition-duration:.08s; }
@@ -401,7 +434,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .detail.open{ translate:0 0; opacity:1; visibility:visible; transition:translate .75s var(--spring),opacity .35s var(--ease),visibility 0s; }
 .d-head{ display:flex; align-items:center; gap:4px; padding:var(--pad) calc(var(--pad) - 4px) 6px var(--pad); }
 .d-head .sp1{ flex:1; }
-.catpick{ display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 10px 0 11px; border-radius:10px; background:color-mix(in srgb,var(--cc) 10%,transparent); color:color-mix(in srgb,var(--cc) 75%,#000); font-size:13px; font-weight:600; transition:background .2s; }
+.catpick{ display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 10px 0 11px; border-radius:10px; background:color-mix(in srgb,var(--cc) 10%,transparent); color:color-mix(in srgb,var(--cc) 72%,#000); font-size:13px; font-weight:650; transition:background .2s; }
 .catpick:hover{ background:color-mix(in srgb,var(--cc) 17%,transparent); }
 .catpick i{ width:9px; height:9px; border-radius:3px; background:var(--cc); }
 .catpick .ic{ width:14px; height:14px; opacity:.7; }
@@ -410,17 +443,17 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .d-anim > *:nth-child(2){ animation-delay:.03s; } .d-anim > *:nth-child(3){ animation-delay:.06s; } .d-anim > *:nth-child(4){ animation-delay:.09s; }
 .d-anim > *:nth-child(5){ animation-delay:.12s; } .d-anim > *:nth-child(n+6){ animation-delay:.15s; }
 @keyframes dIn{ from{ opacity:0; transform:translateY(10px); } }
-.d-title{ margin:6px 0 0; font-size:24px; line-height:1.3; font-weight:700; letter-spacing:.01em; user-select:text; -webkit-user-select:text; }
-.d-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin-top:10px; font-size:12.5px; color:var(--ink3); }
+.d-title{ margin:6px 0 0; font-size:24px; line-height:1.3; font-weight:750; letter-spacing:.01em; user-select:text; -webkit-user-select:text; }
+.d-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin-top:10px; font-size:12.5px; font-weight:500; color:var(--ink3); }
 .d-meta span{ display:inline-flex; align-items:center; gap:5px; }
 .d-meta .ic{ width:14px; height:14px; }
 .d-tags{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:12px; }
 .d-tags .mchip{ height:24px; padding:0 9px; border-radius:8px; font-size:12px; }
-.tag{ display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:8px; background:rgba(28,34,48,.055); color:var(--ink2); font-size:12px; cursor:pointer; transition:background .2s; }
+.tag{ display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:8px; background:rgba(28,34,48,.06); color:var(--ink2); font-size:12px; font-weight:500; cursor:pointer; transition:background .2s; }
 .tag:hover{ background:rgba(28,34,48,.1); }
-.d-note{ margin-top:14px; padding:10px 13px; border-radius:12px; background:rgba(234,162,28,.1); color:#7a5a12; font-size:13px; line-height:1.65; display:flex; gap:9px; user-select:text; -webkit-user-select:text; white-space:pre-wrap; }
+.d-note{ margin-top:14px; padding:10px 13px; border-radius:12px; background:rgba(234,162,28,.12); color:#5f4408; font-size:13px; font-weight:500; line-height:1.65; display:flex; gap:9px; user-select:text; -webkit-user-select:text; white-space:pre-wrap; }
 .d-note .ic{ width:16px; height:16px; margin-top:2px; color:var(--amber); }
-.sec-h{ display:flex; align-items:center; gap:8px; margin:22px 0 10px; font-size:12.5px; font-weight:600; color:var(--ink2); letter-spacing:.04em; }
+.sec-h{ display:flex; align-items:center; gap:8px; margin:22px 0 10px; font-size:12.5px; font-weight:650; color:var(--ink2); letter-spacing:.04em; }
 .sec-h .ic{ width:15px; height:15px; color:var(--cc); }
 .sec-h .sp1{ flex:1; }
 .sec-h .link{ font-weight:500; color:var(--ink3); font-size:12px; padding:3px 6px; border-radius:6px; }
@@ -428,11 +461,11 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .vars{ display:grid; gap:9px; }
 .vf{ display:grid; grid-template-columns:auto 1fr; align-items:start; gap:10px; padding:4px 4px 4px 12px; border-radius:13px; background:rgba(255,255,255,.7); box-shadow:inset 0 0 0 1px var(--line); transition:box-shadow .25s,background .25s; }
 .vf:focus-within{ background:#fff; box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--cc) 60%,transparent),0 0 0 4px color-mix(in srgb,var(--cc) 12%,transparent); }
-.vf > span{ padding-top:9px; font-size:12.5px; font-weight:600; color:color-mix(in srgb,var(--cc) 80%,#000); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.vf > span{ padding-top:9px; font-size:12.5px; font-weight:650; color:color-mix(in srgb,var(--cc) 76%,#000); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
 .vf textarea{ display:block; width:100%; min-height:36px; max-height:240px; resize:none; border:0; outline:0; background:none; padding:8px 8px 8px 0; font-size:13.5px; line-height:1.55; overflow-y:auto; }
-.vf textarea::placeholder{ color:var(--ink4); }
+.vf textarea::placeholder{ color:var(--ink3); }
 .vf.filled > span::after{ content:"✓"; margin-left:5px; color:var(--green); font-weight:700; }
-.prose{ position:relative; padding:16px 18px 18px; border-radius:16px; background:rgba(255,255,255,.66); box-shadow:inset 0 0 0 1px var(--line); font-size:14.5px; line-height:1.85; white-space:pre-wrap; word-break:break-word; user-select:text; -webkit-user-select:text; color:#262d3b; }
+.prose{ position:relative; padding:16px 18px 18px; border-radius:16px; background:rgba(255,255,255,.66); box-shadow:inset 0 0 0 1px var(--line); font-size:14.5px; line-height:1.85; white-space:pre-wrap; word-break:break-word; user-select:text; -webkit-user-select:text; color:#1d2433; }
 .prose .vchip{ padding:1px 6px; margin:0 1px; border-radius:6px; font-weight:600; cursor:pointer; box-decoration-break:clone; -webkit-box-decoration-break:clone;
   background:transparent; color:color-mix(in srgb,var(--cc) 85%,#000); box-shadow:inset 0 0 0 1.2px color-mix(in srgb,var(--cc) 45%,transparent); transition:background .2s; }
 .prose .vchip.filled{ background:color-mix(in srgb,var(--cc) 14%,transparent); box-shadow:none; }
@@ -451,7 +484,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   .d-foot [data-act="done"] kbd{ display:none; }
 }
 .d-foot .grow{ flex:1; }
-.d-foot .savehint{ flex:1; min-width:0; font-size:12.5px; color:var(--ink3); display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.d-foot .savehint{ flex:1; min-width:0; font-size:12.5px; font-weight:500; color:var(--ink3); display:flex; align-items:center; gap:7px; white-space:nowrap; }
 .d-foot .savehint span{ overflow:hidden; text-overflow:ellipsis; }
 .copybtn{ position:relative; overflow:hidden; }
 .copybtn .lab{ display:inline-flex; align-items:center; gap:8px; transition:transform .45s var(--spring),opacity .25s; }
@@ -467,12 +500,12 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 @keyframes burst{ from{ transform:scale(0); opacity:1; } to{ transform:scale(40); opacity:0; } }
 
 /* 编辑模式 */
-.ed-title{ width:100%; margin-top:6px; padding:6px 10px; margin-left:-10px; border:0; outline:0; border-radius:10px; background:transparent; font-size:24px; font-weight:700; line-height:1.3; transition:background .2s,box-shadow .2s; }
+.ed-title{ width:100%; margin-top:6px; padding:6px 10px; margin-left:-10px; border:0; outline:0; border-radius:10px; background:transparent; font-size:24px; font-weight:750; line-height:1.3; transition:background .2s,box-shadow .2s; }
 .ed-title:hover{ background:rgba(28,34,48,.04); }
 .ed-title:focus{ background:#fff; box-shadow:0 0 0 1px rgba(224,96,58,.35),0 0 0 4px rgba(224,96,58,.1); }
 .ed-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
 .field{ display:flex; flex-direction:column; gap:6px; }
-.field > label{ font-size:12px; color:var(--ink3); font-weight:500; padding-left:2px; }
+.field > label{ font-size:12px; color:var(--ink3); font-weight:600; padding-left:2px; }
 .select{ position:relative; }
 .select select{ appearance:none; -webkit-appearance:none; width:100%; height:38px; padding:0 34px 0 12px; border:0; outline:0; border-radius:11px; background:rgba(255,255,255,.75); box-shadow:inset 0 0 0 1px var(--line); font-size:13.5px; cursor:pointer; }
 .select select:focus{ box-shadow:inset 0 0 0 1.5px rgba(224,96,58,.45),0 0 0 4px rgba(224,96,58,.1); background:#fff; }
@@ -487,12 +520,12 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .editor{ display:grid; margin-top:4px; border-radius:16px; background:rgba(255,255,255,.8); box-shadow:inset 0 0 0 1px var(--line); transition:box-shadow .25s,background .25s; }
 .editor:focus-within{ background:#fff; box-shadow:inset 0 0 0 1.5px rgba(224,96,58,.45),0 0 0 4px rgba(224,96,58,.1); }
 .editor > *{ grid-area:1 / 1; margin:0; padding:16px 18px 20px; font-family:var(--font); font-size:14.5px; line-height:1.85; letter-spacing:.01em; white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word; border:0; tab-size:4; }
-.editor pre{ color:#262d3b; pointer-events:none; min-height:220px; }
+.editor pre{ color:#1d2433; pointer-events:none; min-height:220px; }
 .editor pre mark{ background:color-mix(in srgb,var(--cc) 18%,transparent); color:color-mix(in srgb,var(--cc) 85%,#000); border-radius:5px; box-shadow:0 0 0 1px color-mix(in srgb,var(--cc) 25%,transparent); }
 .editor textarea{ resize:none; outline:0; background:transparent; color:transparent; caret-color:var(--ink); overflow:hidden; min-height:220px; }
 .editor textarea::selection{ background:rgba(224,96,58,.22); color:transparent; }
 .editor textarea::placeholder{ color:var(--ink4); }
-.ed-help{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:8px; font-size:12px; color:var(--ink3); }
+.ed-help{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:8px; font-size:12px; font-weight:500; color:var(--ink3); }
 .ed-help > span:not(.sp1){ flex:1 1 160px; min-width:0; }
 .ed-help code{ white-space:nowrap; font-family:var(--font-mono); font-size:11.5px; padding:1px 6px; border-radius:6px; background:color-mix(in srgb,var(--cc) 12%,transparent); color:color-mix(in srgb,var(--cc) 80%,#000); }
 .ed-help .sp1{ flex:1; }
@@ -506,7 +539,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .dock .dg{ display:flex; gap:2px; }
 .dock .dg + .dg{ padding-left:7px; border-left:1px solid var(--line); }
 .dk{ position:relative; width:58px; height:calc(var(--bar) - 12px); border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
-  color:var(--ink2); font-size:11px; line-height:1; transition:transform .4s var(--spring),background .2s,color .2s,box-shadow .25s; }
+  color:var(--ink2); font-size:11px; font-weight:550; line-height:1; transition:transform .4s var(--spring),background .2s,color .2s,box-shadow .25s; }
 .dk .ic{ width:21px; height:21px; stroke-width:1.7; transition:transform .4s var(--spring); }
 .dk:hover{ background:rgba(28,34,48,.06); color:var(--ink); }
 .dk:hover .ic{ transform:translateY(-1px); }
@@ -520,7 +553,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .dock.compact2 .dk.cx{ display:none; }
 
 /* 气泡提示 */
-.tip{ position:fixed; z-index:60; left:0; top:0; padding:6px 10px; border-radius:9px; background:rgba(28,34,48,.92); color:#fff; font-size:12px; line-height:1.3; pointer-events:none; white-space:nowrap;
+.tip{ position:fixed; z-index:60; left:0; top:0; padding:6px 10px; border-radius:9px; background:rgba(28,34,48,.94); color:#fff; font-size:12px; font-weight:500; line-height:1.3; pointer-events:none; white-space:nowrap;
   opacity:0; transform:translate(-50%,-100%) translateY(-4px) scale(.96); transition:opacity .16s,transform .2s var(--ease); display:flex; align-items:center; gap:7px; }
 .tip.show{ opacity:1; transform:translate(-50%,-100%) translateY(-10px); }
 .tip.below{ transform:translate(-50%,4px) scale(.96); }
@@ -541,16 +574,16 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   opacity:0; transform:translateY(24px) scale(.97); transition:opacity .35s var(--ease),transform .6s var(--spring); }
 #sheet.open .panel{ opacity:1; transform:none; }
 .s-head{ display:flex; align-items:center; gap:14px; padding:20px 22px 12px 26px; }
-.s-head h2{ margin:0; font-size:22px; font-weight:700; letter-spacing:.02em; white-space:nowrap; display:flex; align-items:baseline; gap:10px; }
+.s-head h2{ margin:0; font-size:22px; font-weight:750; letter-spacing:.02em; white-space:nowrap; display:flex; align-items:baseline; gap:10px; }
 .s-head h2 small{ font-family:var(--font-num); font-size:14px; font-weight:500; color:var(--ink3); }
 .s-head .search{ flex:1; max-width:420px; margin-left:auto; }
 .s-head .seg{ width:auto; }
 .s-cats{ display:flex; gap:7px; padding:0 26px 14px; overflow-x:auto; scrollbar-width:none; }
 .s-cats::-webkit-scrollbar{ display:none; }
-.chip{ display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 13px; border-radius:10px; background:rgba(28,34,48,.05); font-size:13px; color:var(--ink2); white-space:nowrap; transition:background .2s,color .2s,box-shadow .2s; }
+.chip{ display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 13px; border-radius:10px; background:rgba(28,34,48,.055); font-size:13px; font-weight:500; color:var(--ink2); white-space:nowrap; transition:background .2s,color .2s,box-shadow .2s; }
 .chip:hover{ background:rgba(28,34,48,.09); color:var(--ink); }
 .chip i{ width:8px; height:8px; border-radius:50%; background:var(--cc); }
-.chip.on{ background:#fff; color:var(--ink); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.08),0 0 0 1px color-mix(in srgb,var(--cc,#1c2230) 35%,transparent); }
+.chip.on{ background:#fff; color:var(--ink); font-weight:650; box-shadow:0 1px 3px rgba(0,0,0,.08),0 0 0 1px color-mix(in srgb,var(--cc,#1c2230) 35%,transparent); }
 .chip em{ font-style:normal; font-family:var(--font-num); font-size:12px; color:var(--ink3); }
 .s-grid{ flex:1; overflow-y:auto; padding:6px 26px 30px; display:grid; grid-template-columns:repeat(auto-fill,minmax(272px,1fr)); gap:16px; align-content:start; }
 .pc{ position:relative; display:flex; flex-direction:column; min-height:212px; padding:16px 16px 14px; border-radius:18px; background:rgba(255,255,255,.88); cursor:pointer;
@@ -562,14 +595,14 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .pc::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; opacity:0; transition:opacity .3s;
   background:radial-gradient(420px circle at var(--mx,50%) var(--my,0%),rgba(255,255,255,.75),transparent 45%); mix-blend-mode:soft-light; }
 .pc:hover::after{ opacity:1; }
-.pc-top{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink3); }
+.pc-top{ display:flex; align-items:center; gap:7px; font-size:12px; font-weight:500; color:var(--ink3); }
 .pc-top i{ width:8px; height:8px; border-radius:3px; background:var(--cc); }
 .pc-top .sp1{ flex:1; }
 .pc-top .star{ color:var(--amber); width:15px; height:15px; }
-.pc h3{ margin:9px 0 0; font-size:16.5px; font-weight:650; line-height:1.4; }
+.pc h3{ margin:9px 0 0; font-size:16.5px; font-weight:700; line-height:1.4; }
 .pc p{ margin:8px 0 0; flex:1; font-size:13px; line-height:1.7; color:var(--ink2); display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; word-break:break-all; }
 .pc .vv{ color:color-mix(in srgb,var(--cc) 80%,#000); font-weight:600; }
-.pc-foot{ display:flex; align-items:center; gap:6px; margin-top:12px; font-size:12px; color:var(--ink3); }
+.pc-foot{ display:flex; align-items:center; gap:6px; margin-top:12px; font-size:12px; font-weight:500; color:var(--ink3); }
 .pc-foot .sp1{ flex:1; }
 .pc-foot .btn{ opacity:0; transform:translateY(4px); transition:opacity .25s,transform .35s var(--spring),background .2s; }
 .pc:hover .pc-foot .btn,.pc-foot .btn.copybtn.done{ opacity:1; transform:none; }
@@ -582,17 +615,17 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .pal-in input{ flex:1; height:100%; border:0; outline:0; background:none; font-size:17px; }
 .pal-in input::placeholder{ color:var(--ink3); }
 .pal-list{ max-height:min(440px,58vh); overflow-y:auto; padding:8px; position:relative; }
-.pal-h{ padding:10px 12px 5px; font-size:11.5px; color:var(--ink3); letter-spacing:.06em; }
+.pal-h{ padding:10px 12px 5px; font-size:11.5px; font-weight:600; color:var(--ink3); letter-spacing:.06em; }
 .pal-row{ display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; cursor:pointer; }
 .pal-row .dot{ width:9px; height:9px; border-radius:3px; background:var(--cc); flex:none; }
 .pal-row .ic{ width:17px; height:17px; color:var(--ink2); }
 .pal-row .m{ flex:1; min-width:0; }
-.pal-row .t{ font-size:14.5px; font-weight:550; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pal-row .t{ font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pal-row .s{ font-size:12px; color:var(--ink3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
 .pal-row .k{ display:none; align-items:center; gap:6px; font-size:12px; color:var(--ink3); flex:none; }
 .pal-row.on{ background:rgba(28,34,48,.06); }
 .pal-row.on .k{ display:flex; }
-.pal-foot{ display:flex; gap:16px; padding:10px 18px; border-top:1px solid var(--line); font-size:12px; color:var(--ink3); }
+.pal-foot{ display:flex; gap:16px; padding:10px 18px; border-top:1px solid var(--line); font-size:12px; font-weight:500; color:var(--ink3); }
 .pal-foot span{ display:inline-flex; align-items:center; gap:6px; }
 
 #modals .layer{ z-index:40; }
@@ -601,14 +634,14 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   opacity:0; transform:translateY(16px) scale(.97); transition:opacity .3s var(--ease),transform .55s var(--spring); }
 .layer.open .modal{ opacity:1; transform:none; }
 .m-head{ display:flex; align-items:center; gap:10px; padding:20px 20px 6px 24px; }
-.m-head h3{ margin:0; flex:1; font-size:18px; font-weight:700; }
+.m-head h3{ margin:0; flex:1; font-size:18px; font-weight:750; }
 .m-body{ padding:10px 24px 8px; overflow-y:auto; font-size:14px; color:var(--ink2); line-height:1.7; }
 .m-foot{ display:flex; justify-content:flex-end; gap:8px; padding:14px 20px 20px; }
 .m-tabs{ margin:6px 24px 4px; }
 .opt-row{ display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid var(--line); }
 .opt-row:last-child{ border-bottom:0; }
 .opt-row .l{ flex:1; min-width:0; }
-.opt-row .l b{ display:block; font-size:14px; color:var(--ink); font-weight:600; }
+.opt-row .l b{ display:block; font-size:14px; color:var(--ink); font-weight:650; }
 .opt-row .l small{ display:block; font-size:12.5px; color:var(--ink3); line-height:1.55; margin-top:2px; }
 .opt-row .l small strong{ color:var(--ink2); font-weight:650; }
 .opt-row .seg{ flex:none; }
@@ -640,26 +673,26 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .trash-it b{ display:block; color:var(--ink); font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .trash-it small{ color:var(--ink3); font-size:12px; }
 .keys{ display:grid; grid-template-columns:1fr 1fr; gap:4px 26px; }
-.keys div{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; color:var(--ink2); }
+.keys div{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px; font-weight:500; color:var(--ink2); }
 .keys kbd{ font-size:12px; padding:4px 7px; }
 .drop-zone{ margin-top:6px; padding:18px; border-radius:14px; border:1.5px dashed var(--line2); text-align:center; color:var(--ink3); font-size:13px; }
 
 .menu{ position:fixed; z-index:50; left:0; top:0; min-width:210px; padding:6px; border-radius:15px; background:rgba(255,255,255,.94);
   opacity:0; visibility:hidden; transform:scale(.96) translateY(-4px); transform-origin:var(--to,top left); transition:opacity .15s,transform .3s var(--spring),visibility 0s .2s; }
 .menu.open{ opacity:1; visibility:visible; transform:none; transition:opacity .15s,transform .3s var(--spring),visibility 0s; }
-.mi{ display:flex; align-items:center; gap:10px; width:100%; height:34px; padding:0 10px; border-radius:9px; font-size:13.5px; color:var(--ink); text-align:left; }
+.mi{ display:flex; align-items:center; gap:10px; width:100%; height:34px; padding:0 10px; border-radius:9px; font-size:13.5px; font-weight:500; color:var(--ink); text-align:left; }
 .mi .ic{ width:16px; height:16px; color:var(--ink2); }
 .mi i{ width:9px; height:9px; border-radius:3px; background:var(--cc); margin:0 3px; }
 .mi kbd{ margin-left:auto; }
 .mi:hover,.mi.on{ background:rgba(28,34,48,.06); }
 .mi.danger{ color:#c9372d; } .mi.danger .ic{ color:#c9372d; }
-.mi.cur{ font-weight:600; }
+.mi.cur{ font-weight:650; }
 .mi.cur::after{ content:"✓"; margin-left:auto; color:var(--green); font-weight:700; }
 .m-sep{ height:1px; margin:5px 8px; background:var(--line); }
-.m-lab{ padding:6px 10px 3px; font-size:11.5px; color:var(--ink3); }
+.m-lab{ padding:6px 10px 3px; font-size:11.5px; font-weight:550; color:var(--ink3); }
 
 #toasts{ position:fixed; z-index:45; left:50%; bottom:calc(var(--g) + var(--bar) + 13px); translate:calc(-50% + var(--ox)) 0; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:translate .9s var(--ease); }
-.toast{ display:flex; align-items:center; gap:10px; max-width:min(560px,calc(var(--stage, 100vw) - 26px)); padding:10px 12px 10px 14px; border-radius:15px; background:rgba(26,32,44,.92); color:#fff; font-size:13.5px; pointer-events:auto;
+.toast{ display:flex; align-items:center; gap:10px; max-width:min(560px,calc(var(--stage, 100vw) - 26px)); padding:10px 12px 10px 14px; border-radius:15px; background:rgba(26,32,44,.94); color:#fff; font-size:13.5px; font-weight:500; pointer-events:auto;
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 18px 40px -16px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);
   animation:toastIn .55s var(--spring) backwards; }
 .toast.out{ animation:toastOut .3s var(--ease) forwards; }
@@ -673,7 +706,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 
 .hover-card{ position:fixed; z-index:55; left:0; top:0; width:300px; padding:12px 14px; border-radius:15px; background:rgba(255,255,255,.95); pointer-events:none; opacity:0; transform:translateY(6px) scale(.97); transition:opacity .18s,transform .3s var(--spring); }
 .hover-card.show{ opacity:1; transform:none; }
-.hover-card b{ display:flex; align-items:center; gap:7px; font-size:14px; }
+.hover-card b{ display:flex; align-items:center; gap:7px; font-size:14px; font-weight:700; }
 .hover-card b i{ width:8px; height:8px; border-radius:3px; background:var(--cc); }
 .hover-card p{ margin:6px 0 0; font-size:12.5px; line-height:1.65; color:var(--ink2); display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
 .hover-card small{ display:block; margin-top:8px; font-size:11.5px; color:var(--ink3); }
@@ -750,8 +783,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .poi.show{ opacity:1; visibility:visible; transform:none; transition:opacity .25s var(--ease),transform .45s var(--spring),visibility 0s; }
 .poi-h{ display:flex; align-items:center; gap:9px; padding:0 4px 8px 8px; }
 .poi-h i{ width:10px; height:10px; border-radius:3px; background:var(--cc); box-shadow:0 0 0 3px color-mix(in srgb,var(--cc) 20%,transparent); flex:none; }
-.poi-h b{ min-width:0; overflow:hidden; font-size:15.5px; font-weight:700; white-space:nowrap; text-overflow:ellipsis; }
-.poi-h small{ flex:none; font-size:12px; color:var(--ink3); white-space:nowrap; }
+.poi-h b{ min-width:0; overflow:hidden; font-size:15.5px; font-weight:750; white-space:nowrap; text-overflow:ellipsis; }
+.poi-h small{ flex:none; font-size:12px; font-weight:500; color:var(--ink3); white-space:nowrap; }
 .poi-h .sp1{ flex:1; }
 .poi-h .btn{ width:28px; height:28px; }
 .poi-list{ max-height:min(330px,46vh); overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:1px; }
@@ -759,8 +792,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .poi-it:hover,.poi-it.on{ background:rgba(28,34,48,.055); }
 .poi-it .lan{ width:8px; height:10px; border-radius:4px 4px 3px 3px; flex:none; background:color-mix(in srgb,var(--cc) 45%,#fff); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--cc) 55%,transparent); }
 .poi-it.lit .lan{ background:var(--cc); box-shadow:0 0 8px color-mix(in srgb,var(--cc) 70%,transparent); }
-.poi-it .t{ flex:1; min-width:0; font-size:13.5px; font-weight:550; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.poi-it .m{ font-size:11.5px; color:var(--ink3); display:flex; align-items:center; gap:4px; flex:none; }
+.poi-it .t{ flex:1; min-width:0; font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.poi-it .m{ font-size:11.5px; font-weight:500; color:var(--ink3); display:flex; align-items:center; gap:4px; flex:none; }
 .poi-it .m .ic{ width:12px; height:12px; }
 .poi-it .m .star{ color:var(--amber); }
 .poi-it .cp{ width:26px; height:26px; border-radius:8px; display:none; align-items:center; justify-content:center; color:var(--ink3); flex:none; }
@@ -768,13 +801,13 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .poi-it .cp:hover{ background:rgba(28,34,48,.08); color:var(--ink); }
 .poi-it .cp.done{ color:var(--green); }
 .poi-it .cp .ic{ width:14px; height:14px; }
-.poi-empty{ padding:14px 10px; font-size:13px; color:var(--ink3); text-align:center; }
+.poi-empty{ padding:14px 10px; font-size:13px; font-weight:500; color:var(--ink3); text-align:center; }
 .poi-f{ display:flex; gap:6px; padding:8px 4px 0; margin-top:6px; border-top:1px solid var(--line); }
 .poi-f .btn{ flex:1; height:32px; font-size:12.5px; }
 
 /* ---------- 镜头操作提示（前两次使用时出现） ---------- */
 .camhint{ position:fixed; z-index:11; left:50%; bottom:calc(var(--g) + var(--bar) + 13px); translate:calc(-50% + var(--ox)) 0; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 14px; width:max-content; max-width:calc(var(--stage, 100vw) - 26px); padding:9px 16px; border-radius:14px;
-  background:rgba(26,32,44,.86); color:rgba(255,255,255,.92); font-size:12.5px; white-space:nowrap; pointer-events:none;
+  background:rgba(26,32,44,.88); color:rgba(255,255,255,.95); font-size:12.5px; font-weight:500; white-space:nowrap; pointer-events:none;
   -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); box-shadow:0 14px 30px -14px rgba(0,0,0,.5);
   opacity:0; transform:translateY(8px); transition:opacity .3s var(--ease),transform .45s var(--spring); }
 .camhint.show{ opacity:1; transform:none; }
@@ -813,11 +846,11 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .tour .pop{ position:fixed; left:50%; top:50%; width:348px; padding:18px 18px 14px; border-radius:20px; background:rgba(255,255,255,.97); box-shadow:var(--shadow);
   transition:left .6s var(--ease),top .6s var(--ease),opacity .3s; animation:tourPop .6s var(--spring) backwards; }
 @keyframes tourPop{ from{ opacity:0; transform:translateY(12px) scale(.96); } }
-.tour .pop h4{ margin:0; display:flex; align-items:center; gap:9px; font-size:16.5px; font-weight:700; }
+.tour .pop h4{ margin:0; display:flex; align-items:center; gap:9px; font-size:16.5px; font-weight:750; }
 .tour .pop h4 .ic{ width:20px; height:20px; color:var(--accent); }
 .tour .pop h4 em{ margin-left:auto; font-style:normal; font-family:var(--font-num); font-size:12px; font-weight:500; color:var(--ink3); }
 .tour .pop p{ margin:9px 0 0; font-size:13.5px; line-height:1.75; color:var(--ink2); }
-.tour .pop p b{ color:var(--ink); font-weight:600; }
+.tour .pop p b{ color:var(--ink); font-weight:700; }
 .tour .pop .row{ display:flex; align-items:center; gap:8px; margin-top:15px; }
 .tour .dots{ flex:1; display:flex; gap:5px; }
 .tour .dots i{ width:6px; height:6px; border-radius:3px; background:var(--ink4); transition:width .35s var(--spring),background .3s; }
@@ -835,8 +868,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   :root{ --g:13px; --bar:56px; --pad:12px; --r-xl:20px; }
   .brand{ --logo:38px; gap:11px; padding-right:14px; border-radius:18px; }
   .logo{ border-radius:11px; }
-  .brand h1{ font-size:22px; }
-  .save-state{ margin-top:3px; gap:6px; font-size:11.5px; }
+  .brand h1{ font-size:23px; }
+  .save-state{ margin-top:2px; gap:6px; font-size:11.5px; }
   .stats{ padding:6px; border-radius:18px; }
   .stat{ min-width:0; padding:0 13px; border-radius:11px; }
   .stat b{ font-size:21px; line-height:1.05; }
@@ -869,9 +902,11 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   .it .st{ width:7px; height:7px; margin-top:6.5px; }
   .it-t{ font-size:13.5px; }
   .it-m{ margin-top:3px; gap:5px; font-size:11.5px; }
-  .mchip,.vtag{ height:18px; font-size:11px; }
+  .mchip,.vtag{ height:18px; font-size:11.5px; }
   .ia{ width:26px; height:26px; }
   .lib-foot .btn{ height:38px; padding:0 12px; font-size:13px; gap:7px; }
+  .lib-row .btn.pin{ width:36px; height:36px; border-radius:11px; }
+  .lib-row .btn.pin .ic{ width:16px; height:16px; }
   .lib-foot .btn .ic{ width:16px; height:16px; }
   .d-head .btn.icon{ width:32px; height:32px; border-radius:10px; }
   .d-head .btn.icon .ic{ width:16px; height:16px; }
@@ -916,7 +951,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   :root{ --g:12px; --bar:54px; }
   .brand{ width:auto; --logo:38px; padding-right:16px; }
   .logo{ border-radius:12px; }
-  .brand h1{ font-size:23px; }
+  .brand h1{ font-size:22px; }
   .stats{ display:none; }
   .clock{ padding:0 14px; }
   .clock .time{ font-size:24px; }
@@ -1020,6 +1055,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   <symbol id="i-butterfly" viewBox="0 0 24 24"><path d="M12 7v12M12 9C9.5 4.5 3.5 3.5 3.5 7.5c0 3 3 4.5 6.5 4.5-3.5.5-5 2.5-4 4.5s4.2 1.2 6-2.5c1.8 3.7 5 4.5 6 2.5s-.5-4-4-4.5c3.5 0 6.5-1.5 6.5-4.5 0-4-6-3-8.5 1.5z"/><path d="m10.5 5 1.5 2 1.5-2"/></symbol>
   <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
   <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11.5v-7a1.5 1.5 0 0 1 3 0V12M14 11.5V6.5a1.5 1.5 0 0 1 3 0V14"/><path d="M17 9.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-4.6-2.2L4.4 15.6a1.6 1.6 0 0 1 2.4-2.1L8 14.8"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3.5h6l-.9 5.6 3.4 3.6v1.8h-11v-1.8l3.4-3.6z"/><path d="M12 14.5v6.5"/></symbol>
   <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4V3h6v1.5a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1zM9 11h6M9 15h4"/></symbol>
 </svg>
 
@@ -1034,7 +1070,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 <div class="clouds back" id="cloudsBack" aria-hidden="true"></div>
 
 <!-- ===================== 3D 小岛 ===================== -->
-<div id="stage" aria-label="藏言阁 · 浮空小岛（拖动绕画面中心旋转与俯仰、滚轮缩放、右键或空格拖动平移、双击建筑聚焦）">
+<div id="stage" aria-label="藏言岛 · 浮空小岛（拖动绕画面中心旋转与俯仰、滚轮缩放、右键或空格拖动平移、双击建筑聚焦）">
   <canvas id="gl"></canvas>
   <div id="labels"></div>
 </div>
@@ -1085,14 +1121,18 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
     <div class="term" id="clkTerm">—</div>
   </section>
 
+  <div class="lib-edge hud-in" style="--i:3" id="libEdge" aria-hidden="true"><i></i></div>
   <aside class="card lib hud-in" style="--i:3" id="lib" aria-label="藏书目录">
     <div class="lib-top">
-      <label class="search" id="searchBox">
-        <svg class="ic"><use href="#i-search"/></svg>
-        <input id="q" type="text" placeholder="搜索标题、标签、正文…" autocomplete="off" spellcheck="false">
-        <button class="clear" id="qClear" aria-label="清空搜索"><svg class="ic"><use href="#i-x"/></svg></button>
-        <kbd data-kbd="mod+K">Ctrl K</kbd>
-      </label>
+      <div class="lib-row">
+        <label class="search" id="searchBox">
+          <svg class="ic"><use href="#i-search"/></svg>
+          <input id="q" type="text" placeholder="搜索标题、标签、正文…" autocomplete="off" spellcheck="false">
+          <button class="clear" id="qClear" aria-label="清空搜索"><svg class="ic"><use href="#i-x"/></svg></button>
+          <kbd data-kbd="mod+K">Ctrl K</kbd>
+        </label>
+        <button class="btn icon ghost pin" id="libPin" aria-pressed="false" aria-label="固定目录栏" data-tip="固定目录栏" data-key="B"><svg class="ic"><use href="#i-pin"/></svg></button>
+      </div>
       <div class="seg" id="filters">
         <span class="ind"></span>
         <button data-f="all" class="on">全部</button>
@@ -1261,7 +1301,7 @@ const COLORS = ['#4c7cf3', '#e0603a', '#7c6cf0', '#2fae6a', '#e8a21a', '#18a6b5'
 const STYLES = [['hall', '书阁'], ['tower', '塔楼'], ['pavilion', '亭台'], ['house', '小筑'], ['observatory', '观星台']];
 const MODELS = [['通用', '#9aa3b2'], ['Claude', '#d97757'], ['ChatGPT', '#10a37f'], ['DeepSeek', '#4d6bfe'], ['Gemini', '#8e75f0'], ['Kimi', '#3a3f4a'], ['豆包', '#3c7bff'], ['通义千问', '#615ced']];
 const modelColor = m => (MODELS.find(x => x[0] === m) || MODELS[0])[1];
-const DEFAULT_SETTINGS = { theme: 'auto', season: 'auto', weather: 'auto', labels: true, motion: 'full', toured: false, sendTo: 'Claude' };
+const DEFAULT_SETTINGS = { theme: 'auto', season: 'auto', weather: 'auto', labels: true, motion: 'full', libMode: 'auto', toured: false, sendTo: 'Claude' };
 
 function seedDB() {
   const now = Date.now();
@@ -1280,7 +1320,7 @@ function guidePrompts(categories, now = Date.now()) {
 藏言录是只属于你自己的提示词仓库：把好用的提示词存进来，要用的时候一键复制，粘贴到任何 AI 对话框。
 
 · 小岛上的每座建筑是一个分类，广场边的灯笼是其中的提示词
-· 左侧目录列出全部提示词，点一条，右侧打开详情
+· 左侧目录列出全部提示词，点一条，右侧打开详情；目录平时收在左边缘，鼠标移到窗口最左侧就会滑出来
 · 详情里点「复制」（或按 C），就能直接粘贴使用
 · 「我的提示词」分类是空的，留给你放自己的内容；也可以新建更多分类
 
@@ -1300,7 +1340,7 @@ function guidePrompts(categories, now = Date.now()) {
     S('③ 收录你自己的提示词', ['收录'], false, '', `
 四种方式，任选其一：
 
-1. 点左下角「新建提示词」（或按 N），写上标题和正文，边写边自动保存
+1. 点底部工具坞的「＋」或目录底部的「新建提示词」（或按 N），写上标题和正文，边写边自动保存
 2. 先复制一段文字，再在页面空白处按 ${MOD} + V，直接收录为一条新提示词
 3. 把网页或文档里选中的文字拖进左侧目录
 4. 点「新建提示词」旁边的「分类」按钮：新建、编辑、排序或删除分类，小岛上的建筑随之增减；分类标题上的铅笔和「⋯」也能直接改
@@ -1315,6 +1355,7 @@ function guidePrompts(categories, now = Date.now()) {
 · Q / E：向左 / 向右旋转
 · 按住 Shift：加速
 · + / -：拉近、拉远；H：回到全景
+· B：左侧目录在「自动隐藏」与「固定」之间切换
 
 鼠标：
 · 左键拖动：旋转与俯仰（始终绕画面中心）
@@ -3997,7 +4038,7 @@ void main(){
   gl_FragColor = vec4(c, a * .82);
 }` });
   SHARED.add(matCloud);
-  // 仙鹤：几只丹顶鹤绕着藏言阁盘旋（白身、黑翎、红顶），扑翼与转弯倾斜都在顶点着色器里算；清晨白昼成群，黄昏归巢，夜里不见
+  // 仙鹤：几只丹顶鹤绕着藏言岛中央的宝塔盘旋（白身、黑翎、红顶），扑翼与转弯倾斜都在顶点着色器里算；清晨白昼成群，黄昏归巢，夜里不见
   const uBird = { value: 0 };
   const matCrane = patch(new T.MeshStandardMaterial({ vertexColors: true, roughness: .62, metalness: 0 }), 'crane', {
     uniforms: { uBird },
@@ -4231,7 +4272,7 @@ void main(){
       m.position.set((s.x1 + s.x2) / 2, 1.2, (s.y1 + s.y2) / 2); m.rotation.y = -ang;
       lay.add(m); flows.set(s.b.c.id, m); reflHide.push(m);
     }
-    // 中央藏言阁
+    // 中央藏言岛
     EAVE = [];
     const P = pagoda();
     const pm = P.gb.mesh(); lay.add(pm);
@@ -4311,7 +4352,7 @@ void main(){
 
   /* ---------- 名牌 ---------- */
   function buildLabels() {
-    let h = '<div class="lbl center" data-center="1" style="--cc:var(--accent)"><div class="pill"><i class="dot"></i>藏言阁<span class="sub"></span></div></div>';
+    let h = '<div class="lbl center" data-center="1" style="--cc:var(--accent)"><div class="pill"><i class="dot"></i>藏言岛<span class="sub"></span></div></div>';
     for (const b of L.blds) h += `<div class="lbl" data-cat="${b.c.id}" style="--cc:${b.c.color}"><div class="pill"><i class="dot"></i>${esc(b.c.name)}<span class="sub"></span></div></div>`;
     lblRoot.innerHTML = h;
     labels = [{ el: lblRoot.firstElementChild, x: 0, y: 238, z: 0, k: '' }];
@@ -5528,10 +5569,10 @@ function setQuery(v) {
   $('#searchBox').classList.toggle('has', !!v);
   if (v && UI.filter === 'recent') { UI.filter = 'all'; $$('#filters button').forEach(b => b.classList.toggle('on', b.dataset.f === 'all')); syncSeg($('#filters')); }
   renderLibrary();
-  if (v) q.focus();
+  if (v) { Lib.reveal(); q.focus(); }
 }
 function focusSearch() {
-  if (innerWidth <= 860) toggleLib(true);
+  if (innerWidth <= 860) toggleLib(true); else Lib.reveal();
   const q = $('#q'); q.focus(); q.select();
 }
 function moveSel(d) {
@@ -5564,6 +5605,7 @@ function selectPrompt(id, o = {}) {
 }
 function focusCategory(cid) {
   if (!getC(cid)) return;
+  Lib.reveal(2600);
   Scene.focus(cid);
   setTimeout(() => Poi.show(cid), 260);
   if (UI.q) setQuery('');
@@ -6021,6 +6063,130 @@ function toggleLib(force) {
 }
 
 /* =====================================================================
+   目录栏：固定 / 自动隐藏
+   自动隐藏（默认，同 macOS 程序坞、Arc 浏览器的侧栏）：目录收在左缘，小岛舞台铺满左侧；
+   鼠标贴到窗口左边缘就滑出来，移开后稍等片刻再收回——划过边缘不误触，回头再找也来得及。
+   搜索框或目录里有焦点、菜单与弹窗开着、正在拖动提示词、新手引导讲到它时都不收；拖着按键旋转小岛时不会弹出。
+   只在能悬停的指针（鼠标、触控板）和宽屏下生效；窄屏仍是底部「目录」按钮唤出的抽屉。
+   ===================================================================== */
+const Lib = (() => {
+  const el = $('#lib'), edge = $('#libEdge'), body = document.body;
+  let peek = false, held = false, dragging = false, hintLater = false, entered = false, tShow = 0, tHide = 0, px = -1, py = -1;
+  const zone = { w: 31, top: 82, bottom: 13 };   // 左边缘感应带：apply() 时按当前档位的 --g / --top 重算
+  const canHover = matchMedia('(hover: hover)');
+  const auto = () => DB.settings.libMode !== 'pin' && innerWidth > 860 && canHover.matches;
+  const inZone = () => px >= 0 && px <= zone.w && py >= zone.top && py <= innerHeight - zone.bottom;
+  const inside = () => {
+    if (px < 0) return false;
+    if (inZone()) return true;
+    const r = el.getBoundingClientRect();
+    return px >= r.left - 8 && px <= r.right + 8 && py >= r.top - 8 && py <= r.bottom + 8;
+  };
+  // 正在目录里打字、用键盘在目录里移动焦点时不收；鼠标点过的按钮留着焦点不算
+  const focused = () => { const a = document.activeElement; return !!a && el.contains(a) && (a.matches('input, textarea') || a.matches(':focus-visible')); };
+  const busy = () => held || dragging || focused() || menuEl.classList.contains('open') || modalStack.length > 0;
+  function set(on) {
+    clearTimeout(tShow); clearTimeout(tHide); tShow = tHide = 0;
+    if (peek === on) return;
+    peek = on;
+    body.classList.toggle('lib-peek', on);
+    if (!on) {
+      Tip.hide();
+      const pill = el.querySelector('.hover-pill'); if (pill) pill.style.opacity = '0';
+      if (hintLater) { hintLater = false; setTimeout(hint, 480); }
+    }
+  }
+  /** delay > 0 是驻留判定：指针在边缘停够这么久才滑出，期间离开就作罢（不因每次移动重新计时） */
+  function show(delay = 0) {
+    clearTimeout(tHide); tHide = 0;
+    if (peek || !auto()) return;
+    if (!delay) { set(true); return; }
+    if (!tShow) tShow = setTimeout(() => { tShow = 0; set(true); }, delay);
+  }
+  function hideSoon(ms = 380) {
+    clearTimeout(tShow); tShow = 0;
+    if (!peek) return;
+    clearTimeout(tHide);
+    tHide = setTimeout(tryHide, ms);
+  }
+  function tryHide() {
+    tHide = 0;
+    if (!peek) return;
+    if (!auto()) { set(false); return; }
+    if (inside()) return;                                        // 指针还在上面：等它离开再说
+    if (busy()) { tHide = setTimeout(tryHide, 450); return; }    // 搜索、菜单、弹窗、拖拽结束后再收
+    set(false);
+  }
+  /** 程序性展开（搜索、定位分类）：展开后若指针不在上面，过一会儿自己收回 */
+  function reveal(ms = 2400) { if (!auto()) return; set(true); hideSoon(ms); }
+  function apply() {
+    const on = auto(), pinned = DB.settings.libMode === 'pin';
+    zone.w = cssPx('--g') + 18; zone.top = cssPx('--top'); zone.bottom = cssPx('--g');
+    body.classList.toggle('lib-auto', on);
+    if (!on) set(false);
+    const b = $('#libPin');
+    b.classList.toggle('on', pinned);
+    b.setAttribute('aria-pressed', String(pinned));
+    b.setAttribute('aria-label', pinned ? '取消固定，目录改为自动隐藏' : '固定目录栏');
+    b.dataset.tip = pinned ? '取消固定 · 目录改为自动隐藏' : '固定目录栏 · 一直显示';
+  }
+  /** 图钉 / B 键：固定 ⇄ 自动隐藏。从固定改成自动时指针多半就在目录上，先保持展开，离开后再收 */
+  function toggle() {
+    const toAuto = DB.settings.libMode === 'pin';
+    DB.settings.libMode = toAuto ? 'auto' : 'pin';
+    if (toAuto && inside()) { peek = true; body.classList.add('lib-peek'); }
+    apply(); layout(); changed();
+    if (toAuto) { hideSoon(700); hint(); }
+    toast(toAuto ? '目录栏改为自动隐藏：鼠标移到窗口左边缘即可呼出' : '目录栏已固定，一直显示在左侧', 'info');
+  }
+  /** 把手轻轻探两下，提示目录收在这里（目录正展开着就等它收回再探） */
+  function hint() {
+    if (!auto() || reducedMotion()) return;
+    if (peek) { hintLater = true; return; }
+    edge.classList.remove('hint'); void edge.offsetWidth; edge.classList.add('hint');
+  }
+  // 指针贴到左边缘就滑出：全局跟踪指针位置，快速划过、面板从指针下滑过时也判断得准。
+  // 按着键拖动小岛、开着弹窗或卡片墙时不弹；贴死最左一列立刻滑出，其余位置驻留 70 ms。
+  // 从左边进入窗口（如从摘星阁的导航栏移过来）只是路过：要在边缘停够 0.45 s 才算想要目录
+  document.addEventListener('pointermove', e => {
+    px = e.clientX; py = e.clientY;
+    if (entered && px > zone.w) entered = false;
+    if (!auto() || e.pointerType === 'touch') return;
+    if (!peek) {
+      if (inZone() && e.buttons === 0 && !Tour.on && !modalStack.length && !UI.sheetOpen && !UI.palOpen) show(entered ? 450 : px <= 4 ? 0 : 70);
+      else if (tShow) { clearTimeout(tShow); tShow = 0; }
+    } else if (!tHide && !inside()) hideSoon();
+  }, { passive: true });
+  document.documentElement.addEventListener('pointerenter', e => { entered = e.clientX <= zone.w; });
+  document.documentElement.addEventListener('pointerleave', () => { px = py = -1; entered = false; clearTimeout(tShow); tShow = 0; hideSoon(420); });
+  el.addEventListener('pointerenter', () => { clearTimeout(tHide); tHide = 0; });
+  el.addEventListener('focusout', () => setTimeout(() => { if (peek && !el.contains(document.activeElement)) hideSoon(); }, 0));
+  // 摘星阁、外部应用拖来文字时也能落到目录里；目录内拖动排序或拖到建筑上时保持展开
+  edge.addEventListener('dragenter', () => show(0));
+  el.addEventListener('dragover', () => { clearTimeout(tHide); tHide = 0; });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) hideSoon(600); });
+  el.addEventListener('drop', () => hideSoon(900));
+  el.addEventListener('dragstart', () => { dragging = true; });
+  el.addEventListener('dragend', () => { dragging = false; hideSoon(500); });
+  edge.addEventListener('click', () => show(0));
+  // 点到小岛或别的面板：立刻收起（同 Arc 的浮动侧栏）
+  document.addEventListener('pointerdown', e => {
+    if (!peek || held || dragging || el.contains(e.target) || edge.contains(e.target) || menuEl.contains(e.target) || modalStack.length) return;
+    if (!menuEl.classList.contains('open')) set(false);
+  }, true);
+  $('#libPin').addEventListener('click', toggle);
+  canHover.addEventListener('change', () => { apply(); layout(); });
+  return {
+    apply, toggle, hint, reveal,
+    hide() { set(false); },
+    /** 新手引导讲到目录时按住不收 */
+    hold(on) { held = on; if (on) { if (auto()) set(true); } else hideSoon(260); },
+    get auto() { return auto(); },
+    get peeked() { return peek; },
+  };
+})();
+
+/* =====================================================================
    十二、全部提示词（卡片墙）
    ===================================================================== */
 const SORTS = {
@@ -6136,7 +6302,7 @@ function renderPal() {
   let h = '', i = 0;
   if (ps.length) h += `<div class="pal-h">${ts.length ? '提示词' : '最近 · 常用'}</div>` + ps.map(p => {
     const c = getC(p.categoryId) || DB.categories[0], nv = parseVars(p.content).length;
-    const sub = snippet(p, ts) || esc(p.content.replace(/\s+/g, ' ').slice(0, 60));
+    const sub = snippet(p, ts) || esc(p.content.replace(/\s+/g, ' ').replace(/^[\s·•・*-]+/, '').slice(0, 60));
     return `<div class="pal-row" data-i="${i++}" style="--cc:${c.color}"><i class="dot"></i><div class="m"><div class="t">${hl(p.title || '未命名', ts)}</div><div class="s">${esc(c.name)} · ${sub}</div></div><span class="k">${nv && unfilled(p).length ? '去填变量' : '复制'}<kbd>↵</kbd></span></div>`;
   }).join('');
   if (acts.length) h += '<div class="pal-h">操作</div>' + acts.map(a => `<div class="pal-row" data-i="${i++}">${icon(a.icon)}<div class="m"><div class="t">${hl(a.label, ts)}</div></div><span class="k">${a.kbd ? `<kbd>${a.kbd}</kbd>` : '<kbd>↵</kbd>'}</span></div>`).join('');
@@ -6404,7 +6570,7 @@ const Poi = (() => {
     const W = innerWidth, H = innerHeight;
     if (!bounds) {
       const det = $('#detail'), g = cssPx('--g'), bar = cssPx('--bar'), lib = $('#lib').getBoundingClientRect();
-      bounds = { minX: lib.right + g, maxX: (det.classList.contains('open') ? W - det.offsetWidth - g : W) - g, minY: lib.top, botR: g * 2 + bar };
+      bounds = { minX: Lib.auto ? g * 2 + 18 : lib.right + g, maxX: (det.classList.contains('open') ? W - det.offsetWidth - g : W) - g, minY: lib.top, botR: g * 2 + bar };
     }
     const { minX, maxX, minY, botR } = bounds;
     let x = a.x + 96, right = true;
@@ -6600,7 +6766,7 @@ function openHistory(p) {
   });
 }
 
-const KEYS = [['快速取用（搜索并复制）', 'mod+K'], ['粘贴即收录（剪贴板 → 新提示词）', 'mod+V'], ['聚焦搜索', '/'], ['新建提示词', 'N'], ['全部提示词', 'G'], ['复制当前提示词', 'C'], ['编辑当前提示词', '↵'], ['收藏 / 取消收藏', 'F'], ['删除当前提示词', 'Del'], ['上一条 / 下一条', '↑ ↓'], ['完成编辑', 'mod+↵'], ['关闭 / 返回', 'Esc'], ['漫游小岛：前 / 左 / 后 / 右', 'W A S D'], ['连续左转 / 右转', 'Q E'], ['漫游时加速', 'Shift'], ['左转 / 右转 45°', '[ ]'], ['拉近 / 拉远', '= -'], ['小岛全景', '0'], ['显示 / 隐藏名牌', 'L'], ['切换主题（清晨 / 白昼 / 黄昏 / 夜晚）', 'T'], ['旋转 / 俯仰小岛（绕画面中心）', '左键拖动'], ['平移小岛', '右键 / 空格 / Shift 拖动'], ['缩放（以鼠标处为中心）', '滚轮'], ['聚焦建筑 · 双击空地回全景', '双击'], ['在列表中双击', '直接复制'], ['拖动列表项到聊天框', '粘贴提示词']];
+const KEYS = [['快速取用（搜索并复制）', 'mod+K'], ['粘贴即收录（剪贴板 → 新提示词）', 'mod+V'], ['聚焦搜索', '/'], ['新建提示词', 'N'], ['全部提示词', 'G'], ['复制当前提示词', 'C'], ['编辑当前提示词', '↵'], ['收藏 / 取消收藏', 'F'], ['删除当前提示词', 'Del'], ['上一条 / 下一条', '↑ ↓'], ['完成编辑', 'mod+↵'], ['关闭 / 返回', 'Esc'], ['漫游小岛：前 / 左 / 后 / 右', 'W A S D'], ['连续左转 / 右转', 'Q E'], ['漫游时加速', 'Shift'], ['左转 / 右转 45°', '[ ]'], ['拉近 / 拉远', '= -'], ['小岛全景', '0'], ['显示 / 隐藏名牌', 'L'], ['固定 / 自动隐藏目录栏', 'B'], ['切换主题（清晨 / 白昼 / 黄昏 / 夜晚）', 'T'], ['旋转 / 俯仰小岛（绕画面中心）', '左键拖动'], ['平移小岛', '右键 / 空格 / Shift 拖动'], ['缩放（以鼠标处为中心）', '滚轮'], ['聚焦建筑 · 双击空地回全景', '双击'], ['在列表中双击', '直接复制'], ['拖动列表项到聊天框', '粘贴提示词']];
 function openManage(tab = 'look') {
   let cur = tab;
   const tabs = [['look', '外观'], ['cats', '分类'], ['data', '数据与备份'], ['trash', '回收站'], ['keys', '快捷键']];
@@ -6615,6 +6781,7 @@ function openManage(tab = 'look') {
         + segRow('季节', '树木、草地、池塘与天气的季节样貌。「随主题」即 春晨 · 夏午 · 秋暮 · 冬夜；也可以固定成某一季', 'season', [['auto', '随主题'], ['spring', '春'], ['summer', '夏'], ['autumn', '秋'], ['winter', '冬']])
         + segRow('天气', '「自动」随季节变化：春飞花 · 夏蝶舞 · 秋落叶 · 冬飘雪', 'weather', [['auto', '自动'], ['clear', '晴'], ['petal', '飞花'], ['butterfly', '蝶舞'], ['firefly', '萤火'], ['leaf', '落叶'], ['snow', '飘雪'], ['rain', '细雨']])
         + segRow('动效', '「减弱」会减少粒子、光晕与镜头动画，适合性能较弱的电脑', 'motion', [['full', '完整'], ['low', '减弱']])
+        + segRow('目录栏', '「自动隐藏」时目录收在左侧边缘：鼠标移到窗口最左边就滑出，移开自动收回，小岛舞台更开阔；「固定」则一直显示。快捷键 B 随时切换', 'libMode', [['auto', '自动隐藏'], ['pin', '固定']])
         + segRow('名牌', '小岛上各建筑上方的名称牌', 'labels', [['true', '显示'], ['false', '隐藏']]);
     } else if (cur === 'cats') {
       h = `<div class="cm-head"><p>每个分类都是小岛上的一座建筑。拖动左侧把手或用箭头调整顺序；「编辑」改名称、颜色与建筑样式；「删除」时里面的提示词会移到别的分类，删错了可以撤销。</p><button class="btn primary sm" data-a="catnew">${icon('plus')}新建分类</button></div>`
@@ -6707,6 +6874,7 @@ function openManage(tab = 'look') {
           if (key === 'theme' || key === 'weather' || key === 'season') Sky.apply(true);
           if (key === 'motion') FX.refresh();
           if (key === 'labels') applyLabels();
+          if (key === 'libMode') { Lib.apply(); layout(); }
           changed();
           return;
         }
@@ -6773,7 +6941,7 @@ function layout() {
   const det = $('#detail'), detOpen = det.classList.contains('open');
   // 两侧面板连同各自的两道栏间距一起让出，剩下的就是小岛舞台；舞台中心即统计卡、工具坞与小岛的中轴
   let left = 0, right = 0;
-  if (!mobile) { left = $('#lib').offsetWidth + g * 2; if (detOpen) right = det.offsetWidth + g * 2; }
+  if (!mobile) { left = Lib.auto ? 0 : $('#lib').offsetWidth + g * 2; if (detOpen) right = det.offsetWidth + g * 2; }
   const ox = (left - right) / 2;
   document.documentElement.style.setProperty('--ox', ox + 'px');
   document.documentElement.style.setProperty('--stage', Math.max(0, W - left - right) + 'px');
@@ -6787,9 +6955,11 @@ function layout() {
   }
   const stats = $('#stats');
   if (!mobile) {
-    const sw = stats.offsetWidth, cx = W / 2 + ox;
+    const sw = stats.offsetWidth;
     const bR = $('.brand').getBoundingClientRect().right, cL = $('#clock').getBoundingClientRect().left;
-    stats.classList.toggle('hide', cx - sw / 2 < bR + 14 || cx + sw / 2 > cL - 14);
+    const lo = bR + 14 + sw / 2, hi = cL - 14 - sw / 2;
+    stats.classList.toggle('hide', lo > hi);
+    if (lo <= hi) stats.style.setProperty('--sx', clamp(W / 2 + ox, lo, hi) - W / 2 + 'px');
   }
 }
 
@@ -6961,7 +7131,7 @@ function layout() {
     const st = e.target.closest('.stat[data-act]');
     if (!st) return;
     const k = st.dataset.act;
-    if (k === 's-recent') { const b = $('#filters [data-f="recent"]'); if (b) b.click(); if (innerWidth <= 860) toggleLib(true); return; }
+    if (k === 's-recent') { const b = $('#filters [data-f="recent"]'); if (b) b.click(); if (innerWidth <= 860) toggleLib(true); else Lib.reveal(3200); return; }
     UI.sheetCat = k === 's-fav' ? 'fav' : 'all';
     if (k === 's-most') { UI.sheetSort = 'most'; $('#sSort button').forEach(b => b.classList.toggle('on', b.dataset.s === 'most')); }
     openSheet();
@@ -7008,10 +7178,11 @@ function layout() {
       case '0': case 'h': case 'H': Scene.home(); break;
       case 'l': case 'L': toggleLabels(); break;
       case 't': case 'T': cycleTheme(); break;
+      case 'b': case 'B': if (innerWidth > 860) Lib.toggle(); else toggleLib(); break;
       case '?': openManage('keys'); break;
     }
   });
-  window.addEventListener('resize', debounce(() => { FX.resize(); FX.refresh(); Scene.resize(); layout(); $$('.seg').forEach(syncSeg); }, 120));
+  window.addEventListener('resize', debounce(() => { FX.resize(); FX.refresh(); Scene.resize(); Lib.apply(); layout(); $$('.seg').forEach(syncSeg); }, 120));
 })();
 /* =====================================================================
    新手引导：聚光灯逐步讲解小岛、目录、填变量复制、收录与四季
@@ -7020,21 +7191,22 @@ const Tour = (() => {
   let el = null, i = 0, steps = [];
   // 第一步照亮整个小岛舞台：目录右侧、顶栏之下、工具坞之上
   const area = () => {
-    const lib = $('#lib').getBoundingClientRect(), g = cssPx('--g'), bar = cssPx('--bar');
-    return { x: lib.right + g, y: lib.top, w: innerWidth - lib.right - g * 2, h: innerHeight - lib.top - bar - g * 2, rad: 28 };
+    const lib = $('#lib').getBoundingClientRect(), g = cssPx('--g'), bar = cssPx('--bar'), left = Lib.auto ? 0 : lib.right;
+    return { x: left + g, y: lib.top, w: innerWidth - left - g * 2, h: innerHeight - lib.top - bar - g * 2, rad: 28 };
   };
   const box = (sel, pad = 8, rad = 22) => () => { const t = $(sel); if (!t) return null; const r = t.getBoundingClientRect(); return r.width ? { x: r.left - pad, y: r.top - pad, w: r.width + 2 * pad, h: r.height + 2 * pad, rad } : null; };
   const STEPS = () => [
     { icon: 'home', title: '欢迎来到藏言录', rect: area, side: 'inside',
       body: '这座浮空小岛就是你的私人提示词仓库：每座建筑是一个<b>分类</b>，广场边的灯笼是其中的<b>提示词</b>。<b>点一座建筑</b>，旁边会浮出它的提示词清单。<br>按 <b>W A S D</b> 在岛上漫游、<b>Q E</b> 旋转、按住 Shift 加速；也可以左右拖动旋转、上下拖动俯仰，右键或空格拖动平移，滚轮缩放，双击空地回到全景。' },
-    { icon: 'list', title: '所有提示词都在这里', rect: box('#lib', 6, 28), side: 'right',
-      body: '点一条即可在右侧打开。鼠标悬停时右边会浮现<b>复制</b>与<b>收藏</b>两个按钮，双击条目也能直接复制。顶部搜索会同时查标题、标签和正文。' },
-    { icon: 'braces', title: '填好变量，一键复制', rect: box('#detail', 6, 28), side: 'left', wait: 820,
+    { icon: 'list', title: '所有提示词都在这里', rect: box('#lib', 6, 28), side: 'right', lib: true,
+      body: '点一条即可在右侧打开。鼠标悬停时右边会浮现<b>复制</b>与<b>收藏</b>两个按钮，双击条目也能直接复制。顶部搜索会同时查标题、标签和正文。'
+        + (Lib.auto ? '<br>目录平时<b>收在左边缘</b>：鼠标移到窗口最左侧它就滑出来，移开自动收回；点搜索框旁的<b>图钉</b>或按 <b>B</b> 可以让它一直显示。' : '') },
+    { icon: 'braces', title: '填好变量，一键复制', rect: box('#detail', 6, 28), side: 'left', wait: 820, lib: true,
       before: () => { const p = DB.prompts.find(x => parseVars(x.content).length) || DB.prompts[0]; if (p) selectPrompt(p.id, { reveal: true }); },
       body: '把每次要换的内容写成 <b>{{变量}}</b>，在这里填好后点<b>复制</b>，得到的就是完整、统一的提示词。旁边的 ↗ 会复制并直接打开 Claude、ChatGPT、DeepSeek 等。' },
-    { icon: 'paste', title: '随手收录', rect: box('#btnNew', 6, 16), side: 'right',
+    { icon: 'paste', title: '随手收录', rect: box('#btnNew', 6, 16), side: 'right', lib: true,
       body: `点「新建」，或者在任何空白处按 <b>${MOD} V</b>，剪贴板里的提示词会直接收进仓库。之后随时按 <b>${MOD} K</b> 搜索、回车即复制。` },
-    { icon: 'check', title: '写下的都会被记住', rect: box('.brand', 6, 26), side: 'right',
+    { icon: 'check', title: '写下的都会被记住', rect: box('.brand', 6, 26), side: 'right', lib: true,
       body: `提示词、填过的变量、分类、收藏和外观设置，每一次改动都<b>自动保存在这台电脑上</b>，关掉再打开依然都在，同事之间互不可见。<br>想更保险：在「管理 → 数据与备份」里<b>绑定一个文件</b>，${EMBED ? '重装' : '清理浏览器'}、换电脑都能恢复。` },
     { icon: 'seasons', title: '四时主题', rect: box('#dock [data-act="theme"]', 6, 20), side: 'top',
       body: '这里切换主题：<b>清晨</b>（春 · 飞花）、<b>白昼</b>（夏 · 蝶舞）、<b>黄昏</b>（秋 · 落叶）、<b>夜晚</b>（冬 · 飘雪）。「自动」会按本机时间在 8、12、16、20 点自动换，日光、阴影与季节一起缓缓过渡。' },
@@ -7064,14 +7236,19 @@ const Tour = (() => {
     if (k >= steps.length) { end(); return; }
     i = clamp(k, 0, steps.length - 1);
     const s = steps[i];
+    // 讲到目录的几步把它按住不收；从收起状态滑出要等动画落定再量位置
+    const slide = s.lib && Lib.auto && !Lib.peeked ? 600 : 0;
+    Lib.hold(!!s.lib);
     if (s.before) s.before();
-    setTimeout(place, s.before ? s.wait || 400 : 0);
+    setTimeout(place, Math.max(s.before ? s.wait || 400 : 0, slide));
   }
   function end() {
     if (!el) return;
     const t = el; el = null;
     t.style.transition = 'opacity .35s'; t.style.opacity = '0';
     setTimeout(() => t.remove(), 360);
+    Lib.hold(false);
+    if (Lib.auto) setTimeout(Lib.hint, 700);
     DB.settings.toured = true; saveQuiet();
   }
   function start() {
@@ -7101,6 +7278,7 @@ function closeTop() {
   if (ae && ae.dataset && ae.dataset.var != null) { ae.blur(); return true; }
   if (UI.q) { setQuery(''); $('#q').blur(); return true; }
   if (ae && ae.id === 'q') { ae.blur(); return true; }
+  if (Lib.peeked) { Lib.hide(); return true; }
   if (UI.sel) { closeDetail(); return true; }
   if (document.body.classList.contains('libopen')) { toggleLib(false); return true; }
   if (Scene.focusId) { Scene.home(); return true; }
@@ -7151,6 +7329,7 @@ async function init() {
   Scene.rebuild(true);
   renderLibrary();
   setSave();
+  Lib.apply();
   layout();
   Scene.intro();
   requestAnimationFrame(() => syncSeg($('#filters')));

@@ -23,6 +23,9 @@ Windows 预装字体，不需要内置。字体栈里把它放在**第一位**�
 中文字符在 Times New Roman 里查不到字形，会自动落到后面的思源黑体上——
 一条字体栈同时满足「英文 Times New Roman、中文思源黑体」。
 
+藏言录模块（v0.3.2 起）也用这套字体：它在固定来源 `cangyanlu://app` 下引用 `fonts/source-han-sans-sc/index.css`，
+由 `electron/cangyanlu.js` 从本目录原样提供，不另存副本。
+
 主界面与两张恢复页面共用 `../typography.css`，原生表单、日期与数字输入、
 代码和快捷键标签也显式采用相同字体，避免浏览器默认字体覆盖继承。
 Times New Roman 没有的汉字、全角中文标点和特殊字形继续按字体栈回退，

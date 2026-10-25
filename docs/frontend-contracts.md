@@ -1017,3 +1017,10 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 - **栅格令牌**（藏言录 `:root`）：`--g` 外边距与栏间距、`--bar` 顶栏与工具坞同高、`--top = 2g + bar` 面板顶、`--pad` 面板内边距、`--lib-w = clamp(256px, 19.1vw, 336px)`、`--det-w = clamp(300px, (100vw − lib − 4g) × .382, 560px)`；布局脚本另写 `--ox`（舞台中轴偏移）与 `--stage`（舞台宽，用于镜头提示与通知的上限）。宽松档 g 21 / bar 68 / pad 14；紧凑档（`max-width:1479px` 或 `max-height:859px`）g 13 / bar 56 / pad 12；手机档（≤ 860）g 12 / bar 54。
 - **对齐约束**（`test/e2e/v030-cangyanlu.test.js` 在 1440 × 920 窗口内断言）：品牌卡、统计卡、时钟卡顶 = g、高 = bar；品牌卡宽 = 目录栏宽 ≤ 270；目录栏顶 = 2g + bar；面板底栏高 `bar − 1px`（面板自带 1px 描边），其上缘与工具坞上缘、面板下缘与工具坞下缘对齐；(视口 − 目录 − 详情 − 4g) / 详情 = 1.618 ± 0.02。
 - **运行环境**：`EMBED = location.protocol === 'cangyanlu:'` 时，保存提示、新手教程第 5 张、“数据与备份”说明与引导文字使用摘星阁措辞；独立打开文件时措辞不变。
+
+## v0.3.2 藏言录目录自动隐藏与字体
+
+- **宿主改动只有字体路由**：`electron/cangyanlu.js` 在固定来源下另外提供 `/fonts/source-han-sans-sc/index.css` 与 `noto-sans-sc-(数字|latin|latin-ext|cyrillic|vietnamese)-wght-normal.woff2`，文件取自 `renderer/fonts/source-han-sans-sc/`（`CANGYANLU_FONT_DIR`），路径只由白名单正则的捕获段拼出；样式表 `text/css` + `no-cache`，分片 `font/woff2` + 一年 immutable，读过即缓存在内存。CSP 改为 `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`、`font-src 'self' https://fonts.gstatic.com`，其余不变。摘星阁的渲染脚本、样式、预算与 webview 接线不变。
+- **字体**：藏言录 `--font` 以 `"Source Han Sans SC","Noto Sans SC"` 打头，`--font-brand: var(--font)`；`<head>` 里的小脚本在 `cangyanlu:` 来源下插入 `fonts/source-han-sans-sc/index.css`，否则插入 Google Fonts 的 `Noto Sans SC:wght@300..900`（脚本插入，不阻塞渲染）。标题 `.brand h1` 823 字重（紧凑档 23px，宽松档 27px），正文 450。
+- **目录栏模式**：设置 `libMode` = `auto`（缺省）| `pin`。`body.lib-auto` 仅在 `libMode !== 'pin'`、宽 > 860 且 `(hover: hover)` 时存在；`body.lib-peek` 表示浮出。收起态 `.lib` 位移出左缘、`scale .985`、`visibility:hidden`，浮出态 `z-index:2` 压在工具坞之上。`layout()` 在自动隐藏时把左侧占位记为 0，建筑信息卡左界为 `2g + 18`，引导第一步的舞台从 g 开始。感应带宽 `--g + 18px`、自 `--top` 到底部 g 为止，在 `Lib.apply()`（启动与窗口尺寸变化时）重算。
+- **可测状态**：`#libPin[aria-pressed]`、`body.lib-auto` / `body.lib-peek`、`localStorage['cangyanlu.v1'].settings.libMode`。e2e 用 `webContents.sendInputEvent({ type: 'mouseMove' })` 驱动 guest：(3, 402) 滑出，(640, 420) 收回。黄金栅格断言改量 `offset*` 布局盒（收起态带位移与缩放，`getBoundingClientRect` 会偏）。

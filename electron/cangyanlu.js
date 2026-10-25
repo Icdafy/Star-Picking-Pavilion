@@ -13,7 +13,11 @@ const CANGYANLU_HOST = 'app';
 const CANGYANLU_URL = `${CANGYANLU_SCHEME}://${CANGYANLU_HOST}/`;
 const CANGYANLU_PARTITION = 'persist:cangyanlu';
 const CANGYANLU_FILE = path.join(__dirname, 'cangyanlu', '藏言录.html');
-// 页面唯一的外部请求是标题书法字体的子集；连不上时它自己换用系统楷体。
+// 藏言录与摘星阁共用随包的思源黑体：页面在固定来源下引用 fonts/source-han-sans-sc/index.css，
+// 由这里从摘星阁自己的字体目录原样提供，离线可用、不再向 Google Fonts 取字。
+const FONT_DIR = path.join(__dirname, '..', 'renderer', 'fonts', 'source-han-sans-sc');
+const FONT_ROUTE = /^\/fonts\/source-han-sans-sc\/(index\.css|noto-sans-sc-(?:\d{1,3}|latin|latin-ext|cyrillic|vietnamese)-wght-normal\.woff2)$/;
+// 单独打开时页面才会请求 Google Fonts；嵌在这里时它走上面的本地字体，白名单保留只为兼容旧版页面。
 const FONT_ORIGINS = Object.freeze(['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
 const CANGYANLU_CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
@@ -22,8 +26,8 @@ const CANGYANLU_CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
   "object-src 'none'",
   "script-src 'unsafe-inline'",
-  "style-src 'unsafe-inline' https://fonts.googleapis.com",
-  'font-src https://fonts.gstatic.com',
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
   'img-src data: blob:',
   "connect-src 'none'"
 ].join('; ');
@@ -69,16 +73,36 @@ function registerCangyanluScheme(protocol) {
   }]);
 }
 
-function createCangyanluProtocolHandler({ readFile = fs.promises.readFile, file = CANGYANLU_FILE } = {}) {
+const FONT_HEADERS = Object.freeze({
+  css: Object.freeze({ 'Content-Type': 'text/css; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-cache' }),
+  woff2: Object.freeze({ 'Content-Type': 'font/woff2', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'max-age=31536000, immutable' })
+});
+
+function notFound() {
+  return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+}
+
+function createCangyanluProtocolHandler({ readFile = fs.promises.readFile, file = CANGYANLU_FILE, fontDir = FONT_DIR } = {}) {
   let page = null;
+  const fonts = new Map();
   return async request => {
     const url = parseUrl(request?.url);
-    if (!isCangyanluUrl(url?.href) || url.protocol === 'blob:' || !['/', '/index.html'].includes(url.pathname)) {
-      return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-    }
+    if (!isCangyanluUrl(url?.href) || url.protocol === 'blob:') return notFound();
+    const font = FONT_ROUTE.exec(url.pathname);
+    if (!font && !['/', '/index.html'].includes(url.pathname)) return notFound();
     const method = String(request.method || 'GET').toUpperCase();
     if (method !== 'GET' && method !== 'HEAD') {
       return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+    }
+    if (font) {
+      // 文件名只取白名单正则捕获的那一段，拼不出字体目录以外的路径；分片读过一次就留在内存里
+      const name = font[1];
+      let body = fonts.get(name);
+      if (!body) {
+        try { body = await readFile(path.join(fontDir, name)); } catch { return notFound(); }
+        fonts.set(name, body);
+      }
+      return new Response(method === 'HEAD' ? null : body, { status: 200, headers: FONT_HEADERS[name.endsWith('.css') ? 'css' : 'woff2'] });
     }
     page ||= await readFile(file);
     return new Response(method === 'HEAD' ? null : page, { status: 200, headers: RESPONSE_HEADERS });
@@ -150,6 +174,7 @@ module.exports = {
   CANGYANLU_URL,
   CANGYANLU_PARTITION,
   CANGYANLU_FILE,
+  CANGYANLU_FONT_DIR: FONT_DIR,
   CANGYANLU_CONTENT_SECURITY_POLICY,
   isCangyanluUrl,
   isAllowedGuestRequest,

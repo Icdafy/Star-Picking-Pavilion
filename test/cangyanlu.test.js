@@ -9,8 +9,8 @@ const cangyanlu = require('../electron/cangyanlu');
 
 const root = path.join(__dirname, '..');
 // 藏言录随包原样附带：更新它时整份替换文件，再同步这里的校验和与字节数。
-const BUNDLED_SHA256 = '9eda78ed0c8a95d58c1b6422fa7072205d6e72a587816a9c5411e2bb5fc152d1';
-const BUNDLED_BYTES = 1_130_155;
+const BUNDLED_SHA256 = '55177a1be973bb735739e923c3ed7df9a8aeb8403b201fa4faeb8d8a06cfe3d8';
+const BUNDLED_BYTES = 1_143_516;
 
 function createEvent() {
   return { prevented: false, preventDefault() { this.prevented = true; } };
@@ -74,12 +74,64 @@ test('协议只提供藏言录页面本身，并附带收紧的响应头', async
   assert.equal((await handler(new Request('cangyanlu://app/', { method: 'POST', body: 'x' }))).status, 405);
 });
 
-test('页面策略只放行内联脚本与样式、标题字体和本地图片', () => {
+test('协议从摘星阁的字体目录提供思源黑体，只认样式表与字重分片', async () => {
+  const reads = [];
+  const handler = cangyanlu.createCangyanluProtocolHandler({
+    readFile: async file => { reads.push(file); return Buffer.from(path.basename(file)); },
+    fontDir: 'C:/fonts'
+  });
+  const css = await handler(new Request('cangyanlu://app/fonts/source-han-sans-sc/index.css'));
+  assert.equal(css.status, 200);
+  assert.equal(css.headers.get('content-type'), 'text/css; charset=utf-8');
+  assert.equal(css.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(await css.text(), 'index.css');
+  const slice = await handler(new Request('cangyanlu://app/fonts/source-han-sans-sc/noto-sans-sc-42-wght-normal.woff2'));
+  assert.equal(slice.status, 200);
+  assert.equal(slice.headers.get('content-type'), 'font/woff2');
+  await handler(new Request('cangyanlu://app/fonts/source-han-sans-sc/noto-sans-sc-42-wght-normal.woff2'));
+  assert.deepEqual(reads, [path.join('C:/fonts', 'index.css'), path.join('C:/fonts', 'noto-sans-sc-42-wght-normal.woff2')], '分片读过一次就走内存');
+  for (const url of [
+    'cangyanlu://app/fonts/source-han-sans-sc/LICENSE',
+    'cangyanlu://app/fonts/source-han-sans-sc/../../../package.json',
+    'cangyanlu://app/fonts/source-han-sans-sc/%2e%2e%2findex.css',
+    'cangyanlu://app/fonts/source-han-sans-sc/noto-sans-sc-1-wght-normal.woff2.map',
+    'cangyanlu://app/fonts/other/index.css',
+    'cangyanlu://app/fonts/source-han-sans-sc/'
+  ]) assert.equal((await handler({ url, method: 'GET' })).status, 404, url);
+  assert.equal(reads.length, 2, '白名单之外的地址不读盘');
+  const missing = cangyanlu.createCangyanluProtocolHandler({ readFile: async () => { throw new Error('ENOENT'); } });
+  assert.equal((await missing(new Request('cangyanlu://app/fonts/source-han-sans-sc/noto-sans-sc-999-wght-normal.woff2'))).status, 404);
+});
+
+test('藏言录引用的字体样式表及其全部分片都能由固定来源提供', async () => {
+  assert.equal(path.relative(root, cangyanlu.CANGYANLU_FONT_DIR).split(path.sep).join('/'), 'renderer/fonts/source-han-sans-sc');
+  const page = fs.readFileSync(cangyanlu.CANGYANLU_FILE, 'utf8');
+  assert.match(page, /location\.protocol === 'cangyanlu:' \? 'fonts\/source-han-sans-sc\/index\.css'/);
+  const handler = cangyanlu.createCangyanluProtocolHandler();
+  const css = await handler(new Request('cangyanlu://app/fonts/source-han-sans-sc/index.css'));
+  const text = await css.text();
+  assert.equal(text, fs.readFileSync(path.join(cangyanlu.CANGYANLU_FONT_DIR, 'index.css'), 'utf8'));
+  const slices = [...text.matchAll(/url\(\.\/([^)]+)\)/g)].map(match => match[1]);
+  assert.ok(slices.length > 90, `分片数量 ${slices.length}`);
+  for (const name of [slices[0], 'noto-sans-sc-latin-wght-normal.woff2', slices[slices.length - 1]]) {
+    const response = await handler(new Request(`cangyanlu://app/fonts/source-han-sans-sc/${name}`));
+    assert.equal(response.status, 200, name);
+    assert.ok((await response.arrayBuffer()).byteLength > 1000, name);
+  }
+  // 每个分片名都必须落在协议的白名单里：数字分片之外还有 latin / latin-ext / cyrillic / vietnamese 四片
+  for (const name of slices) {
+    const response = await handler({ url: `cangyanlu://app/fonts/source-han-sans-sc/${name}`, method: 'HEAD' });
+    assert.equal(response.status, 200, name);
+  }
+});
+
+test('页面策略只放行内联脚本与样式、同源字体与 Google Fonts、本地图片', () => {
   const policy = cangyanlu.CANGYANLU_CONTENT_SECURITY_POLICY;
   assert.match(policy, /default-src 'none'/);
   assert.match(policy, /connect-src 'none'/);
   assert.match(policy, /frame-ancestors 'none'/);
-  assert.match(policy, /font-src https:\/\/fonts\.gstatic\.com/);
+  assert.match(policy, /style-src 'self' 'unsafe-inline' https:\/\/fonts\.googleapis\.com/);
+  assert.match(policy, /font-src 'self' https:\/\/fonts\.gstatic\.com/);
   assert.doesNotMatch(policy, /unsafe-eval|\*|http:/);
 });
 

@@ -129,10 +129,14 @@ test('v030 藏言录模块：固定来源、持久存储、隔离分区与桌面
   // v0.3.1 黄金分割版式：等入场动画落定再量。顶栏三卡同顶同高、品牌卡与目录栏同宽，
   // 面板底栏与工具坞落在同一条底线，详情栏 : 小岛舞台 = 1 : φ；嵌在摘星阁里时教程按摘星阁措辞
   await waitFor(() => guest(app, "document.getAnimations().every(a => a.animationName !== 'hudIn' || a.playState === 'finished')"), '藏言录入场动画没有结束');
+  // v0.3.2 起目录栏默认自动隐藏（收起时带位移与缩放），所以目录栏量布局盒（offset*，不受 transform 影响）
   const golden = await guest(app, `(() => {
     const box = s => document.querySelector(s).getBoundingClientRect();
     const css = n => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n));
-    const brand = box('.brand'), stats = box('#stats'), clock = box('#clock'), lib = box('#lib'), dock = box('#dock'), foot = box('.lib-foot');
+    const libEl = document.getElementById('lib'), footEl = libEl.querySelector('.lib-foot');
+    const lib = { width: libEl.offsetWidth, top: libEl.offsetTop, bottom: libEl.offsetTop + libEl.offsetHeight };
+    const foot = { top: libEl.offsetTop + libEl.clientTop + footEl.offsetTop };
+    const brand = box('.brand'), stats = box('#stats'), clock = box('#clock'), dock = box('#dock');
     const g = css('--g'), bar = css('--bar'), detail = document.getElementById('detail').offsetWidth;
     const guide = JSON.parse(localStorage.getItem('cangyanlu.v1')).prompts.find(p => p.id === 'p-guide-4');
     return { vw: innerWidth, g, bar, tops: [brand.top, stats.top, clock.top], heights: [brand.height, stats.height, clock.height],
@@ -146,6 +150,33 @@ test('v030 藏言录模块：固定来源、持久存储、隔离分区与桌面
   assert.ok(near(golden.libBottom, golden.dockBottom) && near(golden.footTop, golden.dockTop) && near(golden.dockHeight, golden.bar), `目录底栏与工具坞应上下缘对齐：${JSON.stringify(golden)}`);
   assert.ok(Math.abs(golden.phi - 1.618) < 0.02, `小岛舞台 : 详情栏应为 φ：${JSON.stringify(golden)}`);
   assert.equal(golden.hostWording, true, '嵌在摘星阁里时，新手教程应说明数据保存在摘星阁里');
+
+  // v0.3.2：字体与摘星阁统一（随包思源黑体经固定来源提供，标题 823 字重），中央建筑改名藏言岛，目录栏默认自动隐藏
+  const look = await guest(app, `(async () => {
+    await document.fonts.ready;
+    const h1 = getComputedStyle(document.querySelector('.brand h1'));
+    return { family: h1.fontFamily.split(',')[0].replace(/"/g, '').trim(), weight: h1.fontWeight,
+      loaded: [...document.fonts].some(face => face.family.replace(/"/g, '') === 'Source Han Sans SC' && face.status === 'loaded'),
+      island: document.querySelector('#labels .lbl.center .pill').textContent.startsWith('藏言岛'),
+      auto: document.body.classList.contains('lib-auto') };
+  })()`);
+  assert.deepEqual(look, { family: 'Source Han Sans SC', weight: '823', loaded: true, island: true, auto: true }, JSON.stringify(look));
+  // 新手引导结束后：鼠标贴到左边缘目录滑出，移到小岛上稍后收回；图钉切换固定并写入设置
+  await waitFor(() => guest(app, "Boolean(document.querySelector('.tour .pop'))"), '首次打开应出现新手引导', 20_000);
+  await guest(app, "document.querySelector('.tour [data-t=\"skip\"]').click(); true", true);
+  const pointer = (x, y) => app.evaluate(({ webContents }, at) => {
+    webContents.getAllWebContents().find(item => item.getType() === 'webview').sendInputEvent({ type: 'mouseMove', x: at.x, y: at.y });
+  }, { x, y });
+  const peeked = () => guest(app, "document.body.classList.contains('lib-peek')");
+  await pointer(560, 400);
+  await pointer(200, 400);
+  await pointer(3, 402);
+  await waitFor(peeked, '鼠标贴到左边缘时目录应滑出');
+  await pointer(300, 400);
+  await pointer(640, 420);
+  await waitFor(async () => !(await peeked()), '鼠标离开后目录应收回');
+  await guest(app, "document.getElementById('libPin').click(); true", true);
+  await waitFor(() => guest(app, "!document.body.classList.contains('lib-auto') && JSON.parse(localStorage.getItem('cangyanlu.v1')).settings.libMode === 'pin'"), '图钉应把目录栏切为固定并保存');
 
   // 权限只放行复制，其余照旧拒绝
   assert.equal(await guest(app, "navigator.permissions.query({ name: 'clipboard-write' }).then(status => status.state)"), 'granted');
