@@ -37,11 +37,10 @@ async function waitFor(check, message, timeout = 15_000) {
   throw new Error(message);
 }
 
-const countFrames = `new Promise(resolve => {
-  let frames = 0;
-  (function tick() { frames += 1; requestAnimationFrame(tick); })();
-  setTimeout(() => resolve(frames), 1000);
-})`;
+// 常驻帧计数：CI 运行器没有显卡，小岛走软件渲染只有每秒几帧，所以只比较“隐藏时不动、回来后继续走”，
+// 不假定任何固定帧率。
+const startFrameCounter = "window.__sppFrames = 0; (function tick() { window.__sppFrames += 1; requestAnimationFrame(tick); })(); true";
+const readFrames = 'window.__sppFrames';
 
 async function present(app, page) {
   await app.evaluate(({ BrowserWindow }) => {
@@ -166,6 +165,8 @@ test('v030 藏言录模块：固定来源、持久存储、隔离分区与桌面
   assert.equal(fs.readFileSync(download, 'utf8'), '{"prompts":[]}');
 
   // 焦点在藏言录里时 Alt+数字仍切换视图；隐藏后它停止出帧，回来后继续
+  await guest(app, startFrameCounter);
+  await waitFor(async () => await guest(app, readFrames) >= 3, '可见的藏言录应持续出帧');
   await app.evaluate(({ webContents }) => {
     const contents = webContents.getAllWebContents().find(item => item.getType() === 'webview');
     contents.focus();
@@ -174,9 +175,14 @@ test('v030 藏言录模块：固定来源、持久存储、隔离分区与桌面
   });
   await page.waitForSelector('#viewReleases:not([hidden])');
   assert.equal(await page.locator('#viewPrompts').isHidden(), true);
-  assert.ok(await guest(app, countFrames) <= 3, '隐藏的藏言录不应继续渲染');
+  await page.waitForTimeout(300);
+  const hiddenStart = await guest(app, readFrames);
+  await page.waitForTimeout(1500);
+  const hiddenEnd = await guest(app, readFrames);
+  console.log(`v030 hidden frames: ${hiddenEnd - hiddenStart} in 1.5 s`);
+  assert.ok(hiddenEnd - hiddenStart <= 2, `隐藏的藏言录不应继续渲染：1.5 秒内 ${hiddenEnd - hiddenStart} 帧`);
   await page.locator('.tab[data-view="prompts"]').click();
-  assert.ok(await guest(app, countFrames) > 10, '回到藏言录后应恢复渲染');
+  await waitFor(async () => await guest(app, readFrames) - hiddenEnd >= 3, '回到藏言录后应恢复渲染');
   assert.equal(await guestCount(app), 1, '切换视图复用同一个 webview');
 
   // 重启：回到上次的藏言录视图，数据仍在
