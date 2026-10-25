@@ -24,6 +24,8 @@
 
   画质：按显卡自动分档——独显（全部效果）/ 核显与移动端（降低采样与分辨率）/ 不支持 WebGL2（不做后期）；
         管理面板里把「动效」设为「减弱」，会同时收弱风、雾、泛光与光柱。
+  版式：黄金分割栅格——顶栏与底部工具坞同高、面板底栏与工具坞同一底线；目录栏占视口 19.1%，详情栏 : 小岛舞台 = 1 : φ。
+        窗口较小（如嵌在摘星阁里）时自动换紧凑档，字号与间距取 φ 音阶和斐波那契数；布局令牌在 <style> 开头的 :root 里。
   开发用地址参数：?debug 在 window.__cyl 上挂出 3D 场景的内部对象；?nopcss 改用 three.js 自带的软阴影。
 
   第三方：three.js — Copyright © 2010-2023 three.js authors — MIT License — https://github.com/mrdoob/three.js
@@ -77,6 +79,15 @@
   --font-brand:"Ma Shan Zheng","STXingkai","华文行楷","STKaiti","KaiTi","楷体",serif;
   --font-mono:"JetBrains Mono","Cascadia Code","SF Mono",Consolas,"Microsoft YaHei UI",monospace;
   --ox:0px;
+  /* 黄金分割栅格（φ = 1.618）：
+     · g 是外边距与栏间距，bar 是顶栏与底部工具坞的共同高度，面板从 2g + bar 处开始；
+     · 目录栏宽 = 视口 × φ⁻²/2（19.1%，与摘星阁导航栏同一比例）；
+     · 详情栏宽 : 小岛舞台 = 1 : φ（详情 = 剩余宽度 × φ⁻²），小岛始终是画面的「大段」；
+     · 面板底栏与工具坞同高、同一条底线，按钮中线对齐。 */
+  --g:21px; --bar:68px; --pad:14px;
+  --top:calc(var(--g) * 2 + var(--bar));
+  --lib-w:clamp(256px, 19.1vw, 336px);
+  --det-w:clamp(300px, calc((100vw - var(--lib-w) - var(--g) * 4) * .382), 560px);
   --night:0; --dusk:0; --snow:0; --envDur:2.8s;
   /* 与 3D 场景的过渡同一时长、同一条缓动（easeInOutCubic）：太阳沿天弧移动时，天色、岛上的阴影与季节一起变 */
   transition-property:--night,--dusk,--dawn,--moon,--snow,--sky1,--sky2,--sky3,--glow,--sunx,--suny,--suns,--sunc;
@@ -209,12 +220,15 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .hud-in{ animation:hudIn 1s var(--ease) backwards; animation-delay:calc(var(--i,0) * 90ms + 420ms); }
 @keyframes hudIn{ from{ opacity:0; transform:translateY(16px) scale(.985); filter:blur(8px); } }
 
-.brand{ position:fixed; left:20px; top:20px; display:flex; align-items:center; gap:13px; padding:11px 22px 11px 11px; border-radius:20px; cursor:default; }
-.logo{ width:46px; height:46px; flex:none; border-radius:14px; overflow:hidden; box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 4px 10px -4px rgba(0,0,0,.2); transition:transform .5s var(--spring); }
+/* 顶栏三张卡片同高同顶：品牌卡与下方目录栏同宽，时钟卡与右缘对齐，统计卡居于小岛舞台正中 */
+.brand{ position:fixed; left:var(--g); top:var(--g); width:var(--lib-w); height:var(--bar); display:flex; align-items:center; gap:13px; padding:0 18px 0 calc((var(--bar) - var(--logo)) / 2); border-radius:20px; cursor:default; --logo:46px; }
+.brand-t{ min-width:0; }
+.logo{ width:var(--logo); height:var(--logo); flex:none; border-radius:14px; overflow:hidden; box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 4px 10px -4px rgba(0,0,0,.2); transition:transform .5s var(--spring); }
 .brand:hover .logo{ transform:rotate(-6deg) scale(1.06); }
 .logo svg{ display:block; width:100%; height:100%; }
 .brand h1{ margin:0; font-family:var(--font-brand); font-weight:400; font-size:28px; line-height:1.05; letter-spacing:.08em; color:var(--ink); }
 .save-state{ display:flex; align-items:center; gap:7px; margin:4px 0 0; font-size:12.5px; color:var(--ink2); white-space:nowrap; }
+.save-state span{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .save-state button{ color:var(--accent); font-weight:600; }
 .live{ position:relative; width:8px; height:8px; border-radius:50%; background:var(--green); flex:none; }
 .live::after{ content:""; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--green); opacity:0; animation:live 2.4s var(--ease) infinite; }
@@ -222,8 +236,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .live.warn{ background:var(--red); } .live.warn::after{ border-color:var(--red); }
 @keyframes live{ 0%{ transform:scale(.4); opacity:.9; } 100%{ transform:scale(1.3); opacity:0; } }
 
-.stats{ position:fixed; top:20px; left:50%; translate:calc(-50% + var(--ox)) 0; display:flex; padding:13px 10px; border-radius:20px; transition:translate .9s var(--ease),opacity .4s; }
-.stat{ min-width:96px; padding:0 18px; display:flex; flex-direction:column; align-items:flex-start; position:relative; cursor:pointer; border-radius:12px; transition:background .2s; }
+.stats{ position:fixed; top:var(--g); left:50%; height:var(--bar); translate:calc(-50% + var(--ox)) 0; display:flex; align-items:stretch; padding:8px; border-radius:20px; transition:translate .9s var(--ease),opacity .4s; }
+.stat{ min-width:96px; padding:0 18px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; position:relative; cursor:pointer; border-radius:12px; transition:background .2s; }
 .stat:hover{ background:rgba(28,34,48,.045); }
 .stat:active{ background:rgba(28,34,48,.08); }
 .stat + .stat::before{ content:""; position:absolute; left:0; top:8px; bottom:8px; width:1px; background:var(--line); }
@@ -231,19 +245,20 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .stat span{ font-size:12.5px; color:var(--ink3); margin-top:2px; }
 .stats.hide{ opacity:0; pointer-events:none; }
 
-.clock{ position:fixed; right:20px; top:20px; padding:12px 20px 12px 24px; border-radius:20px; text-align:right; cursor:pointer; transition:transform .4s var(--spring); }
+/* 时钟横排：大字时间在左，日期与节气两行在右，整张卡与顶栏同高 */
+.clock{ position:fixed; right:var(--g); top:var(--g); height:var(--bar); display:grid; grid-template-columns:auto auto; align-content:center; align-items:center; column-gap:14px; padding:0 20px; border-radius:20px; cursor:pointer; transition:transform .4s var(--spring); }
 .clock:hover{ transform:translateY(-2px); }
 .clock:active{ transform:scale(.97); }
-.clock .time{ font-family:var(--font-num); font-size:34px; font-weight:600; letter-spacing:-.02em; line-height:1.05; font-variant-numeric:tabular-nums; }
+.clock .time{ grid-row:1 / 3; font-family:var(--font-num); font-size:34px; font-weight:600; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums; }
 .clock .time i{ font-style:normal; animation:colon 2s steps(1) infinite; }
 @keyframes colon{ 50%{ opacity:.25; } }
-.clock .date{ font-size:12.5px; color:var(--ink2); margin-top:3px; }
-.clock .term{ display:flex; align-items:center; justify-content:flex-end; gap:6px; font-size:12.5px; color:var(--ink2); margin-top:2px; }
+.clock .date{ grid-column:2; font-size:12.5px; line-height:1.45; color:var(--ink2); white-space:nowrap; }
+.clock .term{ grid-column:2; display:flex; align-items:center; gap:5px; font-size:12.5px; line-height:1.45; color:var(--ink2); white-space:nowrap; }
 .clock .term .ic{ width:15px; height:15px; color:var(--amber); }
 
 /* ---------- 左侧：藏书目录 ---------- */
-.lib{ position:fixed; left:20px; top:112px; bottom:20px; width:344px; display:flex; flex-direction:column; overflow:hidden; transition:translate .7s var(--ease),opacity .4s; }
-.lib-top{ padding:14px 14px 8px; display:flex; flex-direction:column; gap:10px; }
+.lib{ position:fixed; left:var(--g); top:var(--top); bottom:var(--g); width:var(--lib-w); display:flex; flex-direction:column; overflow:hidden; container-type:inline-size; transition:translate .7s var(--ease),opacity .4s; }
+.lib-top{ padding:var(--pad) var(--pad) 8px; display:flex; flex-direction:column; gap:10px; }
 .search{ display:flex; align-items:center; gap:9px; height:40px; padding:0 9px 0 12px; border-radius:13px; background:rgba(28,34,48,.05); box-shadow:inset 0 0 0 1px rgba(28,34,48,.03); transition:background .25s,box-shadow .25s; cursor:text; }
 .search .ic{ color:var(--ink3); width:17px; height:17px; }
 .search:focus-within{ background:#fff; box-shadow:0 0 0 1px rgba(224,96,58,.4),0 0 0 4px rgba(224,96,58,.12); }
@@ -294,7 +309,9 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
   color:var(--ink2); font-size:14px; font-weight:600; border:1.5px dashed rgba(28,34,48,.16); transition:border-color .2s,background .2s,color .2s; }
 .grp-new:hover{ border-color:var(--accent); color:var(--accent); background:rgba(224,96,58,.05); }
 .grp-new .ic{ width:17px; height:17px; }
-.grp-new small{ margin-left:auto; font-size:11.5px; font-weight:500; color:var(--ink3); }
+.grp-new span{ white-space:nowrap; }
+.grp-new small{ margin-left:auto; min-width:0; overflow:hidden; font-size:11.5px; font-weight:500; color:var(--ink3); white-space:nowrap; text-overflow:ellipsis; }
+@container (max-width:300px){ .grp-new small{ display:none; } }
 /* 管理 → 分类 */
 .cm-head{ display:flex; align-items:flex-start; gap:14px; margin:6px 0 10px; }
 .cm-head p{ flex:1; margin:0; font-size:12.5px; color:var(--ink3); line-height:1.6; }
@@ -351,8 +368,10 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .empty{ position:relative; z-index:1; padding:40px 18px; text-align:center; color:var(--ink3); font-size:13.5px; }
 .empty .ic{ width:34px; height:34px; color:var(--ink4); margin-bottom:10px; stroke-width:1.4; }
 .empty b{ display:block; color:var(--ink2); font-size:15px; font-weight:600; margin-bottom:4px; }
-.lib-foot{ display:flex; gap:8px; padding:10px 14px 14px; border-top:1px solid var(--line); }
-.lib-foot .btn.primary{ flex:1; }
+/* 两侧面板的底栏与工具坞同高（面板自带 1px 描边，底栏少算 1px）：分隔线与工具坞上缘、按钮与工具坞按钮都在同一条水平线上 */
+.lib-foot{ flex:none; display:flex; align-items:center; gap:8px; height:calc(var(--bar) - 1px); padding:0 var(--pad); border-top:1px solid var(--line); }
+.lib-foot .btn{ height:40px; }
+.lib-foot .btn.primary{ flex:1; min-width:0; }
 
 /* ---------- 按钮 ---------- */
 .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; border-radius:11px; font-size:13.5px; font-weight:550; color:var(--ink); background:rgba(28,34,48,.06); white-space:nowrap;
@@ -377,16 +396,16 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .btn[disabled]{ opacity:.45; pointer-events:none; }
 
 /* ---------- 右侧：提示词详情 ---------- */
-.detail{ position:fixed; right:20px; top:112px; bottom:20px; width:clamp(400px,31vw,548px); display:flex; flex-direction:column; overflow:hidden;
+.detail{ position:fixed; right:var(--g); top:var(--top); bottom:var(--g); width:var(--det-w); display:flex; flex-direction:column; overflow:hidden; container-type:inline-size;
   translate:calc(100% + 48px) 0; opacity:0; visibility:hidden; transition:translate .7s var(--ease),opacity .45s var(--ease),visibility 0s .7s; }
 .detail.open{ translate:0 0; opacity:1; visibility:visible; transition:translate .75s var(--spring),opacity .35s var(--ease),visibility 0s; }
-.d-head{ display:flex; align-items:center; gap:6px; padding:14px 14px 6px 16px; }
+.d-head{ display:flex; align-items:center; gap:4px; padding:var(--pad) calc(var(--pad) - 4px) 6px var(--pad); }
 .d-head .sp1{ flex:1; }
 .catpick{ display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 10px 0 11px; border-radius:10px; background:color-mix(in srgb,var(--cc) 10%,transparent); color:color-mix(in srgb,var(--cc) 75%,#000); font-size:13px; font-weight:600; transition:background .2s; }
 .catpick:hover{ background:color-mix(in srgb,var(--cc) 17%,transparent); }
 .catpick i{ width:9px; height:9px; border-radius:3px; background:var(--cc); }
 .catpick .ic{ width:14px; height:14px; opacity:.7; }
-.d-scroll{ flex:1; overflow-y:auto; overflow-x:hidden; padding:6px 22px 24px; overscroll-behavior:contain; }
+.d-scroll{ flex:1; overflow-y:auto; overflow-x:hidden; padding:6px calc(var(--pad) + 6px) 24px; overscroll-behavior:contain; }
 .d-anim > *{ animation:dIn .55s var(--ease) backwards; }
 .d-anim > *:nth-child(2){ animation-delay:.03s; } .d-anim > *:nth-child(3){ animation-delay:.06s; } .d-anim > *:nth-child(4){ animation-delay:.09s; }
 .d-anim > *:nth-child(5){ animation-delay:.12s; } .d-anim > *:nth-child(n+6){ animation-delay:.15s; }
@@ -395,7 +414,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .d-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin-top:10px; font-size:12.5px; color:var(--ink3); }
 .d-meta span{ display:inline-flex; align-items:center; gap:5px; }
 .d-meta .ic{ width:14px; height:14px; }
-.d-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.d-tags{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:12px; }
+.d-tags .mchip{ height:24px; padding:0 9px; border-radius:8px; font-size:12px; }
 .tag{ display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:8px; background:rgba(28,34,48,.055); color:var(--ink2); font-size:12px; cursor:pointer; transition:background .2s; }
 .tag:hover{ background:rgba(28,34,48,.1); }
 .d-note{ margin-top:14px; padding:10px 13px; border-radius:12px; background:rgba(234,162,28,.1); color:#7a5a12; font-size:13px; line-height:1.65; display:flex; gap:9px; user-select:text; -webkit-user-select:text; white-space:pre-wrap; }
@@ -419,9 +439,20 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .prose .vchip:hover{ background:color-mix(in srgb,var(--cc) 22%,transparent); }
 .prose .copyall{ position:absolute; right:8px; top:8px; opacity:0; transition:opacity .2s; }
 .prose:hover .copyall{ opacity:1; }
-.d-foot{ display:flex; align-items:center; gap:8px; padding:12px 16px 16px; border-top:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.35)); }
+.d-foot{ flex:none; display:flex; align-items:center; gap:8px; height:calc(var(--bar) - 1px); padding:0 var(--pad); border-top:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.35)); }
+.d-foot .btn.big{ height:44px; border-radius:14px; }
+.d-foot .btn.big.icon{ width:44px; }
+.d-foot .copybtn{ min-width:0; }
+/* 详情栏窄时，「编辑」只留图标（悬停仍有提示），把宽度让给主按钮 */
+@container (max-width:380px){
+  .d-foot .btn.big{ padding:0 14px; font-size:14px; }
+  .d-foot .btn.big.icon,.d-foot .btn.big[data-act="edit"]{ width:40px; padding:0; gap:0; }
+  .d-foot .btn.big[data-act="edit"]{ font-size:0; }
+  .d-foot [data-act="done"] kbd{ display:none; }
+}
 .d-foot .grow{ flex:1; }
-.d-foot .savehint{ flex:1; font-size:12.5px; color:var(--ink3); display:flex; align-items:center; gap:7px; }
+.d-foot .savehint{ flex:1; min-width:0; font-size:12.5px; color:var(--ink3); display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.d-foot .savehint span{ overflow:hidden; text-overflow:ellipsis; }
 .copybtn{ position:relative; overflow:hidden; }
 .copybtn .lab{ display:inline-flex; align-items:center; gap:8px; transition:transform .45s var(--spring),opacity .25s; }
 .copybtn .lab.b{ position:absolute; inset:0; justify-content:center; transform:translateY(120%); opacity:0; }
@@ -462,25 +493,29 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .editor textarea::selection{ background:rgba(224,96,58,.22); color:transparent; }
 .editor textarea::placeholder{ color:var(--ink4); }
 .ed-help{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:8px; font-size:12px; color:var(--ink3); }
-.ed-help code{ font-family:var(--font-mono); font-size:11.5px; padding:1px 6px; border-radius:6px; background:color-mix(in srgb,var(--cc) 12%,transparent); color:color-mix(in srgb,var(--cc) 80%,#000); }
+.ed-help > span:not(.sp1){ flex:1 1 160px; min-width:0; }
+.ed-help code{ white-space:nowrap; font-family:var(--font-mono); font-size:11.5px; padding:1px 6px; border-radius:6px; background:color-mix(in srgb,var(--cc) 12%,transparent); color:color-mix(in srgb,var(--cc) 80%,#000); }
 .ed-help .sp1{ flex:1; }
+.ed-help .btn{ margin-left:auto; }
 .ed-note{ width:100%; min-height:64px; resize:vertical; margin-top:6px; padding:10px 12px; border:0; outline:0; border-radius:12px; background:rgba(255,255,255,.75); box-shadow:inset 0 0 0 1px var(--line); font-size:13px; line-height:1.6; }
 .ed-note:focus{ background:#fff; box-shadow:inset 0 0 0 1.5px rgba(224,96,58,.45),0 0 0 4px rgba(224,96,58,.1); }
 
 /* ---------- 底部工具坞 ---------- */
-.dock{ position:fixed; bottom:20px; left:50%; translate:calc(-50% + var(--ox)) 0; display:flex; align-items:center; gap:14px; transition:translate .9s var(--ease); }
-.dock .dg{ display:flex; gap:9px; }
-.dk{ position:relative; width:64px; height:60px; border-radius:17px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
-  background:rgba(255,255,255,.82); border:1px solid rgba(255,255,255,.75); -webkit-backdrop-filter:blur(18px) saturate(1.6); backdrop-filter:blur(18px) saturate(1.6);
-  box-shadow:var(--shadow-sm); color:var(--ink2); font-size:11.5px; transition:transform .4s var(--spring),background .2s,color .2s,box-shadow .25s; }
-.dk .ic{ width:21px; height:21px; stroke-width:1.7; }
-.dk:hover{ transform:translateY(-4px); background:#fff; color:var(--ink); box-shadow:0 0 0 .5px rgba(28,34,48,.07),0 16px 28px -14px rgba(12,28,20,.45); }
-.dk:active{ transform:translateY(-1px) scale(.93); transition-duration:.08s; }
+/* 一整条玻璃工具栏（同 Figma、无边记的底部工具条）：与顶栏同高，镜头一组、内容一组，中间一道细分隔 */
+.dock{ position:fixed; bottom:var(--g); left:50%; height:var(--bar); translate:calc(-50% + var(--ox)) 0; display:flex; align-items:center; gap:6px; padding:0 6px; border-radius:20px; transition:translate .9s var(--ease); }
+.dock .dg{ display:flex; gap:2px; }
+.dock .dg + .dg{ padding-left:7px; border-left:1px solid var(--line); }
+.dk{ position:relative; width:58px; height:calc(var(--bar) - 12px); border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--ink2); font-size:11px; line-height:1; transition:transform .4s var(--spring),background .2s,color .2s,box-shadow .25s; }
+.dk .ic{ width:21px; height:21px; stroke-width:1.7; transition:transform .4s var(--spring); }
+.dk:hover{ background:rgba(28,34,48,.06); color:var(--ink); }
+.dk:hover .ic{ transform:translateY(-1px); }
+.dk:active{ transform:scale(.92); transition-duration:.08s; }
 .dk.on{ color:var(--accent); }
-.dk.hot{ color:#fff; background:linear-gradient(180deg,#2c3446,#1a202c); border-color:rgba(255,255,255,.1); }
+.dk.hot{ color:#fff; background:linear-gradient(180deg,#2c3446,#1a202c); box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 18px -8px rgba(20,26,40,.7); }
 .dk.hot:hover{ background:linear-gradient(180deg,#363f53,#222937); color:#fff; }
 .dk.mob{ display:none; }
-.dock.compact .dk{ width:48px; height:48px; border-radius:15px; }
+.dock.compact .dk{ width:calc(var(--bar) - 12px); }
 .dock.compact .dk span{ display:none; }
 .dock.compact2 .dk.cx{ display:none; }
 
@@ -561,7 +596,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .pal-foot span{ display:inline-flex; align-items:center; gap:6px; }
 
 #modals .layer{ z-index:40; }
-.modal{ position:absolute; left:50%; top:50%; width:min(var(--mw,560px),calc(100vw - 32px)); max-height:calc(100vh - 48px); translate:-50% -50%; display:flex; flex-direction:column; overflow:hidden; background:rgba(255,255,255,.93); border-radius:22px;
+/* 弹窗的黄金分割点落在视口高度的 38.2% 处（与摘星阁的对话框一致），比正中略高，视线更自然 */
+.modal{ position:absolute; left:50%; top:38.2%; width:min(var(--mw,560px),calc(100vw - 32px)); max-height:calc(100vh - 48px); translate:-50% -38.2%; display:flex; flex-direction:column; overflow:hidden; background:rgba(255,255,255,.93); border-radius:22px;
   opacity:0; transform:translateY(16px) scale(.97); transition:opacity .3s var(--ease),transform .55s var(--spring); }
 .layer.open .modal{ opacity:1; transform:none; }
 .m-head{ display:flex; align-items:center; gap:10px; padding:20px 20px 6px 24px; }
@@ -622,8 +658,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .m-sep{ height:1px; margin:5px 8px; background:var(--line); }
 .m-lab{ padding:6px 10px 3px; font-size:11.5px; color:var(--ink3); }
 
-#toasts{ position:fixed; z-index:45; left:50%; bottom:98px; translate:calc(-50% + var(--ox)) 0; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:translate .9s var(--ease); }
-.toast{ display:flex; align-items:center; gap:10px; max-width:min(560px,calc(100vw - 32px)); padding:10px 12px 10px 14px; border-radius:15px; background:rgba(26,32,44,.92); color:#fff; font-size:13.5px; pointer-events:auto;
+#toasts{ position:fixed; z-index:45; left:50%; bottom:calc(var(--g) + var(--bar) + 13px); translate:calc(-50% + var(--ox)) 0; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:translate .9s var(--ease); }
+.toast{ display:flex; align-items:center; gap:10px; max-width:min(560px,calc(var(--stage, 100vw) - 26px)); padding:10px 12px 10px 14px; border-radius:15px; background:rgba(26,32,44,.92); color:#fff; font-size:13.5px; pointer-events:auto;
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 18px 40px -16px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);
   animation:toastIn .55s var(--spring) backwards; }
 .toast.out{ animation:toastOut .3s var(--ease) forwards; }
@@ -714,8 +750,8 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .poi.show{ opacity:1; visibility:visible; transform:none; transition:opacity .25s var(--ease),transform .45s var(--spring),visibility 0s; }
 .poi-h{ display:flex; align-items:center; gap:9px; padding:0 4px 8px 8px; }
 .poi-h i{ width:10px; height:10px; border-radius:3px; background:var(--cc); box-shadow:0 0 0 3px color-mix(in srgb,var(--cc) 20%,transparent); flex:none; }
-.poi-h b{ font-size:15.5px; font-weight:700; }
-.poi-h small{ font-size:12px; color:var(--ink3); }
+.poi-h b{ min-width:0; overflow:hidden; font-size:15.5px; font-weight:700; white-space:nowrap; text-overflow:ellipsis; }
+.poi-h small{ flex:none; font-size:12px; color:var(--ink3); white-space:nowrap; }
 .poi-h .sp1{ flex:1; }
 .poi-h .btn{ width:28px; height:28px; }
 .poi-list{ max-height:min(330px,46vh); overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:1px; }
@@ -737,17 +773,17 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .poi-f .btn{ flex:1; height:32px; font-size:12.5px; }
 
 /* ---------- 镜头操作提示（前两次使用时出现） ---------- */
-.camhint{ position:fixed; z-index:11; left:50%; bottom:102px; translate:calc(-50% + var(--ox)) 0; display:flex; align-items:center; gap:14px; padding:9px 16px; border-radius:14px;
+.camhint{ position:fixed; z-index:11; left:50%; bottom:calc(var(--g) + var(--bar) + 13px); translate:calc(-50% + var(--ox)) 0; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 14px; width:max-content; max-width:calc(var(--stage, 100vw) - 26px); padding:9px 16px; border-radius:14px;
   background:rgba(26,32,44,.86); color:rgba(255,255,255,.92); font-size:12.5px; white-space:nowrap; pointer-events:none;
   -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); box-shadow:0 14px 30px -14px rgba(0,0,0,.5);
   opacity:0; transform:translateY(8px); transition:opacity .3s var(--ease),transform .45s var(--spring); }
 .camhint.show{ opacity:1; transform:none; }
-.camhint span{ display:inline-flex; align-items:center; gap:6px; }
+.camhint span{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
 .camhint kbd{ background:rgba(255,255,255,.16); color:#fff; box-shadow:none; }
 @media (max-width:860px){ .camhint{ display:none; } }
 
 /* ---------- 键盘漫游键帽：按下 W A S D / Q E 时浮现，按到哪个键哪个亮起（游戏教学式按键可视化） ---------- */
-.keypad{ position:fixed; z-index:11; left:50%; bottom:100px; translate:calc(-50% + var(--ox)) 0; display:flex; align-items:flex-end; gap:12px; padding:10px 12px 12px; border-radius:18px;
+.keypad{ position:fixed; z-index:11; left:50%; bottom:calc(var(--g) + var(--bar) + 13px); translate:calc(-50% + var(--ox)) 0; display:flex; align-items:flex-end; gap:12px; padding:10px 12px 12px; border-radius:18px;
   background:rgba(24,30,42,.8); -webkit-backdrop-filter:blur(16px) saturate(1.5); backdrop-filter:blur(16px) saturate(1.5);
   box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),0 18px 38px -16px rgba(0,0,0,.55); pointer-events:none;
   opacity:0; transform:translateY(10px) scale(.96); transition:opacity .28s var(--ease),transform .5s var(--spring),translate .9s var(--ease); }
@@ -792,26 +828,104 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 /* =====================================================================
    响应式
    ===================================================================== */
-@media (max-width:1180px){
-  .stat{ min-width:78px; padding:0 13px; }
-  .stat b{ font-size:26px; }
+/* 紧凑档：嵌入摘星阁（默认窗口下约 1118 × 754）或笔记本上的小窗口。
+   字号取 φ 的四分音阶（11.5 · 13 · 14.7 · 16.5 · 18.6 · 21），间距取斐波那契数（5 · 8 · 13 · 21），
+   与摘星阁自己的黄金分割令牌同一套比例；面板、卡片与工具坞仍按上面的栅格公式随视口伸缩。 */
+@media (max-width:1479px), (max-height:859px){
+  :root{ --g:13px; --bar:56px; --pad:12px; --r-xl:20px; }
+  .brand{ --logo:38px; gap:11px; padding-right:14px; border-radius:18px; }
+  .logo{ border-radius:11px; }
+  .brand h1{ font-size:22px; }
+  .save-state{ margin-top:3px; gap:6px; font-size:11.5px; }
+  .stats{ padding:6px; border-radius:18px; }
+  .stat{ min-width:0; padding:0 13px; border-radius:11px; }
+  .stat b{ font-size:21px; line-height:1.05; }
+  .stat span{ margin-top:1px; font-size:11.5px; }
+  .stat + .stat::before{ top:9px; bottom:9px; }
+  .clock{ padding:0 16px; column-gap:11px; border-radius:18px; }
+  .clock .time{ font-size:26px; }
+  .clock .date,.clock .term{ font-size:11.5px; }
+  .clock .term .ic{ width:13px; height:13px; }
+  .lib-top{ gap:8px; padding-bottom:6px; }
+  .search{ height:36px; gap:8px; padding:0 8px 0 11px; border-radius:11px; }
+  .search .ic{ width:16px; height:16px; }
+  .search kbd{ padding:3px 4px; font-size:10.5px; }
+  .search input{ font-size:13px; }
+  .seg{ border-radius:11px; }
+  .seg button{ height:26px; font-size:12px; border-radius:8px; }
+  .seg .ind{ border-radius:8px; }
+  .lib-list{ padding:2px 8px 13px; }
+  .hover-pill{ left:8px; right:8px; border-radius:12px; }
+  .grp-h{ height:40px; gap:5px; padding:0 3px 0 11px; border-radius:12px; }
+  .grp-h::before{ top:10px; bottom:10px; width:3px; }
+  .grp-h .bld{ width:24px; height:21px; margin:0 2px 0 1px; }
+  .grp-h b{ font-size:14px; }
+  .grp-h .cnt{ height:20px; margin-right:2px; padding:0 6px; gap:3px; font-size:11.5px; }
+  .grp-h .ga{ width:22px; height:24px; border-radius:7px; }
+  .grp-h .ga .ic{ width:14px; height:14px; }
+  .grp-h .chev{ width:13px; height:13px; }
+  .grp-new{ padding:9px 12px; font-size:13px; border-radius:12px; }
+  .it{ gap:9px; padding:8px 8px 8px 11px; border-radius:12px; }
+  .it .st{ width:7px; height:7px; margin-top:6.5px; }
+  .it-t{ font-size:13.5px; }
+  .it-m{ margin-top:3px; gap:5px; font-size:11.5px; }
+  .mchip,.vtag{ height:18px; font-size:11px; }
+  .ia{ width:26px; height:26px; }
+  .lib-foot .btn{ height:38px; padding:0 12px; font-size:13px; gap:7px; }
+  .lib-foot .btn .ic{ width:16px; height:16px; }
+  .d-head .btn.icon{ width:32px; height:32px; border-radius:10px; }
+  .d-head .btn.icon .ic{ width:16px; height:16px; }
+  .catpick{ height:30px; gap:7px; font-size:12.5px; }
+  .d-title,.ed-title{ font-size:21px; }
+  .d-meta{ margin-top:8px; gap:4px 10px; font-size:12px; }
+  .d-meta span{ gap:4px; }
+  .d-meta .ic{ width:13px; height:13px; }
+  .d-tags{ margin-top:10px; }
+  .tag,.d-tags .mchip{ height:22px; font-size:11.5px; }
+  .d-note{ margin-top:12px; padding:9px 12px; font-size:12.5px; line-height:1.6; }
+  .sec-h{ margin:18px 0 8px; font-size:12px; }
+  .vars{ gap:7px; }
+  .vf{ gap:8px; padding:3px 3px 3px 11px; border-radius:12px; }
+  .vf > span{ padding-top:8px; font-size:12px; }
+  .vf textarea{ min-height:34px; padding:7px 8px 7px 0; font-size:13px; }
+  .prose{ padding:13px 15px 15px; border-radius:14px; font-size:13.5px; line-height:1.8; }
+  .editor{ border-radius:14px; }
+  .editor > *{ padding:13px 15px 16px; font-size:13.5px; line-height:1.8; }
+  .ed-row{ gap:8px; margin-top:10px; }
+  .select select,.tagbox{ min-height:36px; height:auto; }
+  .select select{ height:36px; font-size:13px; }
+  .d-foot .btn.big{ height:40px; border-radius:13px; font-size:14px; padding:0 16px; }
+  .d-foot .btn.big.icon{ width:40px; padding:0; }
+  .dk{ width:calc(var(--bar) - 12px); border-radius:13px; }
+  .dk .ic{ width:20px; height:20px; }
+  .dk span{ display:none; }
+  .dock{ gap:5px; border-radius:18px; }
+  .dock .dg + .dg{ padding-left:6px; }
+  .lbl .pill{ gap:7px; padding:6px 11px 6px 9px; border-radius:11px; font-size:13.5px; }
+  .lbl .sub{ font-size:11.5px; }
+  .lbl.center .pill{ padding:7px 13px 7px 10px; font-size:14.5px; }
+  .lbl .dot{ width:9px; height:9px; }
+  .poi{ width:280px; }
+  .poi-h{ gap:6px; }
+  .poi-h .btn.icon.sm{ width:26px; height:26px; }
+  .tour .pop{ width:324px; padding:16px 16px 13px; }
+  .tour .pop h4{ font-size:15.5px; }
+  .tour .pop p{ font-size:13px; line-height:1.72; }
 }
 @media (max-width:860px){
-  .brand{ left:12px; top:12px; padding:8px 16px 8px 8px; }
-  .logo{ width:38px; height:38px; border-radius:12px; }
+  :root{ --g:12px; --bar:54px; }
+  .brand{ width:auto; --logo:38px; padding-right:16px; }
+  .logo{ border-radius:12px; }
   .brand h1{ font-size:23px; }
   .stats{ display:none; }
-  .clock{ right:12px; top:12px; padding:9px 14px; }
-  .clock .time{ font-size:26px; }
-  .lib{ left:12px; right:12px; top:84px; bottom:94px; width:auto; translate:calc(-100% - 30px) 0; opacity:0; }
+  .clock{ padding:0 14px; }
+  .clock .time{ font-size:24px; }
+  .lib{ right:var(--g); bottom:calc(var(--g) * 2 + var(--bar)); width:auto; translate:calc(-100% - 30px) 0; opacity:0; }
   body.libopen .lib{ translate:0 0; opacity:1; z-index:13; }
-  .detail{ left:12px; right:12px; top:84px; bottom:12px; width:auto; translate:0 calc(100% + 40px); z-index:12; }
+  .detail{ left:var(--g); width:auto; translate:0 calc(100% + 40px); z-index:12; }
   .detail.open{ translate:0 0; }
-  .dock{ bottom:12px; gap:8px; }
-  .dock .dg{ gap:6px; }
   .dk.mob{ display:flex; }
   .dk.cx{ display:none; }
-  #toasts{ bottom:86px; }
   .ed-row{ grid-template-columns:1fr; }
   .hist{ grid-template-columns:1fr; }
   .keys{ grid-template-columns:1fr; }
@@ -826,13 +940,15 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 }
 @media (max-width:520px){
   .brand{ padding-right:12px; }
-  .dock{ gap:6px; }
-  .dock .dg{ gap:5px; }
+  .dock{ gap:3px; padding:0 5px; }
+  .dock .dg{ gap:1px; }
+  .dock .dg + .dg{ padding-left:4px; }
   .save-state span{ max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+  .clock{ grid-template-columns:auto; justify-items:end; row-gap:3px; padding:0 13px; }
   .clock .term{ display:none; }
-  .clock .time{ font-size:22px; }
-  .clock .date{ font-size:11.5px; }
-  .dk{ width:44px; height:44px; border-radius:14px; }
+  .clock .time{ grid-row:auto; font-size:22px; }
+  .clock .date{ grid-column:1; font-size:11.5px; line-height:1; }
+  .dk{ width:40px; border-radius:12px; }
   .dk .ic{ width:19px; height:19px; }
   .dk span{ display:none; }
 }
@@ -994,7 +1110,7 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 
   <aside class="card detail" id="detail" aria-label="提示词详情"></aside>
 
-  <nav class="dock hud-in" style="--i:4" id="dock" aria-label="工具坞">
+  <nav class="card dock hud-in" style="--i:4" id="dock" aria-label="工具坞">
     <div class="dg">
       <button class="dk mob" data-act="lib" data-tip="目录"><svg class="ic"><use href="#i-list"/></svg><span>目录</span></button>
       <button class="dk" data-act="home" data-tip="回到全景（指针是小岛的朝向）" data-key="0"><svg class="ic compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><g class="needle"><path class="n" d="M12 4.2 14.6 12H9.4z"/><path class="s" d="M12 19.8 9.4 12h5.2z"/></g></svg><span>全景</span></button>
@@ -1070,9 +1186,13 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+/** 读取布局令牌（:root 上以 px 写的自定义属性，如 --g、--bar） */
+const cssPx = n => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
 const D2R = Math.PI / 180, TAU = Math.PI * 2;
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const MOD = IS_MAC ? '⌘' : 'Ctrl';
+/** 作为摘星阁的模块运行时（固定来源 cangyanlu://app），数据存在摘星阁里，界面里不再提「浏览器」与「这个 HTML」 */
+const EMBED = location.protocol === 'cangyanlu:';
 const uid = (p = 'p') => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const icon = (n, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
@@ -1202,10 +1322,10 @@ function guidePrompts(categories, now = Date.now()) {
 · 滚轮：以鼠标所在处为中心缩放
 · 点击建筑：浮出这个分类的提示词清单；双击空地：回到全景`),
     S('⑤ 你的数据保存在哪里', ['数据', '备份'], false, '', `
-· 你写的提示词、填过的变量、分类、收藏和外观设置，每一次改动都会自动保存在这台电脑的浏览器里，关掉再打开依然都在。
+· 你写的提示词、填过的变量、分类、收藏和外观设置，每一次改动都会自动保存在这台电脑的${EMBED ? '摘星阁' : '浏览器'}里，关掉再打开依然都在。
 · 数据只在你自己的电脑上，不会上传，也不会出现在同事的藏言录里。
-· 请固定用同一个浏览器（推荐 Chrome 或 Edge）打开这个文件，不要在无痕 / InPrivate 窗口里使用，那里的内容关窗就会被清除。
-· 想更保险：在「管理 → 数据与备份」里点「绑定文件」，所有修改会实时写进一个 JSON 文件，清理浏览器、重装系统都能从文件恢复。
+${EMBED ? '· 它和摘星阁的情报数据分开保存，互不影响。' : '· 请固定用同一个浏览器（推荐 Chrome 或 Edge）打开这个文件，不要在无痕 / InPrivate 窗口里使用，那里的内容关窗就会被清除。'}
+· 想更保险：在「管理 → 数据与备份」里点「绑定文件」，所有修改会实时写进一个 JSON 文件，${EMBED ? '重装摘星阁' : '清理浏览器'}、重装系统都能从文件恢复。
 · 换电脑：导出 JSON 备份，在新电脑上「合并导入」即可。`),
   ];
   return list.map((p, i) => normalizeP({ ...p, id: 'p-guide-' + i, order: i, createdAt: now - (list.length - i) * 60000, updatedAt: now - (list.length - i) * 60000 }, categories));
@@ -4397,13 +4517,14 @@ void main(){
     flyTo({ tx: b.x, ty: 8 + b.top * b.sc * .32, tz: b.y, az, el: clamp(cur.el, HOME.el - 2 * D2R, HOME.el + 8 * D2R), dist: fitDist / mul });
     markFocus();
   }
-  function setFit(availW, availH, ox = 0, cy = .53) {
+  /** topR / botR：顶栏与工具坞各自占去的高度（由布局按栅格令牌算好传入） */
+  function setFit(availW, availH, ox = 0, cy = .53, topR = 104, botR = 70) {
     const W = view.W, H = view.H, tanH = Math.tan(camera.fov * D2R / 2);
-    const el = HOME.el, mob = W <= 860;
+    const el = HOME.el;
     const topNeed = R * Math.sin(el) + 230 * Math.cos(el), botNeed = R * Math.sin(el) + 150;
     const sW = availW * .95 / (2 * R * 1.04);
-    const sT = (cy * H - (mob ? 70 : 104)) / topNeed;
-    const sB = ((1 - cy) * H - (mob ? 80 : 70)) / botNeed;
+    const sT = (cy * H - topR) / topNeed;
+    const sB = ((1 - cy) * H - botR) / botNeed;
     const s = Math.max(.08, Math.min(sW, sT, sB));
     const nf = clamp(H / (2 * tanH * s), 500, 12000);
     const ratio = nf / fitDist;
@@ -5523,7 +5644,7 @@ function finalizeEdit() {
   changed('list', 'info', 'sheet');
   if (!DB.settings.nudged && FSync.supported && FSync.state === 'none' && !/^p-(seed|guide)/.test(p.id)) {
     DB.settings.nudged = true;
-    setTimeout(() => toast('已自动保存在这个浏览器里。再绑定一个本地文件（比如和这个 HTML 放在一起），清缓存、换电脑都不会丢', 'info', { label: '绑定文件', fn: () => FSync.bind() }, 10000), 900);
+    setTimeout(() => toast(EMBED ? '已自动保存在摘星阁里。再绑定一个本地文件，重装、换电脑都不会丢' : '已自动保存在这个浏览器里。再绑定一个本地文件（比如和这个 HTML 放在一起），清缓存、换电脑都不会丢', 'info', { label: '绑定文件', fn: () => FSync.bind() }, 10000), 900);
   }
 }
 function setMode(m) {
@@ -5610,8 +5731,7 @@ let lastDetailKey = '';
 function metaHTML(p) {
   return `<span>${icon('copy')}取用 ${p.copyCount} 次</span>`
     + `<span>${icon('clock')}${p.lastCopiedAt ? '上次 ' + rel(p.lastCopiedAt) : '尚未取用'}</span>`
-    + `<span>${icon('text')}${countChars(p.content)} 字</span>`
-    + `<span class="mchip" style="--mc:${modelColor(p.model)}"><i></i>${esc(p.model)}</span>`;
+    + `<span>${icon('text')}${countChars(p.content)} 字</span>`;
 }
 function proseHTML(p) {
   const defs = Object.fromEntries(parseVars(p.content).map(v => [v.name, v.def]));
@@ -5639,7 +5759,7 @@ function viewHTML(p, c) {
     <div class="d-scroll d-anim">
       <h2 class="d-title">${esc(p.title || '未命名提示词')}</h2>
       <div class="d-meta" id="dMeta">${metaHTML(p)}</div>
-      ${p.tags.length ? `<div class="d-tags">${p.tags.map(t => `<span class="tag" data-tag="${esc(t)}" data-tip="搜索这个标签">#${esc(t)}</span>`).join('')}</div>` : ''}
+      <div class="d-tags"><span class="mchip" style="--mc:${modelColor(p.model)}" data-tip="适用模型"><i></i>${esc(p.model)}</span>${p.tags.map(t => `<span class="tag" data-tag="${esc(t)}" data-tip="搜索这个标签">#${esc(t)}</span>`).join('')}</div>
       ${p.note ? `<div class="d-note">${icon('note')}<div>${esc(p.note)}</div></div>` : ''}
       ${vars.length ? `<div class="sec-h">${icon('braces')}<span>填写变量 · ${vars.length}</span><span class="sp1"></span><button class="link" data-act="clearvars">清空</button></div>
       <div class="vars">${vars.map(v => `<label class="vf${String(p.vars[v.name] || '').trim() ? ' filled' : ''}"><span title="${esc(v.name)}">${esc(v.name)}</span><textarea rows="1" data-var="${esc(v.name)}" placeholder="${esc(v.def ? '默认：' + v.def : '填写' + v.name + '…')}">${esc(p.vars[v.name] || '')}</textarea></label>`).join('')}</div>` : ''}
@@ -5662,7 +5782,7 @@ function editHTML(p, c) {
       <button class="btn icon ghost" data-act="more" data-tip="更多操作">${icon('more')}</button>
     </div>
     <div class="d-scroll d-anim">
-      <input class="ed-title" data-f="title" value="${esc(p.title)}" placeholder="给它起个名字，例如：周报润色" maxlength="80" autocomplete="off">
+      <input class="ed-title" data-f="title" value="${esc(p.title)}" placeholder="标题，例如：周报润色" maxlength="80" autocomplete="off">
       <div class="ed-row">
         <div class="field"><label>标签</label><div class="tagbox" id="tagbox">${tagChips(p)}<input data-f="tag" placeholder="回车添加" autocomplete="off"></div></div>
         <div class="field"><label>适用模型</label><div class="select"><select data-f="model">${MODELS.map(m => `<option${m[0] === p.model ? ' selected' : ''}>${m[0]}</option>`).join('')}${known ? '' : `<option selected>${esc(p.model)}</option>`}</select>${icon('chev')}</div></div>
@@ -5831,6 +5951,11 @@ detailEl.addEventListener('keydown', e => {
       t.setSelectionRange(s + 1, s + 1);
       t.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    return;
+  }
+  if (t.id === 'edTa' && e.key === '}' && !e.ctrlKey && !e.metaKey) {
+    const s = t.selectionStart;
+    if (s === t.selectionEnd && t.value[s] === '}' && /\{\{[^{}\n]*\}?$/.test(t.value.slice(0, s))) { e.preventDefault(); t.setSelectionRange(s + 1, s + 1); }
     return;
   }
   if (t.dataset.var != null && e.key === 'Enter' && !e.shiftKey) {
@@ -6277,12 +6402,15 @@ const Poi = (() => {
     el.style.visibility = '';
     if (!size) size = { w: el.offsetWidth || 296, h: el.offsetHeight || 220 };
     const W = innerWidth, H = innerHeight;
-    if (!bounds) { const det = $('#detail'); bounds = { minX: $('#lib').getBoundingClientRect().right + 14, maxX: (det.classList.contains('open') ? W - det.offsetWidth - 20 : W) - 14 }; }
-    const { minX, maxX } = bounds;
+    if (!bounds) {
+      const det = $('#detail'), g = cssPx('--g'), bar = cssPx('--bar'), lib = $('#lib').getBoundingClientRect();
+      bounds = { minX: lib.right + g, maxX: (det.classList.contains('open') ? W - det.offsetWidth - g : W) - g, minY: lib.top, botR: g * 2 + bar };
+    }
+    const { minX, maxX, minY, botR } = bounds;
     let x = a.x + 96, right = true;
     if (x + size.w > maxX) { x = a.x - 96 - size.w; right = false; }
     x = clamp(x, minX, maxX - size.w);
-    const y = clamp(a.y - 10, 112, H - size.h - 104);
+    const y = clamp(a.y - 10, minY, H - size.h - botR);
     el.style.transform = '';
     el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px';
     el.style.setProperty('--po', right ? '0 20%' : '100% 20%');
@@ -6495,6 +6623,7 @@ function openManage(tab = 'look') {
       if (FSync.supported) {
         const desc = FSync.state === 'on' ? `已绑定「${esc(FSync.name)}」，每次修改都会自动写入该文件。`
           : FSync.state === 'need' ? `已绑定「${esc(FSync.name)}」，浏览器需要你再次授权才能继续写入。`
+          : EMBED ? '把全部提示词实时同步到一个 JSON 文件。即使重装了摘星阁、换了电脑，也能从文件恢复。'
           : '把全部提示词实时同步到一个 JSON 文件（建议和这个 HTML 放在同一个文件夹）。即使清理了浏览器数据、换了电脑，也能从文件恢复。';
         const btns = FSync.state === 'none' ? `<button class="btn primary" data-a="bind">${icon('link')}绑定文件</button><button class="btn" data-a="openfile">载入已有文件</button>`
           : FSync.state === 'need' ? `<button class="btn primary" data-a="regrant">恢复同步</button><button class="btn ghost" data-a="unbind">解除</button>`
@@ -6506,7 +6635,7 @@ function openManage(tab = 'look') {
       h += `<div class="opt-row" style="flex-wrap:wrap"><div class="l"><b>导出</b><small>JSON 可完整恢复全部数据；Markdown 便于阅读、分享或存档。</small></div><button class="btn" data-a="exjson">${icon('down')}JSON 备份</button><button class="btn" data-a="exmd">${icon('file')}Markdown</button></div>`;
       h += `<div class="opt-row" style="flex-wrap:wrap"><div class="l"><b>导入</b><small>「合并」保留现有内容、同名分类自动合并；「覆盖」用文件内容替换全部（会先自动导出一份备份）。也可以直接把 JSON 文件拖进窗口。</small></div><button class="btn" data-a="immerge">${icon('up')}合并导入</button><button class="btn danger" data-a="imreplace">覆盖导入</button></div>`;
       h += `<div class="opt-row" style="flex-wrap:wrap"><div class="l"><b>新手教程</b><small>把 5 张教程卡片放回「新手教程」分类：只补充缺失的卡片，不会动你自己的内容。</small></div><button class="btn" data-a="seed">${icon('spark')}恢复教程</button></div>`;
-      h += `<div class="opt-row"><div class="l"><b>存储说明</b><small>每次改动都会自动保存在本机浏览器里（另有一份备用副本），关掉再打开依然都在；数据只在你自己的电脑上，不会上传。换浏览器、使用无痕窗口或清理浏览数据会看不到，建议绑定文件或定期导出。现有 ${DB.prompts.length} 条提示词、${DB.categories.length} 个分类，回收站 ${DB.trash.length} 条。</small></div></div>`;
+      h += `<div class="opt-row"><div class="l"><b>存储说明</b><small>每次改动都会自动保存在${EMBED ? '摘星阁' : '本机浏览器'}里（另有一份备用副本），关掉再打开依然都在；数据只在你自己的电脑上，不会上传。${EMBED ? '重装或换电脑前，建议绑定文件或定期导出。' : '换浏览器、使用无痕窗口或清理浏览数据会看不到，建议绑定文件或定期导出。'}现有 ${DB.prompts.length} 条提示词、${DB.categories.length} 个分类，回收站 ${DB.trash.length} 条。</small></div></div>`;
     } else if (cur === 'trash') {
       h = DB.trash.length ? `<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 4px"><small style="color:var(--ink3)">最多保留最近删除的 60 条</small><button class="btn sm danger" data-a="emptytrash">清空回收站</button></div>`
         + DB.trash.map(t => `<div class="trash-it"><div class="l"><b>${esc(t.title || '未命名')}</b><small>删除于 ${rel(t.deletedAt)} · ${countChars(t.content)} 字</small></div><button class="btn sm" data-a="restore" data-id="${t.id}">${icon('undo')}恢复</button><button class="btn sm ghost icon" data-a="purge" data-id="${t.id}" data-tip="彻底删除">${icon('x')}</button></div>`).join('')
@@ -6587,7 +6716,7 @@ function openManage(tab = 'look') {
           case 'bind': await FSync.bind(); render(layer); break;
           case 'openfile': await FSync.open(); render(layer); break;
           case 'regrant': await FSync.regrant(); render(layer); break;
-          case 'unbind': await FSync.unbind(); toast('已解除文件绑定，数据仍保存在浏览器中', 'info'); render(layer); break;
+          case 'unbind': await FSync.unbind(); toast(EMBED ? '已解除文件绑定，数据仍保存在摘星阁中' : '已解除文件绑定，数据仍保存在浏览器中', 'info'); render(layer); break;
           case 'exjson': exportJSON(); break;
           case 'exmd': exportMD(); break;
           case 'immerge': pickImport('merge'); break;
@@ -6640,14 +6769,17 @@ fileIn.addEventListener('change', () => { const f = fileIn.files[0]; if (f) impo
    ===================================================================== */
 function layout() {
   const W = innerWidth, H = innerHeight, mobile = W <= 860;
+  const g = cssPx('--g'), bar = cssPx('--bar');
   const det = $('#detail'), detOpen = det.classList.contains('open');
+  // 两侧面板连同各自的两道栏间距一起让出，剩下的就是小岛舞台；舞台中心即统计卡、工具坞与小岛的中轴
   let left = 0, right = 0;
-  if (!mobile) { left = $('#lib').offsetWidth + 26; if (detOpen) right = det.offsetWidth + 26; }
+  if (!mobile) { left = $('#lib').offsetWidth + g * 2; if (detOpen) right = det.offsetWidth + g * 2; }
   const ox = (left - right) / 2;
   document.documentElement.style.setProperty('--ox', ox + 'px');
+  document.documentElement.style.setProperty('--stage', Math.max(0, W - left - right) + 'px');
   Poi.invalidate();
-  Scene.setFit(W - left - right, mobile ? H * .82 : H - 30, ox, mobile ? .46 : .53);
-  const dock = $('#dock'), free = W - left - right - 28;
+  Scene.setFit(W - left - right, mobile ? H * .82 : H - 30, ox, mobile ? .46 : .53, g + bar + (mobile ? 4 : 15), g + bar + (mobile ? 14 : -19));
+  const dock = $('#dock'), free = W - left - right - 16;
   dock.classList.remove('compact', 'compact2');
   if (!mobile) {
     if (dock.offsetWidth > free) dock.classList.add('compact');
@@ -6886,7 +7018,11 @@ function layout() {
    ===================================================================== */
 const Tour = (() => {
   let el = null, i = 0, steps = [];
-  const area = () => { const lib = $('#lib').getBoundingClientRect(); return { x: lib.right + 18, y: 112, w: innerWidth - lib.right - 36, h: innerHeight - 220, rad: 36 }; };
+  // 第一步照亮整个小岛舞台：目录右侧、顶栏之下、工具坞之上
+  const area = () => {
+    const lib = $('#lib').getBoundingClientRect(), g = cssPx('--g'), bar = cssPx('--bar');
+    return { x: lib.right + g, y: lib.top, w: innerWidth - lib.right - g * 2, h: innerHeight - lib.top - bar - g * 2, rad: 28 };
+  };
   const box = (sel, pad = 8, rad = 22) => () => { const t = $(sel); if (!t) return null; const r = t.getBoundingClientRect(); return r.width ? { x: r.left - pad, y: r.top - pad, w: r.width + 2 * pad, h: r.height + 2 * pad, rad } : null; };
   const STEPS = () => [
     { icon: 'home', title: '欢迎来到藏言录', rect: area, side: 'inside',
@@ -6899,7 +7035,7 @@ const Tour = (() => {
     { icon: 'paste', title: '随手收录', rect: box('#btnNew', 6, 16), side: 'right',
       body: `点「新建」，或者在任何空白处按 <b>${MOD} V</b>，剪贴板里的提示词会直接收进仓库。之后随时按 <b>${MOD} K</b> 搜索、回车即复制。` },
     { icon: 'check', title: '写下的都会被记住', rect: box('.brand', 6, 26), side: 'right',
-      body: '提示词、填过的变量、分类、收藏和外观设置，每一次改动都<b>自动保存在这台电脑上</b>，关掉再打开依然都在，同事之间互不可见。<br>想更保险：在「管理 → 数据与备份」里<b>绑定一个文件</b>，清理浏览器、换电脑都能恢复。' },
+      body: `提示词、填过的变量、分类、收藏和外观设置，每一次改动都<b>自动保存在这台电脑上</b>，关掉再打开依然都在，同事之间互不可见。<br>想更保险：在「管理 → 数据与备份」里<b>绑定一个文件</b>，${EMBED ? '重装' : '清理浏览器'}、换电脑都能恢复。` },
     { icon: 'seasons', title: '四时主题', rect: box('#dock [data-act="theme"]', 6, 20), side: 'top',
       body: '这里切换主题：<b>清晨</b>（春 · 飞花）、<b>白昼</b>（夏 · 蝶舞）、<b>黄昏</b>（秋 · 落叶）、<b>夜晚</b>（冬 · 飘雪）。「自动」会按本机时间在 8、12、16、20 点自动换，日光、阴影与季节一起缓缓过渡。' },
   ];

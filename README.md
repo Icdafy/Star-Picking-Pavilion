@@ -2,6 +2,14 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
+## v0.3.1 · 藏言录黄金分割排版
+
+- **两侧收窄，小岛变大**：藏言录的目录栏占视口 19.1%（与摘星阁导航栏同一比例），详情栏与小岛舞台按 1 : φ 分配；默认窗口下两栏由 344 / 400px 收窄为 256 / 309px，小岛可视宽度约 310 → 500px。
+- **视觉对齐**：顶栏三卡同顶同高、品牌卡与目录栏同宽，时钟横排；底部工具坞改为与顶栏同高的整条工具栏，面板底栏与工具坞同一条底线；窗口较小时自动换紧凑档，字号与间距取 φ 音阶和斐波那契数。
+- **新用户体验**：建筑信息卡、镜头提示、通知与新手引导按新栅格摆放；嵌在摘星阁里时保存与备份说明改为“保存在摘星阁里”；编辑器敲 `}` 会越过自动补全的括号。
+
+版本、界面与更新元数据统一为 0.3.1，随包藏言录仍与原始单文件逐字节一致。实现与验证见 [验证记录](docs/v031-validation.md)。升级保留已有情报、星标、备忘、归档、密钥、全部设置与藏言录数据，无新增 npm 依赖。
+
 ## v0.3.0 · 工作区与藏言录
 
 - **工作区**：侧栏分组“情报工作区”更名为“工作区”，底部标识随之改为“本地工作区”。
@@ -9,19 +17,19 @@
 - **桌面一体**：藏言录铺满工作区，窄窗口自动贴齐吸顶导航；<kbd>G</kbd> <kbd>P</kbd> 直达，焦点在藏言录里时 <kbd>Alt</kbd>+数字照常切换视图；外链交给系统浏览器，导出走系统保存框；切到其他视图时暂停渲染。
 - **数据独立**：提示词保存在摘星阁本机的独立分区，重启与升级后仍在，与情报库互不影响，卸载时同样保留。
 
-版本、界面与更新元数据统一为 0.3.0，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v030-validation.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增 npm 依赖。
+v0.3.0 的实现与验证见 [验证记录](docs/v030-validation.md)。正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增 npm 依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.3.0.exe`，双击并按向导安装。v0.3.0 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.3.1.exe`，双击并按向导安装。v0.3.1 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.3.0.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.3.1.exe
 Get-Content .\SHA256SUMS.txt
 ```
 

@@ -126,6 +126,27 @@ test('v030 藏言录模块：固定来源、持久存储、隔离分区与桌面
   await waitFor(() => guest(app, "localStorage.getItem('cangyanlu.v1') !== null"), '藏言录没有写入本地数据');
   await guest(app, "localStorage.setItem('spp.e2e.marker', 'v030'); true");
 
+  // v0.3.1 黄金分割版式：等入场动画落定再量。顶栏三卡同顶同高、品牌卡与目录栏同宽，
+  // 面板底栏与工具坞落在同一条底线，详情栏 : 小岛舞台 = 1 : φ；嵌在摘星阁里时教程按摘星阁措辞
+  await waitFor(() => guest(app, "document.getAnimations().every(a => a.animationName !== 'hudIn' || a.playState === 'finished')"), '藏言录入场动画没有结束');
+  const golden = await guest(app, `(() => {
+    const box = s => document.querySelector(s).getBoundingClientRect();
+    const css = n => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n));
+    const brand = box('.brand'), stats = box('#stats'), clock = box('#clock'), lib = box('#lib'), dock = box('#dock'), foot = box('.lib-foot');
+    const g = css('--g'), bar = css('--bar'), detail = document.getElementById('detail').offsetWidth;
+    const guide = JSON.parse(localStorage.getItem('cangyanlu.v1')).prompts.find(p => p.id === 'p-guide-4');
+    return { vw: innerWidth, g, bar, tops: [brand.top, stats.top, clock.top], heights: [brand.height, stats.height, clock.height],
+      brand: brand.width, lib: lib.width, libTop: lib.top, libBottom: lib.bottom, footTop: foot.top, dockTop: dock.top, dockBottom: dock.bottom, dockHeight: dock.height,
+      phi: (innerWidth - lib.width - detail - g * 4) / detail, hostWording: guide.content.includes('摘星阁') && !guide.content.includes('无痕') };
+  })()`);
+  const near = (a, b, tolerance = 0.75) => Math.abs(a - b) <= tolerance;
+  assert.ok(golden.vw > 1000 && golden.vw < 1200 && golden.g === 13 && golden.bar === 56, `默认窗口下藏言录应取紧凑档：${JSON.stringify(golden)}`);
+  assert.ok(golden.tops.every(top => near(top, golden.g)) && golden.heights.every(height => near(height, golden.bar)), `顶栏三卡应同顶同高：${JSON.stringify(golden)}`);
+  assert.ok(near(golden.brand, golden.lib) && golden.lib <= 270 && near(golden.libTop, golden.g * 2 + golden.bar), `品牌卡与目录栏应同宽且目录栏收窄：${JSON.stringify(golden)}`);
+  assert.ok(near(golden.libBottom, golden.dockBottom) && near(golden.footTop, golden.dockTop) && near(golden.dockHeight, golden.bar), `目录底栏与工具坞应上下缘对齐：${JSON.stringify(golden)}`);
+  assert.ok(Math.abs(golden.phi - 1.618) < 0.02, `小岛舞台 : 详情栏应为 φ：${JSON.stringify(golden)}`);
+  assert.equal(golden.hostWording, true, '嵌在摘星阁里时，新手教程应说明数据保存在摘星阁里');
+
   // 权限只放行复制，其余照旧拒绝
   assert.equal(await guest(app, "navigator.permissions.query({ name: 'clipboard-write' }).then(status => status.state)"), 'granted');
   assert.equal(await guest(app, "navigator.permissions.query({ name: 'geolocation' }).then(status => status.state)"), 'denied');

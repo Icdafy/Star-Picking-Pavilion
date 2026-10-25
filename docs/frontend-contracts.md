@@ -1010,3 +1010,10 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 - **webview**：主窗口 `webviewTag: true`，`will-attach-webview` 只放行固定地址与分区并剥离预加载、强制沙箱与上下文隔离。guest 的外链交给系统浏览器；`window.open` 放行一个不显示的空壳并立即销毁，让页面拿到句柄而不误报“被拦截”。guest 内的 Alt+数字经 `before-input-event` → `cangyanlu:shortcut` → 预加载 `onCangyanluShortcut(cb)`（返回解绑函数）转回工作区切换视图。
 - **铺满**：`CangyanluController.createCangyanluController({ document, window, view, host, viewport, desktop, getPinned, observe })` → `enter` / `measure` / `reload` / `getFrame`。首次进入才创建 webview（分区先于地址写入）；高度 `--cyl-h` = 视口高 − 吸顶塔台（宽屏）或导航（窄屏）下沿 − main 底部留白，用 offsetTop 链计算以免受入场 transform 影响；进入时把视口滚到藏言录紧贴吸顶元素处，尺寸变化只重算高度。`#cangyanluHost[data-state]` = idle | loading | ready | error | unavailable，错误态提供“重新载入”。
 - **预算**：脚本 30/30，CSS ≈ 333.2 KB / 336 KiB，关键帧 20/20，backdrop-filter 10/10 均未新增滤镜或关键帧。
+
+## v0.3.1 藏言录黄金分割排版
+
+- **范围**：只改藏言录原始单文件（`F:\藏言录\藏言录.html`）并整份替换随包副本、同步 `test/cangyanlu.test.js` 的 SHA-256 与字节数；摘星阁宿主的脚本、样式、预算与 webview 接线均不变。
+- **栅格令牌**（藏言录 `:root`）：`--g` 外边距与栏间距、`--bar` 顶栏与工具坞同高、`--top = 2g + bar` 面板顶、`--pad` 面板内边距、`--lib-w = clamp(256px, 19.1vw, 336px)`、`--det-w = clamp(300px, (100vw − lib − 4g) × .382, 560px)`；布局脚本另写 `--ox`（舞台中轴偏移）与 `--stage`（舞台宽，用于镜头提示与通知的上限）。宽松档 g 21 / bar 68 / pad 14；紧凑档（`max-width:1479px` 或 `max-height:859px`）g 13 / bar 56 / pad 12；手机档（≤ 860）g 12 / bar 54。
+- **对齐约束**（`test/e2e/v030-cangyanlu.test.js` 在 1440 × 920 窗口内断言）：品牌卡、统计卡、时钟卡顶 = g、高 = bar；品牌卡宽 = 目录栏宽 ≤ 270；目录栏顶 = 2g + bar；面板底栏高 `bar − 1px`（面板自带 1px 描边），其上缘与工具坞上缘、面板下缘与工具坞下缘对齐；(视口 − 目录 − 详情 − 4g) / 详情 = 1.618 ± 0.02。
+- **运行环境**：`EMBED = location.protocol === 'cangyanlu:'` 时，保存提示、新手教程第 5 张、“数据与备份”说明与引导文字使用摘星阁措辞；独立打开文件时措辞不变。
