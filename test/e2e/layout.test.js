@@ -353,3 +353,50 @@ test('全部窗口、缩放和核心视图无横向溢出且主导航完整可�
     });
   }
 });
+
+// v0.3.3：纵向指挥栏不能沿用窄屏 .nav 的 flex-wrap。窗口不够高时标签列曾被折到「工作区」右侧、
+// 溢出侧栏；golden.css 的 --ctl-h 下限也曾让矮屏压缩失效。默认字号下十一个视图要一屏放下。
+test('宽而矮的窗口里指挥栏标签保持单列、不出侧栏', { timeout: 120_000 }, async t => {
+  const dataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'spp-rail-'));
+  await fs.promises.copyFile(fixture, path.join(dataDir, 'settings.json'));
+  const app = await launchNativeElectron(projectRoot, dataDir);
+  t.after(async () => {
+    await app.close().catch(() => {});
+    await fs.promises.rm(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+  const page = await app.firstWindow();
+  await page.waitForSelector('.nav');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].showInactive());
+  for (const size of [{ width: 1180, height: 680 }, { width: 1280, height: 720 }, { width: 1300, height: 780 }]) {
+    await app.evaluate(({ BrowserWindow }, value) => {
+      BrowserWindow.getAllWindows()[0].setContentSize(value.width, value.height);
+    }, size);
+    await page.waitForFunction(value => innerWidth === value.width && innerHeight === value.height, size);
+    for (const scale of ['sm', 'md', 'lg']) {
+      await page.evaluate(value => {
+        document.documentElement.dataset.uiScale = value;
+        window.dispatchEvent(new Event('resize'));
+      }, scale);
+      await page.waitForTimeout(60);
+      const rail = await page.evaluate(() => {
+        if (!matchMedia('(min-width: 70rem)').matches) return null;
+        const box = document.querySelector('.command-rail').getBoundingClientRect();
+        const label = document.querySelector('.rail-section-label').getBoundingClientRect();
+        const list = document.querySelector('.nav-tabs');
+        const tabs = [...list.querySelectorAll('.tab')].map(tab => tab.getBoundingClientRect());
+        return {
+          wrap: getComputedStyle(document.querySelector('.nav')).flexWrap,
+          outside: tabs.filter(b => b.left < box.left - 1 || b.right > box.right + 1).length,
+          besideLabel: label.height > 0 && tabs.some(b => b.top < label.bottom - 1),
+          hiddenRows: list.scrollHeight - list.clientHeight
+        };
+      });
+      if (!rail) continue;
+      const label = `${size.width}×${size.height}/${scale}`;
+      assert.equal(rail.wrap, 'nowrap', `${label} 指挥栏导航仍会换列`);
+      assert.equal(rail.outside, 0, `${label} 有标签溢出侧栏`);
+      assert.equal(rail.besideLabel, false, `${label} 标签列跑到「工作区」旁边`);
+      if (scale === 'md') assert.ok(rail.hiddenRows <= 1, `${label} 默认字号下标签需要滚动：${rail.hiddenRows}px`);
+    }
+  }
+});

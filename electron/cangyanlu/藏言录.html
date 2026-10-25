@@ -214,6 +214,9 @@ body.nolabels #labels .lbl:not(.focus) .pill{ pointer-events:none; }
 .lbl.center .pill{ font-size:16px; padding:8px 15px 8px 12px; }
 .lbl.center .dot{ border-radius:50%; }
 .lbl.dim{ opacity:.35; }
+/* 名牌钻到顶栏卡片底下又没法往下让、或被两侧面板压住时先隐去，等镜头移开再浮现 */
+.lbl.tuck{ opacity:0; }
+.lbl.tuck .pill{ pointer-events:none; }
 .lbl.dropover .pill{ transform:translateY(-4px) scale(1.1); background:#fff; box-shadow:0 0 0 3px var(--cc),0 18px 30px -12px rgba(12,28,20,.5); }
 .lbl .plus{ position:absolute; left:50%; top:-6px; font-family:var(--font-num); font-weight:700; font-size:15px; color:var(--cc); text-shadow:0 1px 0 #fff,0 0 8px #fff; animation:plus 1.2s var(--ease) forwards; pointer-events:none; }
 @keyframes plus{ from{ transform:translate(-50%,0); opacity:0; } 20%{ opacity:1; } to{ transform:translate(-50%,-30px); opacity:0; } }
@@ -405,6 +408,10 @@ body.lib-auto.lib-peek .lib{ translate:0 0; scale:1; opacity:1; visibility:visib
   box-shadow:var(--shadow),0 34px 80px -28px rgba(12,28,20,.6);
   transition:translate .56s cubic-bezier(.16,1,.3,1),scale .56s cubic-bezier(.16,1,.3,1),opacity .18s,visibility 0s,box-shadow .3s; }
 body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
+/* 目录滑出时若会压到工具坞，工具坞和提示条就让到目录与详情之间（即固定目录时的位置），目录收回再回到舞台中轴。
+   让位与目录滑动走同一条曲线、同样时长，像是目录把它轻轻推开（同 iPadOS 侧栏推开工具条） */
+body.lib-swing :is(.dock,#toasts){ transition-duration:.56s; transition-timing-function:cubic-bezier(.16,1,.3,1); }
+body.lib-swing:not(.lib-peek) :is(.dock,#toasts){ transition-duration:.4s; transition-timing-function:var(--ease-io); }
 
 /* ---------- 按钮 ---------- */
 .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; border-radius:11px; font-size:13.5px; font-weight:600; color:var(--ink); background:rgba(28,34,48,.06); white-space:nowrap;
@@ -470,6 +477,7 @@ body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
   background:transparent; color:color-mix(in srgb,var(--cc) 85%,#000); box-shadow:inset 0 0 0 1.2px color-mix(in srgb,var(--cc) 45%,transparent); transition:background .2s; }
 .prose .vchip.filled{ background:color-mix(in srgb,var(--cc) 14%,transparent); box-shadow:none; }
 .prose .vchip:hover{ background:color-mix(in srgb,var(--cc) 22%,transparent); }
+.prose .vchip.nw{ white-space:nowrap; }
 .prose .copyall{ position:absolute; right:8px; top:8px; opacity:0; transition:opacity .2s; }
 .prose:hover .copyall{ opacity:1; }
 .d-foot{ flex:none; display:flex; align-items:center; gap:8px; height:calc(var(--bar) - 1px); padding:0 var(--pad); border-top:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.35)); }
@@ -482,6 +490,7 @@ body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
   .d-foot .btn.big.icon,.d-foot .btn.big[data-act="edit"]{ width:40px; padding:0; gap:0; }
   .d-foot .btn.big[data-act="edit"]{ font-size:0; }
   .d-foot [data-act="done"] kbd{ display:none; }
+  .d-foot .savehint .more{ display:none; }
 }
 .d-foot .grow{ flex:1; }
 .d-foot .savehint{ flex:1; min-width:0; font-size:12.5px; font-weight:500; color:var(--ink3); display:flex; align-items:center; gap:7px; white-space:nowrap; }
@@ -503,7 +512,8 @@ body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
 .ed-title{ width:100%; margin-top:6px; padding:6px 10px; margin-left:-10px; border:0; outline:0; border-radius:10px; background:transparent; font-size:24px; font-weight:750; line-height:1.3; transition:background .2s,box-shadow .2s; }
 .ed-title:hover{ background:rgba(28,34,48,.04); }
 .ed-title:focus{ background:#fff; box-shadow:0 0 0 1px rgba(224,96,58,.35),0 0 0 4px rgba(224,96,58,.1); }
-.ed-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+/* 两列等分：标签输入框的默认宽度不能把「适用模型」挤成一个字宽 */
+.ed-row{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:12px; }
 .field{ display:flex; flex-direction:column; gap:6px; }
 .field > label{ font-size:12px; color:var(--ink3); font-weight:600; padding-left:2px; }
 .select{ position:relative; }
@@ -516,7 +526,7 @@ body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
 .tagbox .tag button{ width:18px; height:18px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; color:var(--ink3); }
 .tagbox .tag button:hover{ background:rgba(0,0,0,.08); color:var(--ink); }
 .tagbox .tag .ic{ width:12px; height:12px; }
-.tagbox input{ flex:1; min-width:70px; height:26px; border:0; outline:0; background:none; font-size:13px; }
+.tagbox input{ flex:1; width:0; min-width:70px; height:26px; border:0; outline:0; background:none; font-size:13px; }
 .editor{ display:grid; margin-top:4px; border-radius:16px; background:rgba(255,255,255,.8); box-shadow:inset 0 0 0 1px var(--line); transition:box-shadow .25s,background .25s; }
 .editor:focus-within{ background:#fff; box-shadow:inset 0 0 0 1.5px rgba(224,96,58,.45),0 0 0 4px rgba(224,96,58,.1); }
 .editor > *{ grid-area:1 / 1; margin:0; padding:16px 18px 20px; font-family:var(--font); font-size:14.5px; line-height:1.85; letter-spacing:.01em; white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word; border:0; tab-size:4; }
@@ -551,6 +561,7 @@ body.lib-peek .lib-edge i{ opacity:0; transform:translateX(-12px); }
 .dock.compact .dk{ width:calc(var(--bar) - 12px); }
 .dock.compact .dk span{ display:none; }
 .dock.compact2 .dk.cx{ display:none; }
+.dock.compact3 .dk[data-act="labels"]{ display:none; }
 
 /* 气泡提示 */
 .tip{ position:fixed; z-index:60; left:0; top:0; padding:6px 10px; border-radius:9px; background:rgba(28,34,48,.94); color:#fff; font-size:12px; font-weight:500; line-height:1.3; pointer-events:none; white-space:nowrap;
@@ -5272,18 +5283,22 @@ void main(){
     return moving;
   }
   const _v = new V3();
-  let needle = null;
+  let needle = null, hud = [];
+  /** 顶栏卡片、工具坞与看得见的两侧面板的矩形（视口坐标）：名牌不钻到它们底下 */
+  function setHud(list) { hud = list; camMoved = true; kick(); }
   function updateLabels() {
     const W = view.W, H = view.H, items = [], quiet = document.body.classList.contains('nolabels');
     for (const l of labels) {
       const S = l.id && blds3.get(l.id);
       _v.set(l.x, l.y + (S ? S.lift * S.sc : 0), l.z).project(camera);
-      l.X = (_v.x + 1) / 2 * W; l.Y = (1 - _v.y) / 2 * H; l.Z = _v.z; l.hide = _v.z > 1 || _v.z < -1;
+      l.X = (_v.x + 1) / 2 * W; l.Y = (1 - _v.y) / 2 * H; l.Z = _v.z; l.hide = _v.z > 1 || _v.z < -1; l.tuck = false;
       if (!l.hide && !(quiet && l.id !== focusId)) items.push(l);
     }
-    // 名牌避让：近处的名牌不动，被压住的远处名牌向上抬、引线随之拉长（地图标注式避让）
+    // 名牌避让：近处的名牌不动，被压住的远处名牌向上抬、引线随之拉长（地图标注式避让）。
+    // 钻到顶栏卡片底下的往下让、引线缩短，让到底仍被挡住就先隐去；压在工具坞上的往上抬；
+    // 被两侧面板压住一角的直接隐去（同地图标注的碰撞剔除：宁可不显示，也不露半截）
     items.sort((a, b) => a.Z - b.Z);
-    const placed = [];
+    const placed = [], liftMin = W <= 860 ? -8 : -14;
     for (const l of items) {
       if (!l.w) { const p = l.el.firstElementChild; l.w = p.offsetWidth || 120; l.h = p.offsetHeight || 32; }
       let lift = 0;
@@ -5295,14 +5310,25 @@ void main(){
         lift += need;
       }
       l.lift = Math.min(lift, 150);
+      const hy = l.el.classList.contains('tuck') ? 4 : 0;   // 已隐去的要多让出 4px 才浮现，镜头慢移时不闪
+      for (const o of hud) {
+        const m = hy + (o.kind === 'side' ? 0 : 6);           // 与顶栏卡片、工具坞再留 6px
+        const bottom = l.Y - 22 - l.lift, top = bottom - l.h, x0 = l.X - l.w / 2, x1 = l.X + l.w / 2;
+        if (x0 >= o.r + m || x1 <= o.l - m || top >= o.b + m || bottom <= o.t - m) continue;
+        if (o.kind === 'side') l.tuck = true;
+        else if (o.kind === 'top') { l.lift = Math.max(liftMin, l.lift - (o.b + m - top)); if (l.Y - 22 - l.lift - l.h < o.b + m) l.tuck = true; }
+        else l.lift = Math.min(150, l.lift + bottom - (o.t - m));
+      }
+      if (l.tuck) continue;
       const bottom = l.Y - 22 - l.lift;
       placed.push({ x0: l.X - l.w / 2, x1: l.X + l.w / 2, bottom, top: bottom - l.h });
     }
     for (const l of labels) {
-      const key = l.hide ? 'h' : l.X.toFixed(1) + ',' + l.Y.toFixed(1) + ',' + Math.round(l.lift || 0);
+      const key = l.hide ? 'h' : l.X.toFixed(1) + ',' + l.Y.toFixed(1) + ',' + Math.round(l.lift || 0) + (l.tuck ? 't' : '');
       if (key === l.k) continue;
       l.k = key;
       l.el.style.visibility = l.hide ? 'hidden' : '';
+      l.el.classList.toggle('tuck', l.tuck);
       if (!l.hide) {
         l.el.style.transform = `translate3d(${l.X.toFixed(1)}px,${l.Y.toFixed(1)}px,0)`;
         l.el.style.zIndex = String(Math.round((1 - l.Z) * 1e5));
@@ -5400,7 +5426,7 @@ void main(){
   if (/[?&]debug(&|$)/.test(location.search)) window.__cyl = { renderer, scene, camera, sun, hemi, U, Q, env, PH, cur, applyCam, setEnv, kick };
 
   return Object.assign(api, {
-    rebuild, refreshInfo, home, focus, intro, setFit, pulse, kick, setEnv, resize,
+    rebuild, refreshInfo, home, focus, intro, setFit, setHud, pulse, kick, setEnv, resize,
     apply: applyCam,
     rotate(deg) { if (goal) { goal.az += deg * D2R; return; } pend.yaw += deg * D2R; vel = 0; kick(); },
     zoom(f) { goal = null; pend.P.copy(target()); pend.zoom += Math.log(f); kick(); },
@@ -5418,7 +5444,7 @@ void main(){
     stage.classList.add('nogl');
     const noop = () => {};
     return {
-      rebuild() { lblRoot.innerHTML = ''; }, refreshInfo: noop, home: noop, focus: noop, intro: noop, setFit: noop, pulse: noop, kick: noop, setEnv: noop, resize: noop, apply: noop,
+      rebuild() { lblRoot.innerHTML = ''; }, refreshInfo: noop, home: noop, focus: noop, intro: noop, setFit: noop, setHud: noop, pulse: noop, kick: noop, setEnv: noop, resize: noop, apply: noop,
       rotate: noop, zoom: noop, get focusId() { return null; }, clearFocus: noop, catAtPoint: () => null, dropHover: noop, ok: false,
     };
   }
@@ -5484,7 +5510,7 @@ function hl(text, ts) {
   return String(text).split(re).map((part, i) => i % 2 ? `<mark>${esc(part)}</mark>` : esc(part)).join('');
 }
 function snippet(p, ts) {
-  const c = p.content.replace(/\s+/g, ' ');
+  const c = p.content.replace(/\s+/g, ' ').replace(/^[\s·•・*-]+/, '');   // 去掉开头的列表符号，免得和「分类 · 」连成两个点
   if (!ts.length) return '';
   const lc = c.toLowerCase();
   let i = -1;
@@ -5780,8 +5806,10 @@ function proseHTML(p) {
   let out = '', last = 0;
   for (const m of p.content.matchAll(VAR_RE)) {
     out += esc(p.content.slice(last, m.index));
-    const n = m[1].trim(), v = String(p.vars[n] || '').trim();
-    out += `<span class="vchip${v ? ' filled' : ''}" data-var="${esc(n)}" title="变量：${esc(n)}">${esc(v || defs[n] || n)}</span>`;
+    const n = m[1].trim(), v = String(p.vars[n] || '').trim(), shown = v || defs[n] || n;
+    // 短变量（≤8 字、单行）整块换行，不在行尾断成两截
+    const nw = countChars(shown) <= 8 && !/\n/.test(shown) ? ' nw' : '';
+    out += `<span class="vchip${v ? ' filled' : ''}${nw}" data-var="${esc(n)}" title="变量：${esc(n)}">${esc(shown)}</span>`;
     last = m.index + m[0].length;
   }
   out += esc(p.content.slice(last));
@@ -5883,7 +5911,7 @@ function markEdSave() {
   s.querySelector('.live').className = 'live saving';
   s.lastElementChild.textContent = '正在保存…';
   clearTimeout(markEdSave.t);
-  markEdSave.t = setTimeout(() => { if (!s.isConnected) return; s.querySelector('.live').className = 'live'; s.lastElementChild.textContent = '已自动保存 · 可在历史版本中回退'; }, 600);
+  markEdSave.t = setTimeout(() => { if (!s.isConnected) return; s.querySelector('.live').className = 'live'; s.lastElementChild.innerHTML = '已自动保存<span class="more"> · 可在历史版本中回退</span>'; }, 600);
 }
 function beginEdit(p) {
   if (UI.editSnap !== p.id) { pushHistory(p); UI.editSnap = p.id; }
@@ -6071,7 +6099,7 @@ function toggleLib(force) {
    ===================================================================== */
 const Lib = (() => {
   const el = $('#lib'), edge = $('#libEdge'), body = document.body;
-  let peek = false, held = false, dragging = false, hintLater = false, entered = false, tShow = 0, tHide = 0, px = -1, py = -1;
+  let peek = false, held = false, dragging = false, hintLater = false, entered = false, tShow = 0, tHide = 0, tSwing = 0, px = -1, py = -1;
   const zone = { w: 31, top: 82, bottom: 13 };   // 左边缘感应带：apply() 时按当前档位的 --g / --top 重算
   const canHover = matchMedia('(hover: hover)');
   const auto = () => DB.settings.libMode !== 'pin' && innerWidth > 860 && canHover.matches;
@@ -6090,6 +6118,10 @@ const Lib = (() => {
     if (peek === on) return;
     peek = on;
     body.classList.toggle('lib-peek', on);
+    // 工具坞随目录让位：滑动期间借用目录的曲线与时长，结束后恢复它自己的（详情开合时用）
+    body.classList.add('lib-swing');
+    clearTimeout(tSwing); tSwing = setTimeout(() => body.classList.remove('lib-swing'), 600);
+    placeHud();
     if (!on) {
       Tip.hide();
       const pill = el.querySelector('.hover-pill'); if (pill) pill.style.opacity = '0';
@@ -6943,16 +6975,9 @@ function layout() {
   let left = 0, right = 0;
   if (!mobile) { left = Lib.auto ? 0 : $('#lib').offsetWidth + g * 2; if (detOpen) right = det.offsetWidth + g * 2; }
   const ox = (left - right) / 2;
-  document.documentElement.style.setProperty('--ox', ox + 'px');
   document.documentElement.style.setProperty('--stage', Math.max(0, W - left - right) + 'px');
   Poi.invalidate();
   Scene.setFit(W - left - right, mobile ? H * .82 : H - 30, ox, mobile ? .46 : .53, g + bar + (mobile ? 4 : 15), g + bar + (mobile ? 14 : -19));
-  const dock = $('#dock'), free = W - left - right - 16;
-  dock.classList.remove('compact', 'compact2');
-  if (!mobile) {
-    if (dock.offsetWidth > free) dock.classList.add('compact');
-    if (dock.offsetWidth > free) dock.classList.add('compact2');
-  }
   const stats = $('#stats');
   if (!mobile) {
     const sw = stats.offsetWidth;
@@ -6961,6 +6986,37 @@ function layout() {
     stats.classList.toggle('hide', lo > hi);
     if (lo <= hi) stats.style.setProperty('--sx', clamp(W / 2 + ox, lo, hi) - W / 2 + 'px');
   }
+  placeHud();
+}
+/** 工具坞和提示条落在舞台中轴上，放不下先收起文字、再收起镜头按钮，最后收起名牌开关（L 键照常可用）。
+ *  自动隐藏的目录滑出来时若会压到工具坞，就让到目录与详情之间（与固定目录时同位），目录收回再回中轴；小岛始终不动 */
+function placeHud() {
+  const W = innerWidth, H = innerHeight, mobile = W <= 860, g = cssPx('--g'), bar = cssPx('--bar');
+  const det = $('#detail'), dock = $('#dock'), stats = $('#stats');
+  const right = !mobile && det.classList.contains('open') ? det.offsetWidth + g * 2 : 0;
+  const libSpan = $('#lib').offsetWidth + g * 2;   // 目录连同两侧栏间距
+  const fit = left => {
+    dock.classList.remove('compact', 'compact2', 'compact3');
+    if (!mobile) {
+      const free = W - left - right - 16;
+      for (const c of ['compact', 'compact2', 'compact3']) if (dock.offsetWidth > free) dock.classList.add(c);
+    }
+    return (left - right) / 2;
+  };
+  let ox = fit(mobile || Lib.auto ? 0 : libSpan);
+  if (!mobile && Lib.auto && Lib.peeked && W / 2 + ox - dock.offsetWidth / 2 < libSpan) ox = fit(libSpan);
+  document.documentElement.style.setProperty('--ox', ox + 'px');
+  // 顶栏三张卡片、工具坞和看得见的两侧面板（都按过渡结束后的位置算）交给小岛，名牌据此避让
+  const hud = [];
+  const add = (el, l, kind) => hud.push({ l, r: l + el.offsetWidth, t: el.offsetTop, b: el.offsetTop + el.offsetHeight, kind });
+  add($('.brand'), $('.brand').offsetLeft, 'top');
+  add($('#clock'), $('#clock').offsetLeft, 'top');
+  if (!mobile && !stats.classList.contains('hide')) add(stats, W / 2 - stats.offsetWidth / 2 + (parseFloat(stats.style.getPropertyValue('--sx')) || 0), 'top');
+  const dl = W / 2 + ox - dock.offsetWidth / 2;
+  hud.push({ l: dl, r: dl + dock.offsetWidth, t: H - g - bar, b: H - g, kind: 'dock' });
+  if (!mobile && (!Lib.auto || Lib.peeked)) add($('#lib'), $('#lib').offsetLeft, 'side');
+  if (!mobile && det.classList.contains('open')) add(det, det.offsetLeft, 'side');
+  Scene.setHud(hud);
 }
 
 /* =====================================================================
@@ -7236,11 +7292,13 @@ const Tour = (() => {
     if (k >= steps.length) { end(); return; }
     i = clamp(k, 0, steps.length - 1);
     const s = steps[i];
-    // 讲到目录的几步把它按住不收；从收起状态滑出要等动画落定再量位置
-    const slide = s.lib && Lib.auto && !Lib.peeked ? 600 : 0;
+    // 讲到目录的几步把它按住不收；从收起状态滑出要等动画落定再量位置。
+    // 讲别处时目录立刻收回，让过位的工具坞回到中轴后再量（第六步照的就是工具坞上的按钮）
+    const slide = s.lib && Lib.auto && !Lib.peeked ? 600 : 0, tuck = !s.lib && Lib.auto && Lib.peeked ? 450 : 0;
     Lib.hold(!!s.lib);
+    if (tuck) Lib.hide();
     if (s.before) s.before();
-    setTimeout(place, Math.max(s.before ? s.wait || 400 : 0, slide));
+    setTimeout(place, Math.max(s.before ? s.wait || 400 : 0, slide, tuck));
   }
   function end() {
     if (!el) return;

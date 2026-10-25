@@ -609,6 +609,8 @@ main { order: 5; width: 100%; }
     padding: 0;
     display: flex;
     flex-direction: column;
+    /* 窄屏顶栏的 wrap 不能带进纵向指挥栏：窗口不够高时标签列会被折到「工作区」右侧并溢出，应由 .nav-tabs 自己滚动 */
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: var(--sp-2);
     border: 0;
@@ -741,16 +743,28 @@ main { order: 5; width: 100%; }
   .searchbox { order: 0; flex: 1 1 12rem; max-width: none; }
 }
 
-/* 宽而矮的窗口（含特大缩放）压缩指挥栏辅助信息，七个主视图仍应首屏可达。 */
+/* 宽而矮的窗口（含特大缩放）分两档收紧指挥栏，十一个视图都应一屏放下、不出滚动条。
+   golden.css 在后加载，且用 :root:not([data-fluid="off"]) .tab 给标签定了 --ctl-h 下限，
+   所以这里的选择器都多带 .app-stage / .command-rail 两层，否则压缩不生效。 */
+@media (min-width: 70rem) and (max-height: 52rem) {
+  .command-rail .rail-brand { padding-bottom: var(--sp-3); }
+  .command-rail .nav { margin-top: var(--sp-2); gap: var(--sp-1); }
+  .command-rail .nav-tabs { gap: .1rem; }
+  .app-stage .command-rail .nav-tabs .tab { min-height: 2.25rem; padding-block: .2rem; }
+}
+@media (min-width: 70rem) and (max-height: 45rem) {
+  .command-rail .rail-footer small { display: none; }
+  .app-stage .command-rail .nav-tabs .tab { min-height: 2.1rem; }
+}
 @media (min-width: 70rem) and (max-height: 42rem) {
-  .command-rail { padding: var(--sp-3); }
-  .rail-brand { padding: 0 .2rem var(--sp-2); }
+  .app-stage .command-rail { padding: var(--sp-3); }
+  .command-rail .rail-brand { padding: 0 .2rem var(--sp-2); }
   .rail-brand .brand-text p,
   .rail-section-label,
   .rail-footer small { display: none; }
   .nav { margin-top: var(--sp-2); gap: var(--sp-1); }
   .nav-tabs { gap: .1rem; padding: .15rem; }
-  .tab { min-height: 2rem; padding: .25rem .5rem; }
+  .app-stage .command-rail .nav-tabs .tab { min-height: 2rem; padding: .25rem .5rem; }
   .rail-footer { margin-top: var(--sp-2); padding: .5rem .4rem .1rem; }
 }
 

@@ -9,8 +9,8 @@ const cangyanlu = require('../electron/cangyanlu');
 
 const root = path.join(__dirname, '..');
 // 藏言录随包原样附带：更新它时整份替换文件，再同步这里的校验和与字节数。
-const BUNDLED_SHA256 = '55177a1be973bb735739e923c3ed7df9a8aeb8403b201fa4faeb8d8a06cfe3d8';
-const BUNDLED_BYTES = 1_143_516;
+const BUNDLED_SHA256 = '70e5af85d260c29b0c69663641253ef107a13d31201ca385b2b674e6519ec40f';
+const BUNDLED_BYTES = 1_148_421;
 
 function createEvent() {
   return { prevented: false, preventDefault() { this.prevented = true; } };

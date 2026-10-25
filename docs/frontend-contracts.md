@@ -1024,3 +1024,10 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 - **字体**：藏言录 `--font` 以 `"Source Han Sans SC","Noto Sans SC"` 打头，`--font-brand: var(--font)`；`<head>` 里的小脚本在 `cangyanlu:` 来源下插入 `fonts/source-han-sans-sc/index.css`，否则插入 Google Fonts 的 `Noto Sans SC:wght@300..900`（脚本插入，不阻塞渲染）。标题 `.brand h1` 823 字重（紧凑档 23px，宽松档 27px），正文 450。
 - **目录栏模式**：设置 `libMode` = `auto`（缺省）| `pin`。`body.lib-auto` 仅在 `libMode !== 'pin'`、宽 > 860 且 `(hover: hover)` 时存在；`body.lib-peek` 表示浮出。收起态 `.lib` 位移出左缘、`scale .985`、`visibility:hidden`，浮出态 `z-index:2` 压在工具坞之上。`layout()` 在自动隐藏时把左侧占位记为 0，建筑信息卡左界为 `2g + 18`，引导第一步的舞台从 g 开始。感应带宽 `--g + 18px`、自 `--top` 到底部 g 为止，在 `Lib.apply()`（启动与窗口尺寸变化时）重算。
 - **可测状态**：`#libPin[aria-pressed]`、`body.lib-auto` / `body.lib-peek`、`localStorage['cangyanlu.v1'].settings.libMode`。e2e 用 `webContents.sendInputEvent({ type: 'mouseMove' })` 驱动 guest：(3, 402) 滑出，(640, 420) 收回。黄金栅格断言改量 `offset*` 布局盒（收起态带位移与缩放，`getBoundingClientRect` 会偏）。
+
+## v0.3.3 工具坞让位、名牌避让与指挥栏单列
+
+- **HUD 定位只在 `placeHud()`**：藏言录 `layout()` 负责小岛舞台（`--stage`、`Scene.setFit`）与统计卡 `--sx`，末尾调用 `placeHud()`；`placeHud()` 写 `--ox`（工具坞、提示条、镜头提示与键位提示的中轴）与工具坞收缩档 `compact` / `compact2` / `compact3`。自动隐藏的目录浮出时若工具坞左缘 < 目录宽 + 2g，按固定目录时的中轴放置。`Lib.set()` 每次切换调用它，并挂 `body.lib-swing` 600 ms 统一过渡曲线。
+- **名牌避让数据**：`Scene.setHud(list)`，`list` 为视口坐标矩形 `{ l, r, t, b, kind }`，`kind` = `top`（品牌卡、统计卡、时钟）| `dock` | `side`（看得见的目录与详情）。被挡住的名牌带 `.lbl.tuck`（`opacity:0`，名牌不可点）；降级场景（无 WebGL）的 `setHud` 为空操作。
+- **可测状态**：`body.lib-peek` 时 `#dock` 的 `getBoundingClientRect()` 与 `#lib` / `#detail` 的布局盒互不相交且各留 ≥ 8px；未浮出时工具坞中心 = `(innerWidth - 详情宽 - 2g) / 2`；可见名牌（`opacity > .5`）的 `.pill` 不与任一可见卡片相交（容差 2px）。
+- **指挥栏**：宽屏（≥ 70rem）`.nav` 为单列 `flex-wrap: nowrap`，标签列只能在 `.nav-tabs` 内滚动；矮窗口压缩分 52rem / 45rem / 42rem 三档，标签选择器须带 `.app-stage .command-rail` 前缀才能压过 golden.css 的 `--ctl-h` 下限。

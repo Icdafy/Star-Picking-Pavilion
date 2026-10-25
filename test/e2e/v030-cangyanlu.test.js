@@ -175,8 +175,42 @@ test('v030 藏言录模块：固定来源、持久存储、隔离分区与桌面
   await pointer(300, 400);
   await pointer(640, 420);
   await waitFor(async () => !(await peeked()), '鼠标离开后目录应收回');
+  // v0.3.3：详情开着时目录滑出，工具坞曾被目录压住左半截。现在它要让到目录与详情之间，目录收回后回到小岛中轴；
+  // 名牌也不能钻到顶栏卡片、工具坞或两侧面板底下露半截
+  await guest(app, "document.querySelectorAll('#list .it')[1].click(); true", true);
+  await waitFor(() => guest(app, "document.getElementById('detail').classList.contains('open')"), '点目录条目应打开详情');
+  const dockBetween = `(() => {
+    const lib = document.getElementById('lib'), det = document.getElementById('detail'), dock = document.getElementById('dock').getBoundingClientRect();
+    return dock.left >= lib.offsetLeft + lib.offsetWidth + 8 && dock.right <= det.offsetLeft - 8;
+  })()`;
+  const dockOnAxis = `(() => {
+    const g = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--g'));
+    const det = document.getElementById('detail'), dock = document.getElementById('dock').getBoundingClientRect();
+    return Math.abs((dock.left + dock.right) / 2 - (innerWidth - det.offsetWidth - g * 2) / 2) < 1;
+  })()`;
+  const labelsClear = `(() => {
+    const cards = ['.brand', '#stats', '#clock', '#lib', '#detail', '#dock'].map(s => document.querySelector(s)).filter(e => {
+      const cs = getComputedStyle(e); return cs.visibility !== 'hidden' && +cs.opacity > .05 && !e.classList.contains('hide');
+    }).map(e => e.getBoundingClientRect());
+    return [...document.querySelectorAll('#labels .lbl')].filter(l => l.style.visibility !== 'hidden' && +getComputedStyle(l).opacity > .5).every(l => {
+      const p = l.querySelector('.pill').getBoundingClientRect();
+      return cards.every(c => Math.min(p.right, c.right) - Math.max(p.left, c.left) <= 2 || Math.min(p.bottom, c.bottom) - Math.max(p.top, c.top) <= 2);
+    });
+  })()`;
+  await waitFor(() => guest(app, dockOnAxis), '详情打开后工具坞应在小岛中轴');
+  await pointer(200, 400);
+  await pointer(3, 402);
+  await waitFor(peeked, '详情开着时鼠标贴到左边缘目录也应滑出');
+  await waitFor(() => guest(app, dockBetween), '目录滑出时工具坞应让到目录与详情之间，不被目录压住');
+  await waitFor(() => guest(app, labelsClear), '目录滑出后名牌不应露半截在卡片底下');
+  await pointer(300, 400);
+  await pointer(640, 420);
+  await waitFor(async () => !(await peeked()), '鼠标离开后目录应收回');
+  await waitFor(() => guest(app, dockOnAxis), '目录收回后工具坞应回到小岛中轴');
+  await waitFor(() => guest(app, labelsClear), '名牌不应露半截在卡片底下');
   await guest(app, "document.getElementById('libPin').click(); true", true);
   await waitFor(() => guest(app, "!document.body.classList.contains('lib-auto') && JSON.parse(localStorage.getItem('cangyanlu.v1')).settings.libMode === 'pin'"), '图钉应把目录栏切为固定并保存');
+  await waitFor(() => guest(app, dockBetween), '固定目录时工具坞应在目录与详情之间');
 
   // 权限只放行复制，其余照旧拒绝
   assert.equal(await guest(app, "navigator.permissions.query({ name: 'clipboard-write' }).then(status => status.state)"), 'granted');
