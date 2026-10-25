@@ -103,7 +103,8 @@ test('v0.2.29 actual Windows fonts cover every view, native controls, code and b
   };
   const evidence = { views: [], glyphs: {}, recovery: {} };
   const views = await page.locator('.tab[data-view]').evaluateAll(tabs => tabs.map(tab => tab.dataset.view));
-  assert.equal(views.length, 10);
+  // v0.3.0 加入藏言录：宿主文字照常检查；它在 webview 里的页面原样附带，沿用自身字体，不在此列。
+  assert.equal(views.length, 11);
   for (const view of views) {
     await page.locator(`.tab[data-view="${view}"]`).click();
     await page.evaluate(() => document.fonts.ready);

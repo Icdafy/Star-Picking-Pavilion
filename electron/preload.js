@@ -66,6 +66,13 @@ const desktopApi = Object.freeze({
   retryDailyArchives: () => ipcRenderer
     .invoke('daily-archive:retry')
     .then(cloneAndFreeze),
+  // 焦点在藏言录模块里时，主进程转发它不使用的 Alt+数字，让视图切换照常可用。
+  onCangyanluShortcut: cb => {
+    if (typeof cb !== 'function') return () => {};
+    const listener = (_event, payload) => cb(cloneAndFreeze(payload));
+    ipcRenderer.on('cangyanlu:shortcut', listener);
+    return () => ipcRenderer.removeListener('cangyanlu:shortcut', listener);
+  },
   // 主进程推送检查、下载、安装及错误状态。
   onUpdateStatus: cb => ipcRenderer.on('update:status', (_e, payload) => cb(cloneAndFreeze(payload))),
   checkForUpdates: () => ipcRenderer.invoke('update:check').then(cloneAndFreeze),

@@ -2,29 +2,30 @@
 
 摘星阁是一款面向**低空经济**与**商业航天**两个行业的 Windows 桌面热点情报站。它在本机按手动任务或明确开启的自动调度采集官方、媒体、交易所、一级市场媒体与公众号订阅等信源，用 AIHOT 式的精选链判断什么值得看，把同一件事的多家报道归成一个事件、按独立信源算热度，并把一级股权市场公司的融资、订单、试验与人事动态单独拎出来，支持日报、周报与月报。
 
-## v0.2.46 · 信源按实测产出重新梳理
+## v0.3.0 · 工作区与藏言录
 
-- **按数据删减**：依据 2026-08-10 至 10-24 共 7,821 条入库记录，移出 28 个长期零贡献或噪声入口（9 条结果总被主检索线先收录的资本检索线、巨潮全市场公告流、失效栏目等），历史文章、星标与统计保留。
-- **修复一手源**：国家航天局、民航局的 HTTPS 入口持续失败，改走同站 HTTP 并保留原 ID；中国民航网失效栏目改指无人机频道。
-- **补齐盲区**：新增中国政府网最新政策（新 `govcn://` 接口）、发改委低空经济发展司、国防科工局、民航西北局、深圳低空资讯、北京亦庄、FAA、Payload、Ars Technica、中科宇航、沃飞长空、时的科技、Firefly，以及中国政府采购网“低空经济”“卫星”两条招采先行线和天龙三号、引力二号、力箭二号等型号监控线。
+- **工作区**：侧栏分组“情报工作区”更名为“工作区”，底部标识随之改为“本地工作区”。
+- **新增藏言录**：独立开发的提示词仓库作为一个完整模块并入摘星阁，排在常用网址下方。浮空小岛 3D 场景、分类与标签、`{{变量|默认值}}` 模板、一键复制、复制并打开常用 AI 对话页、历史版本、导入导出与本地文件同步全部原样可用；随包文件与藏言录原始单文件逐字节一致。
+- **桌面一体**：藏言录铺满工作区，窄窗口自动贴齐吸顶导航；<kbd>G</kbd> <kbd>P</kbd> 直达，焦点在藏言录里时 <kbd>Alt</kbd>+数字照常切换视图；外链交给系统浏览器，导出走系统保存框；切到其他视图时暂停渲染。
+- **数据独立**：提示词保存在摘星阁本机的独立分区，重启与升级后仍在，与情报库互不影响，卸载时同样保留。
 
-内置信源 201 → 194，海外入口 16 → 20。版本、界面与更新元数据统一为 0.2.46，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。逐源依据见 [v0.2.46 信源梳理](docs/v0246-sources.md)，验证见 [验证记录](docs/v0246-validation.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增依赖。
+版本、界面与更新元数据统一为 0.3.0，正式资产以 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 为准。实现与验证见 [验证记录](docs/v030-validation.md)，历史版本见应用内日志及 [变更日志](CHANGELOG.md)。升级保留已有情报、星标、备忘、归档、密钥与全部设置，无新增 npm 依赖。
 
 ## 系统要求与安装
 
 - Windows 10/11 x64
 - 无需另行安装 Node.js、数据库或浏览器
 
-从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.2.46.exe`，双击并按向导安装。v0.2.46 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
+从 [GitHub Releases](https://github.com/Icdafy/Star-Picking-Pavilion/releases) 下载 `Star-Picking-Pavilion-Setup-0.3.0.exe`，双击并按向导安装。v0.3.0 尚未进行代码签名，因此 Windows SmartScreen 可能显示“Windows 已保护你的电脑”；请先核对校验值，再选择“更多信息 → 仍要运行”。
 
 下载 `SHA256SUMS.txt` 后，可以在 PowerShell 中验证安装包：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.2.46.exe
+Get-FileHash -Algorithm SHA256 .\Star-Picking-Pavilion-Setup-0.3.0.exe
 Get-Content .\SHA256SUMS.txt
 ```
 
-两处 SHA-256 必须完全一致。自动更新只从本项目的 GitHub Releases 检查；检测到新版本时，“本地情报工作区”右侧显示更新按钮，下载完成后提示重启安装，安装完成并确认最新后隐藏。
+两处 SHA-256 必须完全一致。自动更新只从本项目的 GitHub Releases 检查；检测到新版本时，“本地工作区”右侧显示更新按钮，下载完成后提示重启安装，安装完成并确认最新后隐藏。
 
 ## 主要功能
 
@@ -44,6 +45,7 @@ Get-Content .\SHA256SUMS.txt
 - 付费调用回执复用与每小时 / 每天预算熔断；`npm run eval:selection` 用自标注样本校准门槛
 - 实体标签点击即检索，多事件资讯展开为原子事件
 - “云幄 · 常用网址”本地快捷入口与键盘焦点保持
+- 藏言录提示词仓库：浮空小岛上按分类收藏提示词，变量模板填空即用，一键复制或复制并打开 Claude、ChatGPT、DeepSeek 等对话页；数据保存在本机独立分区，可导出 JSON / Markdown 或绑定本地文件同步
 - 深色和浅色主题
 - Aqua 指挥舱与外观实验室：云母/兼容材质、浅色/深色各 6 组流体配色、精细色相与明暗、本机壁纸、DSH 1.1.0 流体与星尘，并支持低功耗和减少动态效果降级
 - 中文使用内置思源黑体；西文、数字与符号优先采用 Windows 自带的 Times New Roman，覆盖表单、代码与恢复页面
@@ -189,7 +191,7 @@ v0.2.2 起，融资事件另按性质分类（股权融资 / 上市进程 / 并�
 
 API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用当前 Windows 用户的系统加密能力保存（多个提供商的密钥合为一份密文）；界面与接口只显示「是否已配置」，已保存的密钥只会发往它被保存时对应的 API 地址。更换电脑或 Windows 账户后，应重新输入 Key。
 
-应用还会按功能需要访问用户启用的资讯信源、RSSHub、常用网址和 GitHub 更新服务。常用网址会交给系统默认浏览器打开；公开发行前必须确认其中不包含未经授权的内部链接。
+应用还会按功能需要访问用户启用的资讯信源、RSSHub、常用网址和 GitHub 更新服务。藏言录只会向 Google Fonts 请求标题书法字体的四字子集（连不上时改用系统楷体），提示词不会离开本机；“复制并打开”只把对话页交给系统浏览器，提示词经剪贴板由你自行粘贴。常用网址会交给系统默认浏览器打开；公开发行前必须确认其中不包含未经授权的内部链接。
 
 开启新闻推送后，摘星阁只把入选情报的标题、摘要、来源、热度与原文链接发送到你绑定的飞书、钉钉或 OneBot 服务；这些平台如何处理、留存消息由其自身规则决定。机器人 Webhook、加签密钥、OneBot Token 与接收 QQ 号与 API Key 合在同一份 safeStorage 密文中，不写入 `settings.json`，接口只返回掩码。
 
@@ -207,8 +209,9 @@ API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用�
 - `daily-archive.json`：每日研究归档的开关、用户所选目录、已成功日期与待补齐状态，不含新闻正文或秘密
 - `migration-v0.0.1.json`：旧版数据迁移记录，不含秘密
 - `storage-maintenance.json`：缓存清理与数据库维护时间记录，不含情报正文或秘密
+- `Partitions\cangyanlu`：藏言录的提示词、分类与界面记忆（Chromium 本地存储与 IndexedDB），与情报库分开保存
 
-备份前请完全退出摘星阁，再复制 `%APPDATA%\摘星阁\star-picking-pavilion.db`、需要的设置文件和可选的 `appearance\wallpaper.asset`；如已开启每日研究归档，还应单独备份所选目录下的 `摘星阁新闻简报`。恢复数据库时也应先退出应用。跨电脑恢复后，建议运行应用确认数据库完整性、重新选择归档目录并重新配置 API Key。
+备份前请完全退出摘星阁，再复制 `%APPDATA%\摘星阁\star-picking-pavilion.db`、需要的设置文件和可选的 `appearance\wallpaper.asset`；如已开启每日研究归档，还应单独备份所选目录下的 `摘星阁新闻简报`。藏言录的提示词请在藏言录「管理 → 数据与备份」中导出 JSON 备份，或绑定一个本地 JSON 文件实时同步。恢复数据库时也应先退出应用。跨电脑恢复后，建议运行应用确认数据库完整性、重新选择归档目录并重新配置 API Key。
 
 开启自动清理后，超过保留天数的文章会按计划清理；可关闭“自动清理”、提前备份，或把保留天数调高。
 
@@ -223,6 +226,7 @@ API Key 不写入 `settings.json`，而是通过 Electron `safeStorage` 使用�
 - 桌面后端只监听 `127.0.0.1` 的随机端口，并由每次启动生成的随机令牌保护 API。
 - 渲染进程启用 sandbox、上下文隔离和严格 CSP，默认拒绝摄像头、麦克风、定位等权限。
 - 远程链接和图片只允许绝对 HTTP(S) URL，外链由系统浏览器打开。
+- 藏言录运行在固定来源 `cangyanlu://app` 的独立分区 webview 中：主窗口只允许挂载这一个地址，预加载与 Node 能力一律剥离；它只获得复制、本地文件同步与持久存储三项权限，网络只放行自身与标题字体子集，接触不到情报库接口与桌面功能。
 - 请求体限制为 64 KiB，配置文件采用原子替换，数据库启动时运行完整性检查。
 - 安装包使用严格文件白名单并扫描 ASAR，数据库、日志、工作树和本机配置不会被打包。
 
@@ -257,7 +261,7 @@ npm run notices
 
 ## 许可证与致谢
 
-项目以 [MIT License](LICENSE) 发布。生产依赖以及本版本复用的 DSH Transparent UI Plugin 1.1.0 许可见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+项目以 [MIT License](LICENSE) 发布。生产依赖、本版本复用的 DSH Transparent UI Plugin 1.1.0 以及藏言录内联的 three.js r158 许可见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
 
 内置的思源黑体（Source Han Sans SC，Google Fonts 发行名 Noto Sans SC）遵循 [SIL Open Font License 1.1](renderer/fonts/source-han-sans-sc/LICENSE)，来源与改动说明见 [renderer/fonts/README.md](renderer/fonts/README.md)。英文使用 Windows 自带的 Times New Roman，不随包分发。
 

@@ -1,3 +1,5 @@
 # Preserve the uploaded SVG source and its derived first frame byte for byte.
 renderer/update-progress-loop.svg -text
 renderer/update-progress-still.svg -text
+# 藏言录随包原样附带，与原始单文件逐字节一致；校验和由 test/cangyanlu.test.js 锁定。
+electron/cangyanlu/*.html -text

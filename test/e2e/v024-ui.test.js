@@ -35,7 +35,7 @@ test('command palette, go-to sequences and the V4.1 Flash default model', { time
   assert.equal(await input.getAttribute('aria-expanded'), 'true');
   assert.equal(await input.getAttribute('aria-activedescendant'), 'palette-opt-0');
   const labels = await page.locator('#paletteList .palette-label').allTextContents();
-  for (const name of ['热点', '精选', '全部动态', '星标', '情报日志', '一级市场', '更新日志', '常用网址', '信源', '设置']) {
+  for (const name of ['热点', '精选', '全部动态', '星标', '情报日志', '一级市场', '更新日志', '常用网址', '藏言录', '信源', '设置']) {
     assert.ok(labels.includes(name), `面板缺少跳转命令 ${name}`);
   }
 

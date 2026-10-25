@@ -18,11 +18,17 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (root) root.Shortcuts = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createShortcutsModule() {
-  // G 之后的第二键 → 视图。字母取英文视图名首字母，与侧栏顺序一致；设置沿用各家通行的逗号。
+  // G 之后的第二键 → 视图。字母取英文视图名首字母，与侧栏顺序一致；设置沿用各家通行的逗号，
+  // 藏言录取 Prompts 的 P。
   const GO_KEYS = Object.freeze({
     f: 'featured', h: 'hot', c: 'capital', a: 'all', s: 'starred',
-    d: 'daily', u: 'releases', l: 'links', r: 'sources', ',': 'settings'
+    d: 'daily', u: 'releases', l: 'links', p: 'prompts', r: 'sources', ',': 'settings'
   });
+  // Alt+1…9、0 → 视图。v0.3.0 插入藏言录后侧栏变成 11 项，数字键保持原有十个视图不变，
+  // 藏言录只用 G P 与侧栏进入。
+  const ALT_VIEWS = Object.freeze([
+    'hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'sources', 'settings'
+  ]);
   const GO_WINDOW_MS = 1500;
 
   function normalize(text) {
@@ -353,8 +359,8 @@
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
         const tabIndex = '1234567890'.indexOf(event.key);
         if (tabIndex >= 0) {
-          const tab = getTabs()[tabIndex];
-          if (tab) { switchView(tab.dataset.view); event.preventDefault(); }
+          const view = ALT_VIEWS[tabIndex];
+          if (getTabs().some(tab => tab.dataset.view === view)) { switchView(view); event.preventDefault(); }
           return;
         }
         const letter = String(event.key).toLowerCase();
@@ -417,5 +423,5 @@
     return Object.freeze({ isTypingTarget });
   }
 
-  return Object.freeze({ createShortcuts, createCommandPalette, rankCommands, scoreCommand, GO_KEYS });
+  return Object.freeze({ createShortcuts, createCommandPalette, rankCommands, scoreCommand, GO_KEYS, ALT_VIEWS });
 });

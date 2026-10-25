@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0] - 2026-10-25
+
+### v0.3.0 · 工作区与藏言录
+
+- 侧栏分组“情报工作区”更名为“工作区”，底部标识改为“本地工作区”；README 同步。
+- 新增藏言录模块（视图 `prompts`），排在常用网址下方：随包附带的 `electron/cangyanlu/藏言录.html` 与藏言录原始单文件逐字节一致（`.gitattributes` 设 `-text`，SHA-256 由测试锁定），由主进程以固定来源 `cangyanlu://app` 在持久分区 `persist:cangyanlu` 中提供，作为 `<webview>` 的顶层文档运行；提示词存储不随后端随机端口变化，重启与升级后保留。
+- 隔离：主窗口开启 `webviewTag`，`will-attach-webview` 只放行固定地址与分区并剥离预加载与 Node；分区只授予复制、文件系统访问与持久存储权限，请求白名单只认藏言录自身、标题字体子集与 `data:`/`blob:`；页面另附 `default-src 'none'` 的 CSP。
+- 桌面集成：首次进入才挂载；铺满塔台（宽屏）或吸顶导航（窄屏）下方的剩余高度；G P 跳转、命令面板别名，Alt+数字由 `Shortcuts.ALT_VIEWS` 固定为原有十个视图且在藏言录内经主进程转发；外链交给系统浏览器且 `window.open` 返回句柄；导出走原生下载；隐藏时停止出帧；加载失败或进程退出可重新载入。
+- 预算：脚本标签 29 → 30（新增 `cangyanlu-controller.js`），CSS 约增 1 KiB，关键帧与 backdrop-filter 不变；第三方声明新增 three.js r158（MIT）。
+- 版本统一为 0.3.0，无新增 npm 依赖；已有情报、星标、备忘、归档、密钥与设置保留。验证见 docs/v030-validation.md。
+
 ## [0.2.46] - 2026-10-24
 
 ### v0.2.46 · 信源按实测产出重新梳理

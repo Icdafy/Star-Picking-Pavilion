@@ -6,7 +6,7 @@
 > 逐条核对后再动手；任何一条被破坏，`npm test` 会立即报出来。
 >
 > 当前统计口径：Aqua 外壳升级后，页面实际加载的三份 CSS 合计约 235.5 KiB，
-> 早期模块化记录中的文件体积为历史值；当前页面脚本为 29 条（v0.2.38 新增极光引擎，v0.2.39 新增流体云），预算 29/29 已用尽。
+> 早期模块化记录中的文件体积为历史值；当前页面脚本为 30 条（v0.2.38 新增极光引擎，v0.2.39 新增流体云，v0.3.0 新增藏言录模块控制器），预算 30/30 已用尽。
 
 ---
 
@@ -236,7 +236,7 @@ linksCategory, commonLinksFavorites, realtime, closeToTray
   `feed-controller.js`、`daily-view-controller.js`、
   `sources-controller.js`、`search-controller.js`、`shortcuts.js`、`realtime-poller.js`、
   `update-pill.js`、`settings-view-controller.js`
-11. 阶段 3 批 4 常用网址视图接线脚本（app.js 之前）：`common-links-controller.js`
+11. 阶段 3 批 4 常用网址视图接线脚本（app.js 之前）：`common-links-controller.js`，v0.3.0 起紧随其后为藏言录模块的 `cangyanlu-controller.js`
 12. 阶段 3 批 3 状态层与视图调度脚本（app.js 之前）：`store.js`、`view-registry.js`
 13. `<script src="aqua-shell.js"></script>`（紧邻 app.js 之前，唯一新增的外观运行时）
 14. `<script src="app.js"></script>` 最后（组合根：state 声明、依赖装配与 start()）
@@ -814,8 +814,8 @@ reduced 偏好不挂类，避免常驻全表 transition 拖累滚动。
 
 | 指标 | Aqua 外壳升级后基线 | 护栏上限 |
 | --- | --- | --- |
-| 页面实际加载的全部本地 CSS | ≈ 314,700 B（CRLF 口径，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置、v0.2.4 命令面板、v0.2.36 推送面板、v0.2.37 设置页统一行面板；v0.2.38 新增 fluid.css 约 20 KiB；v0.2.39 新增 golden.css 约 16 KiB，并删除星鲸样式） | ≤ 336 KiB |
-| index.html `<script>` 标签总数 | 29（v0.2.0 新增合并后的 intel-views.js；v0.2.38 新增极光引擎 aurora-engine.js；v0.2.39 新增流体云 fluid-cloud.js） | ≤ 29 |
+| 页面实际加载的全部本地 CSS | ≈ 333,200 B（CI 的 CRLF 口径，含字体分片索引、v0.2.0 intel.css、v0.2.3 模型设置、v0.2.4 命令面板、v0.2.36 推送面板、v0.2.37 设置页统一行面板；v0.2.38 新增 fluid.css 约 20 KiB；v0.2.39 新增 golden.css 约 16 KiB，并删除星鲸样式；v0.3.0 藏言录外框约 1 KiB） | ≤ 336 KiB |
+| index.html `<script>` 标签总数 | 30（v0.2.0 新增合并后的 intel-views.js；v0.2.38 新增极光引擎 aurora-engine.js；v0.2.39 新增流体云 fluid-cloud.js；v0.3.0 新增藏言录模块 cangyanlu-controller.js） | ≤ 30 |
 | 全部已加载 CSS 的 `@keyframes` 数量 | 20 | ≤ 20 |
 | loadFeed 段内 `#feedList` 整表 `list.innerHTML =` 调用点 | 3（阶段 4 由 4 下调） | ≤ 3（防回退，无余量） |
 | 全部已加载 CSS 的 `backdrop-filter` 声明 | 10（v0.2.38 下拉选项面板 `::picker(select)`；v0.2.39 提示的独立模糊并入流体云外壳，总数不变） | ≤ 10 |
@@ -1000,3 +1000,13 @@ Canvas／顶层装饰仅覆盖当前轨迹边界，缓冲区以 64px 档位复�
 - 沙箱桥 `getDisplayRefreshRate()` / `onDisplayRefreshRateChanged(cb)` 只暴露 `{displayId,refreshRate}`，订阅返回解绑函数。主进程依据窗口相交最多的显示器读取，不接受渲染器指定显示器。移动、恢复、显示参数及热插拔更新，前台五秒原生轮询兜底驱动漏报。
 - 有效系统值优先；rAF 只作无系统信息时的前台回退，分数频率吸附包含 70Hz 的常见档。测量支持换屏升降、取消与异步代次保护，隐藏/失焦取消测量，页面卸载清理全部监听、计时器及订阅。
 - Aurora 弹簧按实际秒数解析求值，果冻能量与流体衰减按时间归一；性能降级依据持续时间并在空闲时清空统计。DSH 背景跟随共享采样节拍，同时限制像素预算；减少动态效果与静态档停止持续绘制，恢复时重新调度。
+
+## v0.3.0 工作区与藏言录模块
+
+- **命名**：侧栏分组“情报工作区”与底部标识“本地情报工作区”统一改称“工作区”“本地工作区”；历史版本说明保持原文。
+- **视图**：`prompts`（`#viewPrompts`，侧栏位于常用网址之后、信源之前，共 11 项）。`ui-preference-schema` 的视图枚举同步加入，重启可回到藏言录。G P 跳转；Alt+1…9、0 由 `Shortcuts.ALT_VIEWS` 固定为原有十个视图，藏言录不占数字。
+- **随包文件**：`electron/cangyanlu/藏言录.html` 与藏言录原始单文件逐字节一致（`.gitattributes` 设 `-text`，SHA-256 与字节数由 `test/cangyanlu.test.js` 锁定），更新时整份替换并同步校验和。
+- **承载**：主进程在 ready 前把 `cangyanlu` 注册为标准安全协议，在分区 `persist:cangyanlu` 上只响应 `cangyanlu://app/`（GET/HEAD，其余 404/405），附独立 CSP（`default-src 'none'`，内联脚本与样式、标题字体、`data:`/`blob:` 图片，`connect-src 'none'`）。固定来源让 localStorage / IndexedDB 不随后端随机端口变化。分区权限只放行藏言录来源的 `clipboard-sanitized-write`、`fileSystem`、`persistent-storage`；请求白名单只认藏言录自身、Google Fonts 的标题字体子集与 `data:`/`blob:`。
+- **webview**：主窗口 `webviewTag: true`，`will-attach-webview` 只放行固定地址与分区并剥离预加载、强制沙箱与上下文隔离。guest 的外链交给系统浏览器；`window.open` 放行一个不显示的空壳并立即销毁，让页面拿到句柄而不误报“被拦截”。guest 内的 Alt+数字经 `before-input-event` → `cangyanlu:shortcut` → 预加载 `onCangyanluShortcut(cb)`（返回解绑函数）转回工作区切换视图。
+- **铺满**：`CangyanluController.createCangyanluController({ document, window, view, host, viewport, desktop, getPinned, observe })` → `enter` / `measure` / `reload` / `getFrame`。首次进入才创建 webview（分区先于地址写入）；高度 `--cyl-h` = 视口高 − 吸顶塔台（宽屏）或导航（窄屏）下沿 − main 底部留白，用 offsetTop 链计算以免受入场 transform 影响；进入时把视口滚到藏言录紧贴吸顶元素处，尺寸变化只重算高度。`#cangyanluHost[data-state]` = idle | loading | ready | error | unavailable，错误态提供“重新载入”。
+- **预算**：脚本 30/30，CSS ≈ 333.2 KB / 336 KiB，关键帧 20/20，backdrop-filter 10/10 均未新增滤镜或关键帧。

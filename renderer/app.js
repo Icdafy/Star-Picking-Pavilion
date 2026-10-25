@@ -10,6 +10,7 @@
      realtime-poller.js / update-pill.js / settings-view-controller.js
      store.js / view-registry.js              —— 状态层与视图查表调度（批 3）
      common-links-controller.js               —— 常用网址视图接线（批 4）
+     cangyanlu-controller.js                  —— 藏言录模块的 webview 挂载与铺满（v0.3.0）
    阶段 4：整卡模板迁为 index.html 的 <template id="cardTemplate">，
    渲染路径改走 feed-card.js 的 createCardRenderer + createFeedDiffList。 */
 
@@ -39,6 +40,7 @@ const SettingsViewController = window.SettingsViewController;
 const Store = window.Store;
 const ViewRegistry = window.ViewRegistry;
 const CommonLinksController = window.CommonLinksController;
+const CangyanluController = window.CangyanluController;
 const IntelRender = window.IntelRender;
 const HotViewController = window.HotViewController;
 const CapitalViewController = window.CapitalViewController;
@@ -657,6 +659,17 @@ const commonLinksController = CommonLinksController.createCommonLinksController(
 });
 const renderCommonLinks = commonLinksController.renderCommonLinks;
 
+// ---------- 藏言录（v0.3.0，renderer/cangyanlu-controller.js） ----------
+// 首次进入才挂载 webview；高度跟随视口、塔台与导航的尺寸变化重新铺满
+const cangyanluController = CangyanluController.createCangyanluController({
+  document, window, desktop: Desktop,
+  view: $('#viewPrompts'),
+  host: $('#cangyanluHost'),
+  viewport: $('#appViewport'),
+  getPinned: () => (window.matchMedia('(min-width: 70rem)').matches ? $('.tower') : $('.nav')),
+  observe: [$('.tower'), $('.nav')]
+});
+
 // ---------- 视图切换 ----------
 // 批 3：switchView 的 if-else 分发改为查表调度（renderer/view-registry.js）。
 // loadFeed 等依赖经 registryDeps 代理懒解析，注册表可以先于各控制器装配；
@@ -682,6 +695,7 @@ viewRegistry.registerView({ id: 'capital', tab: '#viewCapital', onEnter: () => c
 viewRegistry.registerView({ id: 'daily', tab: '#viewDaily', onEnter: () => registryDeps.loadDaily(state.dailyDate) });
 viewRegistry.registerView({ id: 'releases', tab: '#viewReleases', onEnter: () => releaseLog.load() });
 viewRegistry.registerView({ id: 'links', tab: '#viewLinks', onEnter: () => registryDeps.renderCommonLinks() });
+viewRegistry.registerView({ id: 'prompts', tab: '#viewPrompts', onEnter: () => cangyanluController.enter() });
 viewRegistry.registerView({ id: 'sources', tab: '#viewSources', onEnter: () => registryDeps.loadSources() });
 viewRegistry.registerView({ id: 'settings', tab: '#viewSettings', onEnter: () => { settingsViewController.enter(); registryDeps.loadSettings(); loadIndustryInfo(); auroraEngine?.refresh(); }, onLeave: () => settingsViewController.leave() });
 
@@ -809,6 +823,7 @@ const VIEW_ALIASES = {
   daily: ['qingbaoribao', 'qbrb', 'ribao', 'rb', 'daily', 'zhoubao', 'yuebao', '周报', '月报', 'qingbaorizhi', 'qbrz', '情报日报'],
   releases: ['gengxinrizhi', 'gxrz', 'release', 'releases', 'changelog', '版本', '更新'],
   links: ['changyongwangzhi', 'cywz', 'links', 'wangzhi', '网址导航'],
+  prompts: ['cangyanlu', 'cyl', 'prompts', 'prompt', 'tishici', 'tsc', '提示词', '提示词仓库'],
   sources: ['xinyuan', 'xy', 'sources', 'rss', '信源监控'],
   settings: ['shezhi', 'sz', 'settings', 'moxing', 'model', '模型', 'api', '密钥', 'deepseek']
 };
@@ -888,6 +903,13 @@ Shortcuts.createShortcuts({
   lexiconPanel: $('#lexiconPanel'), lexiconToggle: $('#btnLexicon'), setLexiconOpen,
   palette: commandPalette,
   getNavItems: keyboardNavItems
+});
+// 焦点在藏言录里时键盘事件到不了这个文档：主进程把 Alt+数字转发过来，切走后把焦点收回工作区
+Desktop?.onCangyanluShortcut?.(({ key }) => {
+  const view = Shortcuts.ALT_VIEWS['1234567890'.indexOf(key)];
+  if (!view) return;
+  switchView(view);
+  $('#appViewport').focus({ preventScroll: true });
 });
 
 // ---------- 滚动态：导航加重、回到顶部 ----------

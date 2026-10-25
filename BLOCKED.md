@@ -1,4 +1,10 @@
-# v0.2.46 当前状态
+# v0.3.0 当前状态
+
+暂无已确认的代码阻塞。侧栏更名为“工作区”、藏言录模块（随包原样附带，固定来源 `cangyanlu://app` 的独立分区 webview）已完成；本地单元、真实 Electron 全量与候选构建结果，以及 main CI、Release 与公开附件复核进展见[本版验证](docs/v030-validation.md)。
+
+---
+
+# v0.2.46 当前状态（历史）
 
 无发布阻塞。[v0.2.46](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.46)已于2026-10-24 18:38:22（北京时间）发布为最新正式版，六项公开附件重新下载核验全部通过。main CI与Release均首轮通过1246/1246单元、45/45桌面及安装卸载等全部门禁。
 

@@ -15,6 +15,7 @@ const {
   powerMonitor,
   nativeTheme,
   nativeImage,
+  protocol,
   screen
 } = require('electron');
 const crypto = require('node:crypto');
@@ -40,6 +41,7 @@ const { createDailyArchiveService } = require('./daily-archive');
 const { createDailyArchiveBundleRequester } = require('./daily-archive-request');
 const { registerDailyArchiveIpc } = require('./daily-archive-ipc');
 const { getWindowTheme } = require('./window-theme');
+const cangyanlu = require('./cangyanlu');
 const { refreshApplicationShortcuts } = require('./desktop-branding');
 const { registerDisplayRefreshRateIpc, watchDisplayRefreshRate } = require('./display-refresh-rate');
 const {
@@ -118,6 +120,8 @@ function getDataDir() {
 }
 
 app.commandLine.appendSwitch('disk-cache-size', String(CACHE_SOFT_LIMIT_BYTES));
+// 藏言录的固定来源必须在 ready 之前声明为标准安全协议，否则拿不到持久的 Web 存储。
+cangyanlu.registerCangyanluScheme(protocol);
 
 async function confirmLegacyDeletion(candidate) {
   const result = await dialog.showMessageBox({
@@ -367,7 +371,8 @@ async function createWindow(serverPort, initialTheme = 'dark') {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webviewTag: false,
+      // 只为藏言录模块开启：will-attach-webview 只放行固定地址与分区，其余一律拒绝挂载。
+      webviewTag: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
       preload: path.join(__dirname, 'preload.js')
@@ -414,6 +419,15 @@ async function createWindow(serverPort, initialTheme = 'dark') {
       event.preventDefault();
       if (isAllowedExternalUrl(url)) shell.openExternal(url);
     }
+  });
+  // 藏言录模块：只允许挂载固定地址的 webview；它打开的外链同样交给系统浏览器。
+  win.webContents.on('will-attach-webview', cangyanlu.guardCangyanluWebview);
+  win.webContents.on('did-attach-webview', (_event, guest) => {
+    cangyanlu.configureCangyanluGuest(guest, {
+      isAllowedExternalUrl,
+      openExternal: url => shell.openExternal(url),
+      onShortcut: shortcut => { if (!win.isDestroyed()) win.webContents.send('cangyanlu:shortcut', shortcut); }
+    });
   });
   let recoveringRenderer = false;
   win.webContents.on('render-process-gone', async (_event, details) => {
@@ -565,6 +579,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     () => storageMaintenance.prepareBeforeReady()
   );
   installPermissionPolicy();
+  cangyanlu.installCangyanluSession(session.fromPartition(cangyanlu.CANGYANLU_PARTITION));
   installApplicationMenu();
   setupAutoUpdate();
   await migrateUserData({

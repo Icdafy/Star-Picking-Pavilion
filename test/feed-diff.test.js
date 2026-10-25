@@ -73,7 +73,7 @@ function item(id, patch = {}) {
 
 // ---------- 模板与渲染器依赖护栏 ----------
 
-test('index.html 内置卡片模板且仅允许已审计的 29 个脚本边界', () => {
+test('index.html 内置卡片模板且仅允许已审计的 30 个脚本边界', () => {
   assert.match(pageHtml, /<template id="cardTemplate">/, '卡片模板必须落在 index.html');
   // v0.1.0.1 的第 26 个边界是独立、可审计的 DSH Aqua 图形引擎；
   // v0.2.0 的第 27 个是合并后的情报视图 intel-views.js（热点、一级市场与表示层）。
@@ -81,7 +81,8 @@ test('index.html 内置卡片模板且仅允许已审计的 29 个脚本边界',
   // v0.2.38 的第 28 个是极光引擎 aurora-engine.js：流体设计的融合渲染层，
   // 把涟漪、柔性反馈、果冻滑动、彗星追光与下拉压暗合并到同一个按需帧时钟。
   // v0.2.39 的第 29 个是流体云 fluid-cloud.js：采集、更新与提示汇入窗口顶部的实时胶囊。
-  assert.ok(scriptCount <= 29, `脚本标签已有 ${scriptCount} 个，上限 29 个`);
+  // v0.3.0 的第 30 个是藏言录模块 cangyanlu-controller.js：webview 挂载、铺满与重试。
+  assert.ok(scriptCount <= 30, `脚本标签已有 ${scriptCount} 个，上限 30 个`);
   const { template } = makeRenderer();
   const card = template.content.firstElementChild;
   assert.equal(card.tagName, 'article');

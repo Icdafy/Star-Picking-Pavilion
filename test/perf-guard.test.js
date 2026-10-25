@@ -53,8 +53,10 @@ test('index.html 脚本标签总数受控，Aqua 官方引擎保持单一独立�
   // 净增一个边界到 27。
   // v0.2.38 新增极光引擎 aurora-engine.js（流体设计的融合渲染层），净增一个边界到 28。
   // v0.2.39 新增流体云 fluid-cloud.js（窗口顶部的实时状态胶囊，可独立单测），净增一个边界到 29。
+  // v0.3.0 新增藏言录模块控制器 cangyanlu-controller.js（独立模块的 webview 挂载与铺满，可独立单测），
+  // 净增一个边界到 30。
   const scriptCount = [...html.matchAll(/<script\b/gi)].length;
-  assert.ok(scriptCount <= 29, `脚本标签已有 ${scriptCount} 个，上限 29 个`);
+  assert.ok(scriptCount <= 30, `脚本标签已有 ${scriptCount} 个，上限 30 个`);
 });
 
 test('样式表动画关键帧数量受控，动效不无限堆叠', () => {

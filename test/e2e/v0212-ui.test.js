@@ -10,7 +10,7 @@ const { launchNativeElectron } = require('./native-electron.cjs');
 const Schema = require('../../renderer/ui-preference-schema');
 const CommonLinks = require('../../renderer/common-links');
 const root = path.join(__dirname, '../..');
-const order = ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'sources', 'settings'];
+const order = ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'prompts', 'sources', 'settings'];
 
 test('v0212 native navigation, category cancellation, release history and settings chapter index', { timeout: 150_000 }, async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spp-v0212-ui-'));

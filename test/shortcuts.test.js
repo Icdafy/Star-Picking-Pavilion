@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { createShortcuts } = require('../renderer/shortcuts');
+const { createShortcuts, ALT_VIEWS } = require('../renderer/shortcuts');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'shortcuts.js'), 'utf8');
 
@@ -94,12 +94,17 @@ test('Esc 在词库面板关闭时清空并失焦检索框', () => {
   assert.equal(ev.defaultPrevented, true);
 });
 
-test('Alt+数字切换对应视图，Alt+T/R/K/C 各自动作', () => {
-  const tabs = [{ dataset: { view: 'featured' } }, { dataset: { view: 'all' } }];
+test('Alt+数字按原有十个视图切换（藏言录不占数字），Alt+T/R/K/C 各自动作', () => {
+  const order = ['hot', 'featured', 'all', 'starred', 'daily', 'capital', 'releases', 'links', 'prompts', 'sources', 'settings'];
+  const tabs = order.map(view => ({ dataset: { view } }));
   const { env, calls } = makeEnv({ tabs, state: { view: 'all' } });
   createShortcuts(env);
-  env.document.keydown({ key: '2', altKey: true });
-  assert.deepEqual(calls.switchView, [['all', undefined]]);
+  env.document.keydown({ key: '3', altKey: true });
+  env.document.keydown({ key: '9', altKey: true });
+  env.document.keydown({ key: '0', altKey: true });
+  assert.deepEqual(calls.switchView, [['all', undefined], ['sources', undefined], ['settings', undefined]]);
+  assert.deepEqual(ALT_VIEWS, order.filter(view => view !== 'prompts'));
+  calls.switchView.length = 0;
   env.document.keydown({ key: 't', altKey: true });
   assert.equal(calls.toggleTheme, 1);
   env.document.keydown({ key: 'r', altKey: true });
