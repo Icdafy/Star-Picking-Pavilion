@@ -2,7 +2,7 @@
 
 本文适用于 `Icdafy/Star-Picking-Pavilion`。发布流程通过受门禁保护的 tag 工作流执行。
 
-当前候选为 v0.3.0：侧栏“情报工作区”更名为“工作区”，并新增藏言录模块（随包原样附带、固定来源 `cangyanlu://app` 的独立分区 webview）。验证与发布进展见[本版验证](docs/v030-validation.md)。上一正式版为 [v0.2.46](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.46)，其完整门禁与六项公开附件复核结果见[历史验证](docs/v0246-validation.md)。
+当前正式版为 [v0.3.0](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.0)，于2026-10-25 18:25:22（北京时间）发布：侧栏“情报工作区”更名为“工作区”，新增藏言录模块（随包原样附带、固定来源 `cangyanlu://app` 的独立分区 webview）。首轮 tag 因新用例的帧率断言在无显卡运行器失败、未发布；修复后精确提交`a4afac7cfa8ad38a88c31e257d70c15ac60e1491`的main CI与Release全部门禁通过，六项公开附件重新下载核验通过；完整结果见[本版验证](docs/v030-validation.md)。上一正式版[v0.2.46](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.2.46)见[历史验证](docs/v0246-validation.md)。
 
 ## 发布前授权门槛
 

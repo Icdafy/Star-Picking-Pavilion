@@ -23,6 +23,23 @@
 - 生产与完整工具链依赖审计均为 0 漏洞（work/v030/audit-runtime.log、audit-toolchain.log）；第三方声明已更新为本版并新增 three.js r158；内置发布历史 75 条校验通过；`verify:version -- --tag v0.3.0` 通过。
 - 本地候选构建、包边界、七尺寸图标与带产物版本校验通过：1,315 个 ASAR 条目，ASAR 17,319,576 字节、安装器 102,521,802 字节（日志 work/v030/build.log、package.log）。ASAR 内的藏言录与原始单文件逐字节一致；以测试数据目录启动打包后的 exe，版本显示 v0.3.0、侧栏为“工作区”，藏言录在 `cangyanlu://app/` 正常载入。正式附件由 Release 工作流重新构建。
 
+## 远端门禁与公开发布
+
+修复提交 `a4afac7cfa8ad38a88c31e257d70c15ac60e1491` 的 main CI（运行 40183650514）与 Release（运行 40183657851）全部通过：单元与集成 1261/1261、真实 Electron 46/46（无显卡运行器上藏言录隐藏 1.5 秒为 0 帧）、生产与完整工具链依赖审计、第三方声明差异检查、构建、包边界、带产物版本校验、SBOM，以及一次性 Windows 运行器上的安装、启动、单实例、退出与卸载烟测。日志为 work/v030/main-ci-run2.log 与 release-run2.log；首轮失败日志为 main-ci-run1-failed.log 与 release-run1-failed.log。
+
+[v0.3.0](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.0)于2026-10-25 18:25:22（北京时间）发布，Release ID 423320615，非 draft、非 prerelease，已核对为最新正式版；远端注释 tag 解析到上述提交，正文与该提交的 RELEASE_NOTES.md 一致。六项附件下载到 work/v030/published-1/ 重新核验，GitHub 资产摘要全部匹配：
+
+| 附件 | 字节 |
+| --- | ---: |
+| Star-Picking-Pavilion-Setup-0.3.0.exe | 102,519,581 |
+| Star-Picking-Pavilion-Setup-0.3.0.exe.blockmap | 108,004 |
+| latest.yml | 371 |
+| SHA256SUMS.txt | 105 |
+| sbom.cdx.json | 81,884 |
+| THIRD_PARTY_NOTICES.txt | 7,528 |
+
+安装器PE产品及文件版本均为0.3.0，签名状态NotSigned，七尺寸图标一致，SHA-256 为 `b16c88fe330fcdf277193c10910e32c31e535863792022730407d6fb582e836d`；latest.yml版本、文件名、尺寸与SHA-512匹配实际安装器；blockmap 4919块覆盖完整文件；CycloneDX SBOM 47个组件含锁定的Electron 42.11.18；第三方声明换行归一化后与仓库一致。核验报告为work/v030/published-verification.json及published-release-state.json。未执行下载的安装器。
+
 ## 边界
 
 - 藏言录运行在独立分区，数据不进入情报库，也不在“存储治理”的缓存清理范围内；备份请用藏言录「管理 → 数据与备份」导出 JSON，或绑定本地文件同步。

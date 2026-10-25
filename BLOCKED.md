@@ -1,6 +1,6 @@
 # v0.3.0 当前状态
 
-暂无已确认的代码阻塞。侧栏更名为“工作区”、藏言录模块（随包原样附带，固定来源 `cangyanlu://app` 的独立分区 webview）已完成；本地单元、真实 Electron 全量与候选构建结果，以及 main CI、Release 与公开附件复核进展见[本版验证](docs/v030-validation.md)。
+无发布阻塞。[v0.3.0](https://github.com/Icdafy/Star-Picking-Pavilion/releases/tag/v0.3.0)已于2026-10-25 18:25:22（北京时间）发布为最新正式版，六项公开附件重新下载核验全部通过。首轮 tag 因本版新用例假定固定帧率（无显卡运行器只有每秒约 8 帧）在真实 Electron 步骤 45/46 失败、未发布任何附件；改为与帧率无关的断言后，精确提交`a4afac7cfa8ad38a88c31e257d70c15ac60e1491`的main CI与Release均通过1261/1261单元、46/46桌面及安装卸载等全部门禁。详见[本版验证](docs/v030-validation.md)。
 
 ---
 
